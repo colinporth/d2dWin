@@ -1,0 +1,108 @@
+// cTransportStreamPidBox.h
+#pragma once
+//{{{  includes
+#include "cD2dWindow.h"
+#include "../../shared/decoders/cTransportStream.h"
+//}}}
+
+class cTransportStreamBox : public cD2dWindow::cBox {
+public:
+  //{{{
+  cTransportStreamBox (cD2dWindow* window, float width, float height, cTransportStream* ts)
+      : cBox("tsPid", window, width, height), mTs(ts) {
+
+    mPin = true;
+
+    mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
+      DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+      mLineHeight, L"en-us",
+      &mTextFormat);
+    }
+  //}}}
+  //{{{
+  virtual ~cTransportStreamBox() {
+    mTextFormat->Release();
+    }
+  //}}}
+
+  //{{{
+  bool onDown (bool right, cPoint pos)  {
+    togglePin();
+    return true;
+    }
+  //}}}
+  //{{{
+  void onDraw (ID2D1DeviceContext* dc) {
+
+    // draw services
+    auto r = mRect;
+    auto serviceWidth = 0.f;
+
+    mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
+
+    int i = 1;
+    for (auto &service : mTs->mServiceMap) {
+      auto str = dec(i, mTs->mServiceMap.size() >= 10 ? 2:1) + " " + service.second.getNameString();
+      serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
+      r.top += mLineHeight;
+
+      auto vec = service.second.getNowVec();
+      for (auto epgItem : vec) {
+        str = "  - " + epgItem->getStartTimeString() + 
+              " " + epgItem->getDurationString() +
+              " " + epgItem->getTitleString();
+        serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
+        r.top += mLineHeight;
+        }
+
+      i++;
+      }
+
+    // draw pids
+    if (mTs->mPidInfoMap.size()) {
+      auto r = mRect + cRect (serviceWidth + mLineHeight,0, -mLineHeight,0);
+
+      auto maxPidPackets = 10000;
+      for (auto &pidInfo : mTs->mPidInfoMap)
+        maxPidPackets = max (maxPidPackets, pidInfo.second.mTotal);
+
+      for (auto &pidInfo : mTs->mPidInfoMap) {
+        auto str = (mContDigits ? dec (pidInfo.second.mDisContinuity,mContDigits) + ":" : "") +
+                   dec (pidInfo.second.mTotal,mPacketDigits) +
+                   " " + dec (pidInfo.first, 4) +
+                   " " + getFullPtsString (pidInfo.second.mPts) +
+                   " " + dec (pidInfo.second.mStreamType,2) +
+                   " " + pidInfo.second.mTypeStr;
+        auto width = drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight) + mLineHeight;
+
+        dc->FillRectangle (
+          cRect (r.left + width, r.top+4.f,
+                 r.left + width + (r.getWidth() - width)*pidInfo.second.mTotal/maxPidPackets, r.top+mLineHeight),
+          mWindow->getOrangeBrush());
+
+        drawText (dc, pidInfo.second.mInfoStr, mTextFormat,
+                  cRect (r.left + width, r.top, r.right, r.top+mLineHeight), mWindow->getWhiteBrush(), mLineHeight);
+        r.top += mLineHeight;
+
+        if (pidInfo.second.mTotal > pow (10, mPacketDigits))
+          mPacketDigits++;
+        }
+
+      if (mTs->getDiscontinuity() > pow (10, mContDigits))
+        mContDigits++;
+      }
+    }
+  //}}}
+
+private:
+  const float kDefaultLineHeight = 13.f;
+  const float kLargeLineHeight = 16.f;
+
+  float mLineHeight = kDefaultLineHeight;
+
+  cTransportStream* mTs;
+  IDWriteTextFormat* mTextFormat = nullptr;
+
+  int mContDigits = 0;
+  int mPacketDigits = 1;
+  };

@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="cD2dWindow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cPointRect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cView2d.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cLog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\date.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\date\tz.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\date\tz_private.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\format.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cJpegImage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="iImage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\iAudio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cWinAudio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="cD2dWindow.cpp" />
+    <ClCompile Include="..\..\shared\utils\cLog.cpp" />
+    <ClCompile Include="..\date\tz.cpp" />
+    <ClCompile Include="..\..\shared\utils\format.cpp" />
+    <ClCompile Include="cJpegImage.cpp" />
+    <ClCompile Include="..\..\shared\utils\cWinAudio.cpp" />
+  </ItemGroup>
+</Project>

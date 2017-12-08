@@ -1,0 +1,101 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="src\pipeline_decode.cpp" />
+    <ClCompile Include="src\sample_decode.cpp" />
+    <ClCompile Include="src\allocator.cpp" />
+    <ClCompile Include="src\avc_bitstream.cpp" />
+    <ClCompile Include="src\avc_nal_spl.cpp" />
+    <ClCompile Include="src\avc_spl.cpp" />
+    <ClCompile Include="src\d3d_allocator.cpp" />
+    <ClCompile Include="src\d3d_device.cpp" />
+    <ClCompile Include="src\d3d11_allocator.cpp" />
+    <ClCompile Include="src\d3d11_device.cpp" />
+    <ClCompile Include="src\decode_render.cpp" />
+    <ClCompile Include="src\mfx_buffering.cpp" />
+    <ClCompile Include="src\sample_utils.cpp" />
+    <ClCompile Include="src\thread.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="header">
+      <UniqueIdentifier>{e2bbebe9-9da2-491f-be8e-536fe1a53e89}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\pipeline_decode.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\abstract_splitter.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\allocator.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\avc_bitstream.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\avc_headers.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\avc_nal_spl.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\avc_spl.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\avc_structures.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\d3d_allocator.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\d3d_device.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\d3d11_allocator.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\d3d11_device.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\decode_render.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\file_defs.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\hw_device.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mfx_buffering.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mfx_samples_config.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sample_defs.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sample_types.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sample_utils.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\strings_defs.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\thread_defs.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\time_defs.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\time_statistics.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\version.h">
+      <Filter>header</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

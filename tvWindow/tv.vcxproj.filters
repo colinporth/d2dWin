@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="tvWindow.cpp" />
+    <ClCompile Include="stdafx.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\shared\utils\utils.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cBoxes.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cVidFrame.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cAudFrame.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cWinAudio.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cD2dWindow.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cWindowBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cLogBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cTitleBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\cTransportStream.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cTransportStreamBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\huffman.h">
+      <Filter>header</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="header">
+      <UniqueIdentifier>{c3e8b688-223d-4215-bc72-289b623c322f}</UniqueIdentifier>
+      <Extensions>.h</Extensions>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,19 @@
+limit loads to lat lon
+- enforce it to edges not centre
+
+Overview map as bit map or mem array before bitmap
+- need range early on to form size
+
+crashes
+
+cross fade between maps
+- possible key of os over aerial
+
+better key than quadKey ?, 64 bit, 8 bytes, 15 * 2 bits for os, 18*2 for aerial
+
+area load
+
+useload scale to size down
+- /2 /4 /8 rather 10,11,12,13,14,15 only 15,14,10 needed
+
+zoom about pos

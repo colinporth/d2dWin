@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "monitor", "monitor.vcproj", "{09515903-937C-43E0-BD0E-7446DD246C46}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|Windows Mobile 6 Professional SDK (ARMV4I) = Debug|Windows Mobile 6 Professional SDK (ARMV4I)
+		Release|Win32 = Release|Win32
+		Release|Windows Mobile 6 Professional SDK (ARMV4I) = Release|Windows Mobile 6 Professional SDK (ARMV4I)
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Debug|Win32.ActiveCfg = Debug|Win32
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Debug|Win32.Build.0 = Debug|Win32
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Debug|Windows Mobile 6 Professional SDK (ARMV4I).ActiveCfg = Debug|Windows Mobile 6 Professional SDK (ARMV4I)
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Debug|Windows Mobile 6 Professional SDK (ARMV4I).Build.0 = Debug|Windows Mobile 6 Professional SDK (ARMV4I)
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Debug|Windows Mobile 6 Professional SDK (ARMV4I).Deploy.0 = Debug|Windows Mobile 6 Professional SDK (ARMV4I)
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Release|Win32.ActiveCfg = Release|Win32
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Release|Win32.Build.0 = Release|Win32
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Release|Windows Mobile 6 Professional SDK (ARMV4I).ActiveCfg = Release|Windows Mobile 6 Professional SDK (ARMV4I)
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Release|Windows Mobile 6 Professional SDK (ARMV4I).Build.0 = Release|Windows Mobile 6 Professional SDK (ARMV4I)
+		{09515903-937C-43E0-BD0E-7446DD246C46}.Release|Windows Mobile 6 Professional SDK (ARMV4I).Deploy.0 = Release|Windows Mobile 6 Professional SDK (ARMV4I)
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,47 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="tvGrabWindow.cpp" />
+    <ClCompile Include="stdafx.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\shared\decoders\cTransportStream.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cBda.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\utils.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cD2dWindow.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cLog.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\timer.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cBipBuffer.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cTransportStreamBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cLogBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\huffman.h">
+      <Filter>header</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="header">
+      <UniqueIdentifier>{386be96a-4f36-4d65-9a45-9bbf3a500adc}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="html\Extensions.cpp" />
+    <ClCompile Include="htmlcxx.cpp" />
+    <ClCompile Include="html\Node.cpp" />
+    <ClCompile Include="html\ParserDom.cpp" />
+    <ClCompile Include="html\ParserSax.cpp" />
+    <ClCompile Include="html\Uri.cpp" />
+    <ClCompile Include="html\utils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="html\wincstring.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\ci_string.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\Extensions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\Node.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\ParserSax.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\tld.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\tree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\Uri.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="html\ParserSaxInc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
