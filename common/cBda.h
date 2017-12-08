@@ -1,6 +1,7 @@
 // cBda.h
-#pragma once
 //{{{  includes
+#pragma once
+
 #include <initguid.h>
 #include <DShow.h>
 #include <bdaiface.h>
@@ -31,6 +32,7 @@ EXTERN_C const CLSID CLSID_SampleGrabber;
 
 DEFINE_GUID (CLSID_DVBTLocator, 0x9CD64701, 0xBDF3, 0x4d14, 0x8E,0x03, 0xF1,0x29,0x83,0xD8,0x66,0x64);
 DEFINE_GUID (CLSID_BDAtif, 0xFC772ab0, 0x0c7f, 0x11d3, 0x8F,0xf2, 0x00,0xa0,0xc9,0x22,0x4c,0xf4);
+DEFINE_GUID (CLSID_Dump, 0x36a5f770, 0xfe4c, 0x11ce, 0xa8, 0xed, 0x00, 0xaa, 0x00, 0x2f, 0xea, 0xb5);
 
 #pragma comment (lib,"strmiids")
 
@@ -261,29 +263,15 @@ private:
   };
 //}}}
 //{{{
-class cSampleGrabberCB : public ISampleGrabberCB {
+class cGrabberCB : public ISampleGrabberCB {
 public:
-  cSampleGrabberCB() {}
-  virtual ~cSampleGrabberCB() {}
+  cGrabberCB() {}
+  virtual ~cGrabberCB() {}
 
-  //{{{
-  void allocateBuffer (int bufSize) {
-    mBipBuffer.allocateBuffer (bufSize);
-    }
-  //}}}
+  void allocateBuffer (int bufSize) { mBipBuffer.allocateBuffer (bufSize); }
 
-  //{{{
-  uint8_t* getContiguousBlock (int& len) {
-
-    return mBipBuffer.getContiguousBlock (len);
-    }
-  //}}}
-  //{{{
-  void decommitBlock (int len) {
-
-    mBipBuffer.decommitBlock (len);
-    }
-  //}}}
+  uint8_t* getContiguousBlock (int& len) { return mBipBuffer.getContiguousBlock (len); }
+  void decommitBlock (int len) { mBipBuffer.decommitBlock (len); }
 
 private:
   // ISampleGrabberCB methods
@@ -331,79 +319,44 @@ private:
 
 class cBda {
 public:
-  cBda (int bufSize)  { mSampleGrabberCB.allocateBuffer (bufSize); }
-  ~cBda() {}
+ cBda::cBda() {}
+ cBda::~cBda() {}
+
   //{{{
-  bool createGraph (int frequency) {
+  void createGraph (int frequency)  {
 
-    CoCreateInstance (CLSID_FilterGraph, nullptr,
-                      CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mGraphBuilder.GetAddressOf()));
+    createGraphDvbT (frequency);
 
-    ComPtr<IBaseFilter> dvbtNetworkProvider;
-    CoCreateInstance (CLSID_DVBTNetworkProvider, nullptr,
-                      CLSCTX_INPROC_SERVER, IID_PPV_ARGS (dvbtNetworkProvider.GetAddressOf()));
-    mGraphBuilder->AddFilter (dvbtNetworkProvider.Get(), L"dvbtNetworkProvider");
+    createFilter (mGrabberFilter, CLSID_SampleGrabber, L"grabber", mDvbCapture);
+    mGrabberFilter.As (&mGrabber);
+    mGrabber->SetOneShot (false);
+    mGrabber->SetBufferSamples (true);
 
-    // scanningTuner interface from dvbtNetworkProvider
-    dvbtNetworkProvider.As (&mScanningTuner);
+    mGrabberCB.allocateBuffer (128*240*188);
+    mGrabber->SetCallback (&mGrabberCB, 0);
 
-    ComPtr<ITuningSpace> tuningSpace;
-    mScanningTuner->get_TuningSpace (tuningSpace.GetAddressOf());
+    createFilter (mMpeg2Demux, CLSID_MPEG2Demultiplexer, L"MPEG2demux", mGrabberFilter);
+    createFilter (mBdaTif, CLSID_BDAtif, L"BDAtif", mMpeg2Demux);
 
-    // setup dvbTuningSpace2 interface
-    ComPtr<IDVBTuningSpace2> dvbTuningSpace2;
-    tuningSpace.As (&dvbTuningSpace2);
-    dvbTuningSpace2->put__NetworkType (CLSID_DVBTNetworkProvider);
-    dvbTuningSpace2->put_SystemType (DVB_Terrestrial);
-    dvbTuningSpace2->put_NetworkID (9018);
-    dvbTuningSpace2->put_FrequencyMapping (L"");
-    dvbTuningSpace2->put_UniqueName (L"DTV DVB-T");
-    dvbTuningSpace2->put_FriendlyName (L"DTV DVB-T");
+    runGraph();
+    }
+  //}}}
+  //{{{
+  void createGraph (int frequency, const string& fileName) {
 
-    // create dvbtLocator and setup in dvbTuningSpace2 interface
-    ComPtr<IDVBTLocator> dvbtLocator;
-    CoCreateInstance (CLSID_DVBTLocator, nullptr,
-                      CLSCTX_INPROC_SERVER, IID_PPV_ARGS (dvbtLocator.GetAddressOf()));
-    dvbtLocator->put_CarrierFrequency (frequency);
-    dvbtLocator->put_Bandwidth (8);
-    dvbTuningSpace2->put_DefaultLocator (dvbtLocator.Get());
+    createGraphDvbT (frequency);
 
-    // tuneRequest from scanningTuner
-    ComPtr<ITuneRequest> tuneRequest;
-    HRESULT hr = mScanningTuner->get_TuneRequest (tuneRequest.GetAddressOf());
-    if (hr != S_OK)
-      hr = tuningSpace->CreateTuneRequest (tuneRequest.GetAddressOf());
+    createFilter (mInfTeeFilter, CLSID_InfTee, L"infTee", mDvbCapture);
 
-    tuneRequest->put_Locator (dvbtLocator.Get());
-    mScanningTuner->Validate (tuneRequest.Get());
-    mScanningTuner->put_TuneRequest (tuneRequest.Get());
+    auto wstr = wstring (fileName.begin(), fileName.end());
+    createFilter (mDumpFilter, CLSID_Dump, L"dump", mInfTeeFilter);
+    mDumpFilter.As (&mFileSinkFilter);
+    mFileSinkFilter->SetFileName (wstr.c_str(), nullptr);
 
-    // dvbtNetworkProvider -> dvbtTuner -> dvbtCapture -> sampleGrabberFilter -> mpeg2Demux -> bdaTif
-    ComPtr<IBaseFilter> dvbtTuner  =
-      findFilter (mGraphBuilder, KSCATEGORY_BDA_NETWORK_TUNER, L"DVBTtuner", dvbtNetworkProvider);
-    if (!dvbtTuner)
-      return false;
+    createFilter (mMpeg2Demux, CLSID_MPEG2Demultiplexer, L"MPEG2demux", mInfTeeFilter);
+    createFilter (mBdaTif, CLSID_BDAtif, L"BDAtif", mMpeg2Demux);
 
-    ComPtr<IBaseFilter> dvbtCapture =
-      findFilter (mGraphBuilder, KSCATEGORY_BDA_RECEIVER_COMPONENT, L"DVBTcapture", dvbtTuner);
-
-    ComPtr<IBaseFilter> sampleGrabberFilter =
-      createFilter (mGraphBuilder, CLSID_SampleGrabber, L"grabber", dvbtCapture);
-    ComPtr<ISampleGrabber> sampleGrabber;
-    sampleGrabberFilter.As (&sampleGrabber);
-    sampleGrabber->SetOneShot (false);
-    sampleGrabber->SetBufferSamples (true);
-    sampleGrabber->SetCallback (&mSampleGrabberCB, 0);
-
-    ComPtr<IBaseFilter> mpeg2Demux =
-      createFilter (mGraphBuilder, CLSID_MPEG2Demultiplexer, L"MPEG2demux", sampleGrabberFilter);
-    ComPtr<IBaseFilter> bdaTif =
-      createFilter (mGraphBuilder, CLSID_BDAtif, L"BDAtif", mpeg2Demux);
-
-    ComPtr<IMediaControl> mediaControl;
-    mGraphBuilder.As (&mediaControl);
-    mediaControl->Run();
-    return true;
+    runGraph();
     }
   //}}}
 
@@ -419,28 +372,25 @@ public:
     return mSignalStrength;
     }
   //}}}
+
   //{{{
   uint8_t* getContiguousBlock (int& len) {
 
-    return mSampleGrabberCB.getContiguousBlock (len);
+    return mGrabberCB.getContiguousBlock (len);
     }
   //}}}
-
   //{{{
   void decommitBlock (int len) {
-    mSampleGrabberCB.decommitBlock (len);
-    getSignalStrength();
+    mGrabberCB.decommitBlock (len);
     }
   //}}}
-
-  float mSignalStrength = 0;
 
 private:
   //{{{
-  bool connectPins (ComPtr<IGraphBuilder> graphBuilder,
-                     ComPtr<IBaseFilter> fromFilter, ComPtr<IBaseFilter> toFilter,
-                     wchar_t* fromPinName = NULL, wchar_t* toPinName = NULL) {
-  // connect pins, if name == NULL use first correct direction unconnected pin, else use pin matching name
+  bool connectPins (ComPtr<IBaseFilter> fromFilter, ComPtr<IBaseFilter> toFilter,
+                    wchar_t* fromPinName = NULL, wchar_t* toPinName = NULL) {
+  // if name == NULL use first correct direction unconnected pin
+  // else use pin matching name
 
     ComPtr<IEnumPins> fromPins;
     fromFilter->EnumPins (&fromPins);
@@ -453,7 +403,8 @@ private:
         // match fromPin info
         PIN_INFO fromPinInfo;
         fromPin->QueryPinInfo (&fromPinInfo);
-        if ((fromPinInfo.dir == PINDIR_OUTPUT) && (!fromPinName || !wcscmp (fromPinInfo.achName, fromPinName))) {
+        if ((fromPinInfo.dir == PINDIR_OUTPUT) &&
+            (!fromPinName || !wcscmp (fromPinInfo.achName, fromPinName))) {
           // found fromPin, look for toPin
           ComPtr<IEnumPins> toPins;
           toFilter->EnumPins (&toPins);
@@ -466,14 +417,16 @@ private:
               // match toPin info
               PIN_INFO toPinInfo;
               toPin->QueryPinInfo (&toPinInfo);
-              if ((toPinInfo.dir == PINDIR_INPUT) && (!toPinName || !wcscmp (toPinInfo.achName, toPinName))) {
+              if ((toPinInfo.dir == PINDIR_INPUT) &&
+                  (!toPinName || !wcscmp (toPinInfo.achName, toPinName))) {
                 // found toPin
-                if (graphBuilder->Connect(fromPin.Get(), toPin.Get()) == S_OK) {
-                  wprintf(L"- connecting pin %s to %s\n", fromPinInfo.achName, toPinInfo.achName);
+                if (mGraphBuilder->Connect (fromPin.Get(), toPin.Get()) == S_OK) {
+                  cLog::log (LOGINFO, "- connecting pin " + wstrToStr (fromPinInfo.achName) +
+                                      " to " + wstrToStr (toPinInfo.achName));
                   return true;
                   }
                 else {
-                  printf ("- connectPins failed");
+                  cLog::log (LOGINFO, "- connectPins failed");
                   return false;
                   }
                 }
@@ -490,11 +443,10 @@ private:
     }
   //}}}
   //{{{
-  ComPtr<IBaseFilter> findFilter (ComPtr<IGraphBuilder> graphBuilder, const CLSID& clsid, wchar_t* name,
-                                         ComPtr<IBaseFilter> fromFilter) {
+  void findFilter (ComPtr<IBaseFilter>& filter, const CLSID& clsid, wchar_t* name, ComPtr<IBaseFilter> fromFilter) {
   // Find instance of filter of type CLSID by name, add to graphBuilder, connect fromFilter
 
-    ComPtr<IBaseFilter> filter;
+    cLog::log (LOGINFO, "findFilter " + wstrToStr (name));
 
     ComPtr<ICreateDevEnum> systemDevEnum;
     CoCreateInstance (CLSID_SystemDeviceEnum, nullptr,
@@ -515,20 +467,20 @@ private:
           propertyBag->Read (L"FriendlyName", &varName, 0);
           VariantClear (&varName);
 
-          wprintf (L"FindFilter - %s\n", varName.bstrVal);
+          cLog::log (LOGINFO, "FindFilter " + wstrToStr (varName.bstrVal));
 
           // bind the filter
           moniker->BindToObject (NULL, NULL, IID_IBaseFilter, (void**)(&filter));
 
-          graphBuilder->AddFilter (filter.Get(), name);
+          mGraphBuilder->AddFilter (filter.Get(), name);
           propertyBag->Release();
 
-          if (connectPins (graphBuilder, fromFilter, filter)) {
+          if (connectPins (fromFilter, filter)) {
             propertyBag->Release();
             break;
             }
           else
-            graphBuilder->RemoveFilter (filter.Get());
+            mGraphBuilder->RemoveFilter (filter.Get());
           }
         propertyBag->Release();
         moniker->Release();
@@ -536,29 +488,97 @@ private:
 
       moniker->Release();
       }
-    return filter;
     }
   //}}}
   //{{{
-  ComPtr<IBaseFilter> createFilter (ComPtr<IGraphBuilder> graphBuilder, const CLSID& clsid,
-                                    wchar_t* title, ComPtr<IBaseFilter> fromFilter) {
-  // createFilter of type clsid, add to graphBuilder, connect fromFilter
+  void createFilter (ComPtr<IBaseFilter>& filter, const CLSID& clsid, wchar_t* title, ComPtr<IBaseFilter> fromFilter) {
+  // createFilter type clsid, add to graphBuilder, connect fromFilter
 
-    ComPtr<IBaseFilter> filter;
-    CoCreateInstance (clsid, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS (&filter));
-
-    graphBuilder->AddFilter (filter.Get(), title);
-    connectPins (graphBuilder, fromFilter, filter);
-
-    wprintf (L"CreateFilter %s\n", title);
-
-    return filter;
+    cLog::log (LOGINFO, "createFilter " + wstrToStr (title));
+    CoCreateInstance (clsid, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS (filter.GetAddressOf()));
+    mGraphBuilder->AddFilter (filter.Get(), title);
+    connectPins (fromFilter, filter);
     }
   //}}}
 
-  // vars
-  ComPtr<IGraphBuilder> mGraphBuilder;
-  ComPtr<IScanningTuner> mScanningTuner;
+  //{{{
+  void createGraphDvbT (int frequency) {
 
-  cSampleGrabberCB mSampleGrabberCB;
+    CoCreateInstance (CLSID_FilterGraph, nullptr,
+                      CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mGraphBuilder.GetAddressOf()));
+
+    CoCreateInstance (CLSID_DVBTNetworkProvider, nullptr,
+                      CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mDvbNetworkProvider.GetAddressOf()));
+    mGraphBuilder->AddFilter (mDvbNetworkProvider.Get(), L"dvbtNetworkProvider");
+    mDvbNetworkProvider.As (&mScanningTuner);
+
+    mScanningTuner->get_TuningSpace (mTuningSpace.GetAddressOf());
+
+    // setup dvbTuningSpace2 interface
+    mTuningSpace.As (&mDvbTuningSpace2);
+    mDvbTuningSpace2->put__NetworkType (CLSID_DVBTNetworkProvider);
+    mDvbTuningSpace2->put_SystemType (DVB_Terrestrial);
+    mDvbTuningSpace2->put_NetworkID (9018);
+    mDvbTuningSpace2->put_FrequencyMapping (L"");
+    mDvbTuningSpace2->put_UniqueName (L"DTV DVB-T");
+    mDvbTuningSpace2->put_FriendlyName (L"DTV DVB-T");
+
+    // create dvbtLocator and setup in dvbTuningSpace2 interface
+    CoCreateInstance (CLSID_DVBTLocator, nullptr,
+                      CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mDvbLocator.GetAddressOf()));
+    mDvbLocator->put_CarrierFrequency (frequency);
+    mDvbLocator->put_Bandwidth (8);
+    mDvbTuningSpace2->put_DefaultLocator (mDvbLocator.Get());
+
+    // tuneRequest from scanningTuner
+    if (mScanningTuner->get_TuneRequest (mTuneRequest.GetAddressOf()) != S_OK)
+      mTuningSpace->CreateTuneRequest (mTuneRequest.GetAddressOf());
+    mTuneRequest->put_Locator (mDvbLocator.Get());
+    mScanningTuner->Validate (mTuneRequest.Get());
+    mScanningTuner->put_TuneRequest (mTuneRequest.Get());
+
+    // dvbtNetworkProvider -> dvbtTuner -> dvbtCapture -> sampleGrabberFilter -> mpeg2Demux -> bdaTif
+    findFilter (mDvbTuner, KSCATEGORY_BDA_NETWORK_TUNER, L"DVBTtuner", mDvbNetworkProvider);
+    if (!mDvbTuner) {
+      cLog::log (LOGERROR, " createGraph - unable to find dvbtuner filter");
+      return;
+      }
+
+    findFilter (mDvbCapture, KSCATEGORY_BDA_RECEIVER_COMPONENT, L"DVBTcapture", mDvbTuner);
+    }
+  //}}}
+  //{{{
+  void runGraph() {
+    mGraphBuilder.As (&mMediaControl);
+    mMediaControl->Run();
+    }
+  //}}}
+
+  ComPtr<IGraphBuilder> mGraphBuilder;
+
+  ComPtr<IBaseFilter> mDvbNetworkProvider;
+  ComPtr<IBaseFilter> mDvbTuner;
+  ComPtr<IBaseFilter> mDvbCapture;
+
+  ComPtr<IDVBTLocator> mDvbLocator;
+  ComPtr<IScanningTuner> mScanningTuner;
+  ComPtr<ITuningSpace> mTuningSpace;
+  ComPtr<IDVBTuningSpace2> mDvbTuningSpace2;
+  ComPtr<ITuneRequest> mTuneRequest;
+
+  ComPtr<IBaseFilter> mMpeg2Demux;
+  ComPtr<IBaseFilter> mBdaTif;
+
+  ComPtr<IBaseFilter> mGrabberFilter;
+  ComPtr<ISampleGrabber> mGrabber;
+  cGrabberCB mGrabberCB;
+
+  ComPtr<IBaseFilter> mInfTeeFilter;
+
+  ComPtr<IBaseFilter> mDumpFilter;
+  ComPtr<IFileSinkFilter> mFileSinkFilter;
+
+  ComPtr<IMediaControl> mMediaControl;
+
+  float mSignalStrength = 0;
   };
