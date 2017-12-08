@@ -73,13 +73,13 @@ public:
     addBox (new cFramesDebugBox (this, 0.f,120.f), 0.f,kTextHeight);
     addBox (new cTransportStreamBox (this, 0,-200.f, mAnalTs));
 
-    HANDLE file = 0;
-    int frequency = param.empty() ? 674 : atoi(param.c_str());
+    int frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
-      mFileName = "C:/videos/tunes.ts";
-      file = CreateFile (mFileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
-      auto bda = new cBda();
-      thread ([=]() { bdaThread (bda, frequency*1000, file); }).detach();
+      mFileName = "C:/videos/tune.ts";
+      mBda = new cBda();
+      thread ([=]() { bdaThread (mBda, frequency*1000, mFileName); }).detach();
+      // wait for file create
+      Sleep (2000);
       }
     else
       mFileName = param;
@@ -1176,31 +1176,19 @@ private:
   //}}}
 
   //{{{
-  void bdaThread (cBda* bda, int frequency, HANDLE file) {
+  void bdaThread (cBda* bda, int frequency, const string& fileName) {
+  //
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "bdaThread - start");
+    cLog::log (LOGNOTICE, "bdaDumpThread - start");
 
-    bda->createGraph (frequency);
+    bda->createGraph (frequency, fileName);
 
-    int64_t streamPos = 0;
-    auto blockSize = 0;
     while (true) {
-      auto ptr = bda->getContiguousBlock (blockSize);
-      if (blockSize) {
-        DWORD numBytesUsed;
-        WriteFile (file, ptr, blockSize, &numBytesUsed, NULL);
-        if (numBytesUsed != blockSize)
-          cLog::log (LOGERROR, "WriteFile only used " + dec(numBytesUsed) + " of " + dec(blockSize));
-        if (blockSize != 240*188)
-          cLog::log (LOGINFO, "blockSize " + dec(blockSize));
-        bda->decommitBlock (blockSize);
-        }
-      else
-        Sleep (4);
+      Sleep (100);
       }
 
-    cLog::log (LOGNOTICE, "bdaThread - exit");
+    cLog::log (LOGNOTICE, "bdaDumpThread - exit");
     CoUninitialize();
     }
   //}}}
@@ -1511,6 +1499,7 @@ private:
 
   //{{{  vars
   string mFileName;
+  cBda* mBda = nullptr;
 
   ePlaying mPlaying = ePlay;
   int64_t mPlayPts = 0;

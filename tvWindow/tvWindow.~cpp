@@ -3,17 +3,21 @@
 #include "stdafx.h"
 
 #include <stdio.h>
-#include "../common/cFloatBox.h"
-#include "../common/cValueBox.h"
-#include "../common/cLogBox.h"
-#include "../common/cWindowBox.h"
-#include "../common/cVolumeBox.h"
 
 #include "../../shared/utils/cWinAudio.h"
 #include "../../shared/decoders/cTransportStream.h"
 
+#include "../common/cBda.h"
 #include "../common/cVidFrame.h"
 #include "../common/cAudFrame.h"
+
+#include "../common/cTransportStreamBox.h"
+#include "../common/cToggleBox.h"
+#include "../common/cFloatBox.h"
+#include "../common/cValueBox.h"
+#include "../common/cLogBox.h"
+#include "../common/cWindowBox.h"
+#include "../common/cAudFrameBox.h"
 
 extern "C" {
   #include <libavcodec/avcodec.h>
@@ -27,7 +31,7 @@ extern "C" {
 #ifdef _DEBUG
   #pragma comment (lib,"libmfx_vs2015_d.lib")
 #else
-  #pragma comment (lib,"libmfx_vs2015.lib")
+  #pragma comment (lib,"libmfx.lib")
 #endif
 
 #pragma comment (lib,"dxgi.lib")
@@ -35,580 +39,64 @@ extern "C" {
 using namespace concurrency;
 //}}}
 //{{{  const
-const bool kRgba = false;
-const bool kDebugVidDumpPes = false;
-
 const int kAudMaxFrames = 120; // just over 2secs
 const int kVidMaxFrames = 100; // 4secs
 
+const int kAudSamplesPerAacFrame = 1152;
+const int kAudSamplesPerUnknownFrame = 1024;
+
 // drawFrames layout const
-const float kFrameWidth = 20.f;
+const float kPixPerPts = 38.f / 3600.f;
 const float kDrawFramesCentreY = 40.f;
 const float kIndexHeight = 13.f;
-const float kGap = 1.f;
-//}}}
-const bool kMfxD3d11 = true;
-const bool kVideoMemory = true;
-const int kAudOutChannels = 6;  // 2
-//const bool kMfxD3d11 = false;
-//const bool kVideoMemory = false;
-//{{{  mfx
-// defines
-#define MSDK_PRINT_RET_MSG(ERR)      { printErrString(ERR, __FILE__, __LINE__); }
-#define MSDK_CHECK_RESULT(P, X, ERR) { if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return ERR;} }
-#define MSDK_ALIGN32(X)              (((mfxU32)((X)+31)) & (~ (mfxU32)31))
-#define MSDK_ALIGN16(value)          (((value + 15) >> 4) << 4)
-#define WILL_READ  0x1000
-#define WILL_WRITE 0x2000
 
-// types
-typedef struct {
-  mfxMemId memId;
-  mfxMemId memIdStage;
-  mfxU16 rw;
-  } tCustomMemId;
+#define MSDK_ALIGN16(value)  (((value + 15) >> 4) << 4)
+#define MSDK_ALIGN32(X)      (((mfxU32)((X)+31)) & (~ (mfxU32)31))
 
-// vars
-ComPtr<IDXGIAdapter>        gAdapter;
-ComPtr<ID3D11Device>        gD3D11Device;
-ComPtr<ID3D11DeviceContext> gD3D11Context;
-
-std::map<mfxHDL, int> allocDecodeRefCount;
-std::map<mfxMemId*, mfxHDL> allocResponses;
-std::map<mfxHDL, mfxFrameAllocResponse> allocDecodeResponses;
-
-//{{{
-void printErrString (int err, const char* filestr, int line) {
-
-  switch (err) {
-    //{{{
-    case   0:
-      printf("\n No error.\n");
-      break;
-    //}}}
-    //{{{
-    case  -1:
-      printf("\n Unknown error: %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case  -2:
-      printf("\n Null pointer.  Check fileName/path + permissions? %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case  -3:
-      printf("\n Unsupported feature/library load error. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case  -4:
-      printf("\n Could not allocate memory. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case  -5:
-      printf("\n Insufficient IO buffers. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case  -6:
-      printf("\n Invalid handle. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case  -7:
-      printf("\n Memory lock failure. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case  -8:
-      printf("\n Function called before initialization. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case  -9:
-      printf("\n Specified object not found. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -10:
-      printf("\n More input data expected. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -11:
-      printf("\n More output surfaces expected. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -12:
-      printf("\n Operation aborted. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -13:
-      printf("\n HW device lost. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -14:
-      printf("\n Incompatible video parameters. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -15:
-      printf("\n Invalid video parameters. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -16:
-      printf("\n Undefined behavior. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -17:
-      printf("\n Device operation failure. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -18:
-      printf("\n More bitstream data expected. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -19:
-      printf("\n Incompatible audio parameters. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    case -20:
-      printf("\n Invalid audio parameters. %s %d\n",filestr,line);
-      break;
-    //}}}
-    //{{{
-    default:
-      printf("\nError code %d,\t%s\t%d\n\n", err, filestr, line);
-    //}}}
-    }
-  }
-//}}}
-
-//{{{
-mfxStatus _simple_alloc (mfxFrameAllocRequest* request, mfxFrameAllocResponse* response) {
-
-  cLog::log (LOGINFO, "simple_alloc surfaces:" + dec (request->NumFrameSuggested));
-
-  DXGI_FORMAT format;
-  if (MFX_FOURCC_NV12 == request->Info.FourCC)
-    format = DXGI_FORMAT_NV12;
-  else if (MFX_FOURCC_RGB4 == request->Info.FourCC)
-    format = DXGI_FORMAT_B8G8R8A8_UNORM;
-  else if (MFX_FOURCC_YUY2== request->Info.FourCC)
-    format = DXGI_FORMAT_YUY2;
-  else if (MFX_FOURCC_P8 == request->Info.FourCC ) //|| MFX_FOURCC_P8_TEXTURE == request->Info.FourCC
-    format = DXGI_FORMAT_P8;
-  else
-    format = DXGI_FORMAT_UNKNOWN;
-  if (DXGI_FORMAT_UNKNOWN == format)
-    return MFX_ERR_UNSUPPORTED;
-
-  // Allocate custom container to keep texture and stage buffers for each surface
-  // Container also stores the intended read and/or write operation.
-  tCustomMemId** mids = (tCustomMemId**)calloc (request->NumFrameSuggested, sizeof(tCustomMemId*));
-  for (int i = 0; i < request->NumFrameSuggested; i++) {
-    mids[i] = (tCustomMemId*)calloc (1, sizeof(tCustomMemId));
-    mids[i]->rw = request->Type & 0xF000; // Set intended read/write operation
-    }
-  request->Type = request->Type & 0x0FFF;
-
-  // because P8 data (bitstream) for h264 encoder should be allocated by CreateBuffer()
-  // but P8 data (MBData) for MPEG2 encoder should be allocated by CreateTexture2D()
-  if (request->Info.FourCC == MFX_FOURCC_P8) {
-    D3D11_BUFFER_DESC desc = { 0 };
-    if (!request->NumFrameSuggested)
-      return MFX_ERR_MEMORY_ALLOC;
-    desc.ByteWidth           = request->Info.Width * request->Info.Height;
-    desc.Usage               = D3D11_USAGE_STAGING;
-    desc.BindFlags           = 0;
-    desc.CPUAccessFlags      = D3D11_CPU_ACCESS_READ;
-    desc.MiscFlags           = 0;
-    desc.StructureByteStride = 0;
-
-    ID3D11Buffer* buffer = 0;
-    if (FAILED (gD3D11Device->CreateBuffer (&desc, 0, &buffer)))
-      return MFX_ERR_MEMORY_ALLOC;
-
-    mids[0]->memId = reinterpret_cast<ID3D11Texture2D*>(buffer);
-    }
-
-  else {
-    D3D11_TEXTURE2D_DESC desc = {0};
-    desc.Width            = request->Info.Width;
-    desc.Height           = request->Info.Height;
-    desc.MipLevels        = 1;
-    desc.ArraySize        = 1; // number of subresources is 1 in this case
-    desc.Format           = format;
-    desc.SampleDesc.Count = 1;
-    desc.Usage            = D3D11_USAGE_DEFAULT;
-    desc.BindFlags        = D3D11_BIND_DECODER;
-    desc.MiscFlags        = D3D11_RESOURCE_MISC_SHARED;
-
-    if ((MFX_MEMTYPE_FROM_VPPIN & request->Type) &&
-        (DXGI_FORMAT_B8G8R8A8_UNORM == desc.Format)) {
-      desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-      if (desc.ArraySize > 2)
-        return MFX_ERR_MEMORY_ALLOC;
-      }
-
-    if ((MFX_MEMTYPE_FROM_VPPOUT & request->Type) ||
-        (MFX_MEMTYPE_VIDEO_MEMORY_PROCESSOR_TARGET & request->Type)) {
-      desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-      if (desc.ArraySize > 2)
-        return MFX_ERR_MEMORY_ALLOC;
-      }
-    if (DXGI_FORMAT_P8 == desc.Format )
-      desc.BindFlags = 0;
-
-    // Create surface textures
-    ID3D11Texture2D* texture2D;
-    for (size_t i = 0; i < request->NumFrameSuggested / desc.ArraySize; i++) {
-      gD3D11Device->CreateTexture2D (&desc, NULL, &texture2D);
-      mids[i]->memId = texture2D;
-      }
-
-    desc.ArraySize      = 1;
-    desc.Usage          = D3D11_USAGE_STAGING;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;// | D3D11_CPU_ACCESS_WRITE;
-    desc.BindFlags      = 0;
-    desc.MiscFlags      = 0;
-    //desc.MiscFlags        = D3D11_RESOURCE_MISC_SHARED;
-
-    // Create surface staging textures
-    for (size_t i = 0; i < request->NumFrameSuggested; i++) {
-      gD3D11Device->CreateTexture2D (&desc, NULL, &texture2D);
-      mids[i]->memIdStage = texture2D;
-      }
-    }
-
-  response->mids = (mfxMemId*)mids;
-  response->NumFrameActual = request->NumFrameSuggested;
-
-  return MFX_ERR_NONE;
-  }
-//}}}
-//{{{
-mfxStatus simple_alloc (mfxHDL pthis, mfxFrameAllocRequest* request, mfxFrameAllocResponse* response) {
-
-  mfxStatus status = MFX_ERR_NONE;
-
-  if (request->Type & MFX_MEMTYPE_SYSTEM_MEMORY)
-    return MFX_ERR_UNSUPPORTED;
-
-  if (allocDecodeResponses.find (pthis) != allocDecodeResponses.end() &&
-      MFX_MEMTYPE_EXTERNAL_FRAME & request->Type &&
-      MFX_MEMTYPE_FROM_DECODE & request->Type) {
-    // Memory for this request was already allocated during manual allocation stage. Return saved response
-    //   When decode acceleration device (DXVA) is created it requires a list of d3d surfaces to be passed.
-    //   Therefore Media SDK will ask for the surface info/mids again at Init() stage, thus requiring us to return the saved response
-    //   (No such restriction applies to Encode or VPP)
-    *response = allocDecodeResponses[pthis];
-    allocDecodeRefCount[pthis]++;
-    }
-  else {
-    status = _simple_alloc (request, response);
-
-    if (MFX_ERR_NONE == status) {
-      if (MFX_MEMTYPE_EXTERNAL_FRAME & request->Type &&
-          MFX_MEMTYPE_FROM_DECODE & request->Type) {
-        // Decode alloc response handling
-        allocDecodeResponses[pthis] = *response;
-        allocDecodeRefCount[pthis]++;
-        }
-      else
-        // Encode and VPP alloc response handling
-        allocResponses[response->mids] = pthis;
-      }
-    }
-
-  return status;
-  }
-//}}}
-//{{{
-mfxStatus _simple_free (mfxFrameAllocResponse* response) {
-
-  if (response->mids) {
-    for (mfxU32 i = 0; i < response->NumFrameActual; i++) {
-      if (response->mids[i]) {
-        tCustomMemId* mid = (tCustomMemId*)response->mids[i];
-        ID3D11Texture2D* surface = (ID3D11Texture2D*)mid->memId;
-        ID3D11Texture2D* stage = (ID3D11Texture2D*)mid->memIdStage;
-        if (surface)
-          surface->Release();
-        if (stage)
-          stage->Release();
-        free (mid);
-        }
-      }
-    free (response->mids);
-    response->mids = NULL;
-    }
-
-  return MFX_ERR_NONE;
-  }
-//}}}
-//{{{
-mfxStatus simple_free (mfxHDL pthis, mfxFrameAllocResponse* response) {
-
-  if (NULL == response)
-    return MFX_ERR_NULL_PTR;
-
-  if (allocResponses.find (response->mids) == allocResponses.end()) {
-    // Decode free response handling
-    if (--allocDecodeRefCount[pthis] == 0) {
-      _simple_free(response);
-      allocDecodeResponses.erase (pthis);
-      allocDecodeRefCount.erase (pthis);
-      }
-    }
-  else {
-    // Encode and VPP free response handling
-    allocResponses.erase (response->mids);
-    _simple_free (response);
-    }
-
-  return MFX_ERR_NONE;
-  }
-//}}}
-//{{{
-mfxStatus simple_lock (mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr) {
-
-  //cLog::log (LOGINFO, "simple_lock");
-  HRESULT hRes = S_OK;
-
-  D3D11_TEXTURE2D_DESC desc = {0};
-  D3D11_MAPPED_SUBRESOURCE lockedRect = {0};
-
-  tCustomMemId* memId = (tCustomMemId*)mid;
-  ID3D11Texture2D* surface = (ID3D11Texture2D*)memId->memId;
-  ID3D11Texture2D* stage = (ID3D11Texture2D*)memId->memIdStage;
-  if (stage == NULL) {
-    hRes = gD3D11Context->Map (surface, 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &lockedRect);
-    desc.Format = DXGI_FORMAT_P8;
-    }
-  else {
-    surface->GetDesc (&desc);
-
-    // copy data only in case of user wants to read from stored surface
-    if (memId->rw & WILL_READ)
-      gD3D11Context->CopySubresourceRegion (stage, 0, 0, 0, 0, surface, 0, NULL);
-
-    do {
-      hRes = gD3D11Context->Map (stage, 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &lockedRect);
-      if (S_OK != hRes && DXGI_ERROR_WAS_STILL_DRAWING != hRes)
-        return MFX_ERR_LOCK_MEMORY;
-      } while (DXGI_ERROR_WAS_STILL_DRAWING == hRes);
-    }
-
-  if (FAILED (hRes))
-    return MFX_ERR_LOCK_MEMORY;
-
-  switch (desc.Format) {
-    //{{{
-    case DXGI_FORMAT_NV12:
-      ptr->Pitch = (mfxU16)lockedRect.RowPitch;
-      ptr->Y = (mfxU8*)lockedRect.pData;
-      ptr->U = (mfxU8*)lockedRect.pData + desc.Height * lockedRect.RowPitch;
-      ptr->V = ptr->U + 1;
-      break;
-    //}}}
-    //{{{
-    case DXGI_FORMAT_B8G8R8A8_UNORM:
-      ptr->Pitch = (mfxU16)lockedRect.RowPitch;
-      ptr->B = (mfxU8*)lockedRect.pData;
-      ptr->G = ptr->B + 1;
-      ptr->R = ptr->B + 2;
-      ptr->A = ptr->B + 3;
-      break;
-    //}}}
-    //{{{
-    case DXGI_FORMAT_YUY2:
-      ptr->Pitch = (mfxU16)lockedRect.RowPitch;
-      ptr->Y = (mfxU8*)lockedRect.pData;
-      ptr->U = ptr->Y + 1;
-      ptr->V = ptr->Y + 3;
-       break;
-    //}}}
-    //{{{
-    case DXGI_FORMAT_P8:
-      ptr->Pitch = (mfxU16)lockedRect.RowPitch;
-      ptr->Y = (mfxU8*)lockedRect.pData;
-      ptr->U = 0;
-      ptr->V = 0;
-      break;
-    //}}}
-    //{{{
-    default:
-      return MFX_ERR_LOCK_MEMORY;
-    //}}}
-    }
-
-  return MFX_ERR_NONE;
-  }
-//}}}
-//{{{
-mfxStatus simple_unlock (mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr) {
-
-  //cLog::log (LOGINFO, "simple_unlock");
-  tCustomMemId* memId = (tCustomMemId*)mid;
-  ID3D11Texture2D* surface = (ID3D11Texture2D*)memId->memId;
-  ID3D11Texture2D* stage = (ID3D11Texture2D*)memId->memIdStage;
-
-  if (NULL == stage)
-    gD3D11Context->Unmap (surface, 0);
-  else {
-    gD3D11Context->Unmap (stage, 0);
-    // copy data only in case of user wants to write to stored surface
-    if (memId->rw & WILL_WRITE)
-      gD3D11Context->CopySubresourceRegion (surface, 0, 0, 0, 0, stage, 0, NULL);
-    }
-
-  if (ptr) {
-    ptr->Pitch = 0;
-    ptr->U = ptr->V = ptr->Y = 0;
-    ptr->A = ptr->R = ptr->G = ptr->B = 0;
-    }
-
-  return MFX_ERR_NONE;
-  }
-//}}}
-//{{{
-mfxStatus simple_gethdl (mfxHDL pthis, mfxMemId mid, mfxHDL* handle) {
-
-  if (NULL == handle)
-    return MFX_ERR_INVALID_HANDLE;
-
-  mfxHDLPair* pair = (mfxHDLPair*)handle;
-  tCustomMemId* memId = (tCustomMemId*)mid;
-  pair->first = memId->memId; // surface texture
-  pair->second = 0;
-
-  return MFX_ERR_NONE;
-  }
-//}}}
-
-//{{{
-mfxStatus Initialize (mfxIMPL impl, mfxVersion version,
-                      MFXVideoSession* session, mfxFrameAllocator* allocator) {
-
-  auto status = session->Init (kMfxD3d11 ? (impl | MFX_IMPL_VIA_D3D11) : impl, &version);
-  MSDK_CHECK_RESULT (status, MFX_ERR_NONE, status);
-
-  if (allocator) {
-    ComPtr<IDXGIFactory2> dxgiFactory;
-    CreateDXGIFactory (__uuidof(IDXGIFactory2), (void**)(&dxgiFactory));
-    dxgiFactory->EnumAdapters (0, &gAdapter);
-    if (!gAdapter)
-      return MFX_ERR_DEVICE_FAILED;
-
-    static D3D_FEATURE_LEVEL featureLevels[] = {
-      D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0,
-      D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0,
-      D3D_FEATURE_LEVEL_9_3, D3D_FEATURE_LEVEL_9_2, D3D_FEATURE_LEVEL_9_1,
-      };
-
-    D3D_FEATURE_LEVEL featureLevel;
-
-    if (FAILED (D3D11CreateDevice (gAdapter.Get(),
-                                   D3D_DRIVER_TYPE_UNKNOWN,
-                                   NULL,
-                                   0, // dxFlags D3D11_CREATE_DEVICE_DEBUG;
-                                   featureLevels, ARRAYSIZE(featureLevels),
-                                   D3D11_SDK_VERSION,
-                                   &gD3D11Device,
-                                   &featureLevel,
-                                   &gD3D11Context))) {
-      cLog::log (LOGERROR, "D3D11CreateDevice mfx - failed");
-      return MFX_ERR_DEVICE_FAILED;
-      }
-
-    cLog::log (LOGNOTICE, "D3D11CreateDevice mfx - featureLevel %d.%d",
-                          (featureLevel >> 12) & 0xF, (featureLevel >> 8) & 0xF);
-
-    // turn on multithreading for the DX11 context
-    ComPtr<ID3D10Multithread> mD3d10Multithread;
-    gD3D11Context.As (&mD3d10Multithread);
-    if (mD3d10Multithread)
-      mD3d10Multithread->SetMultithreadProtected (true);
-    else
-      return MFX_ERR_DEVICE_FAILED;
-
-    status = session->SetHandle (MFX_HANDLE_D3D11_DEVICE, gD3D11Device.Get());
-    //MSDK_CHECK_RESULT (status, MFX_ERR_NONE, status);
-
-    allocator->pthis  = *session;
-    allocator->Alloc  = simple_alloc;
-    allocator->Free   = simple_free;
-    allocator->Lock   = simple_lock;
-    allocator->Unlock = simple_unlock;
-    allocator->GetHDL = simple_gethdl;
-
-    // using video memory, provide external allocator
-    status = session->SetFrameAllocator (allocator);
-    MSDK_CHECK_RESULT (status, MFX_ERR_NONE, status);
-    }
-
-  return status;
-  }
-//}}}
-
-//{{{
-int getFreeSurfaceIndex (mfxFrameSurface1** surfaces, mfxU16 poolSize) {
-
-  if (surfaces)
-    for (mfxU16 i = 0; i < poolSize; i++)
-      if (0 == surfaces[i]->Data.Locked)
-        return i;
-
-  return MFX_ERR_NOT_FOUND;
-  }
-//}}}
+const bool kRgba = false;
 //}}}
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
   //{{{
-  void run (string title, int width, int height, string fileName) {
+  void run (string title, int width, int height, const string& param) {
 
-    CoInitialize (NULL); // for winAudio
-    audOpen (48000, 16, kAudOutChannels);
+    // init transportStreams
+    mAnalTs = new cAnalTransportStream();
+    mAudTs = new cAudTransportStream (kAudMaxFrames);
+    mVidTs = new cVidTransportStream (kVidMaxFrames);
 
-    // init transportStream
-    mAnalyseTs = new cAnalyseTransportStream();
-    mAudTs = new cAudDecodeTransportStream (kAudMaxFrames);
-    mVidTs = new cVidDecodeTransportStream (kVidMaxFrames);
-
-    // init d2dWindow
+    // init d2dWindow, boxes
     initialise (title, width, height, false);
-    addBox (new cVidFrameView (this, 0,0));
-    addBox (new cLogBox (this, 200.f,0, true), 0,200.f);
-    addBox (new cFramesDebugBox (this, 0,120.f), 0,20.f);
-    addBox (new cVolumeBox (this, 12.f,0), -12.f,0);
-    addBox (new cServicesBox (this, 200.f,16.f, mAnalyseTs));
-    addBox (new cTimecodeBox (this, 600.f,60.f, mPlayPts, mLengthPts), -600.f,-60.f);
-    addBox (new cProgressBox (this, 0,12.f), 0,-12.f);
-    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0);
-    addBox (new cValueBox (this, 48.f,24.f, "av", -25.f,25.f, mVidOffset, mVidOffsetChanged));
-    addBox (new cFloatBox (this, 50.f,20.f, mRenderTime), -50.f,-20.f);
+    addBox (new cVidFrameView (this, 0.f,0.f));
+    addBox (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
+    addBox (new cFramesDebugBox (this, 0.f,120.f), 0.f,kTextHeight);
+    addBox (new cTransportStreamBox (this, 0,-200.f, mAnalTs));
 
-    mFileName = fileName;
+    HANDLE file = 0;
+    int frequency = param.empty() ? 674 : atoi(param.c_str());
+    if (frequency) {
+      mFileName = "C:/videos/tune.ts";
+      auto bda = new cBda();
+      thread ([=]() { bdaDumpThread (bda, frequency*1000, mFileName); }).detach();
+      // wait for file create
+      Sleep (2000);
+      }
+    else
+      mFileName = param;
 
-    auto threadHandle = thread ([=](){ analyseThread(); });
+    addBox (new cTimecodeBox (this, 600.f,60.f, mPlayPts, mAnalTs->mLengthPts), -600.f,-60.f);
+    addBox (new cProgressBox (this, 0.f,12.f), 0.f,-12.f);
+    addBox (new cAudFrameBox (this, 82.f,240.0f, mPlayAudFrame), -84.f,-240.f-12.0f);
+    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
+
+    // init threads
+    auto threadHandle = thread ([=](){ analThread(); });
     SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
     threadHandle.detach();
 
-    thread ([=](){ audioLoadThread(); }).detach();
-    thread ([=](){ videoLoadThread(); }).detach();
+    thread ([=]() { audThread(); }).detach();
+    thread ([=]() { vidThread(); }).detach();
 
     threadHandle = thread ([=](){ playThread(); });
     SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_HIGHEST);
@@ -617,10 +105,7 @@ public:
     // loop till quit
     messagePump();
 
-    //{{{  cleanup
-    audClose();
-    CoUninitialize();
-    //}}}
+    // close (file)
     }
   //}}}
 
@@ -629,23 +114,42 @@ protected:
   bool onKey (int key) {
 
     switch (key) {
-      case 0x00 : break;
-      case 0x1B : return true;
+      case 0x00: break;
+      case 0x1B: return true;
 
-      case ' '  : togglePlay(); break;
+      case  ' ': togglePlay(); break;
 
-      case 0x21 : incPlayPts (-90000*10); break; // page up
-      case 0x22 : incPlayPts (90000*10); break; // page down
-      case 0x23 : break; // home
-      case 0x24 : break; // end
-      case 0x25 : incPlayPts (-90000/25); mPlaying = ePause; break; // left arrow
-      case 0x26 : incPlayPts (-90000); break; // up arrow
-      case 0x27 : incPlayPts (90000/25); mPlaying = ePause; break; // right arrow
-      case 0x28 : incPlayPts (90000); break; // down arrow
+      case 0x21: incPlayPts (-90000*10); break; // page up
+      case 0x22: incPlayPts (90000*10); break; // page down
+      case 0x23: break; // home
+      case 0x24: break; // end
+      case 0x25: incPlayPts (-90000/25); mPlaying = ePause; break; // left arrow
+      case 0x26: incPlayPts (-90000); break; // up arrow
+      case 0x27: incPlayPts (90000/25); mPlaying = ePause; break; // right arrow
+      case 0x28: incPlayPts (90000); break; // down arrow
 
-      case 'F':   toggleFullScreen(); break;
+      case  '0': key += 10; // nasty trick to wrap '0' as channel 10
+      case  '1':
+      case  '2':
+      case  '3':
+      case  '4':
+      case  '5':
+      case  '6':
+      case  '7':
+      case  '8':
+      case  '9': {
+        auto service = mAnalTs->getService (key - '1');
+        if (service) {
+          mAudTs->setPid (service->getAudPid());
+          mVidTs->setPid (service->getVidPid());
+          changed();
+          }
+        break;
+        }
 
-      default:    printf ("key %x\n", key);
+      case  'F': toggleFullScreen(); break;
+
+      default:   printf ("key %x\n", key);
       }
 
     return false;
@@ -654,178 +158,113 @@ protected:
 
 private:
   //{{{
-  class cAnalyseTransportStream : public cTransportStream {
+  class cAnalTransportStream : public cTransportStream {
   public:
-    cAnalyseTransportStream () {}
-    virtual ~cAnalyseTransportStream() {}
+    cAnalTransportStream () {}
+    virtual ~cAnalTransportStream() {}
 
-    uint64_t getPts() { return mLastLoadedAudPts; }
-    uint64_t getVidFirstPts() { return mVidPos[0].mPts; }
-
+    int64_t getBasePts() { return mBasePts; }
+    int64_t getLengthPts() { return mLengthPts; }
     //{{{
-    bool hasFirstVidIframe() {
-      return mVidPos.size() > 0;
-      }
-    //}}}
+    int64_t getFirstPts (int pid) {
+    // return pts of first streamPos matching pid,
+    // - return -1 if none
 
-    //{{{
-    bool selectService (int& audPid, int& vidPid, uint64_t& basePts) {
+      for (auto &streamPos : mStreamPosVector)
+        if (pid == streamPos.mPid)
+          return streamPos.mPts;
 
-      audPid = 0;
-      vidPid = 0;
-      basePts = 0;
-
-      auto service  = mServiceMap.begin();
-      int pcrPid = service->second.getPcrPid();
-      auto pidInfoIt = mPidInfoMap.find (pcrPid);
-      if (pidInfoIt != mPidInfoMap.end()) {
-        audPid = service->second.getAudPid();
-        vidPid = service->second.getVidPid();
-        basePts = pidInfoIt->second.mPcr;
-        cLog::log (LOGINFO, "selectService vid:%d aud:%d pcr:%d basePts:%s",
-                   vidPid, audPid, pcrPid, getPtsStr (basePts));
-        return true;
-        }
-
-      return false;
-      }
-    //}}}
-
-    //{{{
-    int64_t findAudStreamPos (uint64_t pts, int& frame) {
-    // return streamPos for pts
-
-      if (mAudPos.size() > 1)
-        for (frame = 0; frame < mAudPos.size()-1; frame++)
-          if (pts >= mAudPos[frame].mPts && (pts < mAudPos[frame+1].mPts))
-            return mAudPos[frame].mPos;
-
-      frame = -1;
       return -1;
       }
     //}}}
     //{{{
-    int64_t findVidStreamPos (uint64_t pts, int& iFrame) {
-    // return streamPos for iFrame at pts,
+    cService* getService (int index) {
 
-      for (iFrame = 0; iFrame < mVidPos.size()-1; iFrame++)
-        if (pts >= mVidPos[iFrame].mPts && (pts < mVidPos[iFrame+1].mPts))
-          return mVidPos[iFrame].mPos;
-
-      iFrame = -1;
-      return -1;
-      }
-    //}}}
-    //{{{
-    void clearStreamPosIndex() {
-      mAudPos.clear();
-      mVidPos.clear();
-      }
-    //}}}
-
-    //{{{
-    void drawPids (ID2D1DeviceContext* dc, cRect r, IDWriteTextFormat* textFormat,
-                   ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue) {
-
-      if (!mPidInfoMap.empty()) {
-        r.top += kTextHeight;
-        string str = getTimeString() + " services:" + to_string (mServiceMap.size());
-        dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), textFormat, r, white);
-        r.top += kTextHeight;
-
-        float mLargestPid = 10000.f;
-        for (auto pidInfo : mPidInfoMap) {
-          float total = (float)pidInfo.second.mTotal;
-          if (total > mLargestPid)
-            mLargestPid = total;
-
-          auto len = (total / mLargestPid) * (r.right - 50.f);
-          dc->FillRectangle (RectF(40.f, r.top+4.f, 40.f+len, r.top+ kTextHeight), blue);
-
-          str = dec (pidInfo.first, 3) +
-                " " + dec (pidInfo.second.mStreamType,2) +
-                " " + pidInfo.second.mInfo +
-                " " + dec (pidInfo.second.mTotal) +
-                ":" + dec (pidInfo.second.mDisContinuity);
-          dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), textFormat, r, white);
-          r.top += 20.f;
-          }
+      int64_t firstPts;
+      int64_t lastPts;
+      auto service = cTransportStream::getService (index, firstPts, lastPts);
+      if (service) {
+        mLengthPid = service->getAudPid();
+        mBasePts = firstPts;
+        mLengthPts = lastPts - firstPts;
         }
+
+      return service;
+      }
+    //}}}
+
+    //{{{
+    int64_t findStreamPos (int pid, int64_t pts) {
+    // return streamPos for first streamPos, matching pid, on or after pts
+    // - return 0 if none
+
+      for (auto streamPos = mStreamPosVector.rbegin(); streamPos != mStreamPosVector.rend(); ++streamPos)
+        if ((pid == streamPos->mPid) && (pts >= streamPos->mPts))
+          return streamPos->mPos;
+
+      return 0;
       }
     //}}}
     //{{{
-    void drawServices (ID2D1DeviceContext* dc, cRect r, IDWriteTextFormat* textFormat, ID2D1SolidColorBrush* white) {
-
-      for (auto service : mServiceMap) {
-        string str = service.second.getName() + " " + service.second.getNow()->mTitle;
-        dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), textFormat, r, white);
-        r.top += kTextHeight;
-        }
+    void clearStreamPos() {
+      mStreamPosVector.clear();
       }
     //}}}
 
     //{{{
     class cStreamPos {
     public:
-      cStreamPos() {}
-      cStreamPos (uint64_t pts, int64_t pos) : mPts(pts), mPos(pos) {}
-      ~cStreamPos() {}
+      cStreamPos (int pid, int64_t pts, int64_t pos) : mPid(pid), mPts(pts), mPos(pos) {}
 
-      uint64_t mPts = 0;
-      int64_t mPos = 0;
+      int mPid;
+      int64_t mPts;
+      int64_t mPos;
       };
     //}}}
-    concurrent_vector<cStreamPos> mAudPos;
-    concurrent_vector<cStreamPos> mVidPos;
+    concurrent_vector<cStreamPos> mStreamPosVector;
+
+    // public only for box
+    int64_t mLengthPts = -1;
 
   protected:
     //{{{
-    bool audDecodePes (cPidInfo* pidInfo, uint64_t basePts) {
+    bool audDecodePes (cPidInfo* pidInfo, bool skip) {
 
-      if (pidInfo->mPts < basePts) {
-        cLog::log (LOGINFO1, "analyseThread - audDecodePes discard " +
-                             getPtsStr (pidInfo->mPts) + " before " + getPtsStr (basePts));
-        return false;
-        }
-      else {
-        auto pts = pidInfo->mPts - basePts;
-        mAudPos.push_back (cStreamPos (pts, pidInfo->mStreamPos));
-        mLastLoadedAudPts = pts;
-        return true;
-        }
+      mStreamPosVector.push_back (cStreamPos (pidInfo->mPid, pidInfo->mPts, pidInfo->mStreamPos));
+      if (pidInfo->mPid == mLengthPid)
+        mLengthPts = pidInfo->mLastPts - pidInfo->mFirstPts;
+
+      return true;
       }
     //}}}
     //{{{
-    bool vidDecodePes (cPidInfo* pidInfo, uint64_t basePts, char frameType, bool skipped) {
+    bool vidDecodePes (cPidInfo* pidInfo, bool skip) {
 
-      auto pts = pidInfo->mPts ? pidInfo->mPts - basePts : 0;
-      if ((frameType == 'I') || (frameType == '?')) {
-        mVidPos.push_back (cStreamPos (pts, pidInfo->mStreamPos));
-        return true;
-        }
+      char frameType = getFrameType (pidInfo->mBuffer, pidInfo->mBufPtr - pidInfo->mBuffer, pidInfo->mStreamType);
+      if ((frameType == 'I') || (frameType == '?'))
+        mStreamPosVector.push_back (cStreamPos (pidInfo->mPid, pidInfo->mPts, pidInfo->mStreamPos));
 
-      return false;
+      return true;
       }
     //}}}
 
   private:
-    //  vars
-    uint64_t mLastLoadedAudPts = 0;
-
+    int64_t mBasePts = -1;
+    int mLengthPid = -1;
     };
   //}}}
   //{{{
-  class cAudDecodeTransportStream : public cTransportStream {
+  class cAudTransportStream : public cTransportStream {
   public:
     //{{{
-    cAudDecodeTransportStream (int maxFrames) {
+    cAudTransportStream (int maxFrames) {
 
       for (auto i = 0; i < maxFrames; i++)
         mFrames.push_back (new cAudFrame());
       }
     //}}}
     //{{{
-    virtual ~cAudDecodeTransportStream() {
+    virtual ~cAudTransportStream() {
 
       if (mAudContext)
         avcodec_close (mAudContext);
@@ -834,84 +273,70 @@ private:
       }
     //}}}
 
+    int getPid() { return mPid; }
+    int64_t getLastLoadedPts() { return mLastLoadedPts; }
     //{{{
-    void invalidateFrames() {
-
-      mLastLoadedPts = 0;
-      mLoadFrame = 0;
+    cAudFrame* findFrame (int64_t& pts) {
 
       for (auto frame : mFrames)
-        frame->invalidate();
-      }
-    //}}}
-
-    uint64_t getLastLoadedPts() { return mLastLoadedPts; }
-    //{{{
-    bool loaded (uint64_t pts, int audFrames) {
-
-      for (auto i = 0; i < audFrames; i++) {
-        uint64_t ptsWidth = 0;
-        bool found = false;
-        for (auto frame : mFrames) {
-          if ((pts >= frame->mPts) && (pts < frame->mPtsEnd)) {
-            ptsWidth = frame->mPtsEnd - frame->mPts;
-            found = true;
-            break;
-            }
+        if (frame->mLoaded && (pts >= frame->mPts) && (pts < frame->mPtsEnd)) {
+          pts = frame->mPtsEnd;
+          return frame;
           }
-        if (!found)
-          return false;
-        pts += ptsWidth;
-        }
-
-      return true;
-      }
-    //}}}
-    //{{{
-    cAudFrame* findFrameByPts (uint64_t pts) {
-    // find audFrame containing pts
-    // - returns nullPtr if no frame loaded yet
-
-      for (auto frame : mFrames)
-        if (frame->mPts)
-          if ((pts >= frame->mPts) && (pts < frame->mPtsEnd))
-            return frame;
 
       return nullptr;
       }
     //}}}
+    //{{{
+    bool isLoaded (int64_t pts, int frames) {
+
+      for (auto frame = 0; frame < frames; frame++)
+        if (!findFrame (pts))
+          return false;
+
+      return true;
+      }
+    //}}}
 
     //{{{
-    void drawFrames (ID2D1DeviceContext* dc, const cRect rect, IDWriteTextFormat* textFormat,
+    void setPid (int pid) {
+      mPid = pid;
+      invalidateFrames();
+      }
+    //}}}
+
+    //{{{
+    void drawFrames (ID2D1DeviceContext* dc, const cRect& rect, IDWriteTextFormat* textFormat,
                     ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
                     ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
-                    uint64_t playPts) {
+                    int64_t playPts) {
 
       auto y = kDrawFramesCentreY;
 
       auto index = 0;
       for (auto frame : mFrames) {
         if (frame->mNumSamples) {
+          const auto audFrameWidth = (90 * frame->mNumSamples / 48) * kPixPerPts;
           int64_t diff = frame->mPts - playPts;
-          auto pixPerPts = kFrameWidth * 48000 / (frame->mNumSamples * 90000);
-          auto x = rect.left + (rect.right - rect.left)/2.f + (float(diff) * pixPerPts);
+          auto x = rect.left + (rect.right - rect.left)/2.f + (diff * kPixPerPts);
 
-          if ((x + kFrameWidth > rect.left) && (x < rect.right)) {
+          if ((x + audFrameWidth > rect.left) && (x < rect.right)) {
             // draw channels
-            cRect r (x, y-kGap, x-kGap, y-kGap);
-            auto widthPerChannel = kFrameWidth / frame->mChannels;
+            cRect r (x,0.f, 0.f,y-1.f);
+            auto widthPerChannel = (audFrameWidth - 1.f) / frame->mChannels;
             for (auto channel = 0; channel < frame->mChannels; channel++) {
-              r.right = r.left + widthPerChannel - kGap;
-              r.top = y - frame->mPower[channel]/2.f;
+              r.right = r.left + widthPerChannel - 0.5f;
+              r.top = y - frame->mPower[channel] / 3.f;
               dc->FillRectangle (r, blue);
-              r.left = r.right + kGap;
+              r.left = r.right + 0.5f;
               }
 
             //  draw index
-            r = cRect (x,y, x+kFrameWidth-kGap, y+kIndexHeight);
+            r = cRect (x,y, x + audFrameWidth - 1.f, y + kIndexHeight);
             dc->FillRectangle (r, blue);
             auto wstr = to_wstring (index);
-            dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat, r, frame->mPts == frame->mPesPts ? white : black);
+            dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat, r,
+                          frame->mPts == frame->mPesPts ? white : black);
             }
           }
         index++;
@@ -921,11 +346,10 @@ private:
 
   protected:
     //{{{
-    bool audDecodePes (cPidInfo* pidInfo, uint64_t basePts) {
+    bool audDecodePes (cPidInfo* pidInfo, bool skip) {
 
       bool decoded = false;
-      if ((pidInfo->mStreamType == 3) || (pidInfo->mStreamType == 4) ||
-          (pidInfo->mStreamType == 15) || (pidInfo->mStreamType == 17)) {
+      if (pidInfo->mPid == mPid) {
         if (!mAudParser) {
           //{{{  allocate decoder
           AVCodecID streamType;
@@ -933,6 +357,8 @@ private:
             streamType = AV_CODEC_ID_AAC_LATM;
           else if (pidInfo->mStreamType == 15)
             streamType = AV_CODEC_ID_AAC;
+          else if (pidInfo->mStreamType == 129)
+            streamType = AV_CODEC_ID_AC3;
           else
             streamType = AV_CODEC_ID_MP3;
 
@@ -943,122 +369,101 @@ private:
           }
           //}}}
 
-        if (pidInfo->mPts < basePts)
-          cLog::log (LOGINFO1, "audioThread - audDecodePes discard " +
-                               getPtsStr (pidInfo->mPts) + " before " + getPtsStr (basePts));
-        else {
-          auto pesPts = pidInfo->mPts - basePts;
-          cLog::log (LOGINFO3, "audioThread - audDecodePes PES " + getPtsStr (pidInfo->mPts));
+        cLog::log (LOGINFO3, "audThread - audDecodePes PES " + getPtsString (pidInfo->mPts));
 
-          //{{{  init avPacket
-          AVPacket avPacket;
-          av_init_packet (&avPacket);
-          avPacket.data = pidInfo->mBuffer;
-          avPacket.size = 0;
-          //}}}
-          auto interpolatedPts = pesPts;
-          auto pesPtr = pidInfo->mBuffer;
-          auto pesLen = int (pidInfo->mBufPtr - pidInfo->mBuffer);
-          auto avFrame = av_frame_alloc();
-          while (pesLen) {
-            auto lenUsed = av_parser_parse2 (
-              mAudParser, mAudContext, &avPacket.data, &avPacket.size, pesPtr, pesLen, 0, 0, AV_NOPTS_VALUE);
-            pesPtr += lenUsed;
-            pesLen -= lenUsed;
-            if (avPacket.size) {
-              auto ret = avcodec_send_packet (mAudContext, &avPacket);
-              while (ret >= 0) {
-                ret = avcodec_receive_frame (mAudContext, avFrame);
-                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
-                  break;
+        //{{{  init avPacket
+        AVPacket avPacket;
+        av_init_packet (&avPacket);
+        avPacket.data = pidInfo->mBuffer;
+        avPacket.size = 0;
+        //}}}
+        auto interpolatedPts = pidInfo->mPts;
+        auto pesPtr = pidInfo->mBuffer;
+        auto pesSize = pidInfo->mBufPtr - pidInfo->mBuffer;
+        auto avFrame = av_frame_alloc();
+        while (pesSize) {
+          auto bytesUsed = av_parser_parse2 (mAudParser, mAudContext, &avPacket.data, &avPacket.size,
+                                             pesPtr, (int)pesSize, 0, 0, AV_NOPTS_VALUE);
+          pesPtr += bytesUsed;
+          pesSize -= bytesUsed;
+          if (avPacket.size) {
+            auto ret = avcodec_send_packet (mAudContext, &avPacket);
+            while (ret >= 0) {
+              ret = avcodec_receive_frame (mAudContext, avFrame);
+              if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
+                break;
 
-                auto audFrame = mFrames[mLoadFrame];
-                audFrame->set (interpolatedPts, uint64_t ((avFrame->nb_samples * 90000) / 48000), pesPts,
-                               kAudOutChannels, avFrame->channels, 48000, avFrame->nb_samples);
-                mLastLoadedPts = interpolatedPts;
-
-                auto samplePtr = (short*)audFrame->mSamples;
-                if (mAudContext->sample_fmt == AV_SAMPLE_FMT_S16P) {
-                  //{{{  calc 16bit signed planar power, copy samples to avFrame
-                  short* chanPtr[2];
-                  for (auto channel = 0; channel < avFrame->channels; channel++)
-                    chanPtr[channel] = (short*)avFrame->data[channel];
-
-                  for (auto i = 0; i < avFrame->nb_samples; i++) {
-                    for (auto channel = 0; channel < avFrame->channels; channel++) {
-                      auto sample = *chanPtr[channel]++;
-                      audFrame->mPower[channel] += powf (sample, 2);
-                      *samplePtr = sample;
-                      if (kAudOutChannels == 6) {
-                        *(samplePtr+2) = sample;
-                        *(samplePtr+4) = sample;
-                        }
-                      samplePtr++;
+              auto frame = mFrames[mLoadFrame];
+              frame->set (interpolatedPts, avFrame->nb_samples*90/48, pidInfo->mPts, avFrame->channels, avFrame->nb_samples);
+              switch (mAudContext->sample_fmt) {
+                case AV_SAMPLE_FMT_S16P:
+                  //{{{  16bit signed planar, copy planar to interleaved, calc channel power
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    float power = 0.f;
+                    auto srcPtr = (short*)avFrame->data[channel];
+                    auto dstPtr = (short*)(frame->mSamples) + channel;
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      auto sample = *srcPtr++;
+                      power += sample * sample;
+                      *dstPtr = sample;
+                      dstPtr += avFrame->channels;
                       }
-                    if (kAudOutChannels == 6)
-                      samplePtr += 4;
+                    frame->mPower[channel] = sqrtf (power) / avFrame->nb_samples;
                     }
-                  }
+
+                  cLog::log (LOGINFO3, "-> audFrame::set 16bit" + getPtsString(interpolatedPts));
+                  break;
                   //}}}
-                else if (mAudContext->sample_fmt == AV_SAMPLE_FMT_FLTP) {
-                  //{{{  calc 32bit float planar power, copy samples to avFrame 5.1 centre to LR
-                  float* chanPtr[6];
-                  for (auto channel = 0; channel < avFrame->channels; channel++)
-                    chanPtr[channel] = (float*)avFrame->data[channel];
+                case AV_SAMPLE_FMT_FLTP:
+                  //{{{  32bit float planar, copy planar channel to interleaved, calc channel power
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    float power = 0.f;
+                    auto srcPtr = (float*)avFrame->data[channel];
+                    auto dstPtr = (short*)(frame->mSamples) + channel;
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      auto sample = (short)(*srcPtr++ * 0x8000);
+                      power += sample * sample;
+                      *dstPtr = sample;
+                      dstPtr += avFrame->channels;
+                      }
+                    frame->mPower[channel] = sqrtf (power) / avFrame->nb_samples;
+                    }
 
-                  for (auto i = 0; i < avFrame->nb_samples; i++) {
-                    for (auto channel = 0; channel < avFrame->channels; channel++) {
-                      auto sample = (short)(*chanPtr[channel]++ * 0x8000);
-                      audFrame->mPower[channel] += powf (sample, 2);
-                      if (kAudOutChannels == 2) {
-                        // duplicate copy 2 inChans or mix down 6 inChans into 2 outChans
-                        switch (channel) {
-                          case 0: *samplePtr = sample; break;
-                          case 1: *(samplePtr+1) = sample; break;
-                          case 2: *samplePtr += sample; *(samplePtr+1) = sample; break;
-                          case 3: *samplePtr += sample; *(samplePtr+1) = sample; break;
-                          case 4: *samplePtr += sample; break;
-                          case 5: *(samplePtr+1) += sample; break;
-                          }
-                        }
-                      else if (kAudOutChannels == 6) {
-                        *samplePtr= sample;
-                        if (avFrame->channels == 2) {
-                          // duplicate 2 inChans into 6 outChans
-                          *(samplePtr+2) = sample;
-                          *(samplePtr+4) = sample;
-                          }
-                        samplePtr++;
-                        }
-                      } // for channel
-
-                    if (kAudOutChannels == 2)
-                      samplePtr += kAudOutChannels;
-                    else if ((kAudOutChannels == 6) && (avFrame->channels == 2))
-                      samplePtr += 4;
-                    } // for sample
-                  }
+                  cLog::log (LOGINFO3, "-> audFrame::set float " + getPtsString(interpolatedPts));
+                  break;
                   //}}}
-                for (auto channel = 0; channel < avFrame->channels; channel++)
-                  audFrame->mPower[channel] = (float)sqrt (audFrame->mPower[channel]) / (avFrame->nb_samples * 2.f);
-                cLog::log (LOGINFO3, "-> audFrame " + getPtsStr (interpolatedPts));
-
-                interpolatedPts += (avFrame->nb_samples * 90000) / 48000;
-                mLoadFrame = (mLoadFrame + 1) % mFrames.size();
+                default:
+                 cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
                 }
-              decoded = true;
+              mLoadFrame = (mLoadFrame + 1) % mFrames.size();
+
+              mLastLoadedPts = interpolatedPts;
+              interpolatedPts += (avFrame->nb_samples * 90) / 48;
               }
+            decoded = true;
             }
-          av_frame_free (&avFrame);
           }
+        av_frame_free (&avFrame);
         }
+
       return decoded;
       }
     //}}}
 
   private:
-    //  vars
-    uint64_t mLastLoadedPts = 0;
+    //{{{
+    void invalidateFrames() {
+
+      mLoadFrame = 0;
+      mLastLoadedPts = -1;
+
+      for (auto frame : mFrames)
+        frame->invalidate();
+      }
+    //}}}
+
+    int mPid = -1;
+    int64_t mLastLoadedPts = -1;
 
     int mLoadFrame = 0;
     concurrent_vector<cAudFrame*> mFrames;
@@ -1069,137 +474,134 @@ private:
     };
   //}}}
   //{{{
-  class cVidDecodeTransportStream : public cTransportStream {
+  class cVidTransportStream : public cTransportStream {
   public:
     //{{{
-    cVidDecodeTransportStream (int maxFrames) {
+    cVidTransportStream (int maxFrames) {
 
-      Initialize (MFX_IMPL_AUTO, {0, 1}, &mSession, kVideoMemory ? &mAllocator : NULL);
+      mfxVersion version =  {0,1};
+      mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
 
       for (auto i = 0; i < maxFrames; i++)
         mFrames.push_back (new cVidFrame());
       }
     //}}}
     //{{{
-    virtual ~cVidDecodeTransportStream() {
+    virtual ~cVidTransportStream() {
 
       // Clean up resources
-      //  - It is recommended to close Media SDK components first, before releasing allocated surfaces, since
-      //    some surfaces may still be locked by internal Media SDK resources.
-       MFXVideoDECODE_Close (mSession);
+      // -  recommended to close Media SDK components first, before releasing allocated surfaces
+      //    since //    some surfaces may still be locked by internal Media SDK resources.
+      MFXVideoDECODE_Close (mSession);
 
       // mSession closed automatically on destruction
       for (int i = 0; i < mNumSurfaces; i++)
         delete mSurfaces[i];
-
-      mfxFrameAllocResponse mfxResponse;
-      mAllocator.Free (mAllocator.pthis, &mfxResponse);
       }
     //}}}
 
+    int getPid() { return mPid; }
+    int64_t getLastLoadedPts() { return mLastLoadedPts; }
     //{{{
-    void invalidateFrames() {
+    cVidFrame* findFrame (int64_t& pts) {
 
-      mLastLoadedPts = 0;
-      mLoadFrame = 0;
       for (auto frame : mFrames)
-        frame->invalidate();
-      }
-    //}}}
-
-    uint64_t getLastLoadedPts() { return mLastLoadedPts; }
-    //{{{
-    bool loaded (uint64_t pts, int frames) {
-
-      for (auto i = 0; i < frames; i++) {
-        bool found = false;
-        for (auto frame : mFrames) {
-          if (frame->mLoaded && (pts >= frame->mPts) && (pts < frame->mPtsEnd)) {
-            found = true;
-            break;
-            }
+        if (frame->mLoaded && (pts >= frame->mPts) && (pts < frame->mPtsEnd)) {
+          pts = frame->mPtsEnd;
+          return frame;
           }
 
-        if (!found)
-          return false;
-        pts += 3600;
+      return nullptr;
+      }
+    //}}}
+    //{{{
+    cVidFrame* findNearestFrame (int64_t pts) {
+    // find first vidFrame on or past pts
+    // - returns nullPtr if no frame loaded yet
+
+      int64_t nearest = 0;
+      cVidFrame* nearestFrame = nullptr;
+
+      for (auto frame : mFrames) {
+        if (frame->mLoaded) {
+          if ((pts >= frame->mPts) && (pts < frame->mPtsEnd))
+            return frame;
+          else if (pts < frame->mPts) {
+            if (!nearest || ((frame->mPts - pts) < nearest)) {
+              nearest = frame->mPts - pts;
+              nearestFrame = frame;
+              }
+            }
+          else if (pts > frame->mPtsEnd) {
+            if (!nearest || ((pts - frame->mPtsEnd) < nearest)) {
+              nearest = pts - frame->mPts;
+              nearestFrame = frame;
+              }
+            }
+          }
         }
+
+      return nearestFrame;
+      }
+    //}}}
+    //{{{
+    bool isLoaded (int64_t pts, int frames) {
+
+      for (auto frame = 0; frame < frames; frame++)
+        if (!findFrame (pts))
+          return false;
 
       return true;
       }
     //}}}
+
     //{{{
-    cVidFrame* findNearestFrameByPts (uint64_t pts) {
-    // find first vidFrame on or past pts
-    // - returns nullPtr if no frame loaded yet
-
-      uint64_t nearest = 0;
-      cVidFrame* nearestFrame = nullptr;
-
-      for (auto frame : mFrames)
-        if (frame->mLoaded)
-          if ((pts >= frame->mPts) && (pts < frame->mPtsEnd))
-            return frame;
-           else {
-             if (pts < frame->mPts) {
-               if (!nearest || ((frame->mPts - pts) < nearest)) {
-                 nearest = frame->mPts - pts;
-                 nearestFrame = frame;
-                 }
-               }
-             else if (pts > frame->mPtsEnd) {
-               if (!nearest || ((pts - frame->mPtsEnd) < nearest)) {
-                 nearest = pts - frame->mPts;
-                 nearestFrame = frame;
-                 }
-               }
-             }
-
-      return nearestFrame;
+    void setPid (int pid) {
+      mPid = pid;
+      invalidateFrames();
       }
     //}}}
 
     //{{{
     void drawFrames (ID2D1DeviceContext* dc, const cRect& rect, IDWriteTextFormat* textFormat,
-                    ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
-                    ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
-                    uint64_t playPts, float& maxY) {
+                     ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
+                     ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
+                     int64_t playPts, float& maxY) {
 
-      const auto vidFrameWidthPts = 90000.f / 25.f;
-      const auto audFrameWidthPts = 1152.f * 90000.f / 48000.f;
-      const auto pixPerPts = kFrameWidth / audFrameWidthPts;
-      const auto w = kFrameWidth * vidFrameWidthPts / audFrameWidthPts;
-
+      const auto vidFrameWidth = 3600.f * kPixPerPts; // 25fps
       auto y = kDrawFramesCentreY;
 
       maxY = y;
       auto index = 0;
       for (auto frame : mFrames) {
         int64_t diff = frame->mPts - playPts;
-        auto x = rect.left + (rect.right - rect.left)/2.f + float(diff) * pixPerPts;
-        auto y1 = y + kIndexHeight + kGap;
+        auto x = rect.left + (rect.right - rect.left)/2.f + (diff * kPixPerPts);
+        auto y1 = y + kIndexHeight + 1.f;
 
         // draw index
-        dc->FillRectangle (RectF(x, y1, x+w-kGap, y1+ kIndexHeight), yellow);
+        dc->FillRectangle (RectF(x,y1, x + vidFrameWidth - 1.f,y1 + kIndexHeight), yellow);
         auto wstr (to_wstring (index));
-        dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat, RectF(x, y1, x+w-kGap, y1+ kIndexHeight), black);
-        y1 += kIndexHeight + kGap;
+        dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat,
+                      RectF(x,y1, x + vidFrameWidth - 1.f,y1 + kIndexHeight), black);
+        y1 += kIndexHeight + 1.f;
 
         maxY = max (maxY, y1);
         if (frame->mLoaded) {
           // draw type
           wstr = frame->mFrameType;
-          dc->FillRectangle (RectF(x, y1, x+w-kGap, y1+kIndexHeight), blue);
-          dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat, RectF(x, y1, x+w-kGap, y1+ kIndexHeight), black);
-          y1 += kIndexHeight + kGap;
+          dc->FillRectangle (RectF(x, y1, x + vidFrameWidth - 1.f, y1 + kIndexHeight), blue);
+          dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat,
+                        RectF(x,y1, x + vidFrameWidth - 1.f,y1 + kIndexHeight), black);
+          y1 += kIndexHeight + 1.f;
 
           // draw size
-          auto l = frame->mPesLen / 1000.f;
-          dc->FillRectangle (RectF(x, y1, x+w-kGap, y1+l), white);
+          auto l = frame->mPesSize / 1000.f;
+          dc->FillRectangle (RectF(x,y1, x + vidFrameWidth - 1.f,y1 + l), white);
           maxY = max (maxY,y1+l);
 
-          wstr = (frame->mPesLen >= 1000) ? to_wstring (frame->mPesLen / 1000) + L"k" : to_wstring (frame->mPesLen);
-          dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat, RectF(x, y1, x+w-kGap, y1+ kIndexHeight), black);
+          wstr = (frame->mPesSize >= 1000) ? to_wstring (frame->mPesSize / 1000) + L"k" : to_wstring (frame->mPesSize);
+          dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat,
+                        RectF(x,y1, x + vidFrameWidth - 1.f,y1 + kIndexHeight), black);
           }
 
         index++;
@@ -1209,112 +611,101 @@ private:
 
   protected:
     //{{{
-    bool vidDecodePes (cPidInfo* pidInfo, uint64_t basePts, char frameType, bool skipped) {
+    bool vidDecodePes (cPidInfo* pidInfo, bool skip) {
 
       bool decoded = false;
-      auto pesLen = int (pidInfo->mBufPtr - pidInfo->mBuffer);
-      cLog::log (frameType  == 'I' ? LOGINFO : LOGINFO1,
-                 "vidPes %c %d pts:%s dts:%s %s",
-                 frameType, pesLen,
-                 getPtsStr (pidInfo->mPts - basePts),
-                 getPtsStr (pidInfo->mDts - basePts),
-                 skipped ? "skipped":"");
 
-      mBitstream.Data = pidInfo->mBuffer;
-      mBitstream.DataOffset = 0;
-      mBitstream.DataLength = pesLen;
-      mBitstream.MaxLength = pesLen;
-      mBitstream.TimeStamp = pidInfo->mPts - basePts;
+      if (pidInfo->mPid == mPid) {
+        auto pesSize = int (pidInfo->mBufPtr - pidInfo->mBuffer);
+        char frameType = getFrameType (pidInfo->mBuffer, pesSize, pidInfo->mStreamType);
+        cLog::log (LOGINFO1, "vPes " + dec (pesSize,5) +
+                             " pts:" + getPtsString(pidInfo->mPts) +
+                             " " + string (&frameType,1) +
+                             (skip ? " skip":""));
 
-      if (!mNumSurfaces) {
-        //{{{  allocate decoder surfaces, init decoder
-        memset (&mVideoParams, 0, sizeof(mVideoParams));
-        mVideoParams.mfx.CodecId = (pidInfo->mStreamType == 27) ? MFX_CODEC_AVC : MFX_CODEC_MPEG2;
-        mVideoParams.IOPattern = kVideoMemory ? MFX_IOPATTERN_OUT_VIDEO_MEMORY : MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
+        mBitstream.Data = pidInfo->mBuffer;
+        mBitstream.DataOffset = 0;
+        mBitstream.DataLength = pesSize;
+        mBitstream.MaxLength = pesSize;
+        mBitstream.TimeStamp = pidInfo->mPts;
 
-        // read header
-        mfxStatus status = MFXVideoDECODE_DecodeHeader (mSession, &mBitstream, &mVideoParams);
-        if (status == MFX_ERR_NONE) {
-          //{{{  query surfaces
-          mfxFrameAllocRequest frameAllocRequest;
-          memset (&frameAllocRequest, 0, sizeof(frameAllocRequest));
-          status =  MFXVideoDECODE_QueryIOSurf (mSession, &mVideoParams, &frameAllocRequest);
-          mNumSurfaces = frameAllocRequest.NumFrameSuggested;
-          //}}}
-          auto width = MSDK_ALIGN32 (frameAllocRequest.Info.Width);
-          auto height = MSDK_ALIGN32 (frameAllocRequest.Info.Height);
+        if (!mNumSurfaces) {
+          //{{{  allocate decoder surfaces, init decoder
+          memset (&mVideoParams, 0, sizeof(mVideoParams));
+          mVideoParams.mfx.CodecId = (pidInfo->mStreamType == 27) ? MFX_CODEC_AVC : MFX_CODEC_MPEG2;
+          mVideoParams.IOPattern = MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
 
-          mfxU16 outWidth;
-          mfxU16 outHeight;
-
-          if (kRgba) {
-            memset (&mVppParams, 0, sizeof(mVppParams));
-            //{{{  VPP Input data
-            mVppParams.vpp.In.FourCC = MFX_FOURCC_NV12;
-            mVppParams.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
-            mVppParams.vpp.In.CropX = 0;
-            mVppParams.vpp.In.CropY = 0;
-            mVppParams.vpp.In.CropW = mVideoParams.mfx.FrameInfo.CropW;
-            mVppParams.vpp.In.CropH = mVideoParams.mfx.FrameInfo.CropH;
-            mVppParams.vpp.In.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
-            mVppParams.vpp.In.FrameRateExtN = 30;
-            mVppParams.vpp.In.FrameRateExtD = 1;
-            mVppParams.vpp.In.Width = MSDK_ALIGN16 (mVppParams.vpp.In.CropW);
-            mVppParams.vpp.In.Height =
-              (MFX_PICSTRUCT_PROGRESSIVE == mVppParams.vpp.In.PicStruct) ?
-                MSDK_ALIGN16(mVppParams.vpp.In.CropH) : MSDK_ALIGN32(mVppParams.vpp.In.CropH);
+          // decode header
+          mfxStatus status = MFXVideoDECODE_DecodeHeader (mSession, &mBitstream, &mVideoParams);
+          if (status == MFX_ERR_NONE) {
+            //{{{  query surfaces
+            mfxFrameAllocRequest frameAllocRequest;
+            memset (&frameAllocRequest, 0, sizeof(frameAllocRequest));
+            status =  MFXVideoDECODE_QueryIOSurf (mSession, &mVideoParams, &frameAllocRequest);
+            mNumSurfaces = frameAllocRequest.NumFrameSuggested;
             //}}}
-            //{{{  VPP Output data
-            mVppParams.vpp.Out.FourCC = MFX_FOURCC_RGB4;
-            mVppParams.vpp.Out.ChromaFormat = 0;
-            mVppParams.vpp.Out.CropX = 0;
-            mVppParams.vpp.Out.CropY = 0;
-            mVppParams.vpp.Out.CropW = mVideoParams.mfx.FrameInfo.CropW;
-            mVppParams.vpp.Out.CropH = mVideoParams.mfx.FrameInfo.CropW;
-            mVppParams.vpp.Out.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
-            mVppParams.vpp.Out.FrameRateExtN = 30;
-            mVppParams.vpp.Out.FrameRateExtD = 1;
-            mVppParams.vpp.Out.Width = MSDK_ALIGN16 (mVppParams.vpp.Out.CropW);
-            mVppParams.vpp.Out.Height =
-              (MFX_PICSTRUCT_PROGRESSIVE == mVppParams.vpp.Out.PicStruct) ?
-                MSDK_ALIGN16(mVppParams.vpp.Out.CropH) : MSDK_ALIGN32(mVppParams.vpp.Out.CropH);
-            //}}}
-            mVppParams.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY | MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
+            auto width = MSDK_ALIGN32 (frameAllocRequest.Info.Width);
+            auto height = MSDK_ALIGN32 (frameAllocRequest.Info.Height);
 
-            // Query number of required surfaces for VPP, [0] - in, [1] - out
-            mfxFrameAllocRequest vppFrameAllocRequest[2];
-            memset (&vppFrameAllocRequest, 0, sizeof (mfxFrameAllocRequest) * 2);
-            status = MFXVideoVPP_QueryIOSurf (mSession, &mVppParams, vppFrameAllocRequest);
-            mNumVPPInSurfaces = vppFrameAllocRequest[0].NumFrameSuggested;
-            mNumVPPOutSurfaces = vppFrameAllocRequest[1].NumFrameSuggested;
+            mfxU16 outWidth;
+            mfxU16 outHeight;
+            if (kRgba) {
+              memset (&mVppParams, 0, sizeof(mVppParams));
+              //{{{  VPP Input data
+              mVppParams.vpp.In.FourCC = MFX_FOURCC_NV12;
+              mVppParams.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+              mVppParams.vpp.In.CropX = 0;
+              mVppParams.vpp.In.CropY = 0;
+              mVppParams.vpp.In.CropW = mVideoParams.mfx.FrameInfo.CropW;
+              mVppParams.vpp.In.CropH = mVideoParams.mfx.FrameInfo.CropH;
+              mVppParams.vpp.In.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
+              mVppParams.vpp.In.FrameRateExtN = 30;
+              mVppParams.vpp.In.FrameRateExtD = 1;
+              mVppParams.vpp.In.Width = MSDK_ALIGN16 (mVppParams.vpp.In.CropW);
+              mVppParams.vpp.In.Height =
+                (MFX_PICSTRUCT_PROGRESSIVE == mVppParams.vpp.In.PicStruct) ?
+                  MSDK_ALIGN16(mVppParams.vpp.In.CropH) : MSDK_ALIGN32(mVppParams.vpp.In.CropH);
+              //}}}
+              //{{{  VPP Output data
+              mVppParams.vpp.Out.FourCC = MFX_FOURCC_RGB4;
+              mVppParams.vpp.Out.ChromaFormat = 0;
+              mVppParams.vpp.Out.CropX = 0;
+              mVppParams.vpp.Out.CropY = 0;
+              mVppParams.vpp.Out.CropW = mVideoParams.mfx.FrameInfo.CropW;
+              mVppParams.vpp.Out.CropH = mVideoParams.mfx.FrameInfo.CropW;
+              mVppParams.vpp.Out.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
+              mVppParams.vpp.Out.FrameRateExtN = 30;
+              mVppParams.vpp.Out.FrameRateExtD = 1;
+              mVppParams.vpp.Out.Width = MSDK_ALIGN16 (mVppParams.vpp.Out.CropW);
+              mVppParams.vpp.Out.Height =
+                (MFX_PICSTRUCT_PROGRESSIVE == mVppParams.vpp.Out.PicStruct) ?
+                  MSDK_ALIGN16(mVppParams.vpp.Out.CropH) : MSDK_ALIGN32(mVppParams.vpp.Out.CropH);
+              //}}}
+              mVppParams.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY | MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
 
-            outWidth = (mfxU16)MSDK_ALIGN32(vppFrameAllocRequest[1].Info.Width);
-            outHeight = (mfxU16)MSDK_ALIGN32(vppFrameAllocRequest[1].Info.Height);
-            }
+              // Query number of required surfaces for VPP, [0] - in, [1] - out
+              mfxFrameAllocRequest vppFrameAllocRequest[2];
+              memset (&vppFrameAllocRequest, 0, sizeof (mfxFrameAllocRequest) * 2);
+              status = MFXVideoVPP_QueryIOSurf (mSession, &mVppParams, vppFrameAllocRequest);
+              mNumVPPInSurfaces = vppFrameAllocRequest[0].NumFrameSuggested;
+              mNumVPPOutSurfaces = vppFrameAllocRequest[1].NumFrameSuggested;
 
-          cLog::log (LOGNOTICE,"vidDecoder %d %d - allocate numSurfaces %d %d %d",
-                     width, height, mNumSurfaces, mNumVPPInSurfaces, mNumVPPOutSurfaces);
-          mNumSurfaces += mNumVPPInSurfaces;
-          mSurfaces = new mfxFrameSurface1*[mNumSurfaces];
-          if (kVideoMemory) {
-            //{{{  alloc video memory
-            frameAllocRequest.Type |= WILL_READ;
-            mfxFrameAllocResponse frameAllocResponse;
-            status = mAllocator.Alloc (mAllocator.pthis, &frameAllocRequest, &frameAllocResponse);
-            for (int i = 0; i < mNumSurfaces; i++) {
-              mSurfaces[i] = new mfxFrameSurface1;
-              memset (mSurfaces[i], 0, sizeof (mfxFrameSurface1));
-              memcpy (&mSurfaces[i]->Info, &mVideoParams.mfx.FrameInfo, sizeof(mfxFrameInfo));
-              mSurfaces[i]->Data.MemId = frameAllocResponse.mids[i];
+              outWidth = (mfxU16)MSDK_ALIGN32(vppFrameAllocRequest[1].Info.Width);
+              outHeight = (mfxU16)MSDK_ALIGN32(vppFrameAllocRequest[1].Info.Height);
               }
-            }
-            //}}}
-          else {
-            //{{{  alloc system memory
+
+            cLog::log (LOGNOTICE, "vidDecoder " + dec(width) + "," + dec(height) +
+                                  " " + dec(mNumSurfaces) +
+                                  "," + dec(mNumVPPInSurfaces) +
+                                  "," + dec(mNumVPPOutSurfaces));
+            mNumSurfaces += mNumVPPInSurfaces;
+            mSurfaces = new mfxFrameSurface1*[mNumSurfaces];
+            //{{{  alloc surfaces in system memory
             for (int i = 0; i < mNumSurfaces; i++) {
               mSurfaces[i] = new mfxFrameSurface1;
               memset (mSurfaces[i], 0, sizeof (mfxFrameSurface1));
               memcpy (&mSurfaces[i]->Info, &mVideoParams.mfx.FrameInfo, sizeof(mfxFrameInfo));
+
               // allocate NV12 followed by planar u, planar v
               mSurfaces[i]->Data.Y = new mfxU8[width * height * 12 / 8];
               mSurfaces[i]->Data.U = mSurfaces[i]->Data.Y + width * height;
@@ -1331,91 +722,103 @@ private:
                 mSurfaces2[i] = new mfxFrameSurface1;
                 memset (mSurfaces2[i], 0, sizeof(mfxFrameSurface1));
                 memcpy (&mSurfaces2[i]->Info, &mVppParams.vpp.Out, sizeof(mfxFrameInfo));
+
                 mSurfaces2[i]->Data.Y = new mfxU8[outWidth * outHeight * 32 / 8];
                 mSurfaces2[i]->Data.U = mSurfaces2[i]->Data.Y;
                 mSurfaces2[i]->Data.V = mSurfaces2[i]->Data.Y;
                 mSurfaces2[i]->Data.Pitch = outWidth*4;
                 }
               }
-            }
             //}}}
 
-          status = MFXVideoDECODE_Init (mSession, &mVideoParams);
-          status = MFXVideoVPP_Init (mSession, &mVppParams);
-          }
-
-        if (kDebugVidDumpPes) {
-          string fileName = pidInfo->mStreamType == 27 ?
-            "C:\\Users\\colin\\Desktop\\test.h264" : "C:\\Users\\colin\\Desktop\\test.m2v";
-          mVidFile = fopen (fileName.c_str(), "wb");
-          }
-        }
-        //}}}
-
-      if (mNumSurfaces) {
-        // decode PES bitstream
-        if (skipped)
-          mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
-
-        // allocate vidFrame for this PES
-        mFrames[mLoadFrame++ % mFrames.size()]->setPes (pidInfo->mPts - basePts, 3600, pesLen, frameType);
-
-        mfxStatus status = MFX_ERR_NONE;
-        while (status >= MFX_ERR_NONE || status == MFX_ERR_MORE_SURFACE) {
-          int index = getFreeSurfaceIndex (mSurfaces, mNumSurfaces);
-          mfxFrameSurface1* surface = nullptr;
-          mfxSyncPoint syncDecode = nullptr;
-          cLog::log (LOGINFO3, "vidFrame use surface" + dec (index));
-          status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, mSurfaces[index], &surface, &syncDecode);
-          if (status == MFX_ERR_NONE) {
-            if (kRgba) {
-              //{{{  vpp rgba
-              auto index2 = getFreeSurfaceIndex (mSurfaces2, mNumVPPOutSurfaces);
-              mfxSyncPoint syncVpp = nullptr;
-              status = MFXVideoVPP_RunFrameVPPAsync (mSession, surface, mSurfaces2[index2], NULL, &syncVpp);
-
-              status = mSession.SyncOperation (syncDecode, 60000);
-              status = mSession.SyncOperation (syncVpp, 60000);
-
-              surface = mSurfaces2[index2];
-              }
-              //}}}
-            else
-              status = mSession.SyncOperation (syncDecode, 60000);
-            if (status == MFX_ERR_NONE) {
-              //{{{  got decoded frame, set video of vidFrame
-              for (auto frame : mFrames)
-                if (frame->mPts == surface->Data.TimeStamp) {
-                  if (kVideoMemory)
-                    status = mAllocator.Lock (mAllocator.pthis, surface->Data.MemId, &surface->Data);
-                  frame->setNv12 (surface->Data.Y, surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
-                  if (kVideoMemory)
-                    status = mAllocator.Unlock (mAllocator.pthis, surface->Data.MemId, &surface->Data);
-
-                  cLog::log (LOGINFO1, "-> vidFrame pts:" + getPtsStr (surface->Data.TimeStamp));
-                  mLastLoadedPts = surface->Data.TimeStamp;
-                  break;
-                  }
-
-              decoded = true;
-              }
-              //}}}
+            status = MFXVideoDECODE_Init (mSession, &mVideoParams);
+            if (kRgba)
+              status = MFXVideoVPP_Init (mSession, &mVppParams);
             }
           }
+          //}}}
 
-        if (kDebugVidDumpPes)
-          fwrite (pidInfo->mBuffer, 1, pesLen, mVidFile);
+        if (mNumSurfaces) {
+          if (skip)
+            mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
+
+          // allocate vidFrame for this PES
+          mFrames[mLoadFrame++ % mFrames.size()]->setPes (pidInfo->mPts, 90000/25, pesSize, frameType);
+
+          mfxStatus status = MFX_ERR_NONE;
+          while (status >= MFX_ERR_NONE || status == MFX_ERR_MORE_SURFACE) {
+            int index = getFreeSurfaceIndex (mSurfaces, mNumSurfaces);
+            mfxFrameSurface1* surface = nullptr;
+            mfxSyncPoint syncDecode = nullptr;
+            cLog::log (LOGINFO3, "vidFrame use surface" + dec (index));
+            status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, mSurfaces[index], &surface, &syncDecode);
+            if (status == MFX_ERR_NONE) {
+              if (kRgba) {
+                //{{{  vpp rgba
+                auto index2 = getFreeSurfaceIndex (mSurfaces2, mNumVPPOutSurfaces);
+                mfxSyncPoint syncVpp = nullptr;
+                status = MFXVideoVPP_RunFrameVPPAsync (mSession, surface, mSurfaces2[index2], NULL, &syncVpp);
+
+                status = mSession.SyncOperation (syncDecode, 60000);
+                status = mSession.SyncOperation (syncVpp, 60000);
+
+                surface = mSurfaces2[index2];
+                }
+                //}}}
+              else
+                status = mSession.SyncOperation (syncDecode, 60000);
+              if (status == MFX_ERR_NONE) {
+                //{{{  got decoded frame, set video of vidFrame
+                for (auto frame : mFrames)
+                  if (frame->mPts == surface->Data.TimeStamp) {
+                    frame->setNv12 (surface->Data.Y, surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
+                    cLog::log (LOGINFO2, "-> vidFrame::set - pts:" + getPtsString(surface->Data.TimeStamp));
+                    mLastLoadedPts = surface->Data.TimeStamp;
+                    break;
+                    }
+
+                decoded = true;
+                }
+                //}}}
+              }
+            }
+          }
         }
+
       return decoded;
       }
     //}}}
 
   private:
-    //  vars
-    uint64_t mLastLoadedPts = 0;
-    int mLoadFrame = 0;
-    concurrent_vector<cVidFrame*> mFrames;
+    //{{{
+    int getFreeSurfaceIndex (mfxFrameSurface1** surfaces, mfxU16 poolSize) {
 
+      if (surfaces)
+        for (mfxU16 i = 0; i < poolSize; i++)
+          if (0 == surfaces[i]->Data.Locked)
+            return i;
+
+      return MFX_ERR_NOT_FOUND;
+      }
+    //}}}
+    //{{{
+    void invalidateFrames() {
+
+      mLastLoadedPts = -1;
+      mLoadFrame = 0;
+      for (auto frame : mFrames)
+        frame->invalidate();
+      }
+    //}}}
+
+    // vidFrames
+    int mPid = -1;
+    concurrent_vector<cVidFrame*> mFrames;
+    int mLoadFrame = 0;
+
+    int64_t mLastLoadedPts = -1;
+
+    // mfx decoder
     MFXVideoSession mSession;
     mfxFrameAllocator mAllocator;
     mfxVideoParam mVideoParams;
@@ -1423,14 +826,13 @@ private:
     mfxBitstream mBitstream;
     mfxU16 mNumSurfaces = 0;
 
+    mfxVersion kMfxVersion = {0,1};
     mfxVideoParam mVppParams;
     mfxU16 mNumVPPInSurfaces = 0;
     mfxU16 mNumVPPOutSurfaces = 0;
 
     mfxFrameSurface1** mSurfaces;
     mfxFrameSurface1** mSurfaces2;
-
-    FILE* mVidFile = nullptr;
     };
   //}}}
 
@@ -1438,7 +840,7 @@ private:
   class cVidFrameView : public cView {
   public:
     //{{{
-    cVidFrameView (cAppWindow* window, float width, float height)
+    cVidFrameView (cD2dWindow* window, float width, float height)
         : cView("vidFrame", window, width, height) {
       mPin = true;
       }
@@ -1460,7 +862,7 @@ private:
         return cView::onWheel (delta, pos);
       else {
         appWindow->mPlaying = ePause;
-        appWindow->incPlayPts (-int64_t(delta * 3600 / 120));
+        appWindow->incPlayPts (-int64_t(delta * (90000/25) / 120));
         }
 
       return true;
@@ -1474,7 +876,7 @@ private:
       else {
         auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
         appWindow->mPlaying = ePause;
-        appWindow->incPlayPts (int64_t (-inc.x * 1152 * 48 / 90 / 8));
+        appWindow->incPlayPts (int64_t (-inc.x * kAudSamplesPerAacFrame * 48 / 90 / 8));
         return true;
         }
       }
@@ -1495,7 +897,7 @@ private:
 
       auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
 
-      auto vidframe = appWindow->mVidTs->findNearestFrameByPts (appWindow->getPlayPtsWithVidOffset());
+      auto vidframe = appWindow->mVidTs->findNearestFrame (appWindow->getPlayPts());
       if (vidframe && (vidframe->mPts != appWindow->mBitmapPts)) {
         appWindow->mBitmap = vidframe->makeBitmap (dc, appWindow->mBitmap);
         appWindow->mBitmapPts = vidframe->mPts;
@@ -1511,10 +913,92 @@ private:
     };
   //}}}
   //{{{
+  class cFramesDebugBox : public cBox {
+  public:
+    //{{{
+    cFramesDebugBox (cD2dWindow* window, float width, float height)
+        : cBox("frames", window, width, height) {
+
+      mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
+        DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 11.f, L"en-us",
+        &mTextFormat);
+      mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_CENTER);
+
+      mWindow->getDc()->CreateSolidColorBrush (kTransparentBlack, &mBrush);
+      }
+    //}}}
+    //{{{
+    virtual ~cFramesDebugBox() {
+      mTextFormat->Release();
+      mBrush->Release();
+      }
+    //}}}
+
+    //{{{
+    bool onWheel (int delta, cPoint pos)  {
+
+      auto ptsInc = (pos.y > 40.f) ? (90000/25) : (kAudSamplesPerAacFrame * 90 / 48);
+
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+      appWindow->incPlayPts (-int64_t(delta * ptsInc / 120));
+      appWindow->setPlaying (cAppWindow::ePause);
+
+      return true;
+      }
+    //}}}
+    //{{{
+    bool onMove (bool right, cPoint pos, cPoint inc) {
+
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+
+      appWindow->setPlaying (cAppWindow::ePause);
+      auto pixPerPts = 18.f * 48 / (kAudSamplesPerAacFrame * 90);
+      appWindow->incPlayPts (int64_t (-inc.x / pixPerPts));
+
+      return true;
+      }
+    //}}}
+    //{{{
+    bool onUp (bool right, bool mouseMoved, cPoint pos) {
+      if (!mouseMoved)
+        togglePin();
+      return true;
+      }
+    //}}}
+    //{{{
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      if (mPin)
+        dc->FillRectangle (mRect, mBrush);
+
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+      appWindow->mAudTs->drawFrames (dc, mRect, mTextFormat,
+        mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
+        appWindow->getPlayPts());
+
+      float maxY = 0;
+      appWindow->mVidTs->drawFrames (dc, mRect, mTextFormat,
+        mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
+        appWindow->getPlayPts(), maxY);
+
+      dc->FillRectangle (RectF((getWidth()/2)-1, 0, (getWidth()/2)+1, maxY),
+                         mPin ? mWindow->getYellowBrush() : mWindow->getGreyBrush());
+
+      mLayoutHeight = maxY;
+      layout();
+      }
+    //}}}
+
+  private:
+    IDWriteTextFormat* mTextFormat = nullptr;
+    ID2D1SolidColorBrush* mBrush = nullptr;
+    };
+  //}}}
+  //{{{
   class cTimecodeBox : public cBox {
   public:
     //{{{
-    cTimecodeBox (cAppWindow* window, float width, float height, uint64_t& playPts, uint64_t& lengthPts)
+    cTimecodeBox (cD2dWindow* window, float width, float height, int64_t& playPts, int64_t& lengthPts)
         : cBox("timecode", window, width, height), mPlayPts(playPts), mLengthPts(lengthPts) {
 
       mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
@@ -1541,7 +1025,7 @@ private:
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
 
-      string str = getPtsStr (mPlayPts) + " " + getPtsStr (mLengthPts);
+      string str = getPtsString(mPlayPts) + " " + getPtsString(mLengthPts);
       wstring wstr(str.begin(), str.end());
 
       IDWriteTextLayout* textLayout;
@@ -1566,8 +1050,8 @@ private:
     //}}}
 
   private:
-    uint64_t& mPlayPts;
-    uint64_t& mLengthPts;
+    int64_t& mPlayPts;
+    int64_t& mLengthPts;
 
     IDWriteTextFormat* mTextFormat = nullptr;
     ID2D1SolidColorBrush* mBrush = nullptr;
@@ -1577,7 +1061,7 @@ private:
   class cProgressBox : public cBox {
   public:
     //{{{
-    cProgressBox (cAppWindow* window, float width, float height)
+    cProgressBox (cD2dWindow* window, float width, float height)
         : cBox("progress", window, width, height) {
       mPin = true;
       }
@@ -1620,162 +1104,34 @@ private:
 
       const float ylen = 2.f;
 
-      // draw analysePos yellow bar
+      // draw analPos blueBar
       auto r = mRect;
-      r.left = getWidth() * (float)appWindow->getAnalyseStreamPos() / (float)appWindow->getStreamSize();
+      r.left = getWidth() * appWindow->getStreamPosFrac();
       r.top = r.bottom - 3*ylen;
       dc->FillRectangle (r, mWindow->getBlueBrush());
 
-      // draw vidLastPts yellow bar
+      // draw vidLastPts yellowBar
       r.left = mRect.left;
-      r.right = getWidth() * (float)appWindow->mVidTs->getLastLoadedPts() / (float)appWindow->getLengthPts();
+      r.right = getWidth() * (float)(appWindow->mVidTs->getLastLoadedPts() - appWindow->mAnalTs->getBasePts())
+                                     / (float)appWindow->getLengthPts();
       r.top = r.bottom - ylen;
       dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
 
-      // draw audLastPts yellow bar
+      // draw audLastPts yellowBar
       r.bottom = r.top;
       r.top -= ylen;
-      r.right = getWidth() * (float)appWindow->mAudTs->getLastLoadedPts() / (float)appWindow->getLengthPts();
+      r.right = getWidth() * (float)(appWindow->mAudTs->getLastLoadedPts() - appWindow->mAnalTs->getBasePts())
+                                    / (float)appWindow->getLengthPts();
       dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
 
-      // draw playPts yellow bar
+      // draw playPts yellowBar
       r.bottom = r.top;
       r.top -= ylen;
-      r.right = getWidth() * (float)appWindow->getPlayPts() / (float)appWindow->getLengthPts();
+      r.right = getWidth() * (float)(appWindow->getPlayPts() - appWindow->mAnalTs->getBasePts())
+                                    / (float)appWindow->getLengthPts();
       dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
       }
     //}}}
-    };
-  //}}}
-
-  //{{{
-  class cFramesDebugBox : public cBox {
-  public:
-    //{{{
-    cFramesDebugBox (cAppWindow* window, float width, float height)
-        : cBox("frames", window, width, height) {
-
-      mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-        DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 11.f, L"en-us",
-        &mTextFormat);
-      mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_CENTER);
-
-      mWindow->getDc()->CreateSolidColorBrush (kTransparentBlack, &mBrush);
-      }
-    //}}}
-    //{{{
-    virtual ~cFramesDebugBox() {
-      mTextFormat->Release();
-      mBrush->Release();
-      }
-    //}}}
-
-    //{{{
-    bool onWheel (int delta, cPoint pos)  {
-
-      auto ptsInc = (pos.y > 40.f) ? 3600 : (1152 * 90000 / 48000);
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      appWindow->incPlayPts (-int64_t(delta * ptsInc / 120));
-      appWindow->setPlaying (cAppWindow::ePause);
-
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onMove (bool right, cPoint pos, cPoint inc) {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
-      appWindow->setPlaying (cAppWindow::ePause);
-      auto pixPerPts = 18.f * 48000 / (1152 * 90000);
-      appWindow->incPlayPts (int64_t (-inc.x / pixPerPts));
-
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onUp (bool right, bool mouseMoved, cPoint pos) {
-      if (!mouseMoved)
-        togglePin();
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      if (mPin)
-        dc->FillRectangle (mRect, mBrush);
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      appWindow->mAudTs->drawFrames (dc, mRect, mTextFormat,
-        mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
-        appWindow->getPlayPts());
-
-      float maxY = 0;
-      appWindow->mVidTs->drawFrames (dc, mRect, mTextFormat,
-        mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
-        appWindow->getPlayPts(), maxY);
-
-      dc->FillRectangle (RectF((getWidth()/2)-1, 0, (getWidth()/2)+1, maxY),
-                         mPin ? mWindow->getYellowBrush() : mWindow->getGreyBrush());
-
-      mLayoutHeight = maxY;
-      layout();
-      }
-    //}}}
-
-    private:
-      IDWriteTextFormat* mTextFormat = nullptr;
-      ID2D1SolidColorBrush* mBrush = nullptr;
-    };
-  //}}}
-  //{{{
-  class cPidsBox : public cBox {
-  public:
-    //{{{
-    cPidsBox (cAppWindow* window, float width, float height, cAnalyseTransportStream* ts)
-       : cBox("pids", window, width, height), mTs(ts) {
-     }
-    //}}}
-    virtual ~cPidsBox() {}
-
-    //{{{
-    bool onDown (bool right, cPoint pos)  {
-      togglePin();
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      mTs->drawPids (dc, mRect, mWindow->getTextFormat(), mWindow->getWhiteBrush(), mWindow->getBlueBrush());
-      }
-    //}}}
-
-  private:
-    cAnalyseTransportStream* mTs;
-    };
-  //}}}
-  //{{{
-  class cServicesBox : public cBox {
-  public:
-    //{{{
-    cServicesBox (cAppWindow* window, float width, float height, cAnalyseTransportStream* ts)
-        : cBox("services", window, width, height), mTs(ts) {
-      }
-    //}}}
-    virtual ~cServicesBox() {}
-
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-      mTs->drawServices (dc, mRect, mWindow->getTextFormat(), mWindow->getWhiteBrush());
-      }
-    //}}}
-
-  private:
-    cAnalyseTransportStream* mTs;
     };
   //}}}
 
@@ -1783,18 +1139,17 @@ private:
   //{{{  gets
   ePlaying getPlaying() { return mPlaying; }
 
-  uint64_t getPlayPts() { return mPlayPts; }
-  uint64_t getLengthPts() { return mLengthPts; }
-  uint64_t getPlayPtsWithVidOffset() { return mPlayPts + int64_t(mVidOffset * 3600); }
+  int64_t getPlayPts() { return mPlayPts + mAnalTs->getBasePts(); }
+  int64_t getLengthPts() { return mAnalTs->getLengthPts(); }
 
-  int64_t getAnalyseStreamPos() { return mAnalyseStreamPos; }
-  int64_t getStreamSize() { return mStreamSize; }
+  float getStreamPosFrac() { return float(mStreamPos) / float(mStreamSize); }
   //}}}
   //{{{  sets
   void setPlaying (ePlaying playing) { mPlaying = playing; }
 
   //{{{
-  void setPlayPts (uint64_t playPts) {
+  void setPlayPts (int64_t playPts) {
+  // mPlayPts is offset from mBasePts
 
     if (playPts < 0)
       mPlayPts = 0;
@@ -1809,11 +1164,10 @@ private:
     }
   //}}}
   void incPlayPts (int64_t incPts) { setPlayPts (mPlayPts + incPts); }
-
-  void setLengthPts (uint64_t lengthPts) { mLengthPts = lengthPts; }
   //}}}
   //{{{
   void togglePlay() {
+
     switch (mPlaying) {
       case ePause: mPlaying = ePlay; break;
       case eScrub: mPlaying = ePlay; break;
@@ -1823,208 +1177,309 @@ private:
   //}}}
 
   //{{{
-  void analyseThread() {
+  void bdaDumpThread (cBda* bda, int frequency, const string& fileName) {
 
-    // find service
-    cLog::log (LOGNOTICE, "analyseThread - start");
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::log (LOGNOTICE, "bdaDumpThread - start");
 
-    const int kChunkSize = 4096*188;
-    const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
+    bda->createGraph (frequency, fileName);
 
-    // open file and find size
-    auto file = fopen (mFileName.c_str(), "rb");
-    _fseeki64(file, 0, SEEK_END);
-    mStreamSize = _ftelli64 (file);
-
-    // find service - audPid, vidPid, basePts
-    _fseeki64 (file, 0, SEEK_SET);
-    auto chunkRead = fread (chunkBuf, 1, kChunkSize, file);
-    mAnalyseTs->demux (chunkBuf, chunkRead, mAnalyseStreamPos, false, -1, -1, 0);
-    mAnalyseTs->selectService (mAudPid, mVidPid, mBasePts);
-    cLog::log (LOGNOTICE, "analyseThread - service audPid:" + dec(mAudPid) +
-                          " vidPid:" + dec(mVidPid) +
-                          " basePts:" + getPtsStr (mBasePts));
-
-    // find stream length - skip to near end to find stream length from aud as pts
-    _fseeki64 (file, mStreamSize - kChunkSize, SEEK_SET);
-    chunkRead = fread (chunkBuf, 1, kChunkSize, file);
-    auto chunkPtr = chunkBuf;
-    auto streamPos = mStreamSize - kChunkSize;
-    while (chunkRead >= 188) {
-      auto bytesUsed = mAnalyseTs->demux (chunkPtr, chunkRead, streamPos, chunkPtr == chunkBuf,
-                                          mAudPid, mVidPid, mBasePts);
-      streamPos += bytesUsed;
-      chunkPtr += bytesUsed;
-      chunkRead -= bytesUsed;
-      }
-    setLengthPts (mAnalyseTs->getPts());
-    cLog::log (LOGNOTICE, "analyseThread - length " + getPtsStr (getLengthPts()));
-
-    // parse service from the start, discard posStream index, update progress bar as we go
-    _fseeki64 (file, 0, SEEK_SET);
-    mAnalyseStreamPos = 0;
-    mAnalyseTs->clearStreamPosIndex();
     while (true) {
-      chunkRead = fread (chunkBuf, 1, kChunkSize, file);
-      if (chunkRead < 188)
-        break;
-
-      auto chunkPtr = chunkBuf;
-      while (chunkRead >= 188) {
-        auto bytesUsed = mAnalyseTs->demux (chunkPtr, chunkRead, mAnalyseStreamPos, chunkPtr == chunkBuf,
-                                            mAudPid, mVidPid, mBasePts);
-        mAnalyseStreamPos += bytesUsed;
-        chunkPtr += bytesUsed;
-        chunkRead -= bytesUsed;
-
-        changed();
-        if (mAnalyseTs->hasFirstVidIframe())
-          mVidIframeSem.notifyAll();
-        }
+      Sleep (100);
       }
-    fclose (file);
-    free (chunkBuf);
 
-    mAnalyseTs->printPidInfos();
-    mAnalyseTs->printPrograms();
-    mAnalyseTs->printServices();
-    cLog::log (LOGNOTICE, "analyseThread - exit - found vidPos:%d  audPos:%d",
-                           mAnalyseTs->mVidPos.size(), mAnalyseTs->mAudPos.size());
+    cLog::log (LOGNOTICE, "bdaDumpThread - exit");
+    CoUninitialize();
     }
   //}}}
   //{{{
-  void audioLoadThread() {
+  void analThread() {
 
-    cLog::log (LOGNOTICE, "audioLoadThread - start");
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::log (LOGNOTICE, "analThread - start");
+
+    auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
+    //{{{  get streamSize
+    struct _stat64 buf;
+    _fstati64 (file, &buf);
+    mStreamSize = buf.st_size ;
+    //}}}
+
+    const auto kChunkSize = 2048*188;
+    const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
+    //{{{  parse front of stream until first service
+    int64_t streamPos = 0;
+
+    cService* service = nullptr;
+    while (!service) {
+      auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
+      auto chunkPtr = chunkBuf;
+      while (chunkBytesLeft >= 188) {
+        auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, false, -1);
+        streamPos += bytesUsed;
+        chunkPtr += bytesUsed;
+        chunkBytesLeft -= (int)bytesUsed;
+        }
+
+      service = mAnalTs->getService (0);
+      }
+
+    // select first service
+    mVidTs->setPid (service->getVidPid());
+    mAudTs->setPid (service->getAudPid());
+    cLog::log (LOGNOTICE, "analThread - first service - vidPid:" + dec(service->getVidPid()) +
+                          " audPid:" + dec(service->getAudPid()));
+
+    mAnalTs->clearStreamPos();
+    //}}}
+    //{{{  parse end of stream for initial lastPts
+    streamPos = mStreamSize - (kChunkSize * 8);
+    _lseeki64 (file, streamPos, SEEK_SET);
+
+    while (streamPos < mStreamSize) {
+      auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
+      auto chunkPtr = chunkBuf;
+      while (chunkBytesLeft >= 188) {
+        auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, chunkPtr == chunkBuf, -1);
+        streamPos += bytesUsed;
+        chunkPtr += bytesUsed;
+        chunkBytesLeft -= (int)bytesUsed;
+        }
+      }
+
+    mAnalTs->clearStreamPos();
+    //}}}
+
+    // analyse stream from start, chase tail, update progress bar
+    mStreamPos = 0;
+    _lseeki64 (file, mStreamPos, SEEK_SET);
+
+    int firstVidSignalCount = 0;
+    int fileDoneCount = 0;
+    while (fileDoneCount < 10) {
+      int64_t bytesToRead = mStreamSize - mStreamPos;
+      if (bytesToRead > kChunkSize) // trim to kChunkSize
+        bytesToRead = kChunkSize;
+      if (bytesToRead >= 188) {
+        // at least 1 packet to read, trim read to packet boundary
+        bytesToRead -= bytesToRead % 188;
+        auto chunkBytesLeft = _read (file, chunkBuf, (unsigned int)bytesToRead);
+        fileDoneCount = 0;
+        if (chunkBytesLeft >= 188) {
+          auto chunkPtr = chunkBuf;
+          while (chunkBytesLeft >= 188) {
+            auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, mStreamPos, mStreamPos == 0, -1);
+            mStreamPos += bytesUsed;
+            chunkPtr += bytesUsed;
+            chunkBytesLeft -= (int)bytesUsed;
+            changed();
+
+            if ((firstVidSignalCount < 3) && (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
+              cLog::log (LOGNOTICE, "analThread - signal " + dec(firstVidSignalCount++));
+              mFirstVidPtsSem.notifyAll();
+              }
+            }
+          }
+        }
+      else {
+        //{{{  check if fileSize changed, 10 goes 100ms second apart before we give up
+        _fstati64 (file, &buf);
+        if (mStreamSize == buf.st_size) {
+          Sleep (100);
+          fileDoneCount++;
+          }
+        else
+          mStreamSize = buf.st_size;
+        }
+        //}}}
+      }
+
+    _close (file);
+    free (chunkBuf);
+
+    cLog::log (LOGNOTICE, "analThread - exit - mStreamPosVector.size:" + dec (mAnalTs->mStreamPosVector.size()));
+    CoUninitialize();
+    }
+  //}}}
+  //{{{
+  void audThread() {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::log (LOGNOTICE, "audThread - start");
     av_register_all();
+
     const int kChunkSize = 2048*188;
     const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
 
-    mVidIframeSem.wait();
-    cLog::log (LOGNOTICE, "audioLoadThread - signalled using audPid:" + dec(mAudPid));
+    cLog::log (LOGNOTICE, "audThread - waiting");
+    mFirstVidPtsSem.wait();
+    cLog::log (LOGNOTICE, "audThread - signalled");
 
-    bool skipped = false;
-    int lastFrame = -1;
+    bool skip = false;
+    int64_t lastJumpStreamPos = -1;
+
     int64_t streamPos = 0;
-    auto file = fopen (mFileName.c_str(), "rb");
+    auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
     while (true) {
-      auto chunkRead = fread (chunkBuf, 1, kChunkSize, file);
-      if (chunkRead < 188)
-        break;
-
       auto chunkPtr = chunkBuf;
-      while (chunkRead >= 188) {
-        // decode a frame
-        auto bytesUsed = mAudTs->demux (chunkPtr, chunkRead, streamPos, skipped, mAudPid, -1, mBasePts);
-        streamPos += bytesUsed;
-        chunkPtr += bytesUsed;
-        chunkRead -= bytesUsed;
-        skipped = false;
-        changed();
-
-        while (mAudTs->loaded (mPlayPts, kAudMaxFrames/2))
+      auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
+      if (chunkBytesLeft < 188) {
+        // end of file
+        while (mAudTs->isLoaded (getPlayPts(), 1))
           mPlayPtsSem.wait();
+        //{{{  jump to pts in stream
+        auto jumpStreamPos = mAnalTs->findStreamPos (mAudTs->getPid(), getPlayPts());
+        streamPos = jumpStreamPos;
+        _lseeki64 (file, streamPos, SEEK_SET);
+        lastJumpStreamPos = jumpStreamPos;
 
-        if (!mAudTs->loaded (mPlayPts, 1) ||
-            (mPlayPts > mAudTs->getLastLoadedPts() + 100000)) {
-          int frame = 0;
-          auto jumpStreamPos = mAnalyseTs->findAudStreamPos (mPlayPts, frame);
-          if ((jumpStreamPos >= 0) && (frame != lastFrame)) {
-            // valid streamPos, but not same frame as last jump
-            cLog::log (LOGINFO, "audioLoadThread - jump pts:%s %c lastPts:%s",
-                       getPtsStr (mPlayPts),
-                       mPlayPts < mAudTs->getLastLoadedPts() ? '<':'>',
-                       getPtsStr (mAudTs->getLastLoadedPts()));
-            streamPos = jumpStreamPos;
-            _fseeki64 (file, streamPos, SEEK_SET);
-            lastFrame = frame;
-            skipped = true;
-            break;
+        chunkBytesLeft = 0;
+        skip = true;
+        //}}}
+        }
+      else {
+        while (chunkBytesLeft >= 188) {
+          //{{{  demux up to a frame
+          // decode a frame
+          auto bytesUsed = mAudTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mAudTs->getPid());
+          streamPos += bytesUsed;
+          chunkPtr += bytesUsed;
+          chunkBytesLeft -= (int)bytesUsed;
+          skip = false;
+          //}}}
+          changed();
+
+          while (mAudTs->isLoaded (getPlayPts(), kAudMaxFrames/2))
+            mPlayPtsSem.wait();
+
+          bool loaded = mAudTs->isLoaded (getPlayPts(), 1);
+          if (!loaded || (getPlayPts() > mAudTs->getLastLoadedPts() + 100000)) {
+            auto jumpStreamPos = mAnalTs->findStreamPos (mAudTs->getPid(), getPlayPts());
+            if (jumpStreamPos != lastJumpStreamPos) {
+              //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
+              cLog::log (LOGINFO, "audThread - jump playPts:" + getPtsString(getPlayPts()) +
+                         (loaded ? " after ":" notLoaded ") + getPtsString(mAudTs->getLastLoadedPts()));
+              streamPos = jumpStreamPos;
+              _lseeki64 (file, streamPos, SEEK_SET);
+              lastJumpStreamPos = jumpStreamPos;
+              chunkBytesLeft = 0;
+              skip = true;
+              break;
+              }
+              //}}}
             }
           }
         }
       }
 
-    fclose (file);
+    _close (file);
     free (chunkBuf);
-    cLog::log (LOGNOTICE, "audioLoadThread - exit");
+
+    cLog::log (LOGNOTICE, "audThread - exit");
+    CoUninitialize();
     }
   //}}}
   //{{{
-  void videoLoadThread() {
+  void vidThread() {
 
-    cLog::log (LOGNOTICE, "videoLoadThread - start");
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::log (LOGNOTICE, "vidThread - start");
 
     const int kChunkSize = 2048*188;
     const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
-    mVidIframeSem.wait();
-    cLog::log (LOGNOTICE, "videoLoadThread - signalled using vidPid:" + dec(mVidPid));
 
-    bool skipped = false;
-    int lastIFrame = -1;
+    cLog::log (LOGNOTICE, "vidThread - waiting");
+    mFirstVidPtsSem.wait();
+    cLog::log (LOGNOTICE, "vidThread - signalled");
+
+    bool skip = false;
+    int64_t lastJumpStreamPos = -1;
+
     int64_t streamPos = 0;
-    auto file = fopen (mFileName.c_str(), "rb");
+    auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
     while (true) {
-      auto chunkRead = fread (chunkBuf, 1, kChunkSize, file);
-      if (chunkRead < 188)
-        break;
-
       auto chunkPtr = chunkBuf;
-      while (chunkRead >= 188) {
-        // decode a frame
-        auto bytesUsed = mVidTs->demux (chunkPtr, chunkRead, streamPos, skipped, -1, mVidPid, mBasePts);
-        streamPos += bytesUsed;
-        chunkPtr += bytesUsed;
-        chunkRead -= bytesUsed;
-        skipped = false;
-        changed();
-
-        while (mVidTs->loaded (getPlayPtsWithVidOffset(), 4))
+      auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
+      if (chunkBytesLeft < 188) {
+        // end of file
+        while (mVidTs->isLoaded (getPlayPts(), 1))
           mPlayPtsSem.wait();
+        //{{{  jump to pts in stream
+        auto jumpStreamPos = mAnalTs->findStreamPos (mVidTs->getPid(), getPlayPts());
+        streamPos = jumpStreamPos;
+        _lseeki64 (file, streamPos, SEEK_SET);
+        lastJumpStreamPos = jumpStreamPos;
 
-        //if ((getPlayPtsWithVidOffset() < mVidTs->getLastLoadedPts()) ||
-        if (!mVidTs->loaded (getPlayPtsWithVidOffset(), 1) ||
-            (getPlayPtsWithVidOffset() > mVidTs->getLastLoadedPts() + 100000)) {
-          int iFrame = 0;
-          auto jumpStreamPos = mAnalyseTs->findVidStreamPos (getPlayPtsWithVidOffset(), iFrame);
-          if ((jumpStreamPos >= 0) && (iFrame != lastIFrame)) {
-            // valid streamPos, but not same iFrame as last jump
-            cLog::log (LOGINFO, "videoLoadThread - jump - playPts:" + getPtsStr (getPlayPtsWithVidOffset()) +
-                       " lastLoadedPts:" + getPtsStr (mVidTs->getLastLoadedPts()) +
-                       (!mVidTs->loaded (getPlayPtsWithVidOffset(), 1) ? " notLoaded" : "") +
-                       ((getPlayPtsWithVidOffset() > mVidTs->getLastLoadedPts() + 100000) ? " after":""));
-            streamPos = jumpStreamPos;
-            _fseeki64 (file, streamPos, SEEK_SET);
-            lastIFrame = iFrame;
-            skipped = true;
-            break;
+        chunkBytesLeft = 0;
+        skip = true;
+        //}}}
+        }
+      else {
+        while (chunkBytesLeft >= 188) {
+          //{{{  demux up to a frame
+          auto bytesUsed = mVidTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mVidTs->getPid());
+          streamPos += bytesUsed;
+          chunkPtr += bytesUsed;
+          chunkBytesLeft -= (int)bytesUsed;
+          skip = false;
+          //}}}
+          changed();
+
+          while (mVidTs->isLoaded (getPlayPts(), 4))
+            mPlayPtsSem.wait();
+
+          bool loaded = mVidTs->isLoaded (getPlayPts(), 1);
+          if (!loaded || (getPlayPts() > mVidTs->getLastLoadedPts() + 100000)) {
+            auto jumpStreamPos = mAnalTs->findStreamPos (mVidTs->getPid(), getPlayPts());
+            if (jumpStreamPos != lastJumpStreamPos) {
+              //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
+              cLog::log (LOGINFO, "vidThread - jump playPts:" + getPtsString(getPlayPts()) +
+                         (loaded ? " after ":" notLoaded ") + getPtsString(mVidTs->getLastLoadedPts()));
+              _lseeki64 (file, jumpStreamPos, SEEK_SET);
+              lastJumpStreamPos = jumpStreamPos;
+              streamPos = jumpStreamPos;
+              chunkBytesLeft = 0;
+              skip = true;
+              break;
+              }
+              //}}}
             }
           }
         }
       }
 
-    fclose (file);
+    _close (file);
     free (chunkBuf);
-    cLog::log (LOGNOTICE, "videoLoadThread - exit");
+
+    cLog::log (LOGNOTICE, "vidThread - exit");
+    CoUninitialize();
     }
   //}}}
   //{{{
   void playThread() {
 
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::log (LOGNOTICE, "playThread - start");
 
-    mVidIframeSem.wait();
-    mPlayPts = mAnalyseTs->getVidFirstPts();
+    audOpen (2, 48000);
+
+    cLog::log (LOGNOTICE, "audLoadThread - waiting");
+    mFirstVidPtsSem.wait();
+    mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
+    cLog::log (LOGNOTICE, "audLoadThread - signalled " + getFullPtsString (mPlayPts));
 
     while (true) {
-      auto frame = mAudTs->findFrameByPts (mPlayPts);
-      if (frame && (mPlaying != ePause))
-        audPlay (frame->mSamples, kAudOutChannels * frame->mNumSamples*2, 1.f);
-      else
-        audSilence();
+      auto pts = getPlayPts();
+      mPlayAudFrame = mAudTs->findFrame (pts);
+
+      // play using frame where available, else play silence
+      audPlay (mPlayAudFrame ? mPlayAudFrame->mChannels : getSrcChannels(),
+               mPlayAudFrame && (mPlaying != ePause) ?  mPlayAudFrame->mSamples : nullptr,
+               mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
+               1.f);
 
       if (mPlaying == ePlay) {
-        incPlayPts (int64_t ((frame ? frame->mNumSamples : 1024) * 90000 / 48000));
+        incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
 
         if (mPlayPts >= getLengthPts()) {
           mPlaying = ePause;
@@ -2035,7 +1490,10 @@ private:
         }
       }
 
+    audClose();
+
     cLog::log (LOGNOTICE, "playThread - exit");
+    CoUninitialize();
     }
   //}}}
 
@@ -2043,46 +1501,45 @@ private:
   string mFileName;
 
   ePlaying mPlaying = ePlay;
-  uint64_t mPlayPts = 0;
-  uint64_t mLengthPts = 0;
+  int64_t mPlayPts = 0;
 
+  int64_t mStreamPos = 0;
   int64_t mStreamSize = 0;
-  int64_t mAnalyseStreamPos = 0;
 
-  cAnalyseTransportStream* mAnalyseTs;
-  cAudDecodeTransportStream* mAudTs;
-  cVidDecodeTransportStream* mVidTs;
+  cAnalTransportStream* mAnalTs;
+  cAudTransportStream* mAudTs;
+  cVidTransportStream* mVidTs;
 
-  int mServiceSelector = 0;
-  uint64_t mBasePts = 0;
-  int mAudPid = 0;
-  int mVidPid = 0;
-
-  float mVidOffset = 0;
-  bool mVidOffsetChanged = false;
-
-  uint64_t mBitmapPts = 0;
+  int64_t mBitmapPts = -1;
   ID2D1Bitmap* mBitmap = nullptr;
 
+  cAudFrame* mPlayAudFrame;
+
+  cSemaphore mFirstVidPtsSem;
   cSemaphore mPlayPtsSem;
-  cSemaphore mVidIframeSem;
   //}}}
   };
 
 //{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
+  auto res = CoInitializeEx (NULL, COINIT_MULTITHREADED);
+
   cLog::init ("tvWindow", LOGINFO, true);
+
+  string param;
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
   if (numArgs > 1) {
     // get fileName from commandLine
     wstring wstr (args[1]);
-    auto fileName = string (wstr.begin(), wstr.end());
-
-    cAppWindow appWindow;
-    appWindow.run ("tvWindow", 1920/2, 1080/2, fileName);
+    param = string (wstr.begin(), wstr.end());
     }
+
+  cAppWindow appWindow;
+  appWindow.run ("tvWindow", 1920/2, 1080/2, param);
+
+  CoUninitialize();
   }
 //}}}
