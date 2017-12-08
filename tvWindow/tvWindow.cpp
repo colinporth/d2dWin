@@ -74,13 +74,12 @@ public:
     addBox (new cTransportStreamBox (this, 0,-200.f, mAnalTs));
 
     HANDLE file = 0;
-    int frequency = param.empty() ? 706000 : atoi(param.c_str());
+    int frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
-      char fileName[100];
-      sprintf (fileName, "C:/videos/%d.ts", frequency);
-      file = CreateFile (fileName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
-      thread ([=]() { bdaThread (file, frequency); }).detach();
-      mFileName = fileName;
+      mFileName = "C:/videos/tunes.ts";
+      file = CreateFile (mFileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
+      auto bda = new cBda();
+      thread ([=]() { bdaThread (bda, frequency*1000, file); }).detach();
       }
     else
       mFileName = param;
@@ -1177,12 +1176,11 @@ private:
   //}}}
 
   //{{{
-  void bdaThread (HANDLE file, int frequency) {
+  void bdaThread (cBda* bda, int frequency, HANDLE file) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::log (LOGNOTICE, "bdaThread - start");
 
-    auto bda = new cBda (128*240*188);
     bda->createGraph (frequency);
 
     int64_t streamPos = 0;
@@ -1194,11 +1192,12 @@ private:
         WriteFile (file, ptr, blockSize, &numBytesUsed, NULL);
         if (numBytesUsed != blockSize)
           cLog::log (LOGERROR, "WriteFile only used " + dec(numBytesUsed) + " of " + dec(blockSize));
-
+        if (blockSize != 240*188)
+          cLog::log (LOGINFO, "blockSize " + dec(blockSize));
         bda->decommitBlock (blockSize);
         }
       else
-        Sleep (2);
+        Sleep (4);
       }
 
     cLog::log (LOGNOTICE, "bdaThread - exit");

@@ -68,3 +68,5 @@ UpgradeLog*.htm
 *.mdf
 *.ldf
 *.o
+*.~cpp
+*.~cpp
