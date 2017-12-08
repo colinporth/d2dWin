@@ -187,7 +187,6 @@
     <None Include="dump.def" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="dump.h" />
     <ClInclude Include="dumpuids.h" />
   </ItemGroup>
   <ItemGroup>

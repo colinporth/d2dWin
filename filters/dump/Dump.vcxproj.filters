@@ -25,9 +25,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="dump.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="dumpuids.h">
       <Filter>Header Files</Filter>
     </ClInclude>

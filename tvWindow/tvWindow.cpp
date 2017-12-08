@@ -69,22 +69,23 @@ public:
     // init d2dWindow, boxes
     initialise (title, width, height, false);
     addBox (new cVidFrameView (this, 0.f,0.f));
+    addBox (new cTransportStreamBox (this, 0, getHeight()/2.f, mAnalTs))->setPin (false);
+    addBox (new cFramesDebugBox (this, 0.f,getHeight()/4.f), 0.f,kTextHeight);
     addBox (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
-    addBox (new cFramesDebugBox (this, 0.f,120.f), 0.f,kTextHeight);
-    addBox (new cTransportStreamBox (this, 0,-200.f, mAnalTs));
 
     int frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
+      addBox (new cFloatBox (this, 120.f,kTextHeight, "sig ", mSignalStrength), -120.f,0.f);
+
       mFileName = "C:/videos/tune.ts";
-      mBda = new cBda();
-      thread ([=]() { bdaThread (mBda, frequency*1000, mFileName); }).detach();
+      thread ([=]() { bdaThread (frequency*1000, mFileName); }).detach();
       // wait for file create
       Sleep (2000);
       }
     else
       mFileName = param;
 
-    addBox (new cTimecodeBox (this, 600.f,60.f, mPlayPts, mAnalTs->mLengthPts), -600.f,-60.f);
+    addBox (new cTimecodeBox (this, 600.f,60.f, mPlayPts, mAnalTs->mLengthPts), -600.f,-60.f)->setPin (true);
     addBox (new cProgressBox (this, 0.f,12.f), 0.f,-12.f);
     addBox (new cAudFrameBox (this, 82.f,240.0f, mPlayAudFrame), -84.f,-240.f-12.0f);
     addBox (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
@@ -103,8 +104,6 @@ public:
 
     // loop till quit
     messagePump();
-
-    // close (file)
     }
   //}}}
 
@@ -120,8 +119,8 @@ protected:
 
       case 0x21: incPlayPts (-90000*10); break; // page up
       case 0x22: incPlayPts (90000*10); break; // page down
-      case 0x23: break; // home
-      case 0x24: break; // end
+      case 0x23: setPlayPts (mAnalTs->getLengthPts()); break; // end
+      case 0x24: setPlayPts (0); break; // home
       case 0x25: incPlayPts (-90000/25); mPlaying = ePause; break; // left arrow
       case 0x26: incPlayPts (-90000); break; // up arrow
       case 0x27: incPlayPts (90000/25); mPlaying = ePause; break; // right arrow
@@ -1176,19 +1175,20 @@ private:
   //}}}
 
   //{{{
-  void bdaThread (cBda* bda, int frequency, const string& fileName) {
-  //
+  void bdaThread (int frequency, const string& fileName) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "bdaDumpThread - start");
+    cLog::log (LOGNOTICE, "bdaThread - start");
 
+    auto bda = new cBda();
     bda->createGraph (frequency, fileName);
 
-    while (true) {
-      Sleep (100);
+    while (!getExit()) {
+      mSignalStrength = bda->getSignalStrength();
+      Sleep (200);
       }
 
-    cLog::log (LOGNOTICE, "bdaDumpThread - exit");
+    cLog::log (LOGNOTICE, "bdaThread - exit");
     CoUninitialize();
     }
   //}}}
@@ -1499,7 +1499,9 @@ private:
 
   //{{{  vars
   string mFileName;
+
   cBda* mBda = nullptr;
+  float mSignalStrength = 0.f;
 
   ePlaying mPlaying = ePlay;
   int64_t mPlayPts = 0;

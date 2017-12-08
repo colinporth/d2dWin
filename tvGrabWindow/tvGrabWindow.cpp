@@ -26,7 +26,7 @@ public:
     addBox (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
     addBox (new cFloatBox (this, 150.f, kTextHeight, "strength ", mSignalStrength), 0.f,-kTextHeight);
 
-    auto frequency = param.empty() ? 706 : atoi(param.c_str());
+    auto frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
       mFileName = "c:/videos/tune.ts";
       mFile = CreateFile (mFileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
