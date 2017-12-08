@@ -63,8 +63,7 @@ private:
     addBox (new cFloatBox (this, 150.f, kTextHeight, "strength ", bda->mSignalStrength), 0.f,-kTextHeight);
 
     char fileName[100];
-    //sprintf (fileName, "C:/Users/colin/Desktop/%d.ts", mFrequency);
-    sprintf (fileName, "c:/videos/%d.ts", frequency);
+    sprintf (fileName, "c:/videos/tune.ts");
     auto file = CreateFile (fileName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
 
     bda->createGraph (frequency);
