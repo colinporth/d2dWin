@@ -45,7 +45,7 @@ void bdaStrengthDiscontinuityThread (cBda* bda, cTransportStream* ts) {
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::log (LOGNOTICE, "bdaStrengthDiscontinuityThread - start");
 
-  float lastStrength = 0.f;
+  int lastStrength = 0;
   int64_t lastDiscontinuity = 0;
   while (true) {
     auto strength = bda->getSignalStrength();

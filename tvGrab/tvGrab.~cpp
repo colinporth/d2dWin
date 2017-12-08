@@ -72,6 +72,7 @@ void bdaStrengthThread (cBda* bda) {
   while (true) {
     auto strength = bda->getSignalStrength();
     cLog::log (LOGINFO, "strength " + dec(strength));
+    Sleep (100);
     }
 
   cLog::log (LOGNOTICE, "bdaStrengthThread - exit");

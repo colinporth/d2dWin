@@ -6,7 +6,7 @@
 #include "../../shared/decoders/cTransportStream.h"
 
 #include "../common/cTransportStreamBox.h"
-#include "../common/cFloatBox.h"
+#include "../common/cIntBox.h"
 #include "../common/cLogBox.h"
 #include "../common/cWindowBox.h"
 
@@ -24,7 +24,7 @@ public:
     addBox (new cTransportStreamBox (this, 0,-200, mTs));
     addBox (new cLogBox (this, 200.f,0, true), 0,200.f);
     addBox (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
-    addBox (new cFloatBox (this, 150.f, kTextHeight, "strength ", mSignalStrength), 0.f,-kTextHeight);
+    addBox (new cIntBox (this, 150.f, kTextHeight, "strength ", mSignalStrength), 0.f,-kTextHeight);
 
     auto frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
@@ -142,7 +142,7 @@ private:
   HANDLE mFile = 0;
   cTransportStream* mTs = nullptr;
   cBda* mBda = nullptr;
-  float mSignalStrength = 0.f;
+  int mSignalStrength = 0;
   };
 
 //{{{

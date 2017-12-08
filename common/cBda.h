@@ -361,13 +361,13 @@ public:
   //}}}
 
   //{{{
-  float getSignalStrength() {
+  int getSignalStrength() {
 
     long strength = 0;
     if (mScanningTuner)
       mScanningTuner->get_SignalStrength (&strength);
 
-    mSignalStrength = float(strength) / 0x10000;
+    mSignalStrength = strength / 0x10000;
 
     return mSignalStrength;
     }
@@ -580,5 +580,5 @@ private:
 
   ComPtr<IMediaControl> mMediaControl;
 
-  float mSignalStrength = 0;
+  int mSignalStrength = 0;
   };

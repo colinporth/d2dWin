@@ -13,7 +13,7 @@
 
 #include "../common/cTransportStreamBox.h"
 #include "../common/cToggleBox.h"
-#include "../common/cFloatBox.h"
+#include "../common/cIntBox.h"
 #include "../common/cValueBox.h"
 #include "../common/cLogBox.h"
 #include "../common/cWindowBox.h"
@@ -75,12 +75,12 @@ public:
 
     int frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
-      addBox (new cFloatBox (this, 120.f,kTextHeight, "sig ", mSignalStrength), -120.f,0.f);
+      addBox (new cIntBox (this, 120.f,kTextHeight, "sig ", mSignalStrength), -120.f,0.f);
 
       mFileName = "C:/videos/tune.ts";
       thread ([=]() { bdaThread (frequency*1000, mFileName); }).detach();
       // wait for file create
-      Sleep (1000);
+      Sleep (2000);
       }
     else
       mFileName = param;
@@ -1501,7 +1501,7 @@ private:
   string mFileName;
 
   cBda* mBda = nullptr;
-  float mSignalStrength = 0.f;
+  int mSignalStrength = 0;
 
   ePlaying mPlaying = ePlay;
   int64_t mPlayPts = 0;
