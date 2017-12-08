@@ -66,19 +66,16 @@ void bdaStrengthDiscontinuityThread (cBda* bda, cTransportStream* ts) {
 void bdaStrengthThread (cBda* bda) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::log (LOGNOTICE, "bdaStrength1Thread - start");
+  cLog::log (LOGNOTICE, "bdaStrengthThread - start");
 
   float lastStrength = 0.f;
   while (true) {
     auto strength = bda->getSignalStrength();
-    if (abs(strength - lastStrength) > 2.f) {
-      cLog::log (LOGINFO, "strength " + dec(strength));
-      lastStrength = strength;
-      }
-    Sleep (400);
+    cLog::log (LOGINFO, "strength " + dec(strength));
+    Sleep (100);
     }
 
-  cLog::log (LOGNOTICE, "bdaStrength1Thread - exit");
+  cLog::log (LOGNOTICE, "bdaStrengthThread - exit");
   CoUninitialize();
   }
 //}}}

@@ -48,7 +48,7 @@ public:
 
       auto vec = service.second.getNowVec();
       for (auto epgItem : vec) {
-        str = "  - " + epgItem->getStartTimeString() + 
+        str = "  - " + epgItem->getStartTimeString() +
               " " + epgItem->getDurationString() +
               " " + epgItem->getTitleString();
         serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
@@ -60,12 +60,12 @@ public:
 
     // draw pids
     if (mTs->mPidInfoMap.size()) {
-      auto r = mRect + cRect (serviceWidth + mLineHeight,0, -mLineHeight,0);
-
       auto maxPidPackets = 10000;
       for (auto &pidInfo : mTs->mPidInfoMap)
         maxPidPackets = max (maxPidPackets, pidInfo.second.mTotal);
 
+      auto r = cRect (mRect.left + serviceWidth + mLineHeight, mRect.top,
+                      mRect.right, mRect.top + mLineHeight);
       for (auto &pidInfo : mTs->mPidInfoMap) {
         auto str = (mContDigits ? dec (pidInfo.second.mDisContinuity,mContDigits) + ":" : "") +
                    dec (pidInfo.second.mTotal,mPacketDigits) +
@@ -80,9 +80,11 @@ public:
                  r.left + width + (r.getWidth() - width)*pidInfo.second.mTotal/maxPidPackets, r.top+mLineHeight),
           mWindow->getOrangeBrush());
 
-        drawText (dc, pidInfo.second.mInfoStr, mTextFormat,
-                  cRect (r.left + width, r.top, r.right, r.top+mLineHeight), mWindow->getWhiteBrush(), mLineHeight);
-        r.top += mLineHeight;
+        auto rInfo = r;
+        rInfo.left += width;
+        drawText (dc, pidInfo.second.mInfoStr, mTextFormat, rInfo, mWindow->getWhiteBrush(), mLineHeight);
+        r.top = r.bottom;
+        r.bottom += mLineHeight;
 
         if (pidInfo.second.mTotal > pow (10, mPacketDigits))
           mPacketDigits++;
