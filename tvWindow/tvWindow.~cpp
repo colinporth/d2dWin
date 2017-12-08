@@ -75,7 +75,7 @@ public:
 
     int frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
-      addBox (new cIntBox (this, 120.f,kTextHeight, "sig ", mSignalStrength), -120.f,0.f);
+      addBox (new cIntBox (this, 80.f,kTextHeight, "sig ", mSignalStrength), -80.f,0.f);
 
       mFileName = "C:/videos/tune.ts";
       thread ([=]() { bdaThread (frequency*1000, mFileName); }).detach();

@@ -1479,14 +1479,11 @@ private:
                1.f);
 
       if (mPlaying == ePlay) {
-        incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
-
-        if (mPlayPts >= getLengthPts()) {
-          mPlaying = ePause;
+        if (mPlayPts < getLengthPts())
+          incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
+        else if (mPlayPts > getLengthPts())
           mPlayPts = getLengthPts();
-          }
-        else // playPts changed
-          mPlayPtsSem.notifyAll();
+        mPlayPtsSem.notifyAll();
         }
       }
 
