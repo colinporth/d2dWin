@@ -73,7 +73,7 @@ public:
                    " " + getFullPtsString (pidInfo.second.mPts) +
                    " " + dec (pidInfo.second.mStreamType,2) +
                    " " + pidInfo.second.mTypeStr;
-        auto width = drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight) + mLineHeight;
+        auto width = drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight) + mLineHeight/2.f;
 
         dc->FillRectangle (
           cRect (r.left + width, r.top+4.f,
