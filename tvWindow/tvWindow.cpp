@@ -75,7 +75,7 @@ public:
 
     int frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
-      addBox (new cIntBox (this, 80.f,kTextHeight, "sig ", mSignalStrength), -80.f,0.f);
+      addBox (new cIntBox (this, 70.f,kTextHeight, "sig ", mSignalStrength), -70.f,0.f);
 
       mFileName = "C:/videos/tune.ts";
       thread ([=]() { bdaThread (frequency*1000, mFileName); }).detach();
@@ -86,8 +86,8 @@ public:
       mFileName = param;
 
     addBox (new cTimecodeBox (this, 600.f,60.f, mPlayPts, mAnalTs->mLengthPts), -600.f,-60.f)->setPin (true);
-    addBox (new cProgressBox (this, 0.f,12.f), 0.f,-12.f);
-    addBox (new cAudFrameBox (this, 82.f,240.0f, mPlayAudFrame), -84.f,-240.f-12.0f);
+    addBox (new cProgressBox (this, 0.f,6.f), 0.f,-6.f);
+    addBox (new cAudFrameBox (this, 82.f,240.0f, mPlayAudFrame), -84.f,-240.f-6.0f);
     addBox (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
     // init threads
