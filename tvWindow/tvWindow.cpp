@@ -1478,13 +1478,12 @@ private:
                mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
                1.f);
 
-      if (mPlaying == ePlay) {
-        if (mPlayPts < getLengthPts())
-          incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
-        else if (mPlayPts > getLengthPts())
-          mPlayPts = getLengthPts();
-        mPlayPtsSem.notifyAll();
-        }
+      if ((mPlaying == ePlay) && (mPlayPts < getLengthPts()))
+        incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
+      if (mPlayPts > getLengthPts())
+        mPlayPts = getLengthPts();
+
+      mPlayPtsSem.notifyAll();
       }
 
     audClose();
