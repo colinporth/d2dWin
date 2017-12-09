@@ -60,6 +60,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Mp42Ts", "Bento4\Build\Targ
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tvGrab", "tvGrab\tvGrab.vcxproj", "{04BD4C11-8602-49FC-8655-2FF43DA3330B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ts", "ts\ts.vcxproj", "{7EB213CA-726E-455D-B15B-8F855E92C384}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -194,6 +196,14 @@ Global
 		{04BD4C11-8602-49FC-8655-2FF43DA3330B}.Release|x64.Build.0 = Release|x64
 		{04BD4C11-8602-49FC-8655-2FF43DA3330B}.Release|x86.ActiveCfg = Release|Win32
 		{04BD4C11-8602-49FC-8655-2FF43DA3330B}.Release|x86.Build.0 = Release|Win32
+		{7EB213CA-726E-455D-B15B-8F855E92C384}.Debug|x64.ActiveCfg = Debug|x64
+		{7EB213CA-726E-455D-B15B-8F855E92C384}.Debug|x64.Build.0 = Debug|x64
+		{7EB213CA-726E-455D-B15B-8F855E92C384}.Debug|x86.ActiveCfg = Debug|Win32
+		{7EB213CA-726E-455D-B15B-8F855E92C384}.Debug|x86.Build.0 = Debug|Win32
+		{7EB213CA-726E-455D-B15B-8F855E92C384}.Release|x64.ActiveCfg = Release|x64
+		{7EB213CA-726E-455D-B15B-8F855E92C384}.Release|x64.Build.0 = Release|x64
+		{7EB213CA-726E-455D-B15B-8F855E92C384}.Release|x86.ActiveCfg = Release|Win32
+		{7EB213CA-726E-455D-B15B-8F855E92C384}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
