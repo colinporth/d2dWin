@@ -35,7 +35,8 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     // draw services
-    auto r = mRect;
+    auto r = cRect (mRect.left, mRect.top, mRect.right, mRect.top + mLineHeight);
+
     auto serviceWidth = 0.f;
 
     mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
@@ -44,15 +45,16 @@ public:
     for (auto &service : mTs->mServiceMap) {
       auto str = dec(i, mTs->mServiceMap.size() >= 10 ? 2:1) + " " + service.second.getNameString();
       serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
-      r.top += mLineHeight;
+      r.top = r.bottom;
+      r.bottom += mLineHeight;
 
-      auto vec = service.second.getNowVec();
-      for (auto epgItem : vec) {
+      for (auto epgItem : service.second.getNowVec()) {
         str = "  - " + epgItem->getStartTimeString() +
               " " + epgItem->getDurationString() +
               " " + epgItem->getTitleString();
         serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
-        r.top += mLineHeight;
+        r.top = r.bottom;
+        r.bottom += mLineHeight;
         }
 
       i++;

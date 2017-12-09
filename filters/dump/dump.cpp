@@ -198,8 +198,8 @@ private:
 //{{{
 class CDumpFilter : public CBaseFilter {
 public:
-  CDumpFilter(CDump* dump, LPUNKNOWN unknown, CCritSec* lock, HRESULT* hr) :
-    CBaseFilter(NAME("CDumpFilter"), unknown, lock, CLSID_Dump), mDump(dump) {}
+  CDumpFilter (CDump* dump, LPUNKNOWN unknown, CCritSec* lock, HRESULT* hr) :
+    CBaseFilter (NAME("CDumpFilter"), unknown, lock, CLSID_Dump), mDump(dump) {}
 
   CBasePin* GetPin (int n) { return (n == 0) ? mDump->mPin : NULL; }
   int GetPinCount() { return 1; }
@@ -410,8 +410,6 @@ STDMETHODIMP CDump::NonDelegatingQueryInterface (REFIID riid, void** ppv) {
 //{{{
 HRESULT CDump::OpenFile() {
 
-  TCHAR* fileName = NULL;
-
   // Is the file already opened
   if (mFile != INVALID_HANDLE_VALUE)
     return NOERROR;
@@ -421,6 +419,7 @@ HRESULT CDump::OpenFile() {
     return ERROR_INVALID_NAME;
 
   // Convert the UNICODE filename if necessary
+  TCHAR* fileName = NULL;
   #if defined(WIN32) && !defined(UNICODE)
     char convert[MAX_PATH];
     if (!WideCharToMultiByte (CP_ACP, 0, mFileName, -1, convert, MAX_PATH, 0, 0))
