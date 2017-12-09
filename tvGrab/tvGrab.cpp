@@ -7,6 +7,7 @@
 
 using namespace std;
 //}}}
+const bool kDump = false;
 
 //{{{
 void bdaCaptureThread (cBda* bda, cTransportStream* ts, HANDLE file) {
@@ -50,8 +51,11 @@ void bdaStrengthDiscontinuityThread (cBda* bda, cTransportStream* ts) {
   while (true) {
     auto strength = bda->getSignalStrength();
     auto discontinuity = ts->getDiscontinuity();
+    auto packets = ts->getPackets();
     if ((abs(strength - lastStrength) > 2.f) || (discontinuity != lastDiscontinuity)) {
-      cLog::log (LOGINFO, "strength " + dec(strength) + " " + dec(discontinuity));
+      cLog::log (LOGINFO, "strength " + dec(strength) +
+                          " " + dec(discontinuity) +
+                          " " + dec(packets));
       lastStrength = strength;
       lastDiscontinuity = discontinuity;
       }
@@ -80,7 +84,7 @@ void bdaStrengthThread (cBda* bda) {
   }
 //}}}
 
-int main(int argc, char** argv) {
+int main (int argc, char** argv) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init ("tvGrab", LOGINFO, false);
@@ -88,16 +92,12 @@ int main(int argc, char** argv) {
   auto frequency = argc == 1 ? 674 : atoi(argv[1]);
   string mFileName = "c:/videos/tune.ts";
 
-  if (true) {
+  if (kDump) {
     auto mBda = new cBda();
     mBda->createGraph (frequency * 1000, mFileName);
     cLog::log (LOGNOTICE, "created bda- dump - tuned to " + dec(frequency) + "mhz");
 
     thread ([=]() { bdaStrengthThread (mBda); }).detach();
-
-    while (true) {
-      Sleep (200);
-      }
     }
 
   else {
@@ -113,11 +113,10 @@ int main(int argc, char** argv) {
 
     thread ([=]() { bdaCaptureThread (mBda, mTs, mFile); }).detach();
     thread ([=]() { bdaStrengthDiscontinuityThread (mBda, mTs); }).detach();
-
-    while (true) {
-      Sleep (200);
-      }
     }
+
+  while (true)
+    Sleep (200);
 
   CoUninitialize();
   }
