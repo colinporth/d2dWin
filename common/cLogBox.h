@@ -47,7 +47,7 @@ public:
   //{{{
   bool onMove (bool right, cPoint pos, cPoint inc) {
 
-    mLogScroll += (int)inc.y;
+    mLogScroll += (int)inc.y * (mWindow->getControl() ? 100 : 1);
     if (mLogScroll < 0)
       mLogScroll = 0;
     return true;
