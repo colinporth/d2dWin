@@ -1256,7 +1256,7 @@ private:
 
     int firstVidSignalCount = 0;
     int fileDoneCount = 0;
-    while (fileDoneCount < 10) {
+    while (fileDoneCount < 50) {
       int64_t bytesToRead = mStreamSize - mStreamPos;
       if (bytesToRead > kChunkSize) // trim to kChunkSize
         bytesToRead = kChunkSize;
@@ -1282,7 +1282,7 @@ private:
           }
         }
       else {
-        //{{{  check if fileSize changed, 10 goes 100ms second apart before we give up
+        //{{{  check if fileSize changed, 50 goes 100ms second apart before we give up
         _fstati64 (file, &buf);
         if (mStreamSize == buf.st_size) {
           Sleep (100);
