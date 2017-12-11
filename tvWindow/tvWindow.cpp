@@ -231,7 +231,8 @@ private:
       mStreamPosVector.push_back (cStreamPos (pidInfo->mPid, pidInfo->mPts, pidInfo->mStreamPos));
       if (pidInfo->mPid == mLengthPid)
         mLengthPts = pidInfo->mLastPts - pidInfo->mFirstPts;
-
+      //cLog::log (LOGINFO, "anal audPes " + dec(mStreamPosVector.size()) +
+      //                    " " + getPtsString (pidInfo->mPts));
       return true;
       }
     //}}}
@@ -239,9 +240,11 @@ private:
     bool vidDecodePes (cPidInfo* pidInfo, bool skip) {
 
       char frameType = getFrameType (pidInfo->mBuffer, pidInfo->mBufPtr - pidInfo->mBuffer, pidInfo->mStreamType);
-      if ((frameType == 'I') || (frameType == '?'))
+      if ((frameType == 'I') || (frameType == '?')) {
         mStreamPosVector.push_back (cStreamPos (pidInfo->mPid, pidInfo->mPts, pidInfo->mStreamPos));
-
+        //cLog::log (LOGINFO, "anal vidPes " + dec(mStreamPosVector.size()) +
+        //                    " " + getPtsString (pidInfo->mPts));
+        }
       return true;
       }
     //}}}
@@ -367,7 +370,7 @@ private:
           }
           //}}}
 
-        cLog::log (LOGINFO3, "audThread - audDecodePes PES " + getPtsString (pidInfo->mPts));
+        cLog::log (LOGINFO2, "audThread - audDecodePes PES " + getPtsString (pidInfo->mPts));
 
         //{{{  init avPacket
         AVPacket avPacket;
@@ -1274,7 +1277,9 @@ private:
             chunkBytesLeft -= (int)bytesUsed;
             changed();
 
-            if ((firstVidSignalCount < 3) && (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
+            if ((firstVidSignalCount < 3) &&
+                (mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
+                (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
               cLog::log (LOGNOTICE, "analThread - signal " + dec(firstVidSignalCount++));
               mFirstVidPtsSem.notifyAll();
               }
@@ -1463,10 +1468,10 @@ private:
 
     audOpen (2, 48000);
 
-    cLog::log (LOGNOTICE, "audLoadThread - waiting");
+    cLog::log (LOGNOTICE, "playThread - waiting");
     mFirstVidPtsSem.wait();
     mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
-    cLog::log (LOGNOTICE, "audLoadThread - signalled " + getFullPtsString (mPlayPts));
+    cLog::log (LOGNOTICE, "playThread - signalled " + getFullPtsString (mPlayPts));
 
     while (true) {
       auto pts = getPlayPts();
@@ -1524,7 +1529,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   auto res = CoInitializeEx (NULL, COINIT_MULTITHREADED);
 
-  cLog::init ("tvWindow", LOGINFO, true);
+  //cLog::init ("tvWindow", LOGINFO, true);
+  cLog::init ("tvWindow", LOGINFO, false, "C:/Users/colin/Desktop");
 
   string param;
 
