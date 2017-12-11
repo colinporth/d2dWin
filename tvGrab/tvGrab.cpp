@@ -12,11 +12,7 @@ const bool kDump = false;
 //{{{
 class cDumpTransportStream : public cTransportStream {
 public:
-  //{{{
-  cDumpTransportStream() {
-    memset (ts,0,188);
-    }
-  //}}}
+  cDumpTransportStream() {}
   virtual ~cDumpTransportStream() {}
 
 protected:
@@ -44,6 +40,38 @@ protected:
 
 private:
   //{{{
+  void tsHeader (int pid, int continuityCount) {
+
+    memset (mTs, 0xFF, 188);
+
+    mTsPtr = mTs;
+    *mTsPtr++ = 0x47; // sync byte
+    *mTsPtr++ = 0x40 | ((pid & 0x1f00) >> 8);           // payload_unit_start_indicator + pid upper
+    *mTsPtr++ = pid & 0xff;                             // pid lower
+    *mTsPtr++ = 0x10 | continuityCount;                 // no adaptControls + cont count
+    *mTsPtr++ = 0;                                      // pointerField
+
+    mTsSectionStart = mTsPtr;
+    }
+  //}}}
+  //{{{
+  void writeSection (HANDLE file) {
+
+    // tsSection crc, calc from tsSection start to here
+    auto crc32 = crc32Block (0xffffffff, mTsSectionStart, int(mTsPtr - mTsSectionStart));
+    *mTsPtr++ = (crc32 & 0xff000000) >> 24;
+    *mTsPtr++ = (crc32 & 0x00ff0000) >> 16;
+    *mTsPtr++ = (crc32 & 0x0000ff00) >>  8;
+    *mTsPtr++ = crc32 & 0x000000ff;
+
+    // write
+    DWORD numBytesUsed;
+    WriteFile (file, mTs, 188, &numBytesUsed, NULL);
+    if (numBytesUsed != 188)
+      cLog::log (LOGERROR, "writePat " + dec(numBytesUsed));
+    }
+  //}}}
+  //{{{
   void writePat (HANDLE file, int transportStreamId, int serviceId, int pgmPid) {
 
     cLog::log (LOGINFO, "writePat");
@@ -51,45 +79,26 @@ private:
     int pid = PID_PAT;
     int continuityCount = 0;
 
-    // tsHeader
-    auto tsPtr = ts;
-    *tsPtr++ = 0x47; // sync byte
-    *tsPtr++ = 0x40 | ((pid & 0x1f00) >> 8);           // payload_unit_start_indicator + pid upper
-    *tsPtr++ = pid & 0xff;                             // pid lower
-    *tsPtr++ = 0x10 | continuityCount;                 // no adaptControls + cont count
-    *tsPtr++ = 0;                                      // pointerField
+    tsHeader (pid, continuityCount);
 
-    // tsSection start
     auto sectionLength = 5+4 + 4;
-    *tsPtr++ = TID_PAT;                                // PAT tid
-    *tsPtr++ = 0xb0 | ((sectionLength & 0x0F00) >> 8); // Pat sectionLength upper
-    *tsPtr++ = sectionLength & 0x0FF;                  // Pat sectionLength lower
+    *mTsPtr++ = TID_PAT;                                // PAT tid
+    *mTsPtr++ = 0xb0 | ((sectionLength & 0x0F00) >> 8); // Pat sectionLength upper
+    *mTsPtr++ = sectionLength & 0x0FF;                  // Pat sectionLength lower
 
     // sectionLength from here to end of crc
-    *tsPtr++ = (transportStreamId & 0xFF00) >> 8;      // transportStreamId
-    *tsPtr++ = transportStreamId & 0x00FF;
-    *tsPtr++ = 0xc1;                                   // For simplicity, we'll have a version_id of 0
-    *tsPtr++ = 0x00;                                   // First section number = 0
-    *tsPtr++ = 0x00;                                   // last section number = 0
+    *mTsPtr++ = (transportStreamId & 0xFF00) >> 8;      // transportStreamId
+    *mTsPtr++ = transportStreamId & 0x00FF;
+    *mTsPtr++ = 0xc1;                                   // For simplicity, we'll have a version_id of 0
+    *mTsPtr++ = 0x00;                                   // First section number = 0
+    *mTsPtr++ = 0x00;                                   // last section number = 0
 
-    *tsPtr++ = (serviceId & 0xFF00) >> 8;              // first section serviceId
-    *tsPtr++ = serviceId & 0x00FF;
-    *tsPtr++ = 0xE0 | ((pgmPid & 0x1F00) >> 8);       // first section pgmPid
-    *tsPtr++ = pgmPid & 0x00FF;
-    // tsSection end
+    *mTsPtr++ = (serviceId & 0xFF00) >> 8;              // first section serviceId
+    *mTsPtr++ = serviceId & 0x00FF;
+    *mTsPtr++ = 0xE0 | ((pgmPid & 0x1F00) >> 8);       // first section pgmPid
+    *mTsPtr++ = pgmPid & 0x00FF;
 
-    // tsSection crc, calc from tsSection start to here
-    auto crc32 = crc32Block (0xffffffff, ts+5, 3 + 5+4);
-    *tsPtr++ = (crc32 & 0xff000000) >> 24;
-    *tsPtr++ = (crc32 & 0x00ff0000) >> 16;
-    *tsPtr++ = (crc32 & 0x0000ff00) >>  8;
-    *tsPtr++ = crc32 & 0x000000ff;
-
-    // write
-    DWORD numBytesUsed;
-    WriteFile (file, ts, 188, &numBytesUsed, NULL);
-    if (numBytesUsed != 188)
-      cLog::log (LOGERROR, "writePat " + dec(numBytesUsed));
+    writeSection (file);
     }
   //}}}
   //{{{
@@ -107,62 +116,52 @@ private:
     int audStreamType = 3;
     int esInfoLen = 0;
 
-    auto tsPtr = ts;
-    *tsPtr++ = 0x47; // sync byte
-    *tsPtr++ = 0x40 | ((pid & 0x1f00) >> 8);        // payload_unit_start_indicator + pid upper
-    *tsPtr++ = pid & 0xff;                          // pid lower
-    *tsPtr++ = 0x10 | continuityCount;                 // no adaptControls + cont count
-    *tsPtr++ = 0;                                      // pointerField
+    tsHeader (pid, continuityCount);
 
+    auto mTsSectionStart = mTsPtr;
     int sectionLength = 23; // 5+4 + program_info_length + esStreams * (5 + ES_info_length) + 4
-    *tsPtr++ = TID_PMT;
-    *tsPtr++ = 0xb0 | ((sectionLength & 0x0F00) >> 8);
-    *tsPtr++ = sectionLength & 0x0FF;
+    *mTsPtr++ = TID_PMT;
+    *mTsPtr++ = 0xb0 | ((sectionLength & 0x0F00) >> 8);
+    *mTsPtr++ = sectionLength & 0x0FF;
 
-    *tsPtr++ = (serviceId & 0xFF00) >> 8;
-    *tsPtr++ = serviceId & 0x00FF;
-    *tsPtr++ = 0xc1; // version_id of 0
-    *tsPtr++ = 0x00; // first section number = 0
-    *tsPtr++ = 0x00; // last section number = 0
+    // sectionLength from here to end of crc
+    *mTsPtr++ = (serviceId & 0xFF00) >> 8;
+    *mTsPtr++ = serviceId & 0x00FF;
+    *mTsPtr++ = 0xc1; // version_id of 0
+    *mTsPtr++ = 0x00; // first section number = 0
+    *mTsPtr++ = 0x00; // last section number = 0
 
-    *tsPtr++ = 0xE0 | ((pcrPid & 0x1F00) >> 8);
-    *tsPtr++ = pcrPid & 0x00FF;
+    *mTsPtr++ = 0xE0 | ((pcrPid & 0x1F00) >> 8);
+    *mTsPtr++ = pcrPid & 0x00FF;
 
-    *tsPtr++ = 0xF0;
-    *tsPtr++ = 0; // program_info_length;
+    *mTsPtr++ = 0xF0;
+    *mTsPtr++ = 0; // program_info_length;
 
     // vid es
-    *tsPtr++ = vidStreamType; // elementary stream_type
-    *tsPtr++ = 0xE0 | ((vidPid & 0x1F00) >> 8); // elementary_PID
-    *tsPtr++ = vidPid & 0x00FF;
-    *tsPtr++ = ((esInfoLen & 0xFF00) >> 8) | 0xF0;  // ES_info_length
-    *tsPtr++ = esInfoLen & 0x00FF;
+    *mTsPtr++ = vidStreamType; // elementary stream_type
+    *mTsPtr++ = 0xE0 | ((vidPid & 0x1F00) >> 8); // elementary_PID
+    *mTsPtr++ = vidPid & 0x00FF;
+    *mTsPtr++ = ((esInfoLen & 0xFF00) >> 8) | 0xF0;  // ES_info_length
+    *mTsPtr++ = esInfoLen & 0x00FF;
 
     // aud es
-    *tsPtr++ = audStreamType; // elementary stream_type
-    *tsPtr++ = 0xE0 | ((audPid & 0x1F00) >> 8); // elementary_PID
-    *tsPtr++ = audPid & 0x00FF;
-    *tsPtr++ = ((esInfoLen & 0xFF00) >> 8) | 0xF0;  // ES_info_length
-    *tsPtr++ = esInfoLen & 0x00FF;
+    *mTsPtr++ = audStreamType; // elementary stream_type
+    *mTsPtr++ = 0xE0 | ((audPid & 0x1F00) >> 8); // elementary_PID
+    *mTsPtr++ = audPid & 0x00FF;
+    *mTsPtr++ = ((esInfoLen & 0xFF00) >> 8) | 0xF0;  // ES_info_length
+    *mTsPtr++ = esInfoLen & 0x00FF;
 
-    auto crc32 = crc32Block (0xffffffff, ts+5, 27-5);
-    *tsPtr++ = (crc32 & 0xff000000) >> 24;
-    *tsPtr++ = (crc32 & 0x00ff0000) >> 16;
-    *tsPtr++ = (crc32 & 0x0000ff00) >>  8;
-    *tsPtr++ = crc32 & 0x000000ff;
-
-    DWORD numBytesUsed;
-    WriteFile (file, ts, 188, &numBytesUsed, NULL);
-    if (numBytesUsed != 188)
-      cLog::log (LOGERROR, "writePat " + dec(numBytesUsed));
+    writeSection (file);
     }
   //}}}
 
+  HANDLE mProgFile = 0;
   int mVidPid = -1;
   int mAudPid = -1;
 
-  uint8_t ts[188];
-  HANDLE mProgFile = 0;
+  uint8_t mTs[188];
+  uint8_t* mTsPtr = nullptr;
+  uint8_t* mTsSectionStart = nullptr;
   };
 //}}}
 
