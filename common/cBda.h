@@ -323,26 +323,26 @@ public:
  cBda::~cBda() {}
 
   //{{{
-  void createGraph (int frequency)  {
+  bool createGraph (int frequency)  {
 
     createGraphDvbT (frequency);
 
     createFilter (mGrabberFilter, CLSID_SampleGrabber, L"grabber", mDvbCapture);
     mGrabberFilter.As (&mGrabber);
-    mGrabber->SetOneShot (false);
-    mGrabber->SetBufferSamples (true);
+    auto hr = mGrabber->SetOneShot (false);
+    hr = mGrabber->SetBufferSamples (true);
 
     mGrabberCB.allocateBuffer (128*240*188);
-    mGrabber->SetCallback (&mGrabberCB, 0);
+    hr = mGrabber->SetCallback (&mGrabberCB, 0);
 
     createFilter (mMpeg2Demux, CLSID_MPEG2Demultiplexer, L"MPEG2demux", mGrabberFilter);
     createFilter (mBdaTif, CLSID_BDAtif, L"BDAtif", mMpeg2Demux);
 
-    runGraph();
+    return runGraph();
     }
   //}}}
   //{{{
-  void createGraph (int frequency, const string& fileName) {
+  bool createGraph (int frequency, const string& fileName) {
 
     createGraphDvbT (frequency);
 
@@ -356,7 +356,7 @@ public:
     createFilter (mMpeg2Demux, CLSID_MPEG2Demultiplexer, L"MPEG2demux", mInfTeeFilter);
     createFilter (mBdaTif, CLSID_BDAtif, L"BDAtif", mMpeg2Demux);
 
-    runGraph();
+    return runGraph();
     }
   //}}}
 
@@ -504,38 +504,50 @@ private:
   //{{{
   void createGraphDvbT (int frequency) {
 
-    CoCreateInstance (CLSID_FilterGraph, nullptr,
-                      CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mGraphBuilder.GetAddressOf()));
+    auto hr = CoCreateInstance (CLSID_FilterGraph, nullptr,
+                                CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mGraphBuilder.GetAddressOf()));
+    //{{{  report any error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "CoCreateInstance graph failed " + dec(hr));
+    //}}}
 
-    CoCreateInstance (CLSID_DVBTNetworkProvider, nullptr,
-                      CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mDvbNetworkProvider.GetAddressOf()));
-    mGraphBuilder->AddFilter (mDvbNetworkProvider.Get(), L"dvbtNetworkProvider");
+    hr = CoCreateInstance (CLSID_DVBTNetworkProvider, nullptr,
+                           CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mDvbNetworkProvider.GetAddressOf()));
+    //{{{  report any error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "CoCreateInstance dvbNetworkProvider failed " + dec(hr));
+    //}}}
+    hr = mGraphBuilder->AddFilter (mDvbNetworkProvider.Get(), L"dvbtNetworkProvider");
     mDvbNetworkProvider.As (&mScanningTuner);
 
-    mScanningTuner->get_TuningSpace (mTuningSpace.GetAddressOf());
+    hr = mScanningTuner->get_TuningSpace (mTuningSpace.GetAddressOf());
 
     // setup dvbTuningSpace2 interface
     mTuningSpace.As (&mDvbTuningSpace2);
-    mDvbTuningSpace2->put__NetworkType (CLSID_DVBTNetworkProvider);
-    mDvbTuningSpace2->put_SystemType (DVB_Terrestrial);
-    mDvbTuningSpace2->put_NetworkID (9018);
-    mDvbTuningSpace2->put_FrequencyMapping (L"");
-    mDvbTuningSpace2->put_UniqueName (L"DTV DVB-T");
-    mDvbTuningSpace2->put_FriendlyName (L"DTV DVB-T");
+    hr = mDvbTuningSpace2->put__NetworkType (CLSID_DVBTNetworkProvider);
+    hr = mDvbTuningSpace2->put_SystemType (DVB_Terrestrial);
+    hr = mDvbTuningSpace2->put_NetworkID (9018);
+    hr = mDvbTuningSpace2->put_FrequencyMapping (L"");
+    hr = mDvbTuningSpace2->put_UniqueName (L"DTV DVB-T");
+    hr = mDvbTuningSpace2->put_FriendlyName (L"DTV DVB-T");
 
     // create dvbtLocator and setup in dvbTuningSpace2 interface
-    CoCreateInstance (CLSID_DVBTLocator, nullptr,
-                      CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mDvbLocator.GetAddressOf()));
-    mDvbLocator->put_CarrierFrequency (frequency);
-    mDvbLocator->put_Bandwidth (8);
-    mDvbTuningSpace2->put_DefaultLocator (mDvbLocator.Get());
+    hr = CoCreateInstance (CLSID_DVBTLocator, nullptr,
+                           CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mDvbLocator.GetAddressOf()));
+    //{{{  report any error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "CoCreateInstance dvbLocator failed " + dec(hr));
+    //}}}
+    hr = mDvbLocator->put_CarrierFrequency (frequency);
+    hr = mDvbLocator->put_Bandwidth (8);
+    hr = mDvbTuningSpace2->put_DefaultLocator (mDvbLocator.Get());
 
     // tuneRequest from scanningTuner
     if (mScanningTuner->get_TuneRequest (mTuneRequest.GetAddressOf()) != S_OK)
       mTuningSpace->CreateTuneRequest (mTuneRequest.GetAddressOf());
-    mTuneRequest->put_Locator (mDvbLocator.Get());
-    mScanningTuner->Validate (mTuneRequest.Get());
-    mScanningTuner->put_TuneRequest (mTuneRequest.Get());
+    hr = mTuneRequest->put_Locator (mDvbLocator.Get());
+    hr = mScanningTuner->Validate (mTuneRequest.Get());
+    hr = mScanningTuner->put_TuneRequest (mTuneRequest.Get());
 
     // dvbtNetworkProvider -> dvbtTuner -> dvbtCapture -> sampleGrabberFilter -> mpeg2Demux -> bdaTif
     findFilter (mDvbTuner, KSCATEGORY_BDA_NETWORK_TUNER, L"DVBTtuner", mDvbNetworkProvider);
@@ -548,9 +560,13 @@ private:
     }
   //}}}
   //{{{
-  void runGraph() {
+  bool runGraph() {
     mGraphBuilder.As (&mMediaControl);
-    mMediaControl->Run();
+    auto hr = mMediaControl->Run();
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "runGraph failed " + dec(hr));
+
+    return hr == S_OK;
     }
   //}}}
 

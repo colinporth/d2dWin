@@ -84,7 +84,7 @@ void bdaStrengthThread (cBda* bda) {
   }
 //}}}
 
-int main (int argc, char** argv) {
+int main (int argc, char* argv[]) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init ("tvGrab", LOGINFO, false);
@@ -94,10 +94,12 @@ int main (int argc, char** argv) {
 
   if (kDump) {
     auto mBda = new cBda();
-    mBda->createGraph (frequency * 1000, mFileName);
-    cLog::log (LOGNOTICE, "created bda- dump - tuned to " + dec(frequency) + "mhz");
-
-    thread ([=]() { bdaStrengthThread (mBda); }).detach();
+    if (mBda->createGraph (frequency * 1000, mFileName)) {
+      cLog::log (LOGNOTICE, "created bda- dump - tuned to " + dec(frequency) + "mhz");
+      thread ([=]() { bdaStrengthThread (mBda); }).detach();
+      }
+    else
+      cLog::log (LOGERROR, "failed to create bda graph");
     }
 
   else {
@@ -108,15 +110,17 @@ int main (int argc, char** argv) {
     cLog::log (LOGNOTICE, "created ts");
 
     auto mBda = new cBda();
-    mBda->createGraph (frequency * 1000);
-    cLog::log (LOGNOTICE, "created bda- sampleGrabber - tuned to " + dec(frequency) + "mhz");
-
-    thread ([=]() { bdaCaptureThread (mBda, mTs, mFile); }).detach();
-    thread ([=]() { bdaStrengthDiscontinuityThread (mBda, mTs); }).detach();
+    if (mBda->createGraph (frequency * 1000)) {
+      cLog::log (LOGNOTICE, "created bda- sampleGrabber - tuned to " + dec(frequency) + "mhz");
+      thread ([=]() { bdaCaptureThread (mBda, mTs, mFile); }).detach();
+      thread ([=]() { bdaStrengthDiscontinuityThread (mBda, mTs); }).detach();
+      }
+    else
+      cLog::log (LOGERROR, "failed to create bda graph");
     }
 
   while (true)
-    Sleep (200);
+    Sleep (1000);
 
   CoUninitialize();
   }
