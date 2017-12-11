@@ -16,21 +16,41 @@ public:
   virtual ~cDumpTransportStream() {}
 
 protected:
-  void startProgram (int vidPid, int audPid, const string& name, time_t startTime) {
+  void startProgram (cService* service, const string& name, time_t startTime) {
 
-    cLog::log (LOGNOTICE, "startProgram " + dec(vidPid) + " " + dec(audPid) + " " + name);
-    if (vidPid == 101 && audPid == 102) {
-      mVidPid = vidPid;
-      mAudPid = audPid;
-      mProgFile = CreateFile ("c:/videos/prog.ts",
+    //if (service->getSid() == 17540) {
+    if (service->getSid() == 4162) {
+      cLog::log (LOGNOTICE, "startProgram " + dec(service->getVidPid()) +
+                            " " + dec(service->getAudPid()) +
+                            " " + name);
+
+      mVidPid = service->getVidPid();
+      mAudPid = service->getAudPid();
+
+      int vidStreamType = 0;
+      auto pidInfoIt = mPidInfoMap.find (mVidPid);
+      if (pidInfoIt != mPidInfoMap.end())
+        vidStreamType = pidInfoIt->second.mStreamType;
+
+      int audStreamType = 0;
+      pidInfoIt = mPidInfoMap.find (mAudPid);
+      if (pidInfoIt != mPidInfoMap.end())
+        audStreamType = pidInfoIt->second.mStreamType;
+
+      string fileName = "c:/videos/" + name + ".ts";
+      mProgFile = CreateFile (fileName.c_str(),
                               GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
-      writePat (mProgFile, 0x1234, 1, 32); // tsid, sid, pgmPid
-      writePmt (mProgFile, 1, 32); // sid, pgmPid
+      int sid = 1;
+      int pgmPid = 32;
+      writePat (mProgFile, 0x1234, service->getSid(), pgmPid); // tsid, sid, pgmPid
+      writePmt (mProgFile, service->getSid(),
+                pgmPid, service->getVidPid(),
+                service->getVidPid(), vidStreamType, service->getAudPid(), audStreamType);
       }
     }
 
-  void packet (int pid, uint8_t* tsPtr) {
-    if ((pid == mVidPid) || (pid == mAudPid)) {
+  void packet (cPidInfo* pidInfo, uint8_t* tsPtr) {
+    if ((pidInfo->mPid == mVidPid) || (pidInfo->mPid == mAudPid)) {
       DWORD numBytesUsed;
       WriteFile (mProgFile, tsPtr, 188, &numBytesUsed, NULL);
       if (numBytesUsed != 188)
@@ -102,19 +122,13 @@ private:
     }
   //}}}
   //{{{
-  void writePmt (HANDLE file, int serviceId, int pgmPid) {
+  void writePmt (HANDLE file, int serviceId, int pgmPid, int pcrPid,
+                 int vidPid, int vidStreamType, int audPid, int audStreamType) {
 
     cLog::log (LOGINFO, "writePmt");
 
     int pid = pgmPid;
     int continuityCount = 0;
-
-    int pcrPid = 101;
-    int vidPid = 101;
-    int vidStreamType = 2;
-    int audPid = 102;
-    int audStreamType = 3;
-    int esInfoLen = 0;
 
     tsHeader (pid, continuityCount);
 
@@ -141,15 +155,15 @@ private:
     *mTsPtr++ = vidStreamType; // elementary stream_type
     *mTsPtr++ = 0xE0 | ((vidPid & 0x1F00) >> 8); // elementary_PID
     *mTsPtr++ = vidPid & 0x00FF;
-    *mTsPtr++ = ((esInfoLen & 0xFF00) >> 8) | 0xF0;  // ES_info_length
-    *mTsPtr++ = esInfoLen & 0x00FF;
+    *mTsPtr++ = ((0 & 0xFF00) >> 8) | 0xF0;  // ES_info_length
+    *mTsPtr++ = 0 & 0x00FF;
 
     // aud es
     *mTsPtr++ = audStreamType; // elementary stream_type
     *mTsPtr++ = 0xE0 | ((audPid & 0x1F00) >> 8); // elementary_PID
     *mTsPtr++ = audPid & 0x00FF;
-    *mTsPtr++ = ((esInfoLen & 0xFF00) >> 8) | 0xF0;  // ES_info_length
-    *mTsPtr++ = esInfoLen & 0x00FF;
+    *mTsPtr++ = ((0 & 0xFF00) >> 8) | 0xF0;  // ES_info_length
+    *mTsPtr++ = 0 & 0x00FF;
 
     writeSection (file);
     }
@@ -247,7 +261,7 @@ int main (int argc, char* argv[]) {
   if (hr != S_OK)
     cLog::log (LOGERROR, "CoInitializeEx " + dec(hr));
 
-  auto frequency = (argc >= 2) ? 674 : atoi(argv[1]);
+  auto frequency = (argc >= 2) ? atoi(argv[1]) : 674;
   string mFileName = (argc >= 3) ? argv[2] : "c:/videos/tune.ts";
 
   if (kDump) {

@@ -29,7 +29,7 @@ extern "C" {
 
 #include "mfxvideo++.h"
 #ifdef _DEBUG
-  #pragma comment (lib,"libmfx_vs2015_d.lib")
+  #pragma comment (lib,"libmfx_d.lib")
 #else
   #pragma comment (lib,"libmfx.lib")
 #endif
@@ -1529,8 +1529,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   auto res = CoInitializeEx (NULL, COINIT_MULTITHREADED);
 
-  //cLog::init ("tvWindow", LOGINFO, true);
-  cLog::init ("tvWindow", LOGINFO, false, "C:/Users/colin/Desktop");
+  cLog::init ("tvWindow", LOGINFO, true);
+  //cLog::init ("tvWindow", LOGINFO, false, "C:/Users/colin/Desktop");
 
   string param;
 
