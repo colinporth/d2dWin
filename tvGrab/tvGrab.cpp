@@ -13,7 +13,12 @@ const bool kDump = false;
 class cDumpTransportStream : public cTransportStream {
 public:
   cDumpTransportStream() {}
-  virtual ~cDumpTransportStream() {}
+  //{{{
+  virtual ~cDumpTransportStream() {
+    if (mProgFile != 0)
+      CloseHandle (mProgFile);
+    }
+  //}}}
 
 protected:
   void startProgram (cService* service, const string& name, time_t startTime) {
@@ -36,6 +41,9 @@ protected:
       pidInfoIt = mPidInfoMap.find (mAudPid);
       if (pidInfoIt != mPidInfoMap.end())
         audStreamType = pidInfoIt->second.mStreamType;
+
+      if (mProgFile != 0)
+        CloseHandle (mProgFile);
 
       string fileName = "c:/videos/" + name + ".ts";
       mProgFile = CreateFile (fileName.c_str(),
