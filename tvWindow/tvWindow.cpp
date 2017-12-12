@@ -266,7 +266,7 @@ private:
     iFrame* findFrame (int64_t& pts) {
 
       for (auto frame : mFrames)
-        if (frame->mLoaded && (pts >= frame->mPts) && (pts < frame->mPtsEnd)) {
+        if (frame->hasPts (pts)) {
           pts = frame->mPtsEnd;
           return frame;
           }
@@ -282,24 +282,21 @@ private:
       int64_t nearest = 0;
       iFrame* nearestFrame = nullptr;
 
-      for (auto frame : mFrames) {
-        if (frame->mLoaded) {
-          if ((pts >= frame->mPts) && (pts < frame->mPtsEnd))
-            return frame;
-          else if (pts < frame->mPts) {
-            if (!nearest || ((frame->mPts - pts) < nearest)) {
-              nearest = frame->mPts - pts;
-              nearestFrame = frame;
-              }
-            }
-          else if (pts > frame->mPtsEnd) {
-            if (!nearest || ((pts - frame->mPtsEnd) < nearest)) {
-              nearest = pts - frame->mPts;
-              nearestFrame = frame;
-              }
+      for (auto frame : mFrames) 
+        if (frame->hasPts (pts))
+          return frame;
+        else if (frame->before(pts)) {
+          if (!nearest || ((frame->mPts - pts) < nearest)) {
+            nearest = frame->mPts - pts;
+            nearestFrame = frame;
             }
           }
-        }
+        else if (frame->after(pts)) {
+          if (!nearest || ((pts - frame->mPtsEnd) < nearest)) {
+            nearest = pts - frame->mPts;
+            nearestFrame = frame;
+            }
+          }
 
       return nearestFrame;
       }
