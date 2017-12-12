@@ -10,11 +10,6 @@ using namespace std;
 const bool kDump = false;
 const bool kGrabAll = false;
 
-void removeCharsFromString (string& str, char* charsToRemove) {
-  for (unsigned int i = 0; i < strlen(charsToRemove); ++i )
-    str.erase (remove(str.begin(), str.end(), charsToRemove[i]), str.end());
-  }
-
 //{{{
 class cDumpTransportStream : public cTransportStream {
 public:
@@ -25,8 +20,7 @@ protected:
   //{{{
   void startProgram (cService* service, const string& name, time_t startTime) {
 
-    auto validFileName = name;
-    removeCharsFromString (validFileName, "<>:\\|?*""/");
+    auto validFileName = validString (name, "<>:\\|?*""/");
 
     auto recordFileIt = mRecordFileMap.find (service->getSid());
     if (recordFileIt == mRecordFileMap.end()) {
