@@ -1,12 +1,13 @@
 // cYuvFrame.h
 #pragma once
+#include "iFrame.h"
 
-class cAudFrame  {
+class cAudFrame : public iFrame {
 public:
   cAudFrame() {}
   //{{{
   ~cAudFrame() {
-    free (mSamples);
+    freeResources();
     }
   //}}}
 
@@ -47,11 +48,12 @@ public:
     mNumSamples = 0;
     }
   //}}}
+  //{{{
+  void freeResources() {
+    free (mSamples);
+    }
+  //}}}
 
-  bool mLoaded = false;
-
-  int64_t mPts = -1;
-  int64_t mPtsEnd = -1;
   int64_t mPesPts = -1;
 
   int mChannels = 0;

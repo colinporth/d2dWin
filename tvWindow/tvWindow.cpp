@@ -255,7 +255,40 @@ private:
     };
   //}}}
   //{{{
-  class cAudTransportStream : public cTransportStream {
+  class cDecodeTransportStream : public cTransportStream {
+  public:
+    virtual ~cDecodeTransportStream() {}
+
+    int getPid() { return mPid; }
+    int64_t getLastLoadedPts() { return mLastLoadedPts; }
+
+    //{{{
+    void setPid (int pid) {
+      mPid = pid;
+      invalidateFrames();
+      }
+    //}}}
+
+    virtual void drawFrames (ID2D1DeviceContext* dc, const cRect& rect, IDWriteTextFormat* textFormat,
+                             ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
+                             ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
+                             int64_t playPts, float& maxY) = 0;
+  protected:
+    //{{{
+    virtual void invalidateFrames() {
+
+      mLoadFrame = 0;
+      mLastLoadedPts = -1;
+      }
+    //}}}
+
+    int mPid = -1;
+    int64_t mLastLoadedPts = -1;
+    int mLoadFrame = 0;
+    };
+  //}}}
+  //{{{
+  class cAudTransportStream : public cDecodeTransportStream {
   public:
     //{{{
     cAudTransportStream (int maxFrames) {
@@ -274,8 +307,6 @@ private:
       }
     //}}}
 
-    int getPid() { return mPid; }
-    int64_t getLastLoadedPts() { return mLastLoadedPts; }
     //{{{
     cAudFrame* findFrame (int64_t& pts) {
 
@@ -300,20 +331,12 @@ private:
     //}}}
 
     //{{{
-    void setPid (int pid) {
-      mPid = pid;
-      invalidateFrames();
-      }
-    //}}}
-
-    //{{{
     void drawFrames (ID2D1DeviceContext* dc, const cRect& rect, IDWriteTextFormat* textFormat,
                     ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
                     ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
-                    int64_t playPts) {
+                    int64_t playPts, float& maxY) {
 
       auto y = kDrawFramesCentreY;
-
       auto index = 0;
       for (auto frame : mFrames) {
         if (frame->mNumSamples) {
@@ -450,23 +473,17 @@ private:
       return decoded;
       }
     //}}}
-
-  private:
     //{{{
     void invalidateFrames() {
 
-      mLoadFrame = 0;
-      mLastLoadedPts = -1;
+      cDecodeTransportStream::invalidateFrames();
 
       for (auto frame : mFrames)
         frame->invalidate();
       }
     //}}}
 
-    int mPid = -1;
-    int64_t mLastLoadedPts = -1;
-
-    int mLoadFrame = 0;
+  private:
     concurrent_vector<cAudFrame*> mFrames;
 
     AVCodec* mAudCodec = nullptr;
@@ -475,7 +492,7 @@ private:
     };
   //}}}
   //{{{
-  class cVidTransportStream : public cTransportStream {
+  class cVidTransportStream : public cDecodeTransportStream {
   public:
     //{{{
     cVidTransportStream (int maxFrames) {
@@ -501,8 +518,6 @@ private:
       }
     //}}}
 
-    int getPid() { return mPid; }
-    int64_t getLastLoadedPts() { return mLastLoadedPts; }
     //{{{
     cVidFrame* findFrame (int64_t& pts) {
 
@@ -553,13 +568,6 @@ private:
           return false;
 
       return true;
-      }
-    //}}}
-
-    //{{{
-    void setPid (int pid) {
-      mPid = pid;
-      invalidateFrames();
       }
     //}}}
 
@@ -789,6 +797,14 @@ private:
       return decoded;
       }
     //}}}
+    //{{{
+    void invalidateFrames() {
+
+      cDecodeTransportStream::invalidateFrames();
+      for (auto frame : mFrames)
+        frame->invalidate();
+      }
+    //}}}
 
   private:
     //{{{
@@ -802,22 +818,8 @@ private:
       return MFX_ERR_NOT_FOUND;
       }
     //}}}
-    //{{{
-    void invalidateFrames() {
 
-      mLastLoadedPts = -1;
-      mLoadFrame = 0;
-      for (auto frame : mFrames)
-        frame->invalidate();
-      }
-    //}}}
-
-    // vidFrames
-    int mPid = -1;
     concurrent_vector<cVidFrame*> mFrames;
-    int mLoadFrame = 0;
-
-    int64_t mLastLoadedPts = -1;
 
     // mfx decoder
     MFXVideoSession mSession;
@@ -972,12 +974,13 @@ private:
       if (mPin)
         dc->FillRectangle (mRect, mBrush);
 
+      float maxY = 0;
+
       auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
       appWindow->mAudTs->drawFrames (dc, mRect, mTextFormat,
         mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
-        appWindow->getPlayPts());
+        appWindow->getPlayPts(), maxY);
 
-      float maxY = 0;
       appWindow->mVidTs->drawFrames (dc, mRect, mTextFormat,
         mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
         appWindow->getPlayPts(), maxY);

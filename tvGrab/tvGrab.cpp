@@ -51,15 +51,13 @@ void bdaSignalThread (cBda* bda, cTransportStream* ts) {
 
 int main (int argc, char* argv[]) {
 
-  auto hr = CoInitializeEx (NULL, COINIT_MULTITHREADED);
+  CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init ("tvGrab", LOGINFO, false);
-  if (hr != S_OK)
-    cLog::log (LOGERROR, "CoInitializeEx " + dec(hr));
 
-  auto frequency = (argc >= 2) ? atoi(argv[1]) : 674;
+  int frequency = (argc >= 2) ? atoi(argv[1]) : 674;
   string fileName = (argc >= 3) ? argv[2] : "e:/tv";
-  bool dumpFilter = (argc >= 4);
 
+  bool dumpFilter = (argc >= 4);
   if (dumpFilter) {
     //{{{  use dump.ax filter
     auto mBda = new cBda();

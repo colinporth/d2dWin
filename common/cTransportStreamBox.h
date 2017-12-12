@@ -58,6 +58,7 @@ public:
 
         i++;
         }
+      serviceWidth += mLineHeight;
       }
       //}}}
 
@@ -67,7 +68,7 @@ public:
       for (auto &pidInfo : mTs->mPidInfoMap)
         maxPidPackets = max (maxPidPackets, pidInfo.second.mTotal);
 
-      auto r = cRect (mRect.left + serviceWidth + mLineHeight, mRect.top,
+      auto r = cRect (mRect.left + serviceWidth, mRect.top,
                       mRect.right, mRect.top + mLineHeight);
       for (auto &pidInfo : mTs->mPidInfoMap) {
         auto str = (mContDigits ? dec (pidInfo.second.mDisContinuity,mContDigits) + ":" : "") +

@@ -1,8 +1,15 @@
 // cVidFrame.h
 #pragma once
+#include "iFrame.h"
 
-class cVidFrame  {
+class cVidFrame : public iFrame {
 public:
+  //{{{
+  ~cVidFrame() {
+    freeResources();
+    }
+  //}}}
+
   //{{{
   uint32_t* getBgra() {
 
@@ -260,13 +267,9 @@ public:
   //}}}
 
   // vars
-  bool mLoaded = false;
-  bool mNv12 = false;
-
-  int64_t mPts = -1;
-  int64_t mPtsEnd = -1;
-
   int mPesSize = 0;
+
+  bool mNv12 = false;
   char mFrameType = 0;
 
   int mWidth = 0;
