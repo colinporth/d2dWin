@@ -46,15 +46,15 @@ protected:
                           " " + dec(service->getAudPid()) +
                           " " + name);
 
-    int vidStreamType = 0;
-    auto pidInfoIt = mPidInfoMap.find (service->getVidPid());
-    if (pidInfoIt != mPidInfoMap.end())
-      vidStreamType = pidInfoIt->second.mStreamType;
+    auto vidStreamType = 0;
+    auto vidPidInfoIt = mPidInfoMap.find (service->getVidPid());
+    if (vidPidInfoIt != mPidInfoMap.end())
+      vidStreamType = vidPidInfoIt->second.mStreamType;
 
-    int audStreamType = 0;
-    pidInfoIt = mPidInfoMap.find (service->getVidPid());
-    if (pidInfoIt != mPidInfoMap.end())
-      audStreamType = pidInfoIt->second.mStreamType;
+    auto audStreamType = 0;
+    auto audPidInfoIt = mPidInfoMap.find (service->getAudPid());
+    if (audPidInfoIt != mPidInfoMap.end())
+      audStreamType = audPidInfoIt->second.mStreamType;
 
     if ((service->getVidPid() > 0) && (service->getAudPid() > 0) && vidStreamType && audStreamType) {
       recordFile->createFile (name);
@@ -70,11 +70,8 @@ protected:
   void packet (cPidInfo* pidInfo, uint8_t* ts) {
 
     auto recordFileIt = mRecordFileMap.find (pidInfo->mSid);
-    if (recordFileIt != mRecordFileMap.end()) {
-      auto recordFile = &recordFileIt->second;
-      if ((pidInfo->mPid == recordFile->mVidPid) || (pidInfo->mPid == recordFile->mAudPid))
-        recordFile->writePacket (ts);
-      }
+    if (recordFileIt != mRecordFileMap.end())
+      recordFileIt->second.writePes (pidInfo->mPid, ts);
     }
   //}}}
 
