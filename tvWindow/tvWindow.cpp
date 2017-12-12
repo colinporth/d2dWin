@@ -263,6 +263,59 @@ private:
     int64_t getLastLoadedPts() { return mLastLoadedPts; }
 
     //{{{
+    iFrame* findFrame (int64_t& pts) {
+
+      for (auto frame : mFrames)
+        if (frame->mLoaded && (pts >= frame->mPts) && (pts < frame->mPtsEnd)) {
+          pts = frame->mPtsEnd;
+          return frame;
+          }
+
+      return nullptr;
+      }
+    //}}}
+    //{{{
+    iFrame* findNearestFrame (int64_t pts) {
+    // find first vidFrame on or past pts
+    // - returns nullPtr if no frame loaded yet
+
+      int64_t nearest = 0;
+      iFrame* nearestFrame = nullptr;
+
+      for (auto frame : mFrames) {
+        if (frame->mLoaded) {
+          if ((pts >= frame->mPts) && (pts < frame->mPtsEnd))
+            return frame;
+          else if (pts < frame->mPts) {
+            if (!nearest || ((frame->mPts - pts) < nearest)) {
+              nearest = frame->mPts - pts;
+              nearestFrame = frame;
+              }
+            }
+          else if (pts > frame->mPtsEnd) {
+            if (!nearest || ((pts - frame->mPtsEnd) < nearest)) {
+              nearest = pts - frame->mPts;
+              nearestFrame = frame;
+              }
+            }
+          }
+        }
+
+      return nearestFrame;
+      }
+    //}}}
+    //{{{
+    bool isLoaded (int64_t pts, int frames) {
+
+      for (auto frame = 0; frame < frames; frame++)
+        if (!findFrame (pts))
+          return false;
+
+      return true;
+      }
+    //}}}
+
+    //{{{
     void setPid (int pid) {
       mPid = pid;
       invalidateFrames();
@@ -275,16 +328,21 @@ private:
                              int64_t playPts, float& maxY) = 0;
   protected:
     //{{{
-    virtual void invalidateFrames() {
+    void invalidateFrames() {
 
       mLoadFrame = 0;
       mLastLoadedPts = -1;
+
+      for (auto frame : mFrames)
+        frame->invalidate();
       }
     //}}}
 
     int mPid = -1;
     int64_t mLastLoadedPts = -1;
     int mLoadFrame = 0;
+
+    concurrent_vector<iFrame*> mFrames;
     };
   //}}}
   //{{{
@@ -308,29 +366,6 @@ private:
     //}}}
 
     //{{{
-    cAudFrame* findFrame (int64_t& pts) {
-
-      for (auto frame : mFrames)
-        if (frame->mLoaded && (pts >= frame->mPts) && (pts < frame->mPtsEnd)) {
-          pts = frame->mPtsEnd;
-          return frame;
-          }
-
-      return nullptr;
-      }
-    //}}}
-    //{{{
-    bool isLoaded (int64_t pts, int frames) {
-
-      for (auto frame = 0; frame < frames; frame++)
-        if (!findFrame (pts))
-          return false;
-
-      return true;
-      }
-    //}}}
-
-    //{{{
     void drawFrames (ID2D1DeviceContext* dc, const cRect& rect, IDWriteTextFormat* textFormat,
                     ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
                     ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
@@ -338,7 +373,8 @@ private:
 
       auto y = kDrawFramesCentreY;
       auto index = 0;
-      for (auto frame : mFrames) {
+      for (auto iframe : mFrames) {
+        auto frame = (cAudFrame*)iframe;
         if (frame->mNumSamples) {
           const auto audFrameWidth = (90 * frame->mNumSamples / 48) * kPixPerPts;
           int64_t diff = frame->mPts - playPts;
@@ -417,7 +453,7 @@ private:
               if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
                 break;
 
-              auto frame = mFrames[mLoadFrame];
+              auto frame = (cAudFrame*)mFrames[mLoadFrame];
               frame->set (interpolatedPts, avFrame->nb_samples*90/48, pidInfo->mPts, avFrame->channels, avFrame->nb_samples);
               switch (mAudContext->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
@@ -473,19 +509,8 @@ private:
       return decoded;
       }
     //}}}
-    //{{{
-    void invalidateFrames() {
-
-      cDecodeTransportStream::invalidateFrames();
-
-      for (auto frame : mFrames)
-        frame->invalidate();
-      }
-    //}}}
 
   private:
-    concurrent_vector<cAudFrame*> mFrames;
-
     AVCodec* mAudCodec = nullptr;
     AVCodecContext* mAudContext = nullptr;
     AVCodecParserContext* mAudParser = nullptr;
@@ -519,59 +544,6 @@ private:
     //}}}
 
     //{{{
-    cVidFrame* findFrame (int64_t& pts) {
-
-      for (auto frame : mFrames)
-        if (frame->mLoaded && (pts >= frame->mPts) && (pts < frame->mPtsEnd)) {
-          pts = frame->mPtsEnd;
-          return frame;
-          }
-
-      return nullptr;
-      }
-    //}}}
-    //{{{
-    cVidFrame* findNearestFrame (int64_t pts) {
-    // find first vidFrame on or past pts
-    // - returns nullPtr if no frame loaded yet
-
-      int64_t nearest = 0;
-      cVidFrame* nearestFrame = nullptr;
-
-      for (auto frame : mFrames) {
-        if (frame->mLoaded) {
-          if ((pts >= frame->mPts) && (pts < frame->mPtsEnd))
-            return frame;
-          else if (pts < frame->mPts) {
-            if (!nearest || ((frame->mPts - pts) < nearest)) {
-              nearest = frame->mPts - pts;
-              nearestFrame = frame;
-              }
-            }
-          else if (pts > frame->mPtsEnd) {
-            if (!nearest || ((pts - frame->mPtsEnd) < nearest)) {
-              nearest = pts - frame->mPts;
-              nearestFrame = frame;
-              }
-            }
-          }
-        }
-
-      return nearestFrame;
-      }
-    //}}}
-    //{{{
-    bool isLoaded (int64_t pts, int frames) {
-
-      for (auto frame = 0; frame < frames; frame++)
-        if (!findFrame (pts))
-          return false;
-
-      return true;
-      }
-    //}}}
-
-    //{{{
     void drawFrames (ID2D1DeviceContext* dc, const cRect& rect, IDWriteTextFormat* textFormat,
                      ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
                      ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
@@ -582,7 +554,8 @@ private:
 
       maxY = y;
       auto index = 0;
-      for (auto frame : mFrames) {
+      for (auto iframe : mFrames) {
+        auto frame = (cVidFrame*)iframe;
         int64_t diff = frame->mPts - playPts;
         auto x = rect.left + (rect.right - rect.left)/2.f + (diff * kPixPerPts);
         auto y1 = y + kIndexHeight + 1.f;
@@ -752,7 +725,7 @@ private:
             mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
 
           // allocate vidFrame for this PES
-          mFrames[mLoadFrame++ % mFrames.size()]->setPes (pidInfo->mPts, 90000/25, pesSize, frameType);
+          ((cVidFrame*)mFrames[mLoadFrame++ % mFrames.size()])->setPes (pidInfo->mPts, 90000/25, pesSize, frameType);
 
           mfxStatus status = MFX_ERR_NONE;
           while (status >= MFX_ERR_NONE || status == MFX_ERR_MORE_SURFACE) {
@@ -778,13 +751,15 @@ private:
                 status = mSession.SyncOperation (syncDecode, 60000);
               if (status == MFX_ERR_NONE) {
                 //{{{  got decoded frame, set video of vidFrame
-                for (auto frame : mFrames)
+                for (auto iframe : mFrames) {
+                  auto frame = (cVidFrame*)iframe;
                   if (frame->mPts == surface->Data.TimeStamp) {
                     frame->setNv12 (surface->Data.Y, surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
                     cLog::log (LOGINFO2, "-> vidFrame::set - pts:" + getPtsString(surface->Data.TimeStamp));
                     mLastLoadedPts = surface->Data.TimeStamp;
                     break;
                     }
+                  }
 
                 decoded = true;
                 }
@@ -795,14 +770,6 @@ private:
         }
 
       return decoded;
-      }
-    //}}}
-    //{{{
-    void invalidateFrames() {
-
-      cDecodeTransportStream::invalidateFrames();
-      for (auto frame : mFrames)
-        frame->invalidate();
       }
     //}}}
 
@@ -818,8 +785,6 @@ private:
       return MFX_ERR_NOT_FOUND;
       }
     //}}}
-
-    concurrent_vector<cVidFrame*> mFrames;
 
     // mfx decoder
     MFXVideoSession mSession;
@@ -900,7 +865,7 @@ private:
 
       auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
 
-      auto vidframe = appWindow->mVidTs->findNearestFrame (appWindow->getPlayPts());
+      auto vidframe = (cVidFrame*)appWindow->mVidTs->findNearestFrame (appWindow->getPlayPts());
       if (vidframe && (vidframe->mPts != appWindow->mBitmapPts)) {
         appWindow->mBitmap = vidframe->makeBitmap (dc, appWindow->mBitmap);
         appWindow->mBitmapPts = vidframe->mPts;
@@ -1478,7 +1443,7 @@ private:
 
     while (true) {
       auto pts = getPlayPts();
-      mPlayAudFrame = mAudTs->findFrame (pts);
+      mPlayAudFrame = (cAudFrame*)mAudTs->findFrame (pts);
 
       // play using frame where available, else play silence
       audPlay (mPlayAudFrame ? mPlayAudFrame->mChannels : getSrcChannels(),
