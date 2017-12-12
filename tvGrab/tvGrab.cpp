@@ -10,15 +10,10 @@ using namespace std;
 const bool kDump = false;
 const bool kGrabAll = false;
 
-// < (less than)
-// > (greater than)
-// : (colon)
-// " (double quote)
-// / (forward slash)
-// \ (backslash)
-// | (vertical bar or pipe)
-// ? (question mark)
-// * (asterisk)
+void removeCharsFromString (string& str, char* charsToRemove) {
+  for (unsigned int i = 0; i < strlen(charsToRemove); ++i )
+    str.erase (remove(str.begin(), str.end(), charsToRemove[i]), str.end());
+  }
 
 //{{{
 class cDumpTransportStream : public cTransportStream {
@@ -29,6 +24,9 @@ public:
 protected:
   //{{{
   void startProgram (cService* service, const string& name, time_t startTime) {
+
+    auto validFileName = name;
+    removeCharsFromString (validFileName, "<>:\\|?*""/");
 
     auto recordFileIt = mRecordFileMap.find (service->getSid());
     if (recordFileIt == mRecordFileMap.end()) {
@@ -44,7 +42,7 @@ protected:
     // start new file
     cLog::log (LOGNOTICE, "startProgram " + dec(service->getVidPid()) +
                           " " + dec(service->getAudPid()) +
-                          " " + name);
+                          " " + name + ((name != validFileName) ? (" valid:" + validFileName) : ""));
 
     auto vidStreamType = 0;
     auto vidPidInfoIt = mPidInfoMap.find (service->getVidPid());
@@ -57,7 +55,7 @@ protected:
       audStreamType = audPidInfoIt->second.mStreamType;
 
     if ((service->getVidPid() > 0) && (service->getAudPid() > 0) && vidStreamType && audStreamType) {
-      recordFile->createFile (name);
+      recordFile->createFile (validFileName);
 
       int pgmPid = 32;
       recordFile->writePat (0x1234, service->getSid(), pgmPid); // tsid, sid, pgmPid
