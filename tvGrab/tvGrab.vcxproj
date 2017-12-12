@@ -154,6 +154,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\shared\decoders\cDumpTransportStream.h" />
     <ClInclude Include="..\..\shared\decoders\cTransportStream.h" />
     <ClInclude Include="..\common\cBda.h" />
     <ClInclude Include="stdafx.h" />

@@ -37,6 +37,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\shared\decoders\cDumpTransportStream.h" />
     <ClInclude Include="..\..\shared\decoders\cTransportStream.h" />
     <ClInclude Include="..\..\shared\decoders\huffman.h" />
     <ClInclude Include="..\..\shared\utils\cBipBuffer.h" />

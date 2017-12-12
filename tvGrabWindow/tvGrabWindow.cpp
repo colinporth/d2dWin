@@ -4,6 +4,7 @@
 
 #include "../common/cBda.h"
 #include "../../shared/decoders/cTransportStream.h"
+#include "../../shared/decoders/cDumpTransportStream.h"
 
 #include "../common/cTransportStreamBox.h"
 #include "../common/cIntBox.h"
@@ -18,7 +19,8 @@ public:
   //{{{
   void run (const string& title, int width, int height, const string& param) {
 
-    mTs = new cTransportStream();
+    string rootName = "e:/videos";
+    mTs = new cDumpTransportStream (rootName);
 
     initialise (title, width, height, false);
     addBox (new cTransportStreamBox (this, 0,-200, mTs));
@@ -28,11 +30,8 @@ public:
 
     auto frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
-      mFileName = "c:/videos/tune.ts";
-      mFile = CreateFile (mFileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
-
       mBda = new cBda();
-      thread ([=]() { bdaThread (mBda, frequency*1000, mFile); }).detach();
+      thread ([=]() { bdaThread (mBda, frequency*1000); }).detach();
       thread ([=]() { bdaStrengthThread (mBda); }).detach();
       }
     else
@@ -58,7 +57,7 @@ protected:
 
 private:
   //{{{
-  void bdaThread (cBda* bda, int frequency, HANDLE file) {
+  void bdaThread (cBda* bda, int frequency) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::log (LOGNOTICE, "bdaThread - start");
@@ -74,12 +73,12 @@ private:
         streamPos += bytesUsed;
         changed();
 
-        DWORD numBytesUsed;
-        WriteFile (file, ptr, blockSize, &numBytesUsed, NULL);
-        if (numBytesUsed != blockSize)
-          cLog::log (LOGERROR, "WriteFile only used " + dec(numBytesUsed) + " of " + dec(blockSize));
-        if (blockSize != 240*188)
-          cLog::log (LOGINFO, "bda blockSize " + dec (blockSize));
+        //DWORD numBytesUsed;
+        //WriteFile (file, ptr, blockSize, &numBytesUsed, NULL);
+        //if (numBytesUsed != blockSize)
+        //  cLog::log (LOGERROR, "WriteFile only used " + dec(numBytesUsed) + " of " + dec(blockSize));
+        //if (blockSize != 240*188)
+        //  cLog::log (LOGINFO, "bda blockSize " + dec (blockSize));
 
         bda->decommitBlock (blockSize);
         }
