@@ -10,13 +10,24 @@ using namespace std;
 const bool kDump = false;
 const bool kGrabAll = false;
 
+// < (less than)
+// > (greater than)
+// : (colon)
+// " (double quote)
+// / (forward slash)
+// \ (backslash)
+// | (vertical bar or pipe)
+// ? (question mark)
+// * (asterisk)
+
 //{{{
 class cDumpTransportStream : public cTransportStream {
 public:
   cDumpTransportStream() {}
-  virtual ~cDumpTransportStream() { }
+  virtual ~cDumpTransportStream() {}
 
 protected:
+  //{{{
   void startProgram (cService* service, const string& name, time_t startTime) {
 
     auto recordFileIt = mRecordFileMap.find (service->getSid());
@@ -27,173 +38,48 @@ protected:
       }
     auto recordFile = &recordFileIt->second;
 
+    // close any previous file on this sid
+    recordFile->closeFile();
+
+    // start new file
     cLog::log (LOGNOTICE, "startProgram " + dec(service->getVidPid()) +
                           " " + dec(service->getAudPid()) +
                           " " + name);
+
     int vidStreamType = 0;
     auto pidInfoIt = mPidInfoMap.find (service->getVidPid());
     if (pidInfoIt != mPidInfoMap.end())
       vidStreamType = pidInfoIt->second.mStreamType;
 
     int audStreamType = 0;
-    pidInfoIt = mPidInfoMap.find (service->getAudPid());
+    pidInfoIt = mPidInfoMap.find (service->getVidPid());
     if (pidInfoIt != mPidInfoMap.end())
       audStreamType = pidInfoIt->second.mStreamType;
 
-    if (recordFile->mFile != 0)
-      CloseHandle (recordFile->mFile);
+    if ((service->getVidPid() > 0) && (service->getAudPid() > 0) && vidStreamType && audStreamType) {
+      recordFile->createFile (name);
 
-    string fileName = "c:/videos/" + name + ".ts";
-    recordFile->mFile = CreateFile (fileName.c_str(),
-                            GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
-    int pgmPid = 32;
-    writePat (recordFile->mFile, 0x1234, service->getSid(), pgmPid); // tsid, sid, pgmPid
-    writePmt (recordFile->mFile, service->getSid(),
-              pgmPid, service->getVidPid(),
-              service->getVidPid(), vidStreamType, service->getAudPid(), audStreamType);
+      int pgmPid = 32;
+      recordFile->writePat (0x1234, service->getSid(), pgmPid); // tsid, sid, pgmPid
+      recordFile->writePmt (service->getSid(), pgmPid, service->getVidPid(),
+                            service->getVidPid(), vidStreamType, service->getAudPid(), audStreamType);
+      }
     }
-
-  void packet (cPidInfo* pidInfo, uint8_t* tsPtr) {
+  //}}}
+  //{{{
+  void packet (cPidInfo* pidInfo, uint8_t* ts) {
 
     auto recordFileIt = mRecordFileMap.find (pidInfo->mSid);
     if (recordFileIt != mRecordFileMap.end()) {
       auto recordFile = &recordFileIt->second;
-      if ((pidInfo->mPid == recordFile->mVidPid) || (pidInfo->mPid == recordFile->mAudPid)) {
-        DWORD numBytesUsed;
-        WriteFile (recordFile->mFile, tsPtr, 188, &numBytesUsed, NULL);
-        if (numBytesUsed != 188)
-          cLog::log (LOGERROR, "writePacket " + dec(numBytesUsed));
-        }
+      if ((pidInfo->mPid == recordFile->mVidPid) || (pidInfo->mPid == recordFile->mAudPid))
+        recordFile->writePacket (ts);
       }
     }
+  //}}}
 
 private:
-  //{{{
-  void tsHeader (int pid, int continuityCount) {
-
-    memset (mTs, 0xFF, 188);
-
-    mTsPtr = mTs;
-    *mTsPtr++ = 0x47; // sync byte
-    *mTsPtr++ = 0x40 | ((pid & 0x1f00) >> 8);           // payload_unit_start_indicator + pid upper
-    *mTsPtr++ = pid & 0xff;                             // pid lower
-    *mTsPtr++ = 0x10 | continuityCount;                 // no adaptControls + cont count
-    *mTsPtr++ = 0;                                      // pointerField
-
-    mTsSectionStart = mTsPtr;
-    }
-  //}}}
-  //{{{
-  void writeSection (HANDLE file) {
-
-    // tsSection crc, calc from tsSection start to here
-    auto crc32 = crc32Block (0xffffffff, mTsSectionStart, int(mTsPtr - mTsSectionStart));
-    *mTsPtr++ = (crc32 & 0xff000000) >> 24;
-    *mTsPtr++ = (crc32 & 0x00ff0000) >> 16;
-    *mTsPtr++ = (crc32 & 0x0000ff00) >>  8;
-    *mTsPtr++ = crc32 & 0x000000ff;
-
-    // write
-    DWORD numBytesUsed;
-    WriteFile (file, mTs, 188, &numBytesUsed, NULL);
-    if (numBytesUsed != 188)
-      cLog::log (LOGERROR, "writePat " + dec(numBytesUsed));
-    }
-  //}}}
-  //{{{
-  void writePat (HANDLE file, int transportStreamId, int serviceId, int pgmPid) {
-
-    cLog::log (LOGINFO, "writePat");
-
-    int pid = PID_PAT;
-    int continuityCount = 0;
-
-    tsHeader (pid, continuityCount);
-
-    auto sectionLength = 5+4 + 4;
-    *mTsPtr++ = TID_PAT;                                // PAT tid
-    *mTsPtr++ = 0xb0 | ((sectionLength & 0x0F00) >> 8); // Pat sectionLength upper
-    *mTsPtr++ = sectionLength & 0x0FF;                  // Pat sectionLength lower
-
-    // sectionLength from here to end of crc
-    *mTsPtr++ = (transportStreamId & 0xFF00) >> 8;      // transportStreamId
-    *mTsPtr++ = transportStreamId & 0x00FF;
-    *mTsPtr++ = 0xc1;                                   // For simplicity, we'll have a version_id of 0
-    *mTsPtr++ = 0x00;                                   // First section number = 0
-    *mTsPtr++ = 0x00;                                   // last section number = 0
-
-    *mTsPtr++ = (serviceId & 0xFF00) >> 8;              // first section serviceId
-    *mTsPtr++ = serviceId & 0x00FF;
-    *mTsPtr++ = 0xE0 | ((pgmPid & 0x1F00) >> 8);       // first section pgmPid
-    *mTsPtr++ = pgmPid & 0x00FF;
-
-    writeSection (file);
-    }
-  //}}}
-  //{{{
-  void writePmt (HANDLE file, int serviceId, int pgmPid, int pcrPid,
-                 int vidPid, int vidStreamType, int audPid, int audStreamType) {
-
-    cLog::log (LOGINFO, "writePmt");
-
-    int pid = pgmPid;
-    int continuityCount = 0;
-
-    tsHeader (pid, continuityCount);
-
-    auto mTsSectionStart = mTsPtr;
-    int sectionLength = 23; // 5+4 + program_info_length + esStreams * (5 + ES_info_length) + 4
-    *mTsPtr++ = TID_PMT;
-    *mTsPtr++ = 0xb0 | ((sectionLength & 0x0F00) >> 8);
-    *mTsPtr++ = sectionLength & 0x0FF;
-
-    // sectionLength from here to end of crc
-    *mTsPtr++ = (serviceId & 0xFF00) >> 8;
-    *mTsPtr++ = serviceId & 0x00FF;
-    *mTsPtr++ = 0xc1; // version_id of 0
-    *mTsPtr++ = 0x00; // first section number = 0
-    *mTsPtr++ = 0x00; // last section number = 0
-
-    *mTsPtr++ = 0xE0 | ((pcrPid & 0x1F00) >> 8);
-    *mTsPtr++ = pcrPid & 0x00FF;
-
-    *mTsPtr++ = 0xF0;
-    *mTsPtr++ = 0; // program_info_length;
-
-    // vid es
-    *mTsPtr++ = vidStreamType; // elementary stream_type
-    *mTsPtr++ = 0xE0 | ((vidPid & 0x1F00) >> 8); // elementary_PID
-    *mTsPtr++ = vidPid & 0x00FF;
-    *mTsPtr++ = ((0 & 0xFF00) >> 8) | 0xF0;  // ES_info_length
-    *mTsPtr++ = 0 & 0x00FF;
-
-    // aud es
-    *mTsPtr++ = audStreamType; // elementary stream_type
-    *mTsPtr++ = 0xE0 | ((audPid & 0x1F00) >> 8); // elementary_PID
-    *mTsPtr++ = audPid & 0x00FF;
-    *mTsPtr++ = ((0 & 0xFF00) >> 8) | 0xF0;  // ES_info_length
-    *mTsPtr++ = 0 & 0x00FF;
-
-    writeSection (file);
-    }
-  //}}}
-
-  //{{{
-  class cRecordFile {
-  public:
-    cRecordFile (int vidPid, int audPid) : mVidPid(vidPid), mAudPid(audPid) {}
-
-    HANDLE mFile = 0;
-    int mVidPid = -1;
-    int mAudPid = -1;
-    };
-  //}}}
   map<int,cRecordFile> mRecordFileMap;
-
-
-  uint8_t mTs[188];
-  uint8_t* mTsPtr = nullptr;
-  uint8_t* mTsSectionStart = nullptr;
   };
 //}}}
 
