@@ -13,7 +13,7 @@ const bool kGrabAll = false;
 //{{{
 class cDumpTransportStream : public cTransportStream {
 public:
-  cDumpTransportStream() {}
+  cDumpTransportStream (const string& rootName) : mRootName(rootName){}
   virtual ~cDumpTransportStream() {}
 
 protected:
@@ -29,7 +29,7 @@ protected:
           service->getSid(), cRecordFile (service->getVidPid(), service->getAudPid()))).first;
 
     auto validFileName = validString (service->getNameString() + " - " + name, "<>:\\|?*""/");
-    recordFileIt->second.createFile ("c:/videos/" + validFileName + ".ts", service);
+    recordFileIt->second.createFile (mRootName + "/" + validFileName + ".ts", service);
     }
   //}}}
   //{{{
@@ -43,6 +43,7 @@ protected:
   //}}}
 
 private:
+  string mRootName;
   map<int,cRecordFile> mRecordFileMap;
   };
 //}}}
@@ -153,7 +154,7 @@ int main (int argc, char* argv[]) {
       cLog::log (LOGNOTICE, "Created file " + mFileName);
       }
 
-    auto mTs = new cDumpTransportStream();
+    auto mTs = new cDumpTransportStream ("c:/videos");
     cLog::log (LOGNOTICE, "Created ts");
 
     auto mBda = new cBda();
