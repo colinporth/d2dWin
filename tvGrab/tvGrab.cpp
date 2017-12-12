@@ -134,6 +134,7 @@ int main (int argc, char* argv[]) {
 
   auto frequency = (argc >= 2) ? atoi(argv[1]) : 674;
   string mFileName = (argc >= 3) ? argv[2] : "c:/videos/tune.ts";
+  string rootName = "e:/videos";
 
   if (kDump) {
     //{{{  use dump.ax filter
@@ -154,7 +155,7 @@ int main (int argc, char* argv[]) {
       cLog::log (LOGNOTICE, "Created file " + mFileName);
       }
 
-    auto mTs = new cDumpTransportStream ("c:/videos");
+    auto mTs = new cDumpTransportStream (rootName);
     cLog::log (LOGNOTICE, "Created ts");
 
     auto mBda = new cBda();
