@@ -20,46 +20,21 @@ protected:
   //{{{
   void startProgram (cService* service, const string& name, time_t startTime) {
 
-    auto validFileName = validString (name, "<>:\\|?*""/");
+    cLog::log (LOGNOTICE, "startProgram " + name);
 
     auto recordFileIt = mRecordFileMap.find (service->getSid());
-    if (recordFileIt == mRecordFileMap.end()) {
-      auto insertPair = mRecordFileMap.insert (
-        map<int,cRecordFile>::value_type (service->getSid(), cRecordFile (service->getVidPid(), service->getAudPid())));
-      recordFileIt = insertPair.first;
-      }
-    auto recordFile = &recordFileIt->second;
+    if (recordFileIt == mRecordFileMap.end()) // create new cRecordFile for this cService
+      recordFileIt = mRecordFileMap.insert (
+        map<int,cRecordFile>::value_type (
+          service->getSid(), cRecordFile (service->getVidPid(), service->getAudPid()))).first;
 
-    // close any previous file on this sid
-    recordFile->closeFile();
-
-    // start new file
-    cLog::log (LOGNOTICE, "startProgram " + dec(service->getVidPid()) +
-                          " " + dec(service->getAudPid()) +
-                          " " + name + ((name != validFileName) ? (" valid:" + validFileName) : ""));
-
-    auto vidStreamType = 0;
-    auto vidPidInfoIt = mPidInfoMap.find (service->getVidPid());
-    if (vidPidInfoIt != mPidInfoMap.end())
-      vidStreamType = vidPidInfoIt->second.mStreamType;
-
-    auto audStreamType = 0;
-    auto audPidInfoIt = mPidInfoMap.find (service->getAudPid());
-    if (audPidInfoIt != mPidInfoMap.end())
-      audStreamType = audPidInfoIt->second.mStreamType;
-
-    if ((service->getVidPid() > 0) && (service->getAudPid() > 0) && vidStreamType && audStreamType) {
-      recordFile->createFile (validFileName);
-
-      int pgmPid = 32;
-      recordFile->writePat (0x1234, service->getSid(), pgmPid); // tsid, sid, pgmPid
-      recordFile->writePmt (service->getSid(), pgmPid, service->getVidPid(),
-                            service->getVidPid(), vidStreamType, service->getAudPid(), audStreamType);
-      }
+    auto validFileName = validString (service->getNameString() + " - " + name, "<>:\\|?*""/");
+    recordFileIt->second.createFile ("c:/videos/" + validFileName + ".ts", service);
     }
   //}}}
   //{{{
-  void packet (cPidInfo* pidInfo, uint8_t* ts) {
+  void pesPacket (cPidInfo* pidInfo, uint8_t* ts) {
+  // save pes packet
 
     auto recordFileIt = mRecordFileMap.find (pidInfo->mSid);
     if (recordFileIt != mRecordFileMap.end())

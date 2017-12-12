@@ -126,7 +126,7 @@ public:
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
-        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), textFormat,
+        strToWstr(str).data(), (uint32_t)str.size(), textFormat,
         r.getWidth(), r.getHeight(), &textLayout);
 
       if (textLayout) {
@@ -148,11 +148,54 @@ public:
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
-        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), textFormat,
+        strToWstr(str).data(), (uint32_t)str.size(), textFormat,
         r.getWidth(), r.getHeight(), &textLayout);
 
       if (textLayout) {
         textLayout->SetFontSize (textHeight, {0, (uint32_t)str.size()});
+
+        struct DWRITE_TEXT_METRICS textMetrics;
+        textLayout->GetMetrics (&textMetrics);
+
+        dc->DrawTextLayout (r.getTL(), textLayout, brush);
+        textLayout->Release();
+
+        return textMetrics.width;
+        }
+      else
+        return 0;
+      }
+    //}}}
+
+    //{{{
+    float measureText (ID2D1DeviceContext* dc, const wstring& wstr, IDWriteTextFormat* textFormat,
+                       const cRect& r, float textHeight) {
+
+      IDWriteTextLayout* textLayout;
+      mWindow->getDwriteFactory()->CreateTextLayout (wstr.data(), (uint32_t)wstr.size(), textFormat,
+                                                     r.getWidth(), r.getHeight(), &textLayout);
+      if (textLayout) {
+        textLayout->SetFontSize (textHeight, {0, (uint32_t)wstr.size()});
+
+        struct DWRITE_TEXT_METRICS textMetrics;
+        textLayout->GetMetrics (&textMetrics);
+        textLayout->Release();
+
+        return textMetrics.width;
+        }
+      else
+        return 0;
+      }
+    //}}}
+    //{{{
+    float drawText (ID2D1DeviceContext* dc, const wstring& wstr, IDWriteTextFormat* textFormat,
+                    const cRect& r, ID2D1SolidColorBrush* brush, float textHeight) {
+
+      IDWriteTextLayout* textLayout;
+      mWindow->getDwriteFactory()->CreateTextLayout (wstr.data(), (uint32_t)wstr.size(), textFormat,
+                                                     r.getWidth(), r.getHeight(), &textLayout);
+      if (textLayout) {
+        textLayout->SetFontSize (textHeight, {0, (uint32_t)wstr.size()});
 
         struct DWRITE_TEXT_METRICS textMetrics;
         textLayout->GetMetrics (&textMetrics);
@@ -189,8 +232,9 @@ public:
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
-        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+        strToWstr(str).data(), (uint32_t)str.size(),
         mWindow->getTextFormat(), r.getWidth(), r.getHeight(), &textLayout);
+
       dc->DrawTextLayout (r.getTL(2.f), textLayout, mWindow->getBlackBrush());
       dc->DrawTextLayout (r.getTL(), textLayout, mWindow->getWhiteBrush());
       textLayout->Release();
