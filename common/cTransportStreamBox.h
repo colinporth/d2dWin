@@ -34,34 +34,35 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    // draw services
     auto r = cRect (mRect.left, mRect.top, mRect.right, mRect.top + mLineHeight);
-
     auto serviceWidth = 0.f;
 
     mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
-
-    int i = 1;
-    for (auto &service : mTs->mServiceMap) {
-      auto str = dec(i, mTs->mServiceMap.size() >= 10 ? 2:1) + " " + service.second.getNameString();
-      serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
-      r.top = r.bottom;
-      r.bottom += mLineHeight;
-
-      for (auto epgItem : service.second.getNowVec()) {
-        str = "  - " + epgItem->getStartTimeString() +
-              " " + epgItem->getDurationString() +
-              " " + epgItem->getTitleString();
+    if (mTs->mServiceMap.size() > 1) {
+      //{{{  draw services
+      int i = 1;
+      for (auto &service : mTs->mServiceMap) {
+        auto str = dec(i, mTs->mServiceMap.size() >= 10 ? 2:1) + " " + service.second.getNameString();
         serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
         r.top = r.bottom;
         r.bottom += mLineHeight;
+
+        for (auto epgItem : service.second.getNowVec()) {
+          str = "  - " + epgItem->getStartTimeString() +
+                " " + epgItem->getDurationString() +
+                " " + epgItem->getTitleString();
+          serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
+          r.top = r.bottom;
+          r.bottom += mLineHeight;
+          }
+
+        i++;
         }
-
-      i++;
       }
+      //}}}
 
-    // draw pids
     if (mTs->mPidInfoMap.size()) {
+      //{{{  draw pids
       auto maxPidPackets = 10000;
       for (auto &pidInfo : mTs->mPidInfoMap)
         maxPidPackets = max (maxPidPackets, pidInfo.second.mTotal);
@@ -94,6 +95,7 @@ public:
       if (mTs->getDiscontinuity() > pow (10, mContDigits))
         mContDigits++;
       }
+      //}}}
     }
   //}}}
 
