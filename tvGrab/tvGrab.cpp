@@ -8,61 +8,62 @@
 using namespace std;
 //}}}
 const bool kDump = false;
+const bool kGrabAll = false;
 
 //{{{
 class cDumpTransportStream : public cTransportStream {
 public:
   cDumpTransportStream() {}
-  //{{{
-  virtual ~cDumpTransportStream() {
-    if (mProgFile != 0)
-      CloseHandle (mProgFile);
-    }
-  //}}}
+  virtual ~cDumpTransportStream() { }
 
 protected:
   void startProgram (cService* service, const string& name, time_t startTime) {
 
-    //if (service->getSid() == 17540) {
-    if (service->getSid() == 4162) {
-      cLog::log (LOGNOTICE, "startProgram " + dec(service->getVidPid()) +
-                            " " + dec(service->getAudPid()) +
-                            " " + name);
-
-      mVidPid = service->getVidPid();
-      mAudPid = service->getAudPid();
-
-      int vidStreamType = 0;
-      auto pidInfoIt = mPidInfoMap.find (mVidPid);
-      if (pidInfoIt != mPidInfoMap.end())
-        vidStreamType = pidInfoIt->second.mStreamType;
-
-      int audStreamType = 0;
-      pidInfoIt = mPidInfoMap.find (mAudPid);
-      if (pidInfoIt != mPidInfoMap.end())
-        audStreamType = pidInfoIt->second.mStreamType;
-
-      if (mProgFile != 0)
-        CloseHandle (mProgFile);
-
-      string fileName = "c:/videos/" + name + ".ts";
-      mProgFile = CreateFile (fileName.c_str(),
-                              GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
-      int sid = 1;
-      int pgmPid = 32;
-      writePat (mProgFile, 0x1234, service->getSid(), pgmPid); // tsid, sid, pgmPid
-      writePmt (mProgFile, service->getSid(),
-                pgmPid, service->getVidPid(),
-                service->getVidPid(), vidStreamType, service->getAudPid(), audStreamType);
+    auto recordFileIt = mRecordFileMap.find (service->getSid());
+    if (recordFileIt == mRecordFileMap.end()) {
+      auto insertPair = mRecordFileMap.insert (
+        map<int,cRecordFile>::value_type (service->getSid(), cRecordFile (service->getVidPid(), service->getAudPid())));
+      recordFileIt = insertPair.first;
       }
+    auto recordFile = &recordFileIt->second;
+
+    cLog::log (LOGNOTICE, "startProgram " + dec(service->getVidPid()) +
+                          " " + dec(service->getAudPid()) +
+                          " " + name);
+    int vidStreamType = 0;
+    auto pidInfoIt = mPidInfoMap.find (service->getVidPid());
+    if (pidInfoIt != mPidInfoMap.end())
+      vidStreamType = pidInfoIt->second.mStreamType;
+
+    int audStreamType = 0;
+    pidInfoIt = mPidInfoMap.find (service->getAudPid());
+    if (pidInfoIt != mPidInfoMap.end())
+      audStreamType = pidInfoIt->second.mStreamType;
+
+    if (recordFile->mFile != 0)
+      CloseHandle (recordFile->mFile);
+
+    string fileName = "c:/videos/" + name + ".ts";
+    recordFile->mFile = CreateFile (fileName.c_str(),
+                            GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
+    int pgmPid = 32;
+    writePat (recordFile->mFile, 0x1234, service->getSid(), pgmPid); // tsid, sid, pgmPid
+    writePmt (recordFile->mFile, service->getSid(),
+              pgmPid, service->getVidPid(),
+              service->getVidPid(), vidStreamType, service->getAudPid(), audStreamType);
     }
 
   void packet (cPidInfo* pidInfo, uint8_t* tsPtr) {
-    if ((pidInfo->mPid == mVidPid) || (pidInfo->mPid == mAudPid)) {
-      DWORD numBytesUsed;
-      WriteFile (mProgFile, tsPtr, 188, &numBytesUsed, NULL);
-      if (numBytesUsed != 188)
-        cLog::log (LOGERROR, "writePacket " + dec(numBytesUsed));
+
+    auto recordFileIt = mRecordFileMap.find (pidInfo->mSid);
+    if (recordFileIt != mRecordFileMap.end()) {
+      auto recordFile = &recordFileIt->second;
+      if ((pidInfo->mPid == recordFile->mVidPid) || (pidInfo->mPid == recordFile->mAudPid)) {
+        DWORD numBytesUsed;
+        WriteFile (recordFile->mFile, tsPtr, 188, &numBytesUsed, NULL);
+        if (numBytesUsed != 188)
+          cLog::log (LOGERROR, "writePacket " + dec(numBytesUsed));
+        }
       }
     }
 
@@ -177,9 +178,18 @@ private:
     }
   //}}}
 
-  HANDLE mProgFile = 0;
-  int mVidPid = -1;
-  int mAudPid = -1;
+  //{{{
+  class cRecordFile {
+  public:
+    cRecordFile (int vidPid, int audPid) : mVidPid(vidPid), mAudPid(audPid) {}
+
+    HANDLE mFile = 0;
+    int mVidPid = -1;
+    int mAudPid = -1;
+    };
+  //}}}
+  map<int,cRecordFile> mRecordFileMap;
+
 
   uint8_t mTs[188];
   uint8_t* mTsPtr = nullptr;
@@ -201,12 +211,14 @@ void bdaGrabThread (cBda* bda, cTransportStream* ts, HANDLE file) {
       auto bytesUsed = ts->demux (ptr, blockSize, streamPos, false, -1);
       streamPos += bytesUsed;
 
-      DWORD numBytesUsed;
-      WriteFile (file, ptr, blockSize, &numBytesUsed, NULL);
-      if (numBytesUsed != blockSize)
-        cLog::log (LOGERROR, "WriteFile only used " + dec(numBytesUsed) + " of " + dec(blockSize));
-      bda->decommitBlock (blockSize);
+      if (kGrabAll) {
+        DWORD numBytesUsed;
+        WriteFile (file, ptr, blockSize, &numBytesUsed, NULL);
+        if (numBytesUsed != blockSize)
+          cLog::log (LOGERROR, "WriteFile only used " + dec(numBytesUsed) + " of " + dec(blockSize));
+        }
 
+      bda->decommitBlock (blockSize);
       if (blockSize != 240 * 188)
         cLog::log (LOGINFO, "blocksize " + dec(blockSize,6));
       }
@@ -285,8 +297,11 @@ int main (int argc, char* argv[]) {
     //}}}
   else {
     //{{{  use sampleGrabber
-    auto mFile = CreateFile (mFileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
-    cLog::log (LOGNOTICE, "Created file " + mFileName);
+    HANDLE mFile = 0;
+    if (kGrabAll) {
+      mFile = CreateFile (mFileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, 0, NULL);
+      cLog::log (LOGNOTICE, "Created file " + mFileName);
+      }
 
     auto mTs = new cDumpTransportStream();
     cLog::log (LOGNOTICE, "Created ts");
