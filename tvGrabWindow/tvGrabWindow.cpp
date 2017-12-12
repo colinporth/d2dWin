@@ -19,7 +19,7 @@ public:
   //{{{
   void run (const string& title, int width, int height, const string& param) {
 
-    string rootName = "e:/videos";
+    string rootName = "e:/tv";
     mTs = new cDumpTransportStream (rootName);
 
     initialise (title, width, height, false);
