@@ -36,6 +36,7 @@ const int kPlayFrameThreshold = 40; // about a second of analyse before playing
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
+  cAppWindow() : mAnalyseSem("analyse"), mPlayDoneSem("playDone") {}
   //{{{
   void run (string title, int width, int height, string fileName) {
 
@@ -640,11 +641,10 @@ private:
 
       // report analyse time
       auto doneTime = (float)duration_cast<milliseconds>(system_clock::now() - time).count();
-      cLog::log (LOGINFO, "wait - last took " + dec(doneTime) + "ms");
+      cLog::log (LOGINFO, "last took " + dec(doneTime) + "ms");
 
       // wait for play to end
       mPlayDoneSem.wait();
-      cLog::log (LOGINFO, "signalled");
 
       //{{{  close old file mapping
       UnmapViewOfFile (mStreamBuf);
@@ -679,7 +679,6 @@ private:
     while (!getExit()) {
       // wait for first frame
       mAnalyseSem.wait();
-      cLog::log (LOGNOTICE, "signalled");
 
       cMp3Decoder mMp3Decoder;
       audOpen (kChannels, kSamplesPerSec);
