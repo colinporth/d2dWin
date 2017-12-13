@@ -1497,9 +1497,9 @@ private:
 //{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
-  auto res = CoInitializeEx (NULL, COINIT_MULTITHREADED);
+  CoInitializeEx (NULL, COINIT_MULTITHREADED);
 
-  //cLog::init ("tvWindow", LOGINFO, false, "C:/Users/colin/Desktop");
+  //cLog::init (LOGINFO, false, "C:/Users/colin/Desktop");
   cLog::init (LOGINFO, true);
 
   string param;

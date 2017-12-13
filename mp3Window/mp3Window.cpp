@@ -595,7 +595,7 @@ private:
   void analyseThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGINFO, "analyseThread - start");
+    cLog::setThreadName ("anal");
 
     while (!getExit()) {
       //{{{  open file mapping
@@ -613,7 +613,7 @@ private:
       int jpegLen;
       auto jpegBuf = mMp3Decoder.getJpeg (jpegLen);
       if (jpegBuf) {
-        cLog::log (LOGINFO2, "analyseThread - found jpeg tag");
+        cLog::log (LOGINFO2, "found jpeg tag");
         // delete old
         auto temp = mFrameSet.mImage;
         mFrameSet.mImage = nullptr;
@@ -640,11 +640,11 @@ private:
 
       // report analyse time
       auto doneTime = (float)duration_cast<milliseconds>(system_clock::now() - time).count();
-      cLog::log (LOGINFO, "analyseThread - wait - last took " + dec(doneTime) + "ms");
+      cLog::log (LOGINFO, "wait - last took " + dec(doneTime) + "ms");
 
       // wait for play to end
       mPlayDoneSem.wait();
-      cLog::log (LOGINFO, "analyseThread - signalled");
+      cLog::log (LOGINFO, "signalled");
 
       //{{{  close old file mapping
       UnmapViewOfFile (mStreamBuf);
@@ -659,7 +659,7 @@ private:
         break;
       }
 
-    cLog::log (LOGINFO, "analyseThread - exit - frames loaded:%d calc:%d streamLen:%d",
+    cLog::log (LOGINFO, "exit - frames loaded:%d calc:%d streamLen:%d",
                         mFrameSet.getNumLoadedFrames(), mFrameSet.mNumFrames, mStreamLen);
     CoUninitialize();
     }
@@ -668,9 +668,9 @@ private:
   void playThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("play");
 
     // cleanup
-    cLog::log (LOGNOTICE, "playThread - start");
     //{{{  allocate samples, init to silence
     auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
     memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
@@ -679,7 +679,7 @@ private:
     while (!getExit()) {
       // wait for first frame
       mAnalyseSem.wait();
-      cLog::log (LOGNOTICE, "playThread - signalled");
+      cLog::log (LOGNOTICE, "signalled");
 
       cMp3Decoder mMp3Decoder;
       audOpen (kChannels, kSamplesPerSec);
@@ -709,7 +709,7 @@ private:
     free (samples);
     CoUninitialize();
 
-    cLog::log (LOGERROR, "playThread - exit");
+    cLog::log (LOGERROR, "exit");
     }
   //}}}
 
