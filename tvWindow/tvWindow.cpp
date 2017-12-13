@@ -210,18 +210,6 @@ private:
       }
     //}}}
 
-    //{{{
-    class cStreamPos {
-    public:
-      cStreamPos (int pid, int64_t pts, int64_t pos) : mPid(pid), mPts(pts), mPos(pos) {}
-
-      int mPid;
-      int64_t mPts;
-      int64_t mPos;
-      };
-    //}}}
-    concurrent_vector<cStreamPos> mStreamPosVector;
-
     // public only for box
     int64_t mLengthPts = -1;
 
@@ -255,6 +243,18 @@ private:
   private:
     int64_t mBasePts = -1;
     int mLengthPid = -1;
+
+    //{{{
+    class cStreamPos {
+    public:
+      cStreamPos (int pid, int64_t pts, int64_t pos) : mPid(pid), mPts(pts), mPos(pos) {}
+
+      int mPid;
+      int64_t mPts;
+      int64_t mPos;
+      };
+    //}}}
+    concurrent_vector<cStreamPos> mStreamPosVector;
     };
   //}}}
   //{{{
@@ -1274,7 +1274,7 @@ private:
     _close (file);
     free (chunkBuf);
 
-    cLog::log (LOGNOTICE, "analThread - exit - mStreamPosVector.size:" + dec (mAnalTs->mStreamPosVector.size()));
+    cLog::log (LOGNOTICE, "analThread - exit");
     CoUninitialize();
     }
   //}}}
