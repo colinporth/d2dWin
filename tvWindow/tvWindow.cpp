@@ -58,6 +58,7 @@ const bool kRgba = false;
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
+  cAppWindow() : mFirstVidPtsSem("firstVidPts") {}
   //{{{
   void run (string title, int width, int height, const string& param) {
 
@@ -1286,9 +1287,7 @@ private:
     const int kChunkSize = 2048*188;
     const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
 
-    cLog::log (LOGNOTICE, "waiting");
     mFirstVidPtsSem.wait();
-    cLog::log (LOGNOTICE, "signalled");
 
     bool skip = false;
     int64_t lastJumpStreamPos = -1;
@@ -1363,9 +1362,7 @@ private:
     const int kChunkSize = 2048*188;
     const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
 
-    cLog::log (LOGNOTICE, "waiting");
     mFirstVidPtsSem.wait();
-    cLog::log (LOGNOTICE, "signalled");
 
     bool skip = false;
     int64_t lastJumpStreamPos = -1;
@@ -1438,10 +1435,8 @@ private:
 
     audOpen (2, 48000);
 
-    cLog::log (LOGNOTICE, "waiting");
     mFirstVidPtsSem.wait();
     mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
-    cLog::log (LOGNOTICE, "signalled " + getFullPtsString (mPlayPts));
 
     while (true) {
       auto pts = getPlayPts();

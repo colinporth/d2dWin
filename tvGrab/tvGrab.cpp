@@ -54,7 +54,8 @@ int main (int argc, char* argv[]) {
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO, false);
 
-  int frequency = (argc >= 2) ? atoi(argv[1]) : 674;
+  // params, defaults
+  int frequency =   (argc >= 2) ? atoi(argv[1]) : 674;
   string fileName = (argc >= 3) ? argv[2] : "e:/tv";
   bool dumpFilter = (argc >= 4);
 

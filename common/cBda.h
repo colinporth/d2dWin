@@ -342,13 +342,13 @@ public:
     }
   //}}}
   //{{{
-  bool createGraph (int frequency, const string& fileName) {
+  bool createGraph (int frequency, const std::string& fileName) {
 
     createGraphDvbT (frequency);
 
     createFilter (mInfTeeFilter, CLSID_InfTee, L"infTee", mDvbCapture);
 
-    auto wstr = wstring (fileName.begin(), fileName.end());
+    auto wstr = std::wstring (fileName.begin(), fileName.end());
     createFilter (mDumpFilter, CLSID_Dump, L"dump", mInfTeeFilter);
     mDumpFilter.As (&mFileSinkFilter);
     mFileSinkFilter->SetFileName (wstr.c_str(), nullptr);

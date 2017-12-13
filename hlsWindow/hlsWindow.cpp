@@ -33,6 +33,7 @@ const int kScrubFrames = 3;
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
+  cAppWindow() : mLoadSem("load") {}
   //{{{
   void run (const string& title, int width, int height) {
 
