@@ -1,15 +1,17 @@
 // cD2dWindow.h
 #pragma once
 //{{{  includes
+#include <wrl.h>
+#include <deque>
+#include <vector>
+
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/date.h"
 #include "../../shared/utils/cLog.h"
 
-#include <deque>
-#include <vector>
-
 #include "cPointRect.h"
 #include "cView2d.h"
+
 using namespace std;
 //}}}
 const float kTextHeight = 20.f;

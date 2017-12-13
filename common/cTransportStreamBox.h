@@ -72,8 +72,8 @@ public:
                       mRect.right, mRect.top + mLineHeight);
       for (auto &pidInfo : mTs->mPidInfoMap) {
         auto str = wdec (pidInfo.second.mPackets,mPacketDigits) +
-                   (mContDigits ? wdec (pidInfo.second.mDisContinuity, mContDigits) + L":" : L"") +
-                   L" " + wdec (pidInfo.first, 4) +
+                   (mContDigits ? (L":" + wdec(pidInfo.second.mDisContinuity, mContDigits)) : L"") +
+                   L" " + wdec(pidInfo.first, 4) +
                    L" " + getFullPtsWstring (pidInfo.second.mPts) +
                    L" " + pidInfo.second.getTypeWstring();
         auto width = drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight) + mLineHeight/2.f;

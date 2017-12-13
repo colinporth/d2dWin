@@ -2,6 +2,7 @@
 //{{{  includes
 #pragma once
 
+#include <wrl.h>
 #include <initguid.h>
 #include <DShow.h>
 #include <bdaiface.h>

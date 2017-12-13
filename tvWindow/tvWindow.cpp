@@ -1250,10 +1250,8 @@ private:
 
             if ((firstVidSignalCount < 3) &&
                 (mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
-                (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
-              cLog::log (LOGNOTICE, "signal " + dec(firstVidSignalCount++));
+                (mAnalTs->getFirstPts (service->getVidPid()) != -1))
               mFirstVidPtsSem.notifyAll();
-              }
             }
           }
         }

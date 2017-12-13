@@ -5,7 +5,6 @@
 #define NOMINMAX
 
 #include <windows.h>
-#include <wrl.h>
 
 #include <string>
 #include <thread>
