@@ -66,13 +66,13 @@ public:
       //{{{  draw pids
       auto maxPidPackets = 10000;
       for (auto &pidInfo : mTs->mPidInfoMap)
-        maxPidPackets = max (maxPidPackets, pidInfo.second.mTotal);
+        maxPidPackets = max (maxPidPackets, pidInfo.second.mPackets);
 
       auto r = cRect (mRect.left + serviceWidth, mRect.top,
                       mRect.right, mRect.top + mLineHeight);
       for (auto &pidInfo : mTs->mPidInfoMap) {
         auto str = (mContDigits ? dec (pidInfo.second.mDisContinuity,mContDigits) + ":" : "") +
-                   dec (pidInfo.second.mTotal,mPacketDigits) +
+                   dec (pidInfo.second.mPackets,mPacketDigits) +
                    " " + dec (pidInfo.first, 4) +
                    " " + getFullPtsString (pidInfo.second.mPts) +
                    " " + pidInfo.second.getTypeString();
@@ -80,7 +80,7 @@ public:
 
         dc->FillRectangle (
           cRect (r.left + width, r.top+4.f,
-                 r.left + width + (r.getWidth() - width)*pidInfo.second.mTotal/maxPidPackets, r.top+mLineHeight),
+                 r.left + width + (r.getWidth() - width)*pidInfo.second.mPackets/maxPidPackets, r.top+mLineHeight),
           mWindow->getOrangeBrush());
 
         auto rInfo = r;
@@ -89,7 +89,7 @@ public:
         r.top = r.bottom;
         r.bottom += mLineHeight;
 
-        if (pidInfo.second.mTotal > pow (10, mPacketDigits))
+        if (pidInfo.second.mPackets > pow (10, mPacketDigits))
           mPacketDigits++;
         }
 

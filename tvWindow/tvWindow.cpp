@@ -204,8 +204,9 @@ private:
       }
     //}}}
     //{{{
-    void clearStreamPos() {
+    void clear() {
       mStreamPosVector.clear();
+      clearCounts();
       }
     //}}}
 
@@ -282,7 +283,7 @@ private:
       int64_t nearest = 0;
       iFrame* nearestFrame = nullptr;
 
-      for (auto frame : mFrames) 
+      for (auto frame : mFrames)
         if (frame->hasPts (pts))
           return frame;
         else if (frame->before(pts)) {
@@ -1198,7 +1199,7 @@ private:
     cLog::log (LOGNOTICE, "analThread - first service - vidPid:" + dec(service->getVidPid()) +
                           " audPid:" + dec(service->getAudPid()));
 
-    mAnalTs->clearStreamPos();
+    mAnalTs->clear();
     //}}}
     //{{{  parse end of stream for initial lastPts
     streamPos = mStreamSize - (kChunkSize * 8);
@@ -1215,7 +1216,7 @@ private:
         }
       }
 
-    mAnalTs->clearStreamPos();
+    mAnalTs->clear();
     //}}}
 
     // analyse stream from start, chase tail, update progress bar
