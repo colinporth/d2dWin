@@ -160,7 +160,7 @@ public:
   //{{{
   void setPes (int64_t pts, int64_t ptsWidth, int pesSize, char frameType) {
 
-    mLoaded = false;
+    mOk = false;
 
     mPts = pts;
     mPtsEnd = pts + ptsWidth;
@@ -187,7 +187,7 @@ public:
     mVbuf = (uint8_t*)_aligned_realloc (mVbuf, (height/2) * mUVStride, 128);
     memcpy (mVbuf, yuv[2], (height/2) * mUVStride);
 
-    mLoaded = true;
+    mOk = true;
     }
   //}}}
   //{{{
@@ -204,7 +204,7 @@ public:
     mYbuf = (uint8_t*)_aligned_realloc (mYbuf, height * mYStride * 3 / 2, 128);
     memcpy (mYbuf, nv12, height * mYStride * 3 / 2);
 
-    mLoaded = true;
+    mOk = true;
     }
   //}}}
 
@@ -231,7 +231,7 @@ public:
   //{{{
   void invalidate() {
 
-    mLoaded = false;
+    mOk = false;
     mPts = 0;
     mPesSize = 0;
     mFrameType = '?';
@@ -240,7 +240,7 @@ public:
   //{{{
   void freeResources() {
 
-    mLoaded  = false;
+    mOk = false;
 
     mPts = 0;
     mPesSize = 0;

@@ -11,11 +11,13 @@ public:
     }
   //}}}
 
+  bool isFirstPesFrame() { return mPts == mPesPts; }
+
   //{{{
   void set (int64_t pts, int64_t ptsWidth, int64_t pesPts, int channels, int numSamples) {
 
     // invalidate while we set it up
-    mLoaded = false;
+    mOk = false;
 
     mPts = pts;
     mPtsEnd = pts + ptsWidth;
@@ -36,13 +38,13 @@ public:
     mChannels = channels;
     mNumSamples = numSamples;
 
-    mLoaded = true;
+    mOk = true;
     }
   //}}}
   //{{{
   void invalidate() {
 
-    mLoaded = false;
+    mOk = false;
     mPts = 0;
     mChannels = 0;
     mNumSamples = 0;

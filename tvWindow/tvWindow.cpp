@@ -234,6 +234,7 @@ private:
         mLengthPts = pidInfo->mLastPts - pidInfo->mFirstPts;
       //cLog::log (LOGINFO, "anal audPes " + dec(mStreamPosVector.size()) +
       //                    " " + getPtsString (pidInfo->mPts));
+
       return true;
       }
     //}}}
@@ -246,6 +247,7 @@ private:
         //cLog::log (LOGINFO, "anal vidPes " + dec(mStreamPosVector.size()) +
         //                    " " + getPtsString (pidInfo->mPts));
         }
+
       return true;
       }
     //}}}
@@ -268,7 +270,7 @@ private:
 
       for (auto frame : mFrames)
         if (frame->hasPts (pts)) {
-          pts = frame->mPtsEnd;
+          pts = frame->getPtsEnd();
           return frame;
           }
 
@@ -280,21 +282,25 @@ private:
     // find first vidFrame on or past pts
     // - returns nullPtr if no frame loaded yet
 
-      int64_t nearest = 0;
       iFrame* nearestFrame = nullptr;
+      int64_t nearest = 0;
 
       for (auto frame : mFrames)
         if (frame->hasPts (pts))
           return frame;
-        else if (frame->before(pts)) {
-          if (!nearest || ((frame->mPts - pts) < nearest)) {
-            nearest = frame->mPts - pts;
+
+        else if (frame->before (pts)) {
+          auto dist = frame->beforeDist (pts);
+          if (!nearest || (dist < nearest)) {
+            nearest = dist;
             nearestFrame = frame;
             }
           }
-        else if (frame->after(pts)) {
-          if (!nearest || ((pts - frame->mPtsEnd) < nearest)) {
-            nearest = pts - frame->mPts;
+
+        else if (frame->after (pts)) {
+          auto dist = frame->afterDist (pts);
+          if (!nearest || (dist < nearest)) {
+            nearest = dist;
             nearestFrame = frame;
             }
           }
@@ -375,7 +381,7 @@ private:
         auto frame = (cAudFrame*)iframe;
         if (frame->mNumSamples) {
           const auto audFrameWidth = (90 * frame->mNumSamples / 48) * kPixPerPts;
-          int64_t diff = frame->mPts - playPts;
+          int64_t diff = frame->getPts() - playPts;
           auto x = rect.left + (rect.right - rect.left)/2.f + (diff * kPixPerPts);
 
           if ((x + audFrameWidth > rect.left) && (x < rect.right)) {
@@ -394,7 +400,7 @@ private:
             dc->FillRectangle (r, blue);
             auto wstr = to_wstring (index);
             dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat, r,
-                          frame->mPts == frame->mPesPts ? white : black);
+                          frame->isFirstPesFrame() ? white : black);
             }
           }
         index++;
@@ -554,7 +560,7 @@ private:
       auto index = 0;
       for (auto iframe : mFrames) {
         auto frame = (cVidFrame*)iframe;
-        int64_t diff = frame->mPts - playPts;
+        int64_t diff = frame->getPts() - playPts;
         auto x = rect.left + (rect.right - rect.left)/2.f + (diff * kPixPerPts);
         auto y1 = y + kIndexHeight + 1.f;
 
@@ -566,7 +572,7 @@ private:
         y1 += kIndexHeight + 1.f;
 
         maxY = max (maxY, y1);
-        if (frame->mLoaded) {
+        if (frame->isOk()) {
           // draw type
           wstr = frame->mFrameType;
           dc->FillRectangle (RectF(x, y1, x + vidFrameWidth - 1.f, y1 + kIndexHeight), blue);
@@ -751,7 +757,7 @@ private:
                 //{{{  got decoded frame, set video of vidFrame
                 for (auto iframe : mFrames) {
                   auto frame = (cVidFrame*)iframe;
-                  if (frame->mPts == surface->Data.TimeStamp) {
+                  if (frame->getPts() == surface->Data.TimeStamp) {
                     frame->setNv12 (surface->Data.Y, surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
                     cLog::log (LOGINFO2, "-> vidFrame::set - pts:" + getPtsString(surface->Data.TimeStamp));
                     mLastLoadedPts = surface->Data.TimeStamp;
@@ -864,9 +870,9 @@ private:
       auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
 
       auto vidframe = (cVidFrame*)appWindow->mVidTs->findNearestFrame (appWindow->getPlayPts());
-      if (vidframe && (vidframe->mPts != appWindow->mBitmapPts)) {
+      if (vidframe && (vidframe->getPts() != appWindow->mBitmapPts)) {
         appWindow->mBitmap = vidframe->makeBitmap (dc, appWindow->mBitmap);
-        appWindow->mBitmapPts = vidframe->mPts;
+        appWindow->mBitmapPts = vidframe->getPts();
         }
 
       dc->SetTransform (mView2d.mTransform);

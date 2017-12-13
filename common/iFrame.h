@@ -3,31 +3,49 @@
 
 class iFrame {
 public:
+  bool isOk() { return mOk; }
+
   //{{{
   bool hasPts (int64_t pts) {
-    return mLoaded && (pts >= mPts) && (pts < mPtsEnd);
+    return mOk && (pts >= mPts) && (pts < mPtsEnd);
     }
   //}}}
+  int64_t getPts() { return mPts; }
+  int64_t getPtsEnd() { return mPtsEnd; }
+
   //{{{
   bool before (int64_t pts) {
   // true if pts is bfore frame
 
-    return mLoaded && (pts < mPts);
+    return mOk && (pts < mPts);
     }
   //}}}
+  //{{{
+  int64_t beforeDist (int64_t pts) {
+    return mPts - pts;
+    }
+  //}}}
+
   //{{{
   bool after (int64_t pts) {
   // true if pts is after frame
 
-    return mLoaded && (pts > mPtsEnd);
+    return mOk && (pts >= mPtsEnd);
+    }
+  //}}}
+  //{{{
+
+  int64_t afterDist (int64_t pts) {
+    return pts - mPtsEnd;
     }
   //}}}
 
   virtual void invalidate() = 0;
   virtual void freeResources() = 0;
 
+protected:
   // vars
-  bool mLoaded = false;
+  bool mOk = false;
   int64_t mPts = -1;
   int64_t mPtsEnd = -1;
   };
