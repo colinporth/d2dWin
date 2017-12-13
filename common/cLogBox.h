@@ -97,10 +97,11 @@ public:
       auto s = timeOfDay.seconds().count();
       auto subSec = timeOfDay.subseconds().count();
 
-      auto str = dec(h) + ":" + dec(m,2,'0') + ":" + dec(s,2,'0') + "." + dec(subSec,3,'0') + " " + logLine.mStr;
-      wstring wstr(str.begin(), str.end());
+      auto str = wdec(h) + L":" + wdec(m,2,L'0') + L":" + wdec(s,2,'0') + L"." + wdec(subSec,3,'0') +
+                 L" " + whex(logLine.mThreadId >> 3, 3) +
+                 L" " + strToWstr(logLine.mStr);
       IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (wstr.data(), (uint32_t)wstr.size(), mTextFormat,
+      mWindow->getDwriteFactory()->CreateTextLayout (str.data(), (uint32_t)str.size(), mTextFormat,
         mWindow->getSize().x, textHeight, &textLayout);
       textLayout->SetFontSize (textHeight, {0, (uint32_t)str.size()});
 
