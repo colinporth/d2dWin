@@ -1,10 +1,26 @@
 // tvGrab.cpp - minimal console bda grab
 //{{{  includes
-#include "stdafx.h"
+#define _CRT_SECURE_NO_WARNINGS
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 
-#include "../common/cBda.h"
+#include <windows.h>
+#include <wrl.h>
+
+#include <string>
+#include <thread>
+#include <mutex>
+
+#include "../../shared/utils/utils.h"
+#include "../../shared/utils/cLog.h"
+#include "../../shared/utils/cSemaphore.h"
+
 #include "../../shared/decoders/cTransportStream.h"
 #include "../../shared/decoders/cDumpTransportStream.h"
+
+#include "../common/cBda.h"
+
+#pragma comment(lib,"common.lib")
 
 using namespace std;
 //}}}
