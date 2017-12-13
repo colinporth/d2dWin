@@ -20,11 +20,10 @@ void bdaGrabThread (cBda* bda, cTransportStream* ts) {
     auto blockSize = 0;
     auto ptr = bda->getContiguousBlock (blockSize);
     if (blockSize) {
-      auto bytesUsed = ts->demux (ptr, blockSize, streamPos, false, -1);
-      streamPos += bytesUsed;
+      streamPos += ts->demux (ptr, blockSize, streamPos, false, -1);
       bda->decommitBlock (blockSize);
       if (blockSize != 240 * 188)
-        cLog::log (LOGINFO, "blocksize " + dec(blockSize,6));
+        cLog::log (LOGINFO, "blocksize " + dec(blockSize));
       }
     else
       Sleep (4);
@@ -42,7 +41,8 @@ void bdaSignalThread (cBda* bda, cTransportStream* ts) {
 
   while (true)
     cLog::log (LOGINFO, "signal " + dec(bda->getSignalStrength()) +
-                        (ts ? (" " + dec(ts->getDiscontinuity()) + " " + dec(ts->getPackets())) : ""));
+                        (ts ? (" " + dec(ts->getDiscontinuity()) + 
+                               " " + dec(ts->getPackets())) : ""));
 
   cLog::log (LOGNOTICE, "bdaSignalThread - exit");
   CoUninitialize();
@@ -56,10 +56,10 @@ int main (int argc, char* argv[]) {
 
   int frequency = (argc >= 2) ? atoi(argv[1]) : 674;
   string fileName = (argc >= 3) ? argv[2] : "e:/tv";
-
   bool dumpFilter = (argc >= 4);
+
   if (dumpFilter) {
-    //{{{  use dump.ax filter
+    //{{{  use dump filter
     auto mBda = new cBda();
     if (mBda->createGraph (frequency * 1000, fileName + "/tune.ts")) {
       cLog::log (LOGNOTICE, "created bda- dump - tuned to " + dec(frequency) + "mhz");
@@ -70,7 +70,7 @@ int main (int argc, char* argv[]) {
     }
     //}}}
   else {
-    //{{{  sampleGrabber
+    //{{{  use sampleGrabber filter
     auto mTs = new cDumpTransportStream (fileName);
     cLog::log (LOGNOTICE, "Created dumpTransportStream");
 

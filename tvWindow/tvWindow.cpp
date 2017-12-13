@@ -1158,10 +1158,8 @@ private:
     auto bda = new cBda();
     bda->createGraph (frequency, fileName);
 
-    while (!getExit()) {
+    while (!getExit()) 
       mSignalStrength = bda->getSignalStrength();
-      Sleep (200);
-      }
 
     cLog::log (LOGNOTICE, "bdaThread - exit");
     CoUninitialize();

@@ -32,7 +32,7 @@ public:
     if (frequency) {
       mBda = new cBda();
       thread ([=]() { bdaThread (mBda, frequency*1000); }).detach();
-      thread ([=]() { bdaStrengthThread (mBda); }).detach();
+      thread ([=]() { bdaSignalThread (mBda); }).detach();
       }
     else
       thread ([=]() { fileThread (param); }).detach();
@@ -69,21 +69,12 @@ private:
     while (true) {
       auto ptr = bda->getContiguousBlock (blockSize);
       if (blockSize) {
-        auto bytesUsed = mTs->demux (ptr, blockSize, streamPos, false, -1);
-        streamPos += bytesUsed;
-        changed();
-
-        //DWORD numBytesUsed;
-        //WriteFile (file, ptr, blockSize, &numBytesUsed, NULL);
-        //if (numBytesUsed != blockSize)
-        //  cLog::log (LOGERROR, "WriteFile only used " + dec(numBytesUsed) + " of " + dec(blockSize));
-        //if (blockSize != 240*188)
-        //  cLog::log (LOGINFO, "bda blockSize " + dec (blockSize));
-
+        streamPos += mTs->demux (ptr, blockSize, streamPos, false, -1);
         bda->decommitBlock (blockSize);
+        changed();
         }
       else
-        Sleep (4);
+        Sleep (1);
       }
 
     cLog::log (LOGNOTICE, "bdaThread - exit");
@@ -91,19 +82,15 @@ private:
     }
   //}}}
   //{{{
-  void bdaStrengthThread (cBda* bda) {
+  void bdaSignalThread (cBda* bda) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "bdaStrengthThread - start");
+    cLog::log (LOGNOTICE, "bdaSignalThread - start");
 
-    int64_t streamPos = 0;
-    auto blockSize = 0;
-    while (true) {
+    while (true)
       mSignalStrength = bda->getSignalStrength();
-      Sleep (100);
-      }
 
-    cLog::log (LOGNOTICE, "bdaStrengthThread - exit");
+    cLog::log (LOGNOTICE, "bdaSignalThread - exit");
     CoUninitialize();
     }
   //}}}

@@ -71,11 +71,11 @@ public:
       auto r = cRect (mRect.left + serviceWidth, mRect.top,
                       mRect.right, mRect.top + mLineHeight);
       for (auto &pidInfo : mTs->mPidInfoMap) {
-        auto str = (mContDigits ? dec (pidInfo.second.mDisContinuity,mContDigits) + ":" : "") +
-                   dec (pidInfo.second.mPackets,mPacketDigits) +
-                   " " + dec (pidInfo.first, 4) +
-                   " " + getFullPtsString (pidInfo.second.mPts) +
-                   " " + pidInfo.second.getTypeString();
+        auto str = wdec (pidInfo.second.mPackets,mPacketDigits) +
+                   (mContDigits ? wdec (pidInfo.second.mDisContinuity, mContDigits) + L":" : L"") +
+                   L" " + wdec (pidInfo.first, 4) +
+                   L" " + getFullPtsWstring (pidInfo.second.mPts) +
+                   L" " + pidInfo.second.getTypeWstring();
         auto width = drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight) + mLineHeight/2.f;
 
         dc->FillRectangle (
