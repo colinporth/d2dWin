@@ -434,7 +434,7 @@ private:
           }
           //}}}
 
-        cLog::log (LOGINFO2, "audThread - audDecodePes PES " + getPtsString (pidInfo->mPts));
+        cLog::log (LOGINFO2, "audDecodePes PES " + getPtsString (pidInfo->mPts));
 
         //{{{  init avPacket
         AVPacket avPacket;
@@ -1250,8 +1250,10 @@ private:
 
             if ((firstVidSignalCount < 3) &&
                 (mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
-                (mAnalTs->getFirstPts (service->getVidPid()) != -1))
+                (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
+              firstVidSignalCount++;
               mFirstVidPtsSem.notifyAll();
+              }
             }
           }
         }
