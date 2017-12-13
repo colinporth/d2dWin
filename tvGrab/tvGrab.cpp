@@ -13,7 +13,7 @@ using namespace std;
 void bdaGrabThread (cBda* bda, cTransportStream* ts) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::log (LOGNOTICE, "bdaGrabThread - start");
+  cLog::setThreadName ("grab");
 
   int64_t streamPos = 0;
   while (true) {
@@ -29,7 +29,7 @@ void bdaGrabThread (cBda* bda, cTransportStream* ts) {
       Sleep (4);
     }
 
-  cLog::log (LOGNOTICE, "bdaGrabThread - exit");
+  cLog::log (LOGNOTICE, "exit");
   CoUninitialize();
   }
 //}}}
@@ -37,14 +37,14 @@ void bdaGrabThread (cBda* bda, cTransportStream* ts) {
 void bdaSignalThread (cBda* bda, cTransportStream* ts) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::log (LOGNOTICE, "bdaSignalThread - start");
+  cLog::setThreadName ("sign");
 
   while (true)
-    cLog::log (LOGINFO, "signal " + dec(bda->getSignalStrength()) +
-                        (ts ? (" " + dec(ts->getDiscontinuity()) + 
+    cLog::log (LOGINFO, dec(bda->getSignalStrength()) +
+                        (ts ? (" " + dec(ts->getDiscontinuity()) +
                                " " + dec(ts->getPackets())) : ""));
 
-  cLog::log (LOGNOTICE, "bdaSignalThread - exit");
+  cLog::log (LOGNOTICE, "exit");
   CoUninitialize();
   }
 //}}}
@@ -52,7 +52,7 @@ void bdaSignalThread (cBda* bda, cTransportStream* ts) {
 int main (int argc, char* argv[]) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init ("tvGrab", LOGINFO, false);
+  cLog::init (LOGINFO, false);
 
   int frequency = (argc >= 2) ? atoi(argv[1]) : 674;
   string fileName = (argc >= 3) ? argv[2] : "e:/tv";

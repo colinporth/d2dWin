@@ -1099,7 +1099,7 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init ("webWindow", LOGINFO3, true);
+  cLog::init (LOGINFO3, true);
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);

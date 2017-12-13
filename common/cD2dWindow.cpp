@@ -603,7 +603,7 @@ void cD2dWindow::createSizedResources() {
 void cD2dWindow::renderThread() {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::log (LOGNOTICE, "cD2dWindow::renderThread - start");
+  cLog::setThreadName ("rend");
 
   // wait for target bitmap
   while (mD2dTargetBitmap == nullptr)
@@ -627,12 +627,12 @@ void cD2dWindow::renderThread() {
       if (mSwapChain->Present (1, 0) == DXGI_ERROR_DEVICE_REMOVED) {
         mSwapChain = nullptr;
         createDeviceResources();
-        cLog::log (LOGERROR, "cD2dWindow::renderThread - device removed");
+        cLog::log (LOGERROR, "device removed");
         }
       }
     }
 
-  cLog::log (LOGNOTICE, "cD2dWindow::renderThread - stop");
+  cLog::log (LOGNOTICE, "stop");
   CoUninitialize();
   }
 //}}}

@@ -1153,15 +1153,15 @@ private:
   void bdaThread (int frequency, const string& fileName) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "bdaThread - start");
+    cLog::setThreadName ("bda ");
 
     auto bda = new cBda();
     bda->createGraph (frequency, fileName);
 
-    while (!getExit()) 
+    while (!getExit())
       mSignalStrength = bda->getSignalStrength();
 
-    cLog::log (LOGNOTICE, "bdaThread - exit");
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -1169,7 +1169,7 @@ private:
   void analThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "analThread - start");
+    cLog::setThreadName ("anal");
 
     auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
     //{{{  get streamSize
@@ -1200,7 +1200,7 @@ private:
     // select first service
     mVidTs->setPid (service->getVidPid());
     mAudTs->setPid (service->getAudPid());
-    cLog::log (LOGNOTICE, "analThread - first service - vidPid:" + dec(service->getVidPid()) +
+    cLog::log (LOGNOTICE, "first service - vidPid:" + dec(service->getVidPid()) +
                           " audPid:" + dec(service->getAudPid()));
 
     mAnalTs->clear();
@@ -1250,7 +1250,7 @@ private:
             if ((firstVidSignalCount < 3) &&
                 (mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
                 (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
-              cLog::log (LOGNOTICE, "analThread - signal " + dec(firstVidSignalCount++));
+              cLog::log (LOGNOTICE, "signal " + dec(firstVidSignalCount++));
               mFirstVidPtsSem.notifyAll();
               }
             }
@@ -1272,7 +1272,7 @@ private:
     _close (file);
     free (chunkBuf);
 
-    cLog::log (LOGNOTICE, "analThread - exit");
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -1280,15 +1280,15 @@ private:
   void audThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "audThread - start");
+    cLog::setThreadName ("aud ");
     av_register_all();
 
     const int kChunkSize = 2048*188;
     const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
 
-    cLog::log (LOGNOTICE, "audThread - waiting");
+    cLog::log (LOGNOTICE, "waiting");
     mFirstVidPtsSem.wait();
-    cLog::log (LOGNOTICE, "audThread - signalled");
+    cLog::log (LOGNOTICE, "signalled");
 
     bool skip = false;
     int64_t lastJumpStreamPos = -1;
@@ -1332,7 +1332,7 @@ private:
             auto jumpStreamPos = mAnalTs->findStreamPos (mAudTs->getPid(), getPlayPts());
             if (jumpStreamPos != lastJumpStreamPos) {
               //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
-              cLog::log (LOGINFO, "audThread - jump playPts:" + getPtsString(getPlayPts()) +
+              cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
                          (loaded ? " after ":" notLoaded ") + getPtsString(mAudTs->getLastLoadedPts()));
               streamPos = jumpStreamPos;
               _lseeki64 (file, streamPos, SEEK_SET);
@@ -1350,7 +1350,7 @@ private:
     _close (file);
     free (chunkBuf);
 
-    cLog::log (LOGNOTICE, "audThread - exit");
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -1358,14 +1358,14 @@ private:
   void vidThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "vidThread - start");
+    cLog::setThreadName ("vid ");
 
     const int kChunkSize = 2048*188;
     const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
 
-    cLog::log (LOGNOTICE, "vidThread - waiting");
+    cLog::log (LOGNOTICE, "waiting");
     mFirstVidPtsSem.wait();
-    cLog::log (LOGNOTICE, "vidThread - signalled");
+    cLog::log (LOGNOTICE, "signalled");
 
     bool skip = false;
     int64_t lastJumpStreamPos = -1;
@@ -1408,7 +1408,7 @@ private:
             auto jumpStreamPos = mAnalTs->findStreamPos (mVidTs->getPid(), getPlayPts());
             if (jumpStreamPos != lastJumpStreamPos) {
               //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
-              cLog::log (LOGINFO, "vidThread - jump playPts:" + getPtsString(getPlayPts()) +
+              cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
                          (loaded ? " after ":" notLoaded ") + getPtsString(mVidTs->getLastLoadedPts()));
               _lseeki64 (file, jumpStreamPos, SEEK_SET);
               lastJumpStreamPos = jumpStreamPos;
@@ -1426,7 +1426,7 @@ private:
     _close (file);
     free (chunkBuf);
 
-    cLog::log (LOGNOTICE, "vidThread - exit");
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -1434,14 +1434,14 @@ private:
   void playThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "playThread - start");
+    cLog::setThreadName ("play");
 
     audOpen (2, 48000);
 
-    cLog::log (LOGNOTICE, "playThread - waiting");
+    cLog::log (LOGNOTICE, "waiting");
     mFirstVidPtsSem.wait();
     mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
-    cLog::log (LOGNOTICE, "playThread - signalled " + getFullPtsString (mPlayPts));
+    cLog::log (LOGNOTICE, "signalled " + getFullPtsString (mPlayPts));
 
     while (true) {
       auto pts = getPlayPts();
@@ -1463,7 +1463,7 @@ private:
 
     audClose();
 
-    cLog::log (LOGNOTICE, "playThread - exit");
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -1499,8 +1499,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   auto res = CoInitializeEx (NULL, COINIT_MULTITHREADED);
 
-  cLog::init ("tvWindow", LOGINFO, true);
   //cLog::init ("tvWindow", LOGINFO, false, "C:/Users/colin/Desktop");
+  cLog::init (LOGINFO, true);
 
   string param;
 

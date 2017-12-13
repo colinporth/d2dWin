@@ -734,7 +734,7 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init ("mp3Window", LOGINFO1, true);
+  cLog::init (LOGINFO1, true);
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);

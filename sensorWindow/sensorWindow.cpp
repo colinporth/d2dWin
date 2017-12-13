@@ -417,7 +417,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
 
-  cLog::init ("sensorWindow", LOGINFO, true); //, "C:/Users/colin/Desktop");
+  cLog::init (LOGINFO, true); //, "C:/Users/colin/Desktop");
 
   cAppWindow appWindow;
   appWindow.run ("sensorWindow", 800, 600);

@@ -488,6 +488,7 @@ private:
   // make sure chuinks around playframe loaded, only thread using http
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("load");
 
     cWinSockHttp http;
     http.initialise();
@@ -503,6 +504,7 @@ private:
       mLoadSem.wait();
       }
 
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -510,6 +512,8 @@ private:
   void hlsPlayerThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("play");
+
     audOpen (2, 48000);
 
     uint16_t scrubCount = 0;
@@ -558,6 +562,8 @@ private:
 
     // cleanup
     audClose();
+
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -571,7 +577,7 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init ("hlsWindow", LOGINFO1, true);
+  cLog::init (LOGINFO1, true);
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);

@@ -98,7 +98,7 @@ public:
       auto subSec = timeOfDay.subseconds().count();
 
       auto str = wdec(h) + L":" + wdec(m,2,L'0') + L":" + wdec(s,2,'0') + L"." + wdec(subSec,3,'0') +
-                 L" " + whex(logLine.mThreadId >> 3, 3) +
+                 L" " + cLog::getThreadNameWstring (logLine.mThreadId) +
                  L" " + strToWstr(logLine.mStr);
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (str.data(), (uint32_t)str.size(), mTextFormat,

@@ -728,7 +728,7 @@ private:
   void filesThread (const string& rootDir) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "filesThread - start");
+    cLog::setThreadName ("file");
 
     setChangeCountDown (20);
 
@@ -736,7 +736,7 @@ private:
 
     mFileScannedSem.notifyAll();
 
-    cLog::log (LOGNOTICE, "filesThread - exit " +
+    cLog::log (LOGNOTICE, "exit " +
                           dec(mImageSet.getNumImages()) + " images in " +
                           dec(mImageSet.getNumDirs()) + " directories " +
                           dec(mImageSet.getMaxDirDepth()) + " deep");
@@ -750,9 +750,10 @@ private:
   void thumbsThread (int threadNum) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("thu" + dec(threadNum));
 
     mFileScannedSem.wait();
-    cLog::log (LOGNOTICE, "thumbsThread " + dec (threadNum) + " start");
+    cLog::log (LOGNOTICE, "signalled");
 
     int count = 0;
     while (true) {
@@ -769,7 +770,7 @@ private:
         break;
       };
 
-    cLog::log (LOGNOTICE, "thumbsThread " + dec (threadNum) + " exit - loaded " + dec (count));
+    cLog::log (LOGNOTICE, "exit - loaded " + dec (count));
     changed();
 
     CoUninitialize();
@@ -786,7 +787,7 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init ("jpegWindow", LOGINFO1, true);
+  cLog::init (LOGINFO1, true);
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);

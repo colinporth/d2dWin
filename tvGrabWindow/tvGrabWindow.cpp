@@ -60,7 +60,7 @@ private:
   void bdaThread (cBda* bda, int frequency) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "bdaThread - start");
+    cLog::setThreadName ("bda ");
 
     bda->createGraph (frequency);
 
@@ -77,7 +77,7 @@ private:
         Sleep (1);
       }
 
-    cLog::log (LOGNOTICE, "bdaThread - exit");
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -85,12 +85,12 @@ private:
   void bdaSignalThread (cBda* bda) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "bdaSignalThread - start");
+    cLog::setThreadName ("bSig");
 
     while (true)
       mSignalStrength = bda->getSignalStrength();
 
-    cLog::log (LOGNOTICE, "bdaSignalThread - exit");
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -98,7 +98,7 @@ private:
   void fileThread (const string& fileName) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::log (LOGNOTICE, "fileThread - start");
+    cLog::setThreadName ("file");
 
     auto fileHandle = CreateFile (fileName.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (fileHandle != INVALID_HANDLE_VALUE) {
@@ -109,7 +109,7 @@ private:
 
       setChangeCountDown (20);
       auto analyseStreamPos = mTs->demux (streamBuf, streamSize, 0, false, -1);
-      cLog::log (LOGINFO, "analyseThread %d of %d", analyseStreamPos, streamSize);
+      cLog::log (LOGINFO, "%d of %d", analyseStreamPos, streamSize);
       changed();
 
       UnmapViewOfFile (streamBuf);
@@ -119,7 +119,7 @@ private:
     else
       cLog::log (LOGERROR, "CreateFile - failed " + fileName);
 
-    cLog::log (LOGNOTICE, "fileThread - exit");
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -135,7 +135,7 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init ("tvGrabWindow", LOGINFO, true);
+  cLog::init (LOGINFO, true);
 
   string param;
   int numArgs;

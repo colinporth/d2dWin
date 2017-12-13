@@ -837,7 +837,7 @@ private:
 //{{{
 int WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
-  cLog::init ("LogicWindow", LOGINFO, true);
+  cLog::init (LOGINFO, true);
 
   cAppWindow appWindow;
   appWindow.run ("logicWindow", 1600, (((sizeof(SAMPLE_TYPE)*8)+2)*22) + 256);
