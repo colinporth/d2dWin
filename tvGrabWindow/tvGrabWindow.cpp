@@ -31,7 +31,7 @@ public:
     auto frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
       mBda = new cBda();
-      thread ([=]() { bdaThread (mBda, frequency*1000); }).detach();
+      thread ([=]() { bdaGrabThread (mBda, frequency*1000); }).detach();
       thread ([=]() { bdaSignalThread (mBda); }).detach();
       }
     else
@@ -57,10 +57,10 @@ protected:
 
 private:
   //{{{
-  void bdaThread (cBda* bda, int frequency) {
+  void bdaGrabThread (cBda* bda, int frequency) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("bda ");
+    cLog::setThreadName ("grab");
 
     bda->createGraph (frequency);
 
@@ -85,7 +85,7 @@ private:
   void bdaSignalThread (cBda* bda) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("bSig");
+    cLog::setThreadName ("sign");
 
     while (true)
       mSignalStrength = bda->getSignalStrength();
