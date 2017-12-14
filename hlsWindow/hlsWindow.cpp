@@ -382,7 +382,7 @@ private:
           dc->FillRectangle (cRect (r.left-1.f, r.top, r.left, r.bottom), mWindow->getWhiteBrush());
 
         if (seconds % 5 == 0) {
-          auto str = getTimeString(seconds);
+          auto str = getTimeString (seconds);
           dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mTextFormat,
                         cRect (r.left-kTextWidth, r.top-3.f, r.left-3.f, r.bottom),
                         mWindow->getWhiteBrush());
