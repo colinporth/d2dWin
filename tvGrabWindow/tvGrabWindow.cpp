@@ -126,6 +126,7 @@ private:
 
   string mFileName;
   HANDLE mFile = 0;
+
   cTransportStream* mTs = nullptr;
   cBda* mBda = nullptr;
   int mSignalStrength = 0;
