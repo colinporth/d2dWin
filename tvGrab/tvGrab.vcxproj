@@ -156,9 +156,13 @@
   <ItemGroup>
     <ClInclude Include="..\..\shared\decoders\cDumpTransportStream.h" />
     <ClInclude Include="..\..\shared\decoders\cTransportStream.h" />
+    <ClInclude Include="..\..\shared\utils\cLog.h" />
+    <ClInclude Include="..\..\shared\utils\date.h" />
+    <ClInclude Include="..\..\shared\utils\utils.h" />
     <ClInclude Include="..\common\cBda.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\shared\utils\cLog.cpp" />
     <ClCompile Include="tvGrab.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

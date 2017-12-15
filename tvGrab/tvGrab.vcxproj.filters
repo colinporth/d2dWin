@@ -16,8 +16,18 @@
     <ClInclude Include="..\..\shared\decoders\cDumpTransportStream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cLog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\date.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="tvGrab.cpp" />
+    <ClCompile Include="..\..\shared\utils\cLog.cpp" />
   </ItemGroup>
 </Project>
