@@ -1230,7 +1230,7 @@ private:
 
     int firstVidSignalCount = 0;
     int fileDoneCount = 0;
-    while (fileDoneCount < 50) {
+    while (fileDoneCount < 20) {
       int64_t bytesToRead = mStreamSize - mStreamPos;
       if (bytesToRead > kChunkSize) // trim to kChunkSize
         bytesToRead = kChunkSize;
@@ -1261,8 +1261,9 @@ private:
         //{{{  check if fileSize changed, 50 goes 100ms second apart before we give up
         _fstati64 (file, &buf);
         if (mStreamSize == buf.st_size) {
-          Sleep (100);
+          Sleep (1000);
           fileDoneCount++;
+          cLog::log (LOGINFO, "stream countdown " + dec(fileDoneCount));
           }
         else
           mStreamSize = buf.st_size;
