@@ -1175,7 +1175,7 @@ private:
     auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
     //{{{  get streamSize
     struct _stat64 buf;
-    _fstati64 (file, &buf);
+    _fstat64 (file, &buf);
     mStreamSize = buf.st_size ;
     //}}}
 
@@ -1229,8 +1229,7 @@ private:
     _lseeki64 (file, mStreamPos, SEEK_SET);
 
     int firstVidSignalCount = 0;
-    int fileDoneCount = 0;
-    while (fileDoneCount < 20) {
+    while (true) {
       int64_t bytesToRead = mStreamSize - mStreamPos;
       if (bytesToRead > kChunkSize) // trim to kChunkSize
         bytesToRead = kChunkSize;
@@ -1238,7 +1237,6 @@ private:
         // at least 1 packet to read, trim read to packet boundary
         bytesToRead -= bytesToRead % 188;
         auto chunkBytesLeft = _read (file, chunkBuf, (unsigned int)bytesToRead);
-        fileDoneCount = 0;
         if (chunkBytesLeft >= 188) {
           auto chunkPtr = chunkBuf;
           while (chunkBytesLeft >= 188) {
@@ -1258,15 +1256,22 @@ private:
           }
         }
       else {
-        //{{{  check if fileSize changed, 50 goes 100ms second apart before we give up
-        _fstati64 (file, &buf);
-        if (mStreamSize == buf.st_size) {
+        //{{{  check if fileSize changed, 25 goes 1s second apart before we give up
+        while (true) {
+          _close (file);
           Sleep (1000);
-          fileDoneCount++;
-          cLog::log (LOGINFO, "stream countdown " + dec(fileDoneCount));
+          file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
+          _fstat64 (file, &buf);
+          if (buf.st_size > mStreamSize) {
+            cLog::log (LOGINFO, "file size increased - size:" + dec (mStreamSize) +
+                                " newSize:" + dec (buf.st_size));
+            mStreamSize = buf.st_size;
+            _lseeki64 (file, mStreamPos, SEEK_SET);
+            break;
+            }
+          else
+            cLog::log (LOGINFO, "file size same");
           }
-        else
-          mStreamSize = buf.st_size;
         }
         //}}}
       }
@@ -1334,11 +1339,14 @@ private:
               //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
               cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
                          (loaded ? " after ":" notLoaded ") + getPtsString(mAudTs->getLastLoadedPts()));
+
+              _lseeki64 (file, jumpStreamPos, SEEK_SET);
+
               streamPos = jumpStreamPos;
-              _lseeki64 (file, streamPos, SEEK_SET);
               lastJumpStreamPos = jumpStreamPos;
               chunkBytesLeft = 0;
               skip = true;
+
               break;
               }
               //}}}
@@ -1408,11 +1416,14 @@ private:
               //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
               cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
                          (loaded ? " after ":" notLoaded ") + getPtsString(mVidTs->getLastLoadedPts()));
+
               _lseeki64 (file, jumpStreamPos, SEEK_SET);
-              lastJumpStreamPos = jumpStreamPos;
+
               streamPos = jumpStreamPos;
+              lastJumpStreamPos = jumpStreamPos;
               chunkBytesLeft = 0;
               skip = true;
+
               break;
               }
               //}}}
