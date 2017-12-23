@@ -42,20 +42,20 @@ public:
 
     initialise (title, width, height, false);
     mHls = new cHls (chan, kDefaultBitrate, getDaylightSeconds());
-    addBox (new cCalendarBox (this, 190.f,160.f, mTimePoint), -190.f - 24.f,0);
-    addBox (new cHlsDotsBox (this, 18.f,60.f, mHls), -24.f, 0);
-    addBox (new cHlsPeakBox (this, 0,0, mHls));
-    addBox (new cLogBox (this, 200.f,0, true), 0,200.f);
-    addBox (new cBmpBox (this, 60.f, 60.f, r1x80, 1, mHls->mChan, mHls->mChanChanged));
-    addBox (new cBmpBox (this, 60.f, 60.f, r2x80, 2, mHls->mChan, mHls->mChanChanged), 61.f,0);
-    addBox (new cBmpBox (this, 60.f, 60.f, r3x80, 3, mHls->mChan, mHls->mChanChanged), 122.f,0);
-    addBox (new cBmpBox (this, 60.f, 60.f, r4x80, 4, mHls->mChan, mHls->mChanChanged), 183.f,0);
-    addBox (new cBmpBox (this, 60.f, 60.f, r5x80, 5, mHls->mChan, mHls->mChanChanged), 244.f,0);
-    addBox (new cBmpBox (this, 60.f, 60.f, r6x80, 6, mHls->mChan, mHls->mChanChanged), 305.f,0);
-    //addBox (new cClockBox (this, 40.f, mTimePoint), -82.f,-82.f);
-    addBox (new cVolumeBox (this, 12.f,0), -12.f,0);
-    addBox (new cFloatBox (this, 50.f,20.f, mRenderTime), 0,-20.f);
-    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0);
+    add (new cCalendarBox (this, 190.f,160.f, mTimePoint), -190.f - 24.f,0);
+    add (new cHlsDotsBox (this, 18.f,60.f, mHls), -24.f, 0);
+    add (new cHlsPeakBox (this, 0,0, mHls));
+    add (new cLogBox (this, 200.f,0, true), 0,200.f);
+    add (new cBmpBox (this, 60.f, 60.f, r1x80, 1, mHls->mChan, mHls->mChanChanged));
+    add (new cBmpBox (this, 60.f, 60.f, r2x80, 2, mHls->mChan, mHls->mChanChanged), 61.f,0);
+    add (new cBmpBox (this, 60.f, 60.f, r3x80, 3, mHls->mChan, mHls->mChanChanged), 122.f,0);
+    add (new cBmpBox (this, 60.f, 60.f, r4x80, 4, mHls->mChan, mHls->mChanChanged), 183.f,0);
+    add (new cBmpBox (this, 60.f, 60.f, r5x80, 5, mHls->mChan, mHls->mChanChanged), 244.f,0);
+    add (new cBmpBox (this, 60.f, 60.f, r6x80, 6, mHls->mChan, mHls->mChanChanged), 305.f,0);
+    //add (new cClockBox (this, 40.f, mTimePoint), -82.f,-82.f);
+    add (new cVolumeBox (this, 12.f,0), -12.f,0);
+    add (new cFloatBox (this, 50.f,20.f, mRenderTime), 0,-20.f);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     // launch loaderThread
     thread ([=]() { hlsLoaderThread(); } ).detach();

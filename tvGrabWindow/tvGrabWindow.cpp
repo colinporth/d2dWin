@@ -3,6 +3,7 @@
 #include "stdafx.h"
 
 #include "../common/cBda.h"
+
 #include "../../shared/decoders/cTransportStream.h"
 #include "../../shared/decoders/cDumpTransportStream.h"
 
@@ -10,23 +11,33 @@
 #include "../common/cIntBox.h"
 #include "../common/cLogBox.h"
 #include "../common/cWindowBox.h"
-
-using namespace std;
 //}}}
 
 class cAppWindow : public cD2dWindow {
 public:
-  //{{{
-  void run (const string& title, int width, int height, const string& param) {
+  class cTuneBox : public cIntBox {
+  public:
+    cTuneBox (cD2dWindow* window, float width, float height, const string& title, int& value) : 
+       cIntBox (window, width, height, title, value) {}
+    //{{{
+    bool onDown (bool right, cPoint pos)  {
+      cLog::log (LOGNOTICE, "hit tune box");
+      return true;
+      }
+    //}}}
 
-    string rootName = "e:/tv";
+    };
+  //{{{
+  void run (const string& title, int width, int height, const string& param, const string& rootName) {
+
     mTs = new cDumpTransportStream (rootName);
 
     initialise (title, width, height, false);
-    addBox (new cTransportStreamBox (this, 0,-200, mTs));
-    addBox (new cLogBox (this, 200.f,0, true), 0,200.f);
-    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
-    addBox (new cIntBox (this, 150.f, kTextHeight, "strength ", mSignalStrength), 0.f,-kTextHeight);
+    add (new cTransportStreamBox (this, 0,-200, mTs));
+    add (new cLogBox (this, 200.f,0, true), 0,200.f);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
+    add (new cIntBox (this, 150.f, kTextHeight, "strength ", mSignalStrength), 0.f,-kTextHeight);
+    add (new cTuneBox (this, 150.f, kTextHeight, "tune ", mSignalStrength), 150.f,-kTextHeight);
 
     auto frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
@@ -146,9 +157,10 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     wstring wstr (args[1]);
     param = string (wstr.begin(), wstr.end());
     }
+  string rootName = "c:/tv";
 
   cAppWindow appWindow;
-  appWindow.run ("tvGrabWindow", 1050, 900, param);
+  appWindow.run ("tvGrabWindow", 1050, 900, param, rootName);
   CoUninitialize();
   }
 //}}}

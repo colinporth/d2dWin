@@ -52,7 +52,7 @@ void reportfOpen (string fileName) {
     _fseeki64 (file, 0, SEEK_END);
     auto pos = _ftelli64 (file);
     cLog::log (LOGINFO, "tell " + dec(pos));
-    Sleep (12000);
+    Sleep (1000);
     fclose (file);
     }
   }
@@ -62,7 +62,7 @@ void reportFileCreate (const string& fileName) {
 
   while (true) {
     auto file = CreateFile (fileName.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,         // existing file only
-                            FILE_FLAG_NO_BUFFERING, NULL);
+                            FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
       cLog::log (LOGERROR, "createFile failed");
 
@@ -81,7 +81,7 @@ void reportFileCreate (const string& fileName) {
     //  cLog::log (LOGERROR, "ReadFile failed");
     CloseHandle (file);
 
-    Sleep (20000);
+    Sleep (1000);
     }
 
   }

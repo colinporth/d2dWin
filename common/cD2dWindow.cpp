@@ -177,24 +177,24 @@ void cD2dWindow::initialise (string title, int width, int height, bool fullScree
   }
 //}}}
 //{{{
-cD2dWindow::cBox* cD2dWindow::addBox (cBox* box, cPoint pos) {
+cD2dWindow::cBox* cD2dWindow::add (cBox* box, cPoint pos) {
   mBoxes.push_back (box);
   box->setPos (pos);
   return box;
   }
 //}}}
 //{{{
-cD2dWindow::cBox* cD2dWindow::addBox (cBox* box, float x, float y) {
-  return addBox (box, cPoint(x,y));
+cD2dWindow::cBox* cD2dWindow::add (cBox* box, float x, float y) {
+  return add (box, cPoint(x,y));
   }
 //}}}
 //{{{
-cD2dWindow::cBox* cD2dWindow::addBox (cBox* box) {
-  return addBox (box, cPoint());
+cD2dWindow::cBox* cD2dWindow::add (cBox* box) {
+  return add (box, cPoint());
   }
 //}}}
 //{{{
-cD2dWindow::cBox* cD2dWindow::addBoxBelow (cBox* box) {
+cD2dWindow::cBox* cD2dWindow::addBelow (cBox* box) {
 
   mBoxes.push_back (box);
   auto lastBox = mBoxes.back();

@@ -44,19 +44,19 @@ public:
     cLog::log (LOGNOTICE, "getFiles %d files", mFileList.size());
 
     initialise (title, width, height, false);
-    addBox (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
-    addBox (new cClockBox (this, 40.0f, mTimePoint), -82.f,150.f);
-    addBox (new cLogBox (this, 200.0f,0, true), 0,200.0f);
+    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
+    add (new cClockBox (this, 40.0f, mTimePoint), -82.f,150.f);
+    add (new cLogBox (this, 200.0f,0, true), 0,200.0f);
 
     mJpegImageView = new cJpegImageView (this, 0.f,-120.f, false, false, mFrameSet.mImage);
-    addBox (mJpegImageView);
+    add (mJpegImageView);
 
-    addBox (new cListBox (this, 0,250.0f, mFileList, mFileIndex, mFileIndexChanged));
-    addBox (new cFrameSetLensBox (this, 0,100.0f, mFrameSet), 0,-120.0f);
-    addBox (new cFrameSetBox (this, 0,100.0f, mFrameSet), 0,-220.0f);
-    addBox (new cFrameSetTimeBox (this, 600.0f,50.0f, mFrameSet), -600.0f,-50.0f);
-    addBox (new cVolumeBox (this, 12.f,0), -12.f,0);
-    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0);
+    add (new cListBox (this, 0,250.0f, mFileList, mFileIndex, mFileIndexChanged));
+    add (new cFrameSetLensBox (this, 0,100.0f, mFrameSet), 0,-120.0f);
+    add (new cFrameSetBox (this, 0,100.0f, mFrameSet), 0,-220.0f);
+    add (new cFrameSetTimeBox (this, 600.0f,50.0f, mFrameSet), -600.0f,-50.0f);
+    add (new cVolumeBox (this, 12.f,0), -12.f,0);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     if (!mFileList.empty()) {
       thread ([=](){ analyseThread(); }).detach();

@@ -37,16 +37,16 @@ public:
     mImage.setFile (pathName, fileName);
     mImage.loadInfo();
 
-    addBox (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
-    addBox (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
+    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
+    add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
 
-    addBox (new cLogBox (this, 200.f,0.f, true), -200.f,0.f);
-    addBox (new cJpegImageView (this, 0.f,0.f, &mImage));
-    addBox (new cJpegImageView (this, 0.f,0.f, &mCompressImage));
+    add (new cLogBox (this, 200.f,0.f, true), -200.f,0.f);
+    add (new cJpegImageView (this, 0.f,0.f, &mImage));
+    add (new cJpegImageView (this, 0.f,0.f, &mCompressImage));
 
-    addBox (new cValueBox (this, 100.f,kTextHeight, "quality", 1.f,100.f, mQuality, mQualityChanged), 0.f,-kTextHeight);
-    addBox (new cFloatBox (this, 50.f,kTextHeight, mRenderTime), -50.f,-kTextHeight);
-    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0);
+    add (new cValueBox (this, 100.f,kTextHeight, "quality", 1.f,100.f, mQuality, mQualityChanged), 0.f,-kTextHeight);
+    add (new cFloatBox (this, 50.f,kTextHeight, mRenderTime), -50.f,-kTextHeight);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     thread([=]() { changeThread(); }).detach();
 

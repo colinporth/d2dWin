@@ -26,17 +26,16 @@ public:
   void run (const string& title, int width, int height, string name) {
 
     initialise (title, width, height, kFullScreen);
-    addBox (new cClockBox (this, 50.f, mTimePoint), -110.f,-120.f);
-    addBox (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f-120.f,-150.f);
+    add (new cClockBox (this, 50.f, mTimePoint), -110.f,-120.f);
+    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f-120.f,-150.f);
+    add (new cLogBox (this, 200.f,0.f, true), -200.f,0);
 
-    addBox (new cLogBox (this, 200.f,0.f, true), -200.f,0);
-
-    addBox (new cImageSetView (this, 0.f,0.f, mImageSet));
+    add (new cImageSetView (this, 0.f,0.f, mImageSet));
     mJpegImageView = new cJpegImageView (this, 0.f,0.f, nullptr);
-    addBox (mJpegImageView);
+    add (mJpegImageView);
 
-    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
-    addBox (new cFloatBox (this, 50.f,kTextHeight, mRenderTime), 0.f,-kTextHeight);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
+    add (new cFloatBox (this, 50.f,kTextHeight, mRenderTime), 0.f,-kTextHeight);
 
     if (name.find (".lnk") <= name.size()) {
       string fullName;

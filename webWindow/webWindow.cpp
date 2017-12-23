@@ -1006,15 +1006,15 @@ public:
     //mMaps.push_back (new cMap (kRoadUk, mapPlace, this));
     mMap = mMaps[0];
 
-    addBox (new cMapView (this, 0,0, mMap));
-    addBox (new cLogBox (this, 200.f,0, true), -200.f,0);
-    addBox (new cMapOverView (this, 1920/8, 1080/3, mMap), -1920/8, -1080/3);
-    addBox (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
-    addBox (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
-    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0);
-    addBox (new cFloatBox (this, 50.f,kTextHeight, mRenderTime), -50.f,-kTextHeight);
+    add (new cMapView (this, 0,0, mMap));
+    add (new cLogBox (this, 200.f,0, true), -200.f,0);
+    add (new cMapOverView (this, 1920/8, 1080/3, mMap), -1920/8, -1080/3);
+    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
+    add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0);
+    add (new cFloatBox (this, 50.f,kTextHeight, mRenderTime), -50.f,-kTextHeight);
 
-    addBox (new cIndexBox (this, 100.f,3*20.f, {"os", "aerial"}, mMapIndex, &mMapIndexSem), 0.f, 80.f);
+    add (new cIndexBox (this, 100.f,3*20.f, {"os", "aerial"}, mMapIndex, &mMapIndexSem), 0.f, 80.f);
 
     // launch threads
     for (auto map : mMaps) {

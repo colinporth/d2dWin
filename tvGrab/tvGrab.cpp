@@ -72,7 +72,7 @@ int main (int argc, char* argv[]) {
 
   // params, defaults
   int frequency =   (argc >= 2) ? atoi(argv[1]) : 674;
-  string fileName = (argc >= 3) ? argv[2] : "e:/tv";
+  string fileName = (argc >= 3) ? argv[2] : "c:/tv";
   bool dumpFilter = (argc >= 4);
 
   if (dumpFilter) {

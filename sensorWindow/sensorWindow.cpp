@@ -24,32 +24,32 @@ public:
     mSensor->run();
 
     initialise (title, width+20, height+20, kFullScreen);
-    addBox (new cSensorView (this, 0,0, mSensor));
-    addBox (new cLogBox (this, 200.f,0, true), 200.f,0);
+    add (new cSensorView (this, 0,0, mSensor));
+    add (new cLogBox (this, 200.f,0, true), 200.f,0);
 
     mLumaHistogramBox = new cHistogramBox (this, 256.f,256.f, mSensor->getLumaHistogram());
-    addBox (mLumaHistogramBox, -276.f,-532.f);
+    add (mLumaHistogramBox, -276.f,-532.f);
     mRgbHistogramBox = new cRgbHistogramBox (this, 256.f,256.f, mSensor->getRgbHistogram());
-    addBox (mRgbHistogramBox, -276.f,-276.f);
+    add (mRgbHistogramBox, -276.f,-276.f);
     mVectorBox = new cVectorBox (this, 256.f,256.f, mSensor->getVector());
-    addBox (mVectorBox, -276.f,-276.f);
+    add (mVectorBox, -276.f,-276.f);
 
-    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     mBayerValueBox = new cValueBox (this, 60.f,24.f, "bayer", 0,5.f, mBayer, mBayerChanged);
-    addBox (mBayerValueBox, -60.f,-24.f);
+    add (mBayerValueBox, -60.f,-24.f);
 
     if (mSensor->getId() == kMt9d112)
-      addBox (new cIndexBox (this, 50.f, 4*20.f,
+      add (new cIndexBox (this, 50.f, 4*20.f,
                                       {"pvw", "full", "bayer"}, (int&)mMode, &mModeChanged));
     else if (mSensor->getId() == kMt9d111) {
-      addBox (new cIndexBox (this, 50.f, 4*20.f,
+      add (new cIndexBox (this, 50.f, 4*20.f,
                                       {"pvw", "full", "bayer", "jpeg"}, (int&)mMode, &mModeChanged));
-      addBox (
+      add (
         new cValueBox (this, 100.f,20.f, "focus", 0,255.f, mFocus, mFocusChanged), -100.f,0);
       }
-    addBox (new cFloatBox (this, 50.f,20.f, mRenderTime), -50.f,-20.f);
-    addBox (new cClockBox (this, 40.f, mTimePoint, true, true), -82.f,-82.f);
+    add (new cFloatBox (this, 50.f,20.f, mRenderTime), -50.f,-20.f);
+    add (new cClockBox (this, 40.f, mTimePoint, true, true), -82.f,-82.f);
 
     if (mSensor->getId() == kMt9d111)
       setMode (cSensor::ePreview);

@@ -69,14 +69,14 @@ public:
 
     // init d2dWindow, boxes
     initialise (title, width, height, false);
-    addBox (new cVidFrameView (this, 0.f,0.f));
-    addBox (new cTransportStreamBox (this, 0, getHeight()/2.f, mAnalTs))->setPin (false);
-    addBox (new cFramesDebugBox (this, 0.f,getHeight()/4.f), 0.f,kTextHeight);
-    addBox (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
+    add (new cVidFrameView (this, 0.f,0.f));
+    add (new cTransportStreamBox (this, 0, getHeight()/2.f, mAnalTs))->setPin (false);
+    add (new cFramesDebugBox (this, 0.f,getHeight()/4.f), 0.f,kTextHeight);
+    add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
 
     int frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
-      addBox (new cIntBox (this, 70.f,kTextHeight, "sig ", mSignalStrength), -70.f,0.f);
+      add (new cIntBox (this, 70.f,kTextHeight, "sig ", mSignalStrength), -70.f,0.f);
 
       mFileName = "C:/videos/tune.ts";
       thread ([=]() { bdaThread (frequency*1000, mFileName); }).detach();
@@ -86,10 +86,10 @@ public:
     else
       mFileName = param;
 
-    addBox (new cTimecodeBox (this, 600.f,60.f, mPlayPts, mAnalTs->mLengthPts), -600.f,-60.f)->setPin (true);
-    addBox (new cProgressBox (this, 0.f,6.f), 0.f,-6.f);
-    addBox (new cAudFrameBox (this, 82.f,240.0f, mPlayAudFrame), -84.f,-240.f-6.0f);
-    addBox (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
+    add (new cTimecodeBox (this, 600.f,60.f, mPlayPts, mAnalTs->mLengthPts), -600.f,-60.f)->setPin (true);
+    add (new cProgressBox (this, 0.f,6.f), 0.f,-6.f);
+    add (new cAudFrameBox (this, 82.f,240.0f, mPlayAudFrame), -84.f,-240.f-6.0f);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
     // init threads
     auto threadHandle = thread ([=](){ analThread(); });
@@ -1259,7 +1259,9 @@ private:
         //{{{  check if fileSize changed, 25 goes 1s second apart before we give up
         while (true) {
           _close (file);
+
           Sleep (1000);
+
           file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
           _fstat64 (file, &buf);
           if (buf.st_size > mStreamSize) {

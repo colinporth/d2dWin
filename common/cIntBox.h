@@ -1,8 +1,11 @@
 // cIntBox.h
+//{{{  includes
 #pragma once
+
 #include "cD2dWindow.h"
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/cLog.h"
+//}}}
 
 class cIntBox : public cD2dWindow::cBox {
 public:
@@ -14,6 +17,7 @@ public:
   //}}}
   virtual ~cIntBox() {}
 
+  //{{{
   void onDraw (ID2D1DeviceContext* dc) {
     string str = mTitle + dec(mValue);
 
@@ -26,6 +30,7 @@ public:
 
     textLayout->Release();
     }
+  //}}}
 
 private:
   string mTitle;
@@ -41,9 +46,11 @@ public:
   //}}}
   virtual ~cIntBgndBox() {}
 
+  //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
     dc->FillRectangle (mRect, mWindow->getGreyBrush());
     cIntBox::onDraw (dc);
     }
+  //}}}
   };

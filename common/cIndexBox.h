@@ -32,7 +32,7 @@ public:
     return true;
     }
   //}}}
-
+  //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
     auto r = mRect;
@@ -47,6 +47,7 @@ public:
       r.bottom += kTextHeight;
       }
     }
+  //}}}
 
 private:
   //{{{

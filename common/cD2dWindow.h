@@ -332,10 +332,10 @@ public:
   //}}}
 
   void initialise (string title, int width, int height, bool fullScreen);
-  cBox* addBox (cBox* box, cPoint pos);
-  cBox* addBox (cBox* box, float x, float y);
-  cBox* addBox (cBox* box);
-  cBox* addBoxBelow (cBox* box);
+  cBox* add (cBox* box, cPoint pos);
+  cBox* add (cBox* box, float x, float y);
+  cBox* add (cBox* box);
+  cBox* addBelow (cBox* box);
 
   //{{{  gets
   ID3D11Device* getD3d11Device() { return mD3device.Get(); }
