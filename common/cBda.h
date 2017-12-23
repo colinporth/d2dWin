@@ -613,6 +613,7 @@ private:
     }
   //}}}
 
+  //{{{  vars
   ComPtr<IGraphBuilder> mGraphBuilder;
 
   ComPtr<IBaseFilter> mDvbNetworkProvider;
@@ -640,4 +641,5 @@ private:
   ComPtr<IMediaControl> mMediaControl;
 
   int mSignalStrength = 0;
+  //}}}
   };
