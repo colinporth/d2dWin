@@ -1158,6 +1158,7 @@ private:
 
     auto bda = new cBda();
     bda->createGraph (frequency, fileName);
+    bda->run();
 
     while (!getExit())
       mSignalStrength = bda->getSignalStrength();

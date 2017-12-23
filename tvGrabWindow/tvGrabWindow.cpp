@@ -15,18 +15,44 @@
 
 class cAppWindow : public cD2dWindow {
 public:
-  class cTuneBox : public cIntBox {
+  //{{{
+  class cTuneBox : public cD2dWindow::cBox {
   public:
-    cTuneBox (cD2dWindow* window, float width, float height, const string& title, int& value) : 
-       cIntBox (window, width, height, title, value) {}
     //{{{
-    bool onDown (bool right, cPoint pos)  {
-      cLog::log (LOGNOTICE, "hit tune box");
-      return true;
+    cTuneBox (cD2dWindow* window, float width, float height, const string& title, int frequency) :
+        cBox ("tune", window, width, height), mTitle(title), mFrequency(frequency) {
+      mPin = true;
       }
     //}}}
 
+    //{{{
+    bool onDown (bool right, cPoint pos)  {
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+      appWindow->retune (mFrequency);
+      return true;
+      }
+    //}}}
+    //{{{
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      IDWriteTextLayout* textLayout;
+      mWindow->getDwriteFactory()->CreateTextLayout (
+        strToWstr(mTitle).data(), (uint32_t)mTitle.size(), mWindow->getTextFormat(),
+        getSize().x, getSize().y, &textLayout);
+
+      dc->FillRectangle (mRect, mWindow->getGreyBrush());
+      dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+
+      textLayout->Release();
+      }
+    //}}}
+
+  private:
+    string mTitle;
+    int mFrequency;
     };
+  //}}}
   //{{{
   void run (const string& title, int width, int height, const string& param, const string& rootName) {
 
@@ -36,8 +62,11 @@ public:
     add (new cTransportStreamBox (this, 0,-200, mTs));
     add (new cLogBox (this, 200.f,0, true), 0,200.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
-    add (new cIntBox (this, 150.f, kTextHeight, "strength ", mSignalStrength), 0.f,-kTextHeight);
-    add (new cTuneBox (this, 150.f, kTextHeight, "tune ", mSignalStrength), 150.f,-kTextHeight);
+
+    add (new cTuneBox (this, 40.f, kTextHeight, "bbc", 674));
+    add (new cTuneBox (this, 40.f, kTextHeight, "itv", 650), 42.f,0.f);
+    add (new cTuneBox (this, 40.f, kTextHeight, "hd", 706), 84.f,0.f);
+    add (new cIntBox (this, 120.f, kTextHeight, "signal ", mSignalStrength), 126.f,0.f);
 
     auto frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
@@ -74,14 +103,15 @@ private:
     cLog::setThreadName ("grab");
 
     bda->createGraph (frequency);
+    bda->run();
 
     int64_t streamPos = 0;
     auto blockSize = 0;
     while (true) {
-      auto ptr = bda->getContiguousBlock (blockSize);
+      auto ptr = bda->getBlock (blockSize);
       if (blockSize) {
         streamPos += mTs->demux (ptr, blockSize, streamPos, false, -1);
-        bda->decommitBlock (blockSize);
+        bda->releaseBlock (blockSize);
         changed();
         }
       else
@@ -132,6 +162,14 @@ private:
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
+    }
+  //}}}
+  //{{{
+  void retune (int frequency) {
+    mBda->stop();
+    mTs->clear();
+    mBda->tune (frequency * 1000);
+    mBda->run();
     }
   //}}}
 

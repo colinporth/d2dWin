@@ -270,9 +270,10 @@ public:
   virtual ~cGrabberCB() {}
 
   void allocateBuffer (int bufSize) { mBipBuffer.allocateBuffer (bufSize); }
+  void clear() { mBipBuffer.clear(); }
 
-  uint8_t* getContiguousBlock (int& len) { return mBipBuffer.getContiguousBlock (len); }
-  void decommitBlock (int len) { mBipBuffer.decommitBlock (len); }
+  uint8_t* getBlock (int& len) { return mBipBuffer.getContiguousBlock (len); }
+  void releaseBlock (int len) { mBipBuffer.decommitBlock (len); }
 
 private:
   // ISampleGrabberCB methods
@@ -324,7 +325,7 @@ public:
  cBda::~cBda() {}
 
   //{{{
-  bool createGraph (int frequency)  {
+  void createGraph (int frequency)  {
 
     createGraphDvbT (frequency);
 
@@ -338,12 +339,11 @@ public:
 
     createFilter (mMpeg2Demux, CLSID_MPEG2Demultiplexer, L"MPEG2demux", mGrabberFilter);
     createFilter (mBdaTif, CLSID_BDAtif, L"BDAtif", mMpeg2Demux);
-
-    return runGraph();
+    mGraphBuilder.As (&mMediaControl);
     }
   //}}}
   //{{{
-  bool createGraph (int frequency, const std::string& fileName) {
+  void createGraph (int frequency, const std::string& fileName) {
 
     createGraphDvbT (frequency);
 
@@ -356,8 +356,60 @@ public:
 
     createFilter (mMpeg2Demux, CLSID_MPEG2Demultiplexer, L"MPEG2demux", mInfTeeFilter);
     createFilter (mBdaTif, CLSID_BDAtif, L"BDAtif", mMpeg2Demux);
+    mGraphBuilder.As (&mMediaControl);
+    }
+  //}}}
 
-    return runGraph();
+  //{{{
+  void pause() {
+
+    mMediaControl->Pause();
+    mGrabberCB.clear();
+    }
+  //}}}
+  //{{{
+  void stop() {
+
+    mMediaControl->Stop();
+    mGrabberCB.clear();
+    }
+  //}}}
+  //{{{
+  void tune (int frequency) {
+
+    auto hr = mDvbLocator->put_CarrierFrequency (frequency);
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune put_CarrierFrequency" + dec(hr));
+
+    hr = mDvbLocator->put_Bandwidth (8);
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune put_Bandwidth" + dec(hr));
+
+    hr = mDvbTuningSpace2->put_DefaultLocator (mDvbLocator.Get());
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune put_DefaultLocator" + dec(hr));
+
+    hr = mTuneRequest->put_Locator (mDvbLocator.Get());
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune put_Locator" + dec(hr));
+
+    hr = mScanningTuner->Validate (mTuneRequest.Get());
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune Validate" + dec(hr));
+
+    hr = mScanningTuner->put_TuneRequest (mTuneRequest.Get());
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune put_TuneRequest" + dec(hr));
+    }
+  //}}}
+  //{{{
+  bool run() {
+
+    auto hr = mMediaControl->Run();
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "runGraph failed " + dec(hr));
+
+    return hr == S_OK;
     }
   //}}}
 
@@ -375,14 +427,14 @@ public:
   //}}}
 
   //{{{
-  uint8_t* getContiguousBlock (int& len) {
+  uint8_t* getBlock (int& len) {
 
-    return mGrabberCB.getContiguousBlock (len);
+    return mGrabberCB.getBlock (len);
     }
   //}}}
   //{{{
-  void decommitBlock (int len) {
-    mGrabberCB.decommitBlock (len);
+  void releaseBlock (int len) {
+    mGrabberCB.releaseBlock (len);
     }
   //}}}
 
@@ -558,16 +610,6 @@ private:
       }
 
     findFilter (mDvbCapture, KSCATEGORY_BDA_RECEIVER_COMPONENT, L"DVBTcapture", mDvbTuner);
-    }
-  //}}}
-  //{{{
-  bool runGraph() {
-    mGraphBuilder.As (&mMediaControl);
-    auto hr = mMediaControl->Run();
-    if (hr != S_OK)
-      cLog::log (LOGERROR, "runGraph failed " + dec(hr));
-
-    return hr == S_OK;
     }
   //}}}
 

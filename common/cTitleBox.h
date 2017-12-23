@@ -12,6 +12,7 @@ public:
   //}}}
   virtual ~cTitleBox() {}
 
+  //{{{
   void onDraw (ID2D1DeviceContext* dc) {
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
@@ -21,6 +22,7 @@ public:
     dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
     textLayout->Release();
     }
+  //}}}
 
 private:
   string& mTitle;

@@ -34,10 +34,10 @@ void bdaGrabThread (cBda* bda, cTransportStream* ts) {
   int64_t streamPos = 0;
   while (true) {
     auto blockSize = 0;
-    auto ptr = bda->getContiguousBlock (blockSize);
+    auto ptr = bda->getBlock (blockSize);
     if (blockSize) {
       streamPos += ts->demux (ptr, blockSize, streamPos, false, -1);
-      bda->decommitBlock (blockSize);
+      bda->releaseBlock (blockSize);
       if (blockSize != 240 * 188)
         cLog::log (LOGINFO, "blocksize " + dec(blockSize));
       }
@@ -78,7 +78,8 @@ int main (int argc, char* argv[]) {
   if (dumpFilter) {
     //{{{  use dump filter
     auto mBda = new cBda();
-    if (mBda->createGraph (frequency * 1000, fileName + "/tune.ts")) {
+    mBda->createGraph (frequency * 1000, fileName + "/tune.ts");
+    if (mBda->run()) {
       cLog::log (LOGNOTICE, "created bda- dump - tuned to " + dec(frequency) + "mhz");
       thread ([=]() { bdaSignalThread (mBda, nullptr); }).detach();
       }
@@ -92,7 +93,8 @@ int main (int argc, char* argv[]) {
     cLog::log (LOGNOTICE, "Created dumpTransportStream");
 
     auto mBda = new cBda();
-    if (mBda->createGraph (frequency * 1000)) {
+    mBda->createGraph (frequency * 1000);
+    if (mBda->run()) {
       cLog::log (LOGNOTICE, "Created bda- sampleGrabber - tuned to " + dec(frequency) + "mhz");
       thread ([=]() { bdaGrabThread (mBda, mTs); }).detach();
       thread ([=]() { bdaSignalThread (mBda, mTs); }).detach();
