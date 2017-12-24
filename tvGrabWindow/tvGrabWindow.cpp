@@ -59,14 +59,14 @@ public:
     mTs = new cDumpTransportStream (rootName);
 
     initialise (title, width, height, false);
-    add (new cTransportStreamBox (this, 0,-200, mTs));
-    add (new cLogBox (this, 200.f,0, true), 0,200.f);
-    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
-
     add (new cTuneBox (this, 40.f, kTextHeight, "bbc", 674));
     add (new cTuneBox (this, 40.f, kTextHeight, "itv", 650), 42.f,0.f);
     add (new cTuneBox (this, 40.f, kTextHeight, "hd", 706), 84.f,0.f);
-    add (new cIntBox (this, 120.f, kTextHeight, "signal ", mSignalStrength), 126.f,0.f);
+    add (new cIntBox (this, 120.f, kTextHeight, "signal ", mSignal), 126.f,0.f);
+
+    add (new cTransportStreamBox (this, 0,-kTextHeight, mTs), 0.f, kTextHeight);
+    add (new cLogBox (this, 200.f,0, true), 0,200.f);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
     auto frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
@@ -129,7 +129,7 @@ private:
     cLog::setThreadName ("sign");
 
     while (true)
-      mSignalStrength = bda->getSignalStrength();
+      mSignal = bda->getSignal();
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -178,7 +178,7 @@ private:
 
   cTransportStream* mTs = nullptr;
   cBda* mBda = nullptr;
-  int mSignalStrength = 0;
+  int mSignal = 0;
   };
 
 //{{{

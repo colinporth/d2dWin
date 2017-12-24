@@ -76,7 +76,7 @@ public:
 
     int frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
-      add (new cIntBox (this, 70.f,kTextHeight, "sig ", mSignalStrength), -70.f,0.f);
+      add (new cIntBox (this, 70.f,kTextHeight, "sig ", mSignal), -70.f,0.f);
 
       mFileName = "C:/videos/tune.ts";
       thread ([=]() { bdaThread (frequency*1000, mFileName); }).detach();
@@ -1161,7 +1161,7 @@ private:
     bda->run();
 
     while (!getExit())
-      mSignalStrength = bda->getSignalStrength();
+      mSignal = bda->getSignal();
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -1482,7 +1482,7 @@ private:
   string mFileName;
 
   cBda* mBda = nullptr;
-  int mSignalStrength = 0;
+  int mSignal = 0;
 
   ePlaying mPlaying = ePlay;
   int64_t mPlayPts = 0;

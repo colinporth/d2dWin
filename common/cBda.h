@@ -3,6 +3,7 @@
 #pragma once
 
 #include <wrl.h>
+
 #include <initguid.h>
 #include <DShow.h>
 #include <bdaiface.h>
@@ -36,294 +37,10 @@ DEFINE_GUID (CLSID_BDAtif, 0xFC772ab0, 0x0c7f, 0x11d3, 0x8F,0xf2, 0x00,0xa0,0xc9
 DEFINE_GUID (CLSID_Dump, 0x36a5f770, 0xfe4c, 0x11ce, 0xa8, 0xed, 0x00, 0xaa, 0x00, 0x2f, 0xea, 0xb5);
 
 #pragma comment (lib,"strmiids")
-
-using namespace Microsoft::WRL;
-//}}}
-
-//{{{
-class cBipBuffer {
-public:
-    cBipBuffer() : mBuffer(NULL), ixa(0), sza(0), ixb(0), szb(0), buflen(0), ixResrv(0), szResrv(0) {}
-    //{{{
-    ~cBipBuffer() {
-        // We don't call FreeBuffer, because we don't need to reset our variables - our object is dying
-        if (mBuffer != NULL)
-            ::VirtualFree (mBuffer, buflen, MEM_DECOMMIT);
-    }
-    //}}}
-
-    //{{{
-    bool allocateBuffer (int buffersize) {
-    // Allocates a buffer in virtual memory, to the nearest page size (rounded up)
-    //   int buffersize size of buffer to allocate, in bytes
-    //   return bool true if successful, false if buffer cannot be allocated
-
-      if (buffersize <= 0)
-        return false;
-      if (mBuffer != NULL)
-        freeBuffer();
-
-      SYSTEM_INFO si;
-      ::GetSystemInfo(&si);
-
-      // Calculate nearest page size
-      buffersize = ((buffersize + si.dwPageSize - 1) / si.dwPageSize) * si.dwPageSize;
-
-      mBuffer = (BYTE*)::VirtualAlloc (NULL, buffersize, MEM_COMMIT, PAGE_READWRITE);
-      if (mBuffer == NULL)
-        return false;
-
-      buflen = buffersize;
-      return true;
-      }
-    //}}}
-    //{{{
-    void clear() {
-    // Clears the buffer of any allocations or reservations. Note; it
-    // does not wipe the buffer memory; it merely resets all pointers,
-    // returning the buffer to a completely empty state ready for new
-    // allocations.
-
-      ixa = sza = ixb = szb = ixResrv = szResrv = 0;
-      }
-    //}}}
-    //{{{
-    void freeBuffer() {
-    // Frees a previously allocated buffer, resetting all internal pointers to 0.
-
-      if (mBuffer == NULL)
-        return;
-
-      ixa = sza = ixb = szb = buflen = 0;
-
-      ::VirtualFree(mBuffer, buflen, MEM_DECOMMIT);
-
-      mBuffer = NULL;
-      }
-    //}}}
-
-    //{{{
-    uint8_t* reserve (int size, OUT int& reserved) {
-    // Reserves space in the buffer for a memory write operation
-    //   int size                 amount of space to reserve
-    //   OUT int& reserved        size of space actually reserved
-    // Returns:
-    //   BYTE*                    pointer to the reserved block
-    //   Will return NULL for the pointer if no space can be allocated.
-    //   Can return any value from 1 to size in reserved.
-    //   Will return NULL if a previous reservation has not been committed.
-
-      // We always allocate on B if B exists; this means we have two blocks and our buffer is filling.
-      if (szb) {
-        int freespace = getBFreeSpace();
-        if (size < freespace)
-          freespace = size;
-        if (freespace == 0)
-          return NULL;
-
-        szResrv = freespace;
-        reserved = freespace;
-        ixResrv = ixb + szb;
-        return mBuffer + ixResrv;
-        }
-      else {
-        // Block b does not exist, so we can check if the space AFTER a is bigger than the space
-        // before A, and allocate the bigger one.
-        int freespace = getSpaceAfterA();
-        if (freespace >= ixa) {
-          if (freespace == 0)
-            return NULL;
-          if (size < freespace)
-            freespace = size;
-
-          szResrv = freespace;
-          reserved = freespace;
-          ixResrv = ixa + sza;
-          return mBuffer + ixResrv;
-          }
-        else {
-          if (ixa == 0)
-            return NULL;
-          if (ixa < size)
-            size = ixa;
-          szResrv = size;
-          reserved = size;
-          ixResrv = 0;
-          return mBuffer;
-          }
-        }
-      }
-    //}}}
-    //{{{
-    void commit (int size) {
-    // Commits space that has been written to in the buffer
-    // Parameters:
-    //   int size                number of bytes to commit
-    //   Committing a size > than the reserved size will cause an assert in a debug build;
-    //   in a release build, the actual reserved size will be used.
-    //   Committing a size < than the reserved size will commit that amount of data, and release
-    //   the rest of the space.
-    //   Committing a size of 0 will release the reservation.
-
-      if (size == 0) {
-        // decommit any reservation
-        szResrv = ixResrv = 0;
-        return;
-        }
-
-      // If we try to commit more space than we asked for, clip to the size we asked for.
-
-      if (size > szResrv)
-        size = szResrv;
-
-      // If we have no blocks being used currently, we create one in A.
-      if (sza == 0 && szb == 0) {
-        ixa = ixResrv;
-        sza = size;
-
-        ixResrv = 0;
-        szResrv = 0;
-        return;
-        }
-
-      if (ixResrv == sza + ixa)
-        sza += size;
-      else
-        szb += size;
-
-      ixResrv = 0;
-      szResrv = 0;
-      }
-    //}}}
-
-    //{{{
-    uint8_t* getContiguousBlock (OUT int& size) {
-    // Gets a pointer to the first contiguous block in the buffer, and returns the size of that block.
-    //   OUT int & size            returns the size of the first contiguous block
-    // Returns:
-    //   BYTE*                    pointer to the first contiguous block, or NULL if empty.
-
-      if (sza == 0) {
-        size = 0;
-        return NULL;
-        }
-
-      size = sza;
-      return mBuffer + ixa;
-      }
-    //}}}
-    //{{{
-    void decommitBlock (int size) {
-    // Decommits space from the first contiguous block,  size amount of memory to decommit
-
-      if (size >= sza) {
-        ixa = ixb;
-        sza = szb;
-        ixb = 0;
-        szb = 0;
-        }
-      else {
-        sza -= size;
-        ixa += size;
-        }
-      }
-    //}}}
-    //{{{
-    int getCommittedSize() const {
-    // Queries how much data (in total) has been committed in the buffer
-    // Returns:
-    //   int                    total amount of committed data in the buffer
-
-      return sza + szb;
-      }
-    //}}}
-
-private:
-  //{{{
-  int getSpaceAfterA() const {
-    return buflen - ixa - sza;
-    }
-  //}}}
-  //{{{
-  int getBFreeSpace() const {
-    return ixa - ixb - szb;
-    }
-  //}}}
-
-  uint8_t* mBuffer;
-  int buflen;
-
-  int ixa;
-  int sza;
-
-  int ixb;
-  int szb;
-
-  int ixResrv;
-  int szResrv;
-  };
-//}}}
-//{{{
-class cGrabberCB : public ISampleGrabberCB {
-public:
-  cGrabberCB() {}
-  virtual ~cGrabberCB() {}
-
-  void allocateBuffer (int bufSize) { mBipBuffer.allocateBuffer (bufSize); }
-  void clear() { mBipBuffer.clear(); }
-
-  uint8_t* getBlock (int& len) { return mBipBuffer.getContiguousBlock (len); }
-  void releaseBlock (int len) { mBipBuffer.decommitBlock (len); }
-
-private:
-  // ISampleGrabberCB methods
-  STDMETHODIMP_(ULONG) AddRef() { return ++ul_cbrc; }
-  STDMETHODIMP_(ULONG) Release() { return --ul_cbrc; }
-  STDMETHODIMP QueryInterface (REFIID riid, void** p_p_object) { return E_NOTIMPL; }
-
-  //{{{
-  STDMETHODIMP BufferCB (double sampleTime, BYTE* samples, long sampleLen) {
-    cLog::log (LOGERROR, "cSampleGrabberCB::BufferCB called");
-    return S_OK;
-    }
-  //}}}
-  //{{{
-  STDMETHODIMP SampleCB (double sampleTime, IMediaSample* mediaSample) {
-
-    if (mediaSample->IsDiscontinuity() == S_OK)
-      cLog::log (LOGERROR, "cSampleGrabCB::SampleCB sample isDiscontinuity");
-
-    int actualDataLength = mediaSample->GetActualDataLength();
-    if (actualDataLength != 240*188)
-     cLog::log (LOGERROR, "cSampleGrabCB::SampleCB - unexpected sampleLength");
-
-    int bytesAllocated = 0;
-    uint8_t* ptr = mBipBuffer.reserve (actualDataLength, bytesAllocated);
-
-    if (!ptr || (bytesAllocated != actualDataLength))
-      cLog::log (LOGERROR, "failed to reserve buffer");
-    else {
-      uint8_t* samples;
-      mediaSample->GetPointer (&samples);
-      memcpy (ptr, samples, actualDataLength);
-      mBipBuffer.commit (actualDataLength);
-      }
-
-    return S_OK;
-    }
-  //}}}
-
-  // vars
-  ULONG ul_cbrc = 0;
-  cBipBuffer mBipBuffer;
-  };
 //}}}
 
 class cBda {
 public:
- cBda::cBda() {}
- cBda::~cBda() {}
-
   //{{{
   void createGraph (int frequency)  {
 
@@ -331,11 +48,19 @@ public:
 
     createFilter (mGrabberFilter, CLSID_SampleGrabber, L"grabber", mDvbCapture);
     mGrabberFilter.As (&mGrabber);
+
     auto hr = mGrabber->SetOneShot (false);
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "SetOneShot failed " + dec(hr));
+
     hr = mGrabber->SetBufferSamples (true);
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "SetBufferSamples failed " + dec(hr));
 
     mGrabberCB.allocateBuffer (128*240*188);
     hr = mGrabber->SetCallback (&mGrabberCB, 0);
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "SetCallback failed " + dec(hr));
 
     createFilter (mMpeg2Demux, CLSID_MPEG2Demultiplexer, L"MPEG2demux", mGrabberFilter);
     createFilter (mBdaTif, CLSID_BDAtif, L"BDAtif", mMpeg2Demux);
@@ -363,43 +88,21 @@ public:
   //{{{
   void pause() {
 
-    mMediaControl->Pause();
+    auto hr = mMediaControl->Pause();
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "pause graph failed " + dec(hr));
+
     mGrabberCB.clear();
     }
   //}}}
   //{{{
   void stop() {
 
-    mMediaControl->Stop();
+    auto hr = mMediaControl->Stop();
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "stop graph failed " + dec(hr));
+
     mGrabberCB.clear();
-    }
-  //}}}
-  //{{{
-  void tune (int frequency) {
-
-    auto hr = mDvbLocator->put_CarrierFrequency (frequency);
-    if (hr != S_OK)
-      cLog::log (LOGERROR, "tune put_CarrierFrequency" + dec(hr));
-
-    hr = mDvbLocator->put_Bandwidth (8);
-    if (hr != S_OK)
-      cLog::log (LOGERROR, "tune put_Bandwidth" + dec(hr));
-
-    hr = mDvbTuningSpace2->put_DefaultLocator (mDvbLocator.Get());
-    if (hr != S_OK)
-      cLog::log (LOGERROR, "tune put_DefaultLocator" + dec(hr));
-
-    hr = mTuneRequest->put_Locator (mDvbLocator.Get());
-    if (hr != S_OK)
-      cLog::log (LOGERROR, "tune put_Locator" + dec(hr));
-
-    hr = mScanningTuner->Validate (mTuneRequest.Get());
-    if (hr != S_OK)
-      cLog::log (LOGERROR, "tune Validate" + dec(hr));
-
-    hr = mScanningTuner->put_TuneRequest (mTuneRequest.Get());
-    if (hr != S_OK)
-      cLog::log (LOGERROR, "tune put_TuneRequest" + dec(hr));
     }
   //}}}
   //{{{
@@ -407,22 +110,62 @@ public:
 
     auto hr = mMediaControl->Run();
     if (hr != S_OK)
-      cLog::log (LOGERROR, "runGraph failed " + dec(hr));
+      cLog::log (LOGERROR, "run graph failed " + dec(hr));
 
     return hr == S_OK;
     }
   //}}}
+  //{{{
+  void tune (int frequency) {
+
+    auto hr = mDvbLocator->put_CarrierFrequency (frequency);
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune - put_CarrierFrequency" + dec(hr));
+    //}}}
+
+    hr = mDvbLocator->put_Bandwidth (8);
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune - put_Bandwidth" + dec(hr));
+    //}}}
+
+    hr = mDvbTuningSpace2->put_DefaultLocator (mDvbLocator.Get());
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune - put_DefaultLocator" + dec(hr));
+
+    //}}}
+    hr = mTuneRequest->put_Locator (mDvbLocator.Get());
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune - put_Locator" + dec(hr));
+    //}}}
+
+    hr = mScanningTuner->Validate (mTuneRequest.Get());
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune - Validate" + dec(hr));
+    //}}}
+
+    hr = mScanningTuner->put_TuneRequest (mTuneRequest.Get());
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune - put_TuneRequest" + dec(hr));
+    //}}}
+    }
+  //}}}
 
   //{{{
-  int getSignalStrength() {
+  int getSignal() {
 
-    long strength = 0;
+    long signal = 0;
     if (mScanningTuner)
-      mScanningTuner->get_SignalStrength (&strength);
+      mScanningTuner->get_SignalStrength (&signal);
 
-    mSignalStrength = strength / 0x10000;
+    mSignal = signal / 0x10000;
 
-    return mSignalStrength;
+    return mSignal;
     }
   //}}}
 
@@ -440,17 +183,298 @@ public:
 
 private:
   //{{{
-  bool connectPins (ComPtr<IBaseFilter> fromFilter, ComPtr<IBaseFilter> toFilter,
+  class cGrabberCB : public ISampleGrabberCB {
+  public:
+    cGrabberCB() {}
+    virtual ~cGrabberCB() {}
+
+    void allocateBuffer (int bufSize) { mBipBuffer.allocateBuffer (bufSize); }
+    void clear() { mBipBuffer.clear(); }
+
+    uint8_t* getBlock (int& len) { return mBipBuffer.getContiguousBlock (len); }
+    void releaseBlock (int len) { mBipBuffer.decommitBlock (len); }
+
+  private:
+    //{{{
+    class cBipBuffer {
+    public:
+        cBipBuffer() : mBuffer(NULL), ixa(0), sza(0), ixb(0), szb(0), buflen(0), ixResrv(0), szResrv(0) {}
+        //{{{
+        ~cBipBuffer() {
+            // We don't call FreeBuffer, because we don't need to reset our variables - our object is dying
+            if (mBuffer != NULL)
+                ::VirtualFree (mBuffer, buflen, MEM_DECOMMIT);
+        }
+        //}}}
+
+        //{{{
+        bool allocateBuffer (int buffersize) {
+        // Allocates a buffer in virtual memory, to the nearest page size (rounded up)
+        //   int buffersize size of buffer to allocate, in bytes
+        //   return bool true if successful, false if buffer cannot be allocated
+
+          if (buffersize <= 0)
+            return false;
+          if (mBuffer != NULL)
+            freeBuffer();
+
+          SYSTEM_INFO si;
+          ::GetSystemInfo(&si);
+
+          // Calculate nearest page size
+          buffersize = ((buffersize + si.dwPageSize - 1) / si.dwPageSize) * si.dwPageSize;
+
+          mBuffer = (BYTE*)::VirtualAlloc (NULL, buffersize, MEM_COMMIT, PAGE_READWRITE);
+          if (mBuffer == NULL)
+            return false;
+
+          buflen = buffersize;
+          return true;
+          }
+        //}}}
+        //{{{
+        void clear() {
+        // Clears the buffer of any allocations or reservations. Note; it
+        // does not wipe the buffer memory; it merely resets all pointers,
+        // returning the buffer to a completely empty state ready for new
+        // allocations.
+
+          ixa = sza = ixb = szb = ixResrv = szResrv = 0;
+          }
+        //}}}
+        //{{{
+        void freeBuffer() {
+        // Frees a previously allocated buffer, resetting all internal pointers to 0.
+
+          if (mBuffer == NULL)
+            return;
+
+          ixa = sza = ixb = szb = buflen = 0;
+
+          ::VirtualFree(mBuffer, buflen, MEM_DECOMMIT);
+
+          mBuffer = NULL;
+          }
+        //}}}
+
+        //{{{
+        uint8_t* reserve (int size, OUT int& reserved) {
+        // Reserves space in the buffer for a memory write operation
+        //   int size                 amount of space to reserve
+        //   OUT int& reserved        size of space actually reserved
+        // Returns:
+        //   BYTE*                    pointer to the reserved block
+        //   Will return NULL for the pointer if no space can be allocated.
+        //   Can return any value from 1 to size in reserved.
+        //   Will return NULL if a previous reservation has not been committed.
+
+          // We always allocate on B if B exists; this means we have two blocks and our buffer is filling.
+          if (szb) {
+            int freespace = getBFreeSpace();
+            if (size < freespace)
+              freespace = size;
+            if (freespace == 0)
+              return NULL;
+
+            szResrv = freespace;
+            reserved = freespace;
+            ixResrv = ixb + szb;
+            return mBuffer + ixResrv;
+            }
+          else {
+            // Block b does not exist, so we can check if the space AFTER a is bigger than the space
+            // before A, and allocate the bigger one.
+            int freespace = getSpaceAfterA();
+            if (freespace >= ixa) {
+              if (freespace == 0)
+                return NULL;
+              if (size < freespace)
+                freespace = size;
+
+              szResrv = freespace;
+              reserved = freespace;
+              ixResrv = ixa + sza;
+              return mBuffer + ixResrv;
+              }
+            else {
+              if (ixa == 0)
+                return NULL;
+              if (ixa < size)
+                size = ixa;
+              szResrv = size;
+              reserved = size;
+              ixResrv = 0;
+              return mBuffer;
+              }
+            }
+          }
+        //}}}
+        //{{{
+        void commit (int size) {
+        // Commits space that has been written to in the buffer
+        // Parameters:
+        //   int size                number of bytes to commit
+        //   Committing a size > than the reserved size will cause an assert in a debug build;
+        //   in a release build, the actual reserved size will be used.
+        //   Committing a size < than the reserved size will commit that amount of data, and release
+        //   the rest of the space.
+        //   Committing a size of 0 will release the reservation.
+
+          if (size == 0) {
+            // decommit any reservation
+            szResrv = ixResrv = 0;
+            return;
+            }
+
+          // If we try to commit more space than we asked for, clip to the size we asked for.
+
+          if (size > szResrv)
+            size = szResrv;
+
+          // If we have no blocks being used currently, we create one in A.
+          if (sza == 0 && szb == 0) {
+            ixa = ixResrv;
+            sza = size;
+
+            ixResrv = 0;
+            szResrv = 0;
+            return;
+            }
+
+          if (ixResrv == sza + ixa)
+            sza += size;
+          else
+            szb += size;
+
+          ixResrv = 0;
+          szResrv = 0;
+          }
+        //}}}
+
+        //{{{
+        uint8_t* getContiguousBlock (OUT int& size) {
+        // Gets a pointer to the first contiguous block in the buffer, and returns the size of that block.
+        //   OUT int & size            returns the size of the first contiguous block
+        // Returns:
+        //   BYTE*                    pointer to the first contiguous block, or NULL if empty.
+
+          if (sza == 0) {
+            size = 0;
+            return NULL;
+            }
+
+          size = sza;
+          return mBuffer + ixa;
+          }
+        //}}}
+        //{{{
+        void decommitBlock (int size) {
+        // Decommits space from the first contiguous block,  size amount of memory to decommit
+
+          if (size >= sza) {
+            ixa = ixb;
+            sza = szb;
+            ixb = 0;
+            szb = 0;
+            }
+          else {
+            sza -= size;
+            ixa += size;
+            }
+          }
+        //}}}
+        //{{{
+        int getCommittedSize() const {
+        // Queries how much data (in total) has been committed in the buffer
+        // Returns:
+        //   int                    total amount of committed data in the buffer
+
+          return sza + szb;
+          }
+        //}}}
+
+    private:
+      //{{{
+      int getSpaceAfterA() const {
+        return buflen - ixa - sza;
+        }
+      //}}}
+      //{{{
+      int getBFreeSpace() const {
+        return ixa - ixb - szb;
+        }
+      //}}}
+
+      uint8_t* mBuffer;
+      int buflen;
+
+      int ixa;
+      int sza;
+
+      int ixb;
+      int szb;
+
+      int ixResrv;
+      int szResrv;
+      };
+    //}}}
+
+    // ISampleGrabberCB methods
+    STDMETHODIMP_(ULONG) AddRef() { return ++ul_cbrc; }
+    STDMETHODIMP_(ULONG) Release() { return --ul_cbrc; }
+    STDMETHODIMP QueryInterface (REFIID riid, void** p_p_object) { return E_NOTIMPL; }
+
+    //{{{
+    STDMETHODIMP BufferCB (double sampleTime, BYTE* samples, long sampleLen) {
+      cLog::log (LOGERROR, "cSampleGrabberCB::BufferCB called");
+      return S_OK;
+      }
+    //}}}
+    //{{{
+    STDMETHODIMP SampleCB (double sampleTime, IMediaSample* mediaSample) {
+
+      if (mediaSample->IsDiscontinuity() == S_OK)
+        cLog::log (LOGERROR, "cSampleGrabCB::SampleCB sample isDiscontinuity");
+
+      int actualDataLength = mediaSample->GetActualDataLength();
+      if (actualDataLength != 240*188)
+       cLog::log (LOGERROR, "cSampleGrabCB::SampleCB - unexpected sampleLength");
+
+      int bytesAllocated = 0;
+      uint8_t* ptr = mBipBuffer.reserve (actualDataLength, bytesAllocated);
+
+      if (!ptr || (bytesAllocated != actualDataLength))
+        cLog::log (LOGERROR, "failed to reserve buffer");
+      else {
+        uint8_t* samples;
+        mediaSample->GetPointer (&samples);
+        memcpy (ptr, samples, actualDataLength);
+        mBipBuffer.commit (actualDataLength);
+        }
+
+      return S_OK;
+      }
+    //}}}
+
+    // vars
+    ULONG ul_cbrc = 0;
+    cBipBuffer mBipBuffer;
+    };
+  //}}}
+
+  //{{{
+  bool connectPins (Microsoft::WRL::ComPtr<IBaseFilter> fromFilter, 
+                    Microsoft::WRL::ComPtr<IBaseFilter> toFilter,
                     wchar_t* fromPinName = NULL, wchar_t* toPinName = NULL) {
   // if name == NULL use first correct direction unconnected pin
   // else use pin matching name
 
-    ComPtr<IEnumPins> fromPins;
+    Microsoft::WRL::ComPtr<IEnumPins> fromPins;
     fromFilter->EnumPins (&fromPins);
 
-    ComPtr<IPin> fromPin;
+    Microsoft::WRL::ComPtr<IPin> fromPin;
     while (fromPins->Next (1, &fromPin, NULL) == S_OK) {
-      ComPtr<IPin> connectedPin;
+      Microsoft::WRL::ComPtr<IPin> connectedPin;
       fromPin->ConnectedTo (&connectedPin);
       if (!connectedPin) {
         // match fromPin info
@@ -459,12 +483,12 @@ private:
         if ((fromPinInfo.dir == PINDIR_OUTPUT) &&
             (!fromPinName || !wcscmp (fromPinInfo.achName, fromPinName))) {
           // found fromPin, look for toPin
-          ComPtr<IEnumPins> toPins;
+          Microsoft::WRL::ComPtr<IEnumPins> toPins;
           toFilter->EnumPins (&toPins);
 
-          ComPtr<IPin> toPin;
+          Microsoft::WRL::ComPtr<IPin> toPin;
           while (toPins->Next (1, &toPin, NULL) == S_OK) {
-            ComPtr<IPin> connectedPin;
+            Microsoft::WRL::ComPtr<IPin> connectedPin;
             toPin->ConnectedTo (&connectedPin);
             if (!connectedPin) {
               // match toPin info
@@ -496,16 +520,18 @@ private:
     }
   //}}}
   //{{{
-  void findFilter (ComPtr<IBaseFilter>& filter, const CLSID& clsid, wchar_t* name, ComPtr<IBaseFilter> fromFilter) {
+  void findFilter (Microsoft::WRL::ComPtr<IBaseFilter>& filter, 
+                   const CLSID& clsid, wchar_t* name,
+                   Microsoft::WRL::ComPtr<IBaseFilter> fromFilter) {
   // Find instance of filter of type CLSID by name, add to graphBuilder, connect fromFilter
 
     cLog::log (LOGINFO, "findFilter " + wstrToStr (name));
 
-    ComPtr<ICreateDevEnum> systemDevEnum;
+    Microsoft::WRL::ComPtr<ICreateDevEnum> systemDevEnum;
     CoCreateInstance (CLSID_SystemDeviceEnum, nullptr,
                       CLSCTX_INPROC_SERVER, IID_PPV_ARGS (&systemDevEnum));
 
-    ComPtr<IEnumMoniker> classEnumerator;
+    Microsoft::WRL::ComPtr<IEnumMoniker> classEnumerator;
     systemDevEnum->CreateClassEnumerator (clsid, &classEnumerator, 0);
 
     if (classEnumerator) {
@@ -544,7 +570,9 @@ private:
     }
   //}}}
   //{{{
-  void createFilter (ComPtr<IBaseFilter>& filter, const CLSID& clsid, wchar_t* title, ComPtr<IBaseFilter> fromFilter) {
+  void createFilter (Microsoft::WRL::ComPtr<IBaseFilter>& filter, 
+                     const CLSID& clsid, wchar_t* title, 
+                     Microsoft::WRL::ComPtr<IBaseFilter> fromFilter) {
   // createFilter type clsid, add to graphBuilder, connect fromFilter
 
     cLog::log (LOGINFO, "createFilter " + wstrToStr (title));
@@ -559,87 +587,147 @@ private:
 
     auto hr = CoCreateInstance (CLSID_FilterGraph, nullptr,
                                 CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mGraphBuilder.GetAddressOf()));
-    //{{{  report any error
+    //{{{  error 
     if (hr != S_OK)
-      cLog::log (LOGERROR, "CoCreateInstance graph failed " + dec(hr));
+      cLog::log (LOGERROR, "createGraphDvbT - CoCreateInstance graph failed " + dec(hr));
     //}}}
 
     hr = CoCreateInstance (CLSID_DVBTNetworkProvider, nullptr,
                            CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mDvbNetworkProvider.GetAddressOf()));
-    //{{{  report any error
+    //{{{  error 
     if (hr != S_OK)
-      cLog::log (LOGERROR, "CoCreateInstance dvbNetworkProvider failed " + dec(hr));
+      cLog::log (LOGERROR, "createGraphDvbT - CoCreateInstance dvbNetworkProvider failed " + dec(hr));
     //}}}
+
     hr = mGraphBuilder->AddFilter (mDvbNetworkProvider.Get(), L"dvbtNetworkProvider");
+    //{{{   error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - AddFilter failed " + dec(hr));
+    //}}}
     mDvbNetworkProvider.As (&mScanningTuner);
 
+    //{{{  setup dvbTuningSpace2 interface
     hr = mScanningTuner->get_TuningSpace (mTuningSpace.GetAddressOf());
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - get_TuningSpace failed " + dec(hr));
+    //}}}
 
-    // setup dvbTuningSpace2 interface
     mTuningSpace.As (&mDvbTuningSpace2);
     hr = mDvbTuningSpace2->put__NetworkType (CLSID_DVBTNetworkProvider);
+    //{{{   error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put__NetworkType failed " + dec(hr));
+    //}}}
     hr = mDvbTuningSpace2->put_SystemType (DVB_Terrestrial);
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_SystemType failed " + dec(hr));
+    //}}}
     hr = mDvbTuningSpace2->put_NetworkID (9018);
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_NetworkID failed " + dec(hr));
+    //}}}
     hr = mDvbTuningSpace2->put_FrequencyMapping (L"");
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_FrequencyMapping failed " + dec(hr));
+    //}}}
     hr = mDvbTuningSpace2->put_UniqueName (L"DTV DVB-T");
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_UniqueName failed " + dec(hr));
+    //}}}
     hr = mDvbTuningSpace2->put_FriendlyName (L"DTV DVB-T");
-
-    // create dvbtLocator and setup in dvbTuningSpace2 interface
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_FriendlyName failed " + dec(hr));
+    //}}}
+    //}}}
+    //{{{  create dvbtLocator and setup in dvbTuningSpace2 interface
     hr = CoCreateInstance (CLSID_DVBTLocator, nullptr,
                            CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mDvbLocator.GetAddressOf()));
-    //{{{  report any error
+    //{{{  error
     if (hr != S_OK)
-      cLog::log (LOGERROR, "CoCreateInstance dvbLocator failed " + dec(hr));
+      cLog::log (LOGERROR, "createGraphDvbT - CoCreateInstance dvbLocator failed " + dec(hr));
     //}}}
     hr = mDvbLocator->put_CarrierFrequency (frequency);
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_CarrierFrequency failed " + dec(hr));
+    //}}}
     hr = mDvbLocator->put_Bandwidth (8);
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_Bandwidth failed " + dec(hr));
+    //}}}
     hr = mDvbTuningSpace2->put_DefaultLocator (mDvbLocator.Get());
-
-    // tuneRequest from scanningTuner
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_DefaultLocator failed " + dec(hr));
+    //}}}
+    //}}}
+    //{{{  tuneRequest from scanningTuner
     if (mScanningTuner->get_TuneRequest (mTuneRequest.GetAddressOf()) != S_OK)
       mTuningSpace->CreateTuneRequest (mTuneRequest.GetAddressOf());
     hr = mTuneRequest->put_Locator (mDvbLocator.Get());
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_Locator failed " + dec(hr));
+    //}}}
     hr = mScanningTuner->Validate (mTuneRequest.Get());
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - Validate failed " + dec(hr));
+    //}}}
     hr = mScanningTuner->put_TuneRequest (mTuneRequest.Get());
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "createGraphDvbT - put_TuneRequest failed " + dec(hr));
+    //}}}
+    //}}}
 
     // dvbtNetworkProvider -> dvbtTuner -> dvbtCapture -> sampleGrabberFilter -> mpeg2Demux -> bdaTif
     findFilter (mDvbTuner, KSCATEGORY_BDA_NETWORK_TUNER, L"DVBTtuner", mDvbNetworkProvider);
     if (!mDvbTuner) {
-      cLog::log (LOGERROR, " createGraph - unable to find dvbtuner filter");
+      //{{{  error
+      cLog::log (LOGERROR, "createGraphDvbT - unable to find dvbtuner filter");
       return;
       }
+      //}}}
 
     findFilter (mDvbCapture, KSCATEGORY_BDA_RECEIVER_COMPONENT, L"DVBTcapture", mDvbTuner);
     }
   //}}}
 
   //{{{  vars
-  ComPtr<IGraphBuilder> mGraphBuilder;
+  Microsoft::WRL::ComPtr<IGraphBuilder> mGraphBuilder;
 
-  ComPtr<IBaseFilter> mDvbNetworkProvider;
-  ComPtr<IBaseFilter> mDvbTuner;
-  ComPtr<IBaseFilter> mDvbCapture;
+  Microsoft::WRL::ComPtr<IBaseFilter> mDvbNetworkProvider;
+  Microsoft::WRL::ComPtr<IBaseFilter> mDvbTuner;
+  Microsoft::WRL::ComPtr<IBaseFilter> mDvbCapture;
 
-  ComPtr<IDVBTLocator> mDvbLocator;
-  ComPtr<IScanningTuner> mScanningTuner;
-  ComPtr<ITuningSpace> mTuningSpace;
-  ComPtr<IDVBTuningSpace2> mDvbTuningSpace2;
-  ComPtr<ITuneRequest> mTuneRequest;
+  Microsoft::WRL::ComPtr<IDVBTLocator> mDvbLocator;
+  Microsoft::WRL::ComPtr<IScanningTuner> mScanningTuner;
+  Microsoft::WRL::ComPtr<ITuningSpace> mTuningSpace;
+  Microsoft::WRL::ComPtr<IDVBTuningSpace2> mDvbTuningSpace2;
+  Microsoft::WRL::ComPtr<ITuneRequest> mTuneRequest;
 
-  ComPtr<IBaseFilter> mMpeg2Demux;
-  ComPtr<IBaseFilter> mBdaTif;
+  Microsoft::WRL::ComPtr<IBaseFilter> mMpeg2Demux;
+  Microsoft::WRL::ComPtr<IBaseFilter> mBdaTif;
 
-  ComPtr<IBaseFilter> mGrabberFilter;
-  ComPtr<ISampleGrabber> mGrabber;
+  Microsoft::WRL::ComPtr<IBaseFilter> mGrabberFilter;
+  Microsoft::WRL::ComPtr<ISampleGrabber> mGrabber;
   cGrabberCB mGrabberCB;
 
-  ComPtr<IBaseFilter> mInfTeeFilter;
+  Microsoft::WRL::ComPtr<IBaseFilter> mInfTeeFilter;
 
-  ComPtr<IBaseFilter> mDumpFilter;
-  ComPtr<IFileSinkFilter> mFileSinkFilter;
+  Microsoft::WRL::ComPtr<IBaseFilter> mDumpFilter;
+  Microsoft::WRL::ComPtr<IFileSinkFilter> mFileSinkFilter;
 
-  ComPtr<IMediaControl> mMediaControl;
+  Microsoft::WRL::ComPtr<IMediaControl> mMediaControl;
 
-  int mSignalStrength = 0;
+  int mSignal = 0;
   //}}}
   };

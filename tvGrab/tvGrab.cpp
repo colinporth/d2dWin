@@ -56,7 +56,7 @@ void bdaSignalThread (cBda* bda, cTransportStream* ts) {
   cLog::setThreadName ("sign");
 
   while (true)
-    cLog::log (LOGINFO, dec(bda->getSignalStrength()) +
+    cLog::log (LOGINFO, dec(bda->getSignal()) +
                         (ts ? (" " + dec(ts->getDiscontinuity()) +
                                " " + dec(ts->getPackets())) : ""));
 
