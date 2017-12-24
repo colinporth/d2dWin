@@ -62,7 +62,9 @@ public:
     add (new cTuneBox (this, 40.f, kTextHeight, "bbc", 674));
     add (new cTuneBox (this, 40.f, kTextHeight, "itv", 650), 42.f,0.f);
     add (new cTuneBox (this, 40.f, kTextHeight, "hd", 706), 84.f,0.f);
-    add (new cIntBox (this, 120.f, kTextHeight, "signal ", mSignal), 126.f,0.f);
+    add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), 126.f,0.f);
+    add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mTs->mPackets), 248.f,0.f);
+    add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mTs->mDiscontinuity), 370.f,0.f);
 
     add (new cTransportStreamBox (this, 0,-kTextHeight, mTs), 0.f, kTextHeight);
     add (new cLogBox (this, 200.f,0, true), 0,200.f);
@@ -195,9 +197,9 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     wstring wstr (args[1]);
     param = string (wstr.begin(), wstr.end());
     }
-  string rootName = "c:/tv";
 
   cAppWindow appWindow;
+  string rootName = "c:/tv";
   appWindow.run ("tvGrabWindow", 1050, 900, param, rootName);
   CoUninitialize();
   }
