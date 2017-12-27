@@ -8,6 +8,7 @@
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/date.h"
 #include "../../shared/utils/cLog.h"
+#include "../../shared/utils/iChange.h"
 
 #include "cPointRect.h"
 #include "cView2d.h"
@@ -16,7 +17,7 @@ using namespace std;
 //}}}
 const float kTextHeight = 20.f;
 
-class cD2dWindow {
+class cD2dWindow : public iChange {
 public:
   static cD2dWindow* mD2dWindow;
   //{{{  static utils
@@ -337,6 +338,9 @@ public:
   cBox* add (cBox* box);
   cBox* addBelow (cBox* box);
 
+  // iChanged
+  void changed() { mCountDown = 0; }
+
   //{{{  gets
   ID3D11Device* getD3d11Device() { return mD3device.Get(); }
   ID2D1Factory1* getD2d1Factory() { return mD2D1Factory.Get(); }
@@ -378,7 +382,6 @@ public:
   bool getExit() { return mExit; }
   void setExit() { mExit = true; }
 
-  void changed() { mCountDown = 0; }
   void setChangeCountDown (int countDown) { mChangeCountDown = countDown; }
 
   void cursorChanged() { mCursorDown = mCursorCountDown; }

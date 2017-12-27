@@ -33,7 +33,7 @@ const int kScrubFrames = 3;
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
-  cAppWindow() : mLoadSem("load") {}
+  cAppWindow() {}
   //{{{
   void run (const string& title, int width, int height) {
 
@@ -58,10 +58,25 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     // launch loaderThread
-    thread ([=]() { hlsLoaderThread(); } ).detach();
+    thread ([=]() { 
+      //{{{  loader
+      CoInitializeEx (NULL, COINIT_MULTITHREADED);
+      cWinSockHttp http;
+      mHls->loader (http);
+      CoUninitialize();
+      }
+      //}}}
+      ).detach();
 
     // launch playerThread, high priority
-    auto playerThread = thread ([=]() { hlsPlayerThread(); });
+    auto playerThread = thread ([=]() { 
+      //{{{  player
+      CoInitializeEx (NULL, COINIT_MULTITHREADED);
+      mHls->player (this, this);
+      CoUninitialize();
+      }
+      //}}}
+      );
     SetThreadPriority (playerThread.native_handle(), THREAD_PRIORITY_HIGHEST);
     playerThread.detach();
 
@@ -84,7 +99,7 @@ protected:
         //{{{  page up
         if (mHls) {
           mHls->incPlaySeconds (-60);
-          mLoadSem.notify();
+          mHls->mLoadSem.notify();
           changed();
           }
         break;
@@ -93,7 +108,7 @@ protected:
         //{{{  page down
         if (mHls) {
           mHls->incPlaySeconds (60);
-          mLoadSem.notify();
+          mHls->mLoadSem.notify();
           changed();
           }
         break;
@@ -102,7 +117,7 @@ protected:
        //{{{  left arrow
        if (mHls) {
          mHls->incPlaySeconds (-1);
-         mLoadSem.notify();
+         mHls->mLoadSem.notify();
          changed();
          }
        break;
@@ -111,7 +126,7 @@ protected:
         //{{{  right arrow
         if (mHls) {
           mHls->incPlaySeconds (1);
-          mLoadSem.notify();
+          mHls->mLoadSem.notify();
           changed();
           }
         break;
@@ -484,94 +499,8 @@ private:
     };
   //}}}
 
-  //{{{
-  void hlsLoaderThread() {
-  // make sure chuinks around playframe loaded, only thread using http
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("load");
-
-    cWinSockHttp http;
-    http.initialise();
-
-    mHls->mChanChanged = true;
-    while (true) {
-      if (mHls->mChanChanged)
-        mHls->setChan (http, mHls->mChan);
-      if (!mHls->loadAtPlayFrame (http))
-        Sleep (1000);
-
-      // wait for change to run again
-      mLoadSem.wait();
-      }
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-  //{{{
-  void hlsPlayerThread() {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("play");
-
-    audOpen (2, 48000);
-
-    uint16_t scrubCount = 0;
-    double scrubSample = 0;
-
-    uint32_t seqNum = 0;
-    uint32_t lastSeqNum = 0;
-
-    while (true) {
-      switch (mHls->getPlaying()) {
-        case cHls::ePause:
-          audPlay (2, nullptr, 1024, 1.f);
-          break;
-
-        case cHls::eScrub: {
-          if (scrubCount == 0)
-            scrubSample = mHls->getPlaySample();
-          if (scrubCount < 3) {
-            uint32_t numSamples = 0;
-            auto sample = mHls->getPlaySamples (scrubSample + scrubCount*kSamplesPerFrame, seqNum, numSamples);
-            audPlay (2, sample, 1024, 1.f);
-            }
-          else
-            audPlay (2, nullptr, 1024, 1.f);
-          if (scrubCount++ > 3)
-            scrubCount = 0;
-          }
-          break;
-
-        case cHls::ePlay: {
-          uint32_t numSamples = 0;
-          auto sample = mHls->getPlaySamples (mHls->getPlaySample(), seqNum, numSamples);
-          audPlay (2, sample, 1024, 1.f);
-          if (sample)
-            mHls->incPlayFrame();
-          changed();
-          }
-          break;
-        }
-
-      if (mHls->mChanChanged || !seqNum || (seqNum != lastSeqNum)) {
-        lastSeqNum = seqNum;
-        mLoadSem.notify();
-        }
-      }
-
-    // cleanup
-    audClose();
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-
   // vars
   cHls* mHls = nullptr;
-  cSemaphore mLoadSem;
   };
 
 //{{{
