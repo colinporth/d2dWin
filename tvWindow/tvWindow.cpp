@@ -14,10 +14,10 @@
 #include "../common/cTransportStreamBox.h"
 #include "../common/cToggleBox.h"
 #include "../common/cIntBox.h"
-#include "../common/cValueBox.h"
+#include "../common/box/cValueBox.h"
 #include "../common/cLogBox.h"
 #include "../common/cWindowBox.h"
-#include "../common/cAudFrameBox.h"
+#include "../common/box/cAudFrameBox.h"
 
 extern "C" {
   #include <libavcodec/avcodec.h>

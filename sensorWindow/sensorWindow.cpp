@@ -3,8 +3,8 @@
 #include "stdafx.h"
 
 #include "../common/cFloatBox.h"
-#include "../common/cValueBox.h"
-#include "../common/cIndexBox.h"
+#include "../common/box/cValueBox.h"
+#include "../common/box/cIndexBox.h"
 #include "../common/cLogBox.h"
 #include "../common/cWindowBox.h"
 #include "../common/cClockBox.h"

@@ -11,7 +11,7 @@
 #include "../common/cClockBox.h"
 
 #include "../common/cJpegImageView.h"
-#include "../common/cListBox.h"
+#include "../common/box/cListBox.h"
 #include "../common/cLogBox.h"
 
 #include "../common/cVolumeBox.h"

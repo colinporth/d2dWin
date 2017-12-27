@@ -18,7 +18,7 @@
 #include "../common/cLogBox.h"
 #include "../common/cJpegImageView.h"
 
-#include "../common/cValueBox.h"
+#include "../common/box/cValueBox.h"
 #include "../common/cFloatBox.h"
 #include "../common/cWindowBox.h"
 

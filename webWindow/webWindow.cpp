@@ -14,11 +14,11 @@
 #include "../inc/jpeglib/jpeglib.h"
 #pragma comment(lib,"turbojpeg-static.lib")
 
-#include "../common/cBitmapBox.h"
+#include "../common/box/cBitmapBox.h"
 #include "../common/cLogBox.h"
 #include "../common/cClockBox.h"
 #include "../common/cCalendarBox.h"
-#include "../common/cIndexBox.h"
+#include "../common/box/cIndexBox.h"
 #include "../common/cFloatBox.h"
 #include "../common/cWindowBox.h"
 

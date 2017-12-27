@@ -80,5 +80,11 @@
     <ClInclude Include="..\common\cLogBox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\box\cHlsDotsBox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\box\cHlsPeakBox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
