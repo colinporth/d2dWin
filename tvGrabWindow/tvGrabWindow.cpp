@@ -7,10 +7,10 @@
 #include "../../shared/decoders/cTransportStream.h"
 #include "../../shared/decoders/cDumpTransportStream.h"
 
-#include "../common/cTransportStreamBox.h"
-#include "../common/cIntBox.h"
-#include "../common/cLogBox.h"
-#include "../common/cWindowBox.h"
+#include "../common/box/cTransportStreamBox.h"
+#include "../common/box/cIntBox.h"
+#include "../common/box/cLogBox.h"
+#include "../common/box/cWindowBox.h"
 //}}}
 
 class cAppWindow : public cD2dWindow {

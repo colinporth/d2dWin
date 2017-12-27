@@ -11,12 +11,12 @@
 #include "../common/cVidFrame.h"
 #include "../common/cAudFrame.h"
 
-#include "../common/cTransportStreamBox.h"
-#include "../common/cToggleBox.h"
-#include "../common/cIntBox.h"
+#include "../common/box/cTransportStreamBox.h"
+#include "../common/box/cToggleBox.h"
+#include "../common/box/cIntBox.h"
 #include "../common/box/cValueBox.h"
-#include "../common/cLogBox.h"
-#include "../common/cWindowBox.h"
+#include "../common/box/cLogBox.h"
+#include "../common/box/cWindowBox.h"
 #include "../common/box/cAudFrameBox.h"
 
 extern "C" {

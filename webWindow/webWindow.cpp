@@ -15,12 +15,12 @@
 #pragma comment(lib,"turbojpeg-static.lib")
 
 #include "../common/box/cBitmapBox.h"
-#include "../common/cLogBox.h"
-#include "../common/cClockBox.h"
-#include "../common/cCalendarBox.h"
+#include "../common/box/cLogBox.h"
+#include "../common/box/cClockBox.h"
+#include "../common/box/cCalendarBox.h"
 #include "../common/box/cIndexBox.h"
-#include "../common/cFloatBox.h"
-#include "../common/cWindowBox.h"
+#include "../common/box/cFloatBox.h"
+#include "../common/box/cWindowBox.h"
 
 #include "apikey.h"
 

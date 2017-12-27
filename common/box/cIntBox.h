@@ -1,11 +1,8 @@
 // cIntBox.h
-//{{{  includes
 #pragma once
-
-#include "cD2dWindow.h"
-#include "../../shared/utils/utils.h"
-#include "../../shared/utils/cLog.h"
-//}}}
+#include "../cD2dWindow.h"
+#include "../../../shared/utils/utils.h"
+#include "../../../shared/utils/cLog.h"
 
 class cIntBox : public cD2dWindow::cBox {
 public:

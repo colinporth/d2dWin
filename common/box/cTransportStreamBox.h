@@ -1,9 +1,7 @@
 // cTransportStreamPidBox.h
 #pragma once
-//{{{  includes
-#include "cD2dWindow.h"
-#include "../../shared/decoders/cTransportStream.h"
-//}}}
+#include "../cD2dWindow.h"
+#include "../../../shared/decoders/cTransportStream.h"
 
 class cTransportStreamBox : public cD2dWindow::cBox {
 public:

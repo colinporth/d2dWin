@@ -1,10 +1,9 @@
 // cAudBox.h
 #pragma once
-//{{{  includes
 #include "../cD2dWindow.h"
 #include "../cAudFrame.h"
 #include "../../../shared/utils/iAudio.h"
-//}}}
+
 const float kBarsScale = 3.0f;  // need to work out power scaling derivation
 
 class cAudFrameBox : public cD2dWindow::cBox {
