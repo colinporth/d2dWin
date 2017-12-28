@@ -169,11 +169,12 @@ protected:
   //}}}
   };
 
-//{{{
+
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO1, true);
+  cLog::log (LOGNOTICE, "d2dHlsPlayer");
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
@@ -196,5 +197,5 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   appWindow.run ("hlsWindow", 600, 340, chan);
 
   CoUninitialize();
+  return 0;
   }
-//}}}
