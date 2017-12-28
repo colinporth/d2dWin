@@ -31,7 +31,7 @@ public:
       bool loaded;
       bool loading;
       int offset;
-      mHls->getChunkLoad (chunk, loaded, loading, offset);
+      mHls->getChunkInfo (chunk, loaded, loading, offset);
       auto brush = loading ? mWindow->getOrangeBrush() :
                      loaded ? mWindow->getGreenBrush() : mWindow->getRedBrush();
 
