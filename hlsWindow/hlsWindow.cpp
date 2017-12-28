@@ -173,6 +173,10 @@ protected:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
+  WSADATA wsaData;
+  if (WSAStartup (MAKEWORD(2,2), &wsaData))
+    exit (0);
+
   cLog::init (LOGINFO1, true);
   cLog::log (LOGNOTICE, "d2dHlsPlayer");
 
@@ -184,14 +188,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     auto fileName = string (wstr.begin(), wstr.end());
     }
   int chan = 4;
-
-  WSADATA wsaData;
-  if (WSAStartup (MAKEWORD(2,2), &wsaData)) {
-    //{{{  error exit
-    cLog::log (LOGERROR, "WSAStartup failed");
-    exit (0);
-    }
-    //}}}
 
   cAppWindow appWindow;
   appWindow.run ("hlsWindow", 600, 340, chan);
