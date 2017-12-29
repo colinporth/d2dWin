@@ -1229,8 +1229,9 @@ private:
     mStreamPos = 0;
     _lseeki64 (file, mStreamPos, SEEK_SET);
 
+    int sameCount = 0;
     int firstVidSignalCount = 0;
-    while (true) {
+    while (sameCount < 10) {
       int64_t bytesToRead = mStreamSize - mStreamPos;
       if (bytesToRead > kChunkSize) // trim to kChunkSize
         bytesToRead = kChunkSize;
@@ -1257,23 +1258,25 @@ private:
           }
         }
       else {
-        //{{{  check if fileSize changed, 25 goes 1s second apart before we give up
+        //{{{  check fileSize changed
         while (true) {
-          _close (file);
-
           Sleep (1000);
-
-          file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
           _fstat64 (file, &buf);
           if (buf.st_size > mStreamSize) {
-            cLog::log (LOGINFO, "file size increased - size:" + dec (mStreamSize) +
-                                " newSize:" + dec (buf.st_size));
+            cLog::log (LOGINFO, "fileSize now " + dec(mStreamSize));
             mStreamSize = buf.st_size;
-            _lseeki64 (file, mStreamPos, SEEK_SET);
+            sameCount = 0;
             break;
             }
-          else
-            cLog::log (LOGINFO, "file size same");
+          else {
+            sameCount++;
+            if (sameCount >= 10) {
+              cLog::log (LOGINFO, "fileSize sameCount expired " + dec(sameCount));
+              break;
+              }
+            else
+              cLog::log (LOGINFO, "fileSize same " + dec(sameCount));
+            }
           }
         }
         //}}}
