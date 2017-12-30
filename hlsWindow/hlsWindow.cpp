@@ -28,17 +28,15 @@
 #include "../common/box/cCalendarBox.h"
 #include "../common/box/cHlsPeakBox.h"
 #include "../common/box/cHlsDotsBox.h"
-
-//using namespace chrono;
 //}}}
 
 class cAppWindow : public cHls, public cD2dWindow, public cWinAudio {
 public:
-  cAppWindow() : cHls(4, kDefaultBitrate, getDaylightSeconds()) {}
+  cAppWindow (int chan, int bitrate) : cHls(chan, bitrate, getDaylightSeconds()) {}
   //{{{
-  void run (const string& title, int width, int height, int chan) {
+  void run (const string& title, int width, int height) {
 
-    cLog::log (LOGINFO, "hlsWindow " + dec(chan) + " " + dec(kDefaultBitrate));
+    cLog::log (LOGINFO, "hlsWindow");
 
     initialise (title, width, height, false);
     add (new cCalendarBox (this, 190.f,160.f, mTimePoint), -190.f - 24.f,0);
@@ -189,8 +187,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     }
   int chan = 4;
 
-  cAppWindow appWindow;
-  appWindow.run ("hlsWindow", 600, 340, chan);
+  cAppWindow appWindow (chan, kDefaultBitrate);
+  appWindow.run ("hlsWindow", 600, 340);
 
   CoUninitialize();
   return 0;
