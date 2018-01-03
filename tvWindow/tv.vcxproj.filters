@@ -41,9 +41,6 @@
     <ClInclude Include="..\common\cTransportStreamBox.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\huffman.h">
-      <Filter>header</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="header">

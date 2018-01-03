@@ -35,9 +35,6 @@
     <ClInclude Include="..\common\cLogBox.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\huffman.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\decoders\cDumpTransportStream.h">
       <Filter>header</Filter>
     </ClInclude>
