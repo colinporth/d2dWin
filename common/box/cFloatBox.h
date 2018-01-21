@@ -22,7 +22,7 @@ public:
 
   void onDraw (ID2D1DeviceContext* dc) {
 
-    string str = mTitle + decFrac (mValue, mDigits, mPrecision, '0');
+    string str = mTitle + frac(mValue, mDigits, mPrecision, '0');
 
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (

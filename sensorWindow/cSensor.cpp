@@ -527,7 +527,7 @@ void cSensor::updateTitle() {
   mTitle = mSensorTitle +
            " " + dec(getSize().x) + "x" + dec(getSize().y) +
            " " + dec(mFrameLen) +
-           " "   + decFrac(1.f/getFrameTime(),0,3,' ') + " + " + decFrac(getRgbTime()*1000.f,0,2, ' ');
+           " "   + frac(1.f/getFrameTime(),0,3,' ') + " + " + frac(getRgbTime()*1000.f,0,2, ' ');
   }
 //}}}
 
