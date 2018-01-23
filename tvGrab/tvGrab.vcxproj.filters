@@ -10,12 +10,6 @@
     <ClInclude Include="..\common\cBda.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\cTransportStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\cDumpTransportStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\utils\cLog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -23,6 +17,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\utils\date.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

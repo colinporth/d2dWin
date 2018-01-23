@@ -5,9 +5,6 @@
     <ClCompile Include="stdafx.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\shared\decoders\cTransportStream.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\cBda.h">
       <Filter>header</Filter>
     </ClInclude>
@@ -35,7 +32,10 @@
     <ClInclude Include="..\common\cLogBox.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\cDumpTransportStream.h">
+    <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
       <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>

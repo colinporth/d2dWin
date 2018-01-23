@@ -154,8 +154,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\shared\decoders\cDumpTransportStream.h" />
-    <ClInclude Include="..\..\shared\decoders\cTransportStream.h" />
+    <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h" />
+    <ClInclude Include="..\..\shared\dvb\cTransportStream.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\date.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />

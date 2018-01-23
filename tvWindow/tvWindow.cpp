@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #include "../../shared/utils/cWinAudio.h"
-#include "../../shared/decoders/cTransportStream.h"
+#include "../../shared/dvb/cTransportStream.h"
 
 #include "../common/cBda.h"
 #include "../common/cVidFrame.h"

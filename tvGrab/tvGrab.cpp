@@ -15,8 +15,7 @@
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/cSemaphore.h"
 
-#include "../../shared/decoders/cTransportStream.h"
-#include "../../shared/decoders/cDumpTransportStream.h"
+#include "../../shared/dvb/cDumpTransportStream.h"
 
 #include "../common/cBda.h"
 

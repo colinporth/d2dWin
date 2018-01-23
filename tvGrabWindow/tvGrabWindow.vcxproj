@@ -37,8 +37,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\shared\decoders\cDumpTransportStream.h" />
-    <ClInclude Include="..\..\shared\decoders\cTransportStream.h" />
+    <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h" />
+    <ClInclude Include="..\..\shared\dvb\cTransportStream.h" />
     <ClInclude Include="..\..\shared\utils\cBipBuffer.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\timer.h" />

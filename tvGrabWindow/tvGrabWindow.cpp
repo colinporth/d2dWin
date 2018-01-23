@@ -4,8 +4,7 @@
 
 #include "../common/cBda.h"
 
-#include "../../shared/decoders/cTransportStream.h"
-#include "../../shared/decoders/cDumpTransportStream.h"
+#include "../../shared/dvb/cDumpTransportStream.h"
 
 #include "../common/box/cTransportStreamBox.h"
 #include "../common/box/cIntBox.h"
