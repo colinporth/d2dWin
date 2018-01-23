@@ -25,7 +25,13 @@ public:
 
   //{{{
   bool onDown (bool right, cPoint pos)  {
-    togglePin();
+
+    auto epgItemIt = mEpgItemMap.find (int(pos.y/ mLineHeight));
+    if (epgItemIt != mEpgItemMap.end()) 
+      epgItemIt->second->toggleRecord();
+    else
+      togglePin();
+
     return true;
     }
   //}}}
@@ -40,6 +46,7 @@ public:
     mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
     if (mTs->mServiceMap.size() > 1) {
       //{{{  draw services
+      mEpgItemMap.clear();
       auto now = mTs->getCurTime();
       struct tm nowTime = *localtime (&now);
 
@@ -54,20 +61,23 @@ public:
           str = "  - now - " + epgItem->getStartTimeString() +
                 " " + epgItem->getDurationString() +
                 " " + epgItem->getTitleString();
-          serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
+          auto brush = epgItem->getRecord() ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
+          serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
+          mEpgItemMap.insert (std::map<int,cEpgItem*>::value_type (int((r.top-mRect.top)/mLineHeight), epgItem));
           r.top = r.bottom;
           r.bottom += mLineHeight;
           }
 
-        auto epgItemMap = service.second.getEpgItemMap();
-        for (auto epgItemIt = epgItemMap.begin(); epgItemIt != epgItemMap.end(); ++epgItemIt) {
-          auto timet = epgItemIt->second.getStartTime();
+        for (auto &epgItem : service.second.getEpgItemMap()) {
+          auto timet = epgItem.second.getStartTime();
           struct tm time = *localtime (&timet);
           if ((time.tm_mday == nowTime.tm_mday) && (timet > now)) {
             std::string str = "  - epg - " + dec(time.tm_hour,2,' ') +
                               ":" + dec(time.tm_min,2,'0') +
-                              " "+ epgItemIt->second.getTitleString();
-            serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
+                              " "+ epgItem.second.getTitleString();
+            auto brush = epgItem.second.getRecord() ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
+            serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
+            mEpgItemMap.insert (std::map<int,cEpgItem*>::value_type (int((r.top-mRect.top)/mLineHeight), &epgItem.second));
             r.top = r.bottom;
             r.bottom += mLineHeight;
             }
@@ -132,4 +142,6 @@ private:
 
   int mContDigits = 0;
   int mPacketDigits = 1;
+
+  std::map<int,cEpgItem*> mEpgItemMap;
   };
