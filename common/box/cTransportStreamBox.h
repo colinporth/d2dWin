@@ -26,28 +26,9 @@ public:
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
-    auto epgItemIt = mEpgItemMap.find (int(pos.y/ mLineHeight));
-    if (epgItemIt != mEpgItemMap.end()) {
-      epgItemIt->second->toggleRecord();
-      return true;
-      }
-
-    auto serviceNameIt = mServiceNameMap.find (int(pos.y/ mLineHeight));
-    if (serviceNameIt != mServiceNameMap.end()) {
-      serviceNameIt->second->toggleShowEpg();
-      return true;
-      }
-
-    auto serviceIt = mServiceMap.find (int(pos.y/ mLineHeight));
-    if (serviceIt != mServiceMap.end()) {
-      serviceIt->second->getNow()->toggleRecord();
-      mTs->startProgram (serviceIt->second,
-                         serviceIt->second->getNow()->getTitleString(),
-                         serviceIt->second->getNow()->getStartTime(), 
-                         serviceIt->second->getNow()->getRecord());
-      return true;
-      }
-
+    auto actionIt = mActionMap.find (int(pos.y / mLineHeight));
+    if (actionIt != mActionMap.end())
+      actionIt->second->onDown();
     return true;
     }
   //}}}
@@ -62,9 +43,7 @@ public:
     mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
     if (mTs->mServiceMap.size() > 1) {
       //{{{  draw services
-      mServiceMap.clear();
-      mServiceNameMap.clear();
-      mEpgItemMap.clear();
+      mActionMap.clear();
 
       auto now = mTs->getCurTime();
       struct tm nowTime = *localtime (&now);
@@ -74,8 +53,8 @@ public:
         auto str = dec(i, mTs->mServiceMap.size() >= 10 ? 2:1) + " " + service.second.getNameString();
         auto brush = service.second.getShowEpg() ? mWindow->getBlueBrush() : mWindow->getWhiteBrush();
         serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
-        mServiceNameMap.insert (
-          std::map<int,cService*>::value_type (int((r.top-mRect.top)/mLineHeight), &service.second));
+        mActionMap.insert (std::map<int,cAction*>::value_type (int((r.top-mRect.top)/mLineHeight),
+                                                               new cServiceNameAction (&service.second)));
         r.top = r.bottom;
         r.bottom += mLineHeight;
 
@@ -86,8 +65,8 @@ public:
                 " " + epgItem->getTitleString();
           auto brush = epgItem->getRecord() ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
           serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
-          mServiceMap.insert (
-            std::map<int,cService*>::value_type (int((r.top-mRect.top)/mLineHeight), &service.second));
+          mActionMap.insert (std::map<int,cAction*>::value_type (int((r.top-mRect.top)/mLineHeight),
+                                                                 new cServiceNowAction (&service.second, mTs)));
           r.top = r.bottom;
           r.bottom += mLineHeight;
           }
@@ -102,8 +81,8 @@ public:
                                 " "+ epgItem.second.getTitleString();
               auto brush = epgItem.second.getRecord() ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
               serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
-              mEpgItemMap.insert (
-                std::map<int,cEpgItem*>::value_type (int((r.top-mRect.top)/mLineHeight), &epgItem.second));
+              mActionMap.insert (std::map<int,cAction*>::value_type (int((r.top-mRect.top)/mLineHeight),
+                                                                     new cEpgAction (&epgItem.second)));
               r.top = r.bottom;
               r.bottom += mLineHeight;
               }
@@ -159,6 +138,49 @@ public:
   //}}}
 
 private:
+  //{{{
+  class cAction {
+  public:
+    virtual void onDown() = 0;
+    };
+  //}}}
+  //{{{
+  class cServiceNameAction : public cAction {
+  public:
+    cServiceNameAction (cService* service) : mService(service) {}
+    virtual void onDown() { mService->toggleShowEpg(); }
+
+  private:
+    cService* mService;
+    };
+  //}}}
+  //{{{
+  class cServiceNowAction : public cAction {
+  public:
+    cServiceNowAction (cService* service, cTransportStream* ts) : mService(service), mTs(ts) {}
+    virtual void onDown() {
+      mService->getNow()->toggleRecord();
+      mTs->startProgram (mService,
+                         mService->getNow()->getTitleString(),
+                         mService->getNow()->getStartTime(),
+                         mService->getNow()->getRecord());
+      }
+  private:
+    cService* mService;
+    cTransportStream* mTs;
+    };
+  //}}}
+  //{{{
+  class cEpgAction : public cAction {
+  public:
+    cEpgAction (cEpgItem* epgItem) : mEpgItem(epgItem) {}
+    virtual void onDown() { mEpgItem->toggleRecord(); }
+
+  private:
+    cEpgItem* mEpgItem;
+    };
+  //}}}
+
   const float kDefaultLineHeight = 13.f;
   const float kLargeLineHeight = 16.f;
 
@@ -170,7 +192,5 @@ private:
   int mContDigits = 0;
   int mPacketDigits = 1;
 
-  std::map<int,cEpgItem*> mEpgItemMap;
-  std::map<int,cService*> mServiceMap;
-  std::map<int,cService*> mServiceNameMap;
+  std::map<int,cAction*> mActionMap;
   };
