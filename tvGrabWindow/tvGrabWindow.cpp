@@ -55,7 +55,7 @@ public:
   //{{{
   void run (const string& title, int width, int height, const string& param, const string& rootName) {
 
-    mTs = new cDumpTransportStream (rootName);
+    mTs = new cDumpTransportStream (rootName, false);
 
     initialise (title, width, height, false);
     add (new cTuneBox (this, 40.f, kTextHeight, "bbc", 674));

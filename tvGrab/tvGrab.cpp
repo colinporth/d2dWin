@@ -88,7 +88,7 @@ int main (int argc, char* argv[]) {
     //}}}
   else {
     //{{{  use sampleGrabber filter
-    auto mTs = new cDumpTransportStream (fileName);
+    auto mTs = new cDumpTransportStream (fileName, true);
     cLog::log (LOGNOTICE, "Created dumpTransportStream");
 
     auto mBda = new cBda();
