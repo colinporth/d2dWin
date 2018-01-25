@@ -27,7 +27,7 @@ public:
   bool onDown (bool right, cPoint pos)  {
 
     auto epgItemIt = mEpgItemMap.find (int(pos.y/ mLineHeight));
-    if (epgItemIt != mEpgItemMap.end()) 
+    if (epgItemIt != mEpgItemMap.end())
       epgItemIt->second->toggleRecord();
     else
       togglePin();
@@ -57,7 +57,8 @@ public:
         r.top = r.bottom;
         r.bottom += mLineHeight;
 
-        for (auto epgItem : service.second.getNowVec()) {
+        auto epgItem = service.second.getNow();
+        if (epgItem) {
           str = "  - now - " + epgItem->getStartTimeString() +
                 " " + epgItem->getDurationString() +
                 " " + epgItem->getTitleString();

@@ -186,6 +186,7 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
+
   cLog::init (LOGINFO, true);
 
   string param;
@@ -200,6 +201,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cAppWindow appWindow;
   string rootName = "c:/tv";
   appWindow.run ("tvGrabWindow", 1050, 900, param, rootName);
+
   CoUninitialize();
   }
 //}}}
