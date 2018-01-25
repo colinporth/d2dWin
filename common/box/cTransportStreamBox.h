@@ -27,15 +27,26 @@ public:
   bool onDown (bool right, cPoint pos)  {
 
     auto epgItemIt = mEpgItemMap.find (int(pos.y/ mLineHeight));
-    if (epgItemIt == mEpgItemMap.end()) {
-      auto serviceNameIt = mServiceNameMap.find (int(pos.y/ mLineHeight));
-      if (serviceNameIt == mServiceNameMap.end())
-        togglePin();
-      else
-        serviceNameIt->second->toggleShowEpg();
-      }
-    else
+    if (epgItemIt != mEpgItemMap.end()) {
       epgItemIt->second->toggleRecord();
+      return true;
+      }
+
+    auto serviceNameIt = mServiceNameMap.find (int(pos.y/ mLineHeight));
+    if (serviceNameIt != mServiceNameMap.end()) {
+      serviceNameIt->second->toggleShowEpg();
+      return true;
+      }
+
+    auto serviceIt = mServiceMap.find (int(pos.y/ mLineHeight));
+    if (serviceIt != mServiceMap.end()) {
+      serviceIt->second->getNow()->toggleRecord();
+      mTs->startProgram (serviceIt->second,
+                         serviceIt->second->getNow()->getTitleString(),
+                         serviceIt->second->getNow()->getStartTime(), 
+                         serviceIt->second->getNow()->getRecord());
+      return true;
+      }
 
     return true;
     }
@@ -51,16 +62,20 @@ public:
     mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
     if (mTs->mServiceMap.size() > 1) {
       //{{{  draw services
+      mServiceMap.clear();
       mServiceNameMap.clear();
       mEpgItemMap.clear();
+
       auto now = mTs->getCurTime();
       struct tm nowTime = *localtime (&now);
 
       int i = 1;
       for (auto &service : mTs->mServiceMap) {
         auto str = dec(i, mTs->mServiceMap.size() >= 10 ? 2:1) + " " + service.second.getNameString();
-        serviceWidth = max (drawText (dc, str, mTextFormat, r, mWindow->getWhiteBrush(), mLineHeight), serviceWidth);
-        mServiceNameMap.insert (std::map<int,cService*>::value_type (int((r.top-mRect.top)/mLineHeight), &service.second));
+        auto brush = service.second.getShowEpg() ? mWindow->getBlueBrush() : mWindow->getWhiteBrush();
+        serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
+        mServiceNameMap.insert (
+          std::map<int,cService*>::value_type (int((r.top-mRect.top)/mLineHeight), &service.second));
         r.top = r.bottom;
         r.bottom += mLineHeight;
 
@@ -71,7 +86,8 @@ public:
                 " " + epgItem->getTitleString();
           auto brush = epgItem->getRecord() ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
           serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
-          mEpgItemMap.insert (std::map<int,cEpgItem*>::value_type (int((r.top-mRect.top)/mLineHeight), epgItem));
+          mServiceMap.insert (
+            std::map<int,cService*>::value_type (int((r.top-mRect.top)/mLineHeight), &service.second));
           r.top = r.bottom;
           r.bottom += mLineHeight;
           }
@@ -86,7 +102,8 @@ public:
                                 " "+ epgItem.second.getTitleString();
               auto brush = epgItem.second.getRecord() ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
               serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
-              mEpgItemMap.insert (std::map<int,cEpgItem*>::value_type (int((r.top-mRect.top)/mLineHeight), &epgItem.second));
+              mEpgItemMap.insert (
+                std::map<int,cEpgItem*>::value_type (int((r.top-mRect.top)/mLineHeight), &epgItem.second));
               r.top = r.bottom;
               r.bottom += mLineHeight;
               }
@@ -154,5 +171,6 @@ private:
   int mPacketDigits = 1;
 
   std::map<int,cEpgItem*> mEpgItemMap;
+  std::map<int,cService*> mServiceMap;
   std::map<int,cService*> mServiceNameMap;
   };
