@@ -42,12 +42,13 @@ public:
 
     lock_guard<mutex> lockGuard (mTs->mMutex);
 
-    mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
+    mLineHeight = (mTs->mServiceMap.size() >= 10) ? kDefaultLineHeight : kLargeLineHeight;
     auto r = cRect (mRect.left, mRect.top, mRect.right, mRect.top + mLineHeight);
 
     auto serviceWidth = 0.f;
     if (mTs->mServiceMap.size() > 1) {
       // construct services menu
+      // !!! could check for ts service change here to cull rebuilding menu !!!
       mBoxItemVec.clear();
       auto now = mTs->getCurTime();
       struct tm nowTime = *localtime (&now);
