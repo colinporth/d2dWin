@@ -1,7 +1,9 @@
-// cTransportStreamPidBox.h
+// cTransportStreamBox.h
+//{{{  includes
 #pragma once
 #include "../cD2dWindow.h"
 #include "../../../shared/dvb/cTransportStream.h"
+//}}}
 
 class cTransportStreamBox : public cD2dWindow::cBox {
 public:
@@ -47,26 +49,24 @@ public:
 
     auto serviceWidth = 0.f;
     if (mTs->mServiceMap.size() > 1) {
-      // construct services menu
-      // !!! could check for ts service change here to cull rebuilding menu !!!
+      // construct services menu, !!! could check for ts service change here to cull rebuilding menu !!!
       mBoxItemVec.clear();
+
       auto nowTime = mTs->getCurTime();
       struct tm nowTm = *localtime (&nowTime);
       int nowDay = nowTm.tm_mday;
 
       int serviceIndex = 1;
-      for (auto &service : mTs->mServiceMap) {
-        mBoxItemVec.push_back (new cServiceNameItem (this, &service.second, serviceIndex++));
-
-        if (service.second.getNow()) 
-          mBoxItemVec.push_back (new cServiceNowItem (this, &service.second, mTs));
-
+      for (auto& service : mTs->mServiceMap) {
+        mBoxItemVec.push_back (new cServiceName (this, &service.second, serviceIndex++));
+        if (service.second.getNow())
+          mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs));
         if (service.second.getShowEpg()) {
           for (auto &epgItem : service.second.getEpgItemMap()) {
             auto timet = epgItem.second.getStartTime();
             struct tm time = *localtime (&timet);
             if ((time.tm_mday == nowDay) && (timet > nowTime)) // later today
-              mBoxItemVec.push_back (new cServiceEpgItem (this, &service.second, &epgItem.second));
+              mBoxItemVec.push_back (new cServiceEpg (this, &service.second, &epgItem.second));
             }
           }
         }
@@ -118,16 +118,19 @@ private:
   //{{{
   class cBoxItem {
   public:
-    cBoxItem (cTransportStreamBox* box, cService* service) :
-      mBox(box), mService(service) {}
+    cBoxItem (cTransportStreamBox* box, cService* service) : mBox(box), mService(service) {}
 
-    bool inside(cPoint pos) { return mRect.inside (pos); }
+    bool inside (const cPoint& pos) { return mRect.inside (pos); }
+
     virtual void onDown() = 0;
     //{{{
     virtual float onDraw (ID2D1DeviceContext* dc, cRect& r) {
+
       auto width = mBox->drawText (dc, mStr, mBox->mTextFormat, r, mBrush, mBox->mLineHeight);
+
       mRect = r;
       mRect.right = r.left + width;
+
       r.top = r.bottom;
       r.bottom += mBox->mLineHeight;
       return width;
@@ -137,16 +140,16 @@ private:
   protected:
     cTransportStreamBox* mBox;
     cService* mService;
+
     std::string mStr;
     ID2D1SolidColorBrush* mBrush;
     cRect mRect;
     };
   //}}}
   //{{{
-  class cServiceNameItem : public cBoxItem {
+  class cServiceName : public cBoxItem {
   public:
-    cServiceNameItem (cTransportStreamBox* box, cService* service, int index) :
-       cBoxItem(box, service) {
+    cServiceName (cTransportStreamBox* box, cService* service, int index) : cBoxItem(box, service) {
       mStr = dec(index, 2) + " " + service->getNameString();
       mBrush = mService->getShowEpg() ? mBox->getWindow()->getBlueBrush() : mBox->getWindow()->getWhiteBrush();
       }
@@ -155,9 +158,9 @@ private:
     };
   //}}}
   //{{{
-  class cServiceNowItem : public cBoxItem {
+  class cServiceNow : public cBoxItem {
   public:
-    cServiceNowItem (cTransportStreamBox* box, cService* service, cTransportStream* ts) :
+    cServiceNow (cTransportStreamBox* box, cService* service, cTransportStream* ts) :
         cBoxItem(box, service), mTs(ts) {
       mStr = "  - now - " + mService->getNow()->getStartTimeString() +
              " " + mService->getNow()->getDurationString() +
@@ -178,9 +181,9 @@ private:
     };
   //}}}
   //{{{
-  class cServiceEpgItem : public cBoxItem {
+  class cServiceEpg : public cBoxItem {
   public:
-    cServiceEpgItem (cTransportStreamBox* box, cService* service, cEpgItem* epgItem) :
+    cServiceEpg (cTransportStreamBox* box, cService* service, cEpgItem* epgItem) :
         cBoxItem(box, service), mEpgItem(epgItem) {
       auto timet = mEpgItem->getStartTime();
       struct tm time = *localtime (&timet);
@@ -197,12 +200,12 @@ private:
     };
   //}}}
 
-  const float kDefaultLineHeight = 13.f;
-  const float kLargeLineHeight = 16.f;
+  cTransportStream* mTs;
 
+  const float kLargeLineHeight = 16.f;
+  const float kDefaultLineHeight = 13.f;
   float mLineHeight = kDefaultLineHeight;
 
-  cTransportStream* mTs;
   IDWriteTextFormat* mTextFormat = nullptr;
 
   int mContDigits = 0;
