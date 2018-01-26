@@ -26,11 +26,13 @@ public:
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
-    auto itemIt = mBoxItemMap.find (int(pos.y / mLineHeight));
-    if (itemIt != mBoxItemMap.end()) {
-      itemIt->second->onDown();
-      getWindow()->changed();
-      }
+    pos += getTL();
+    for (auto boxItem : mBoxItemVec)
+      if (boxItem->inside (pos)) {
+        boxItem->onDown();
+        getWindow()->changed();
+        break;
+        }
 
     return true;
     }
@@ -40,27 +42,26 @@ public:
 
     lock_guard<mutex> lockGuard (mTs->mMutex);
 
-    auto r = cRect (mRect.left, mRect.top, mRect.right, mRect.top + mLineHeight);
     mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
+    auto r = cRect (mRect.left, mRect.top, mRect.right, mRect.top + mLineHeight);
 
     auto serviceWidth = 0.f;
     if (mTs->mServiceMap.size() > 1) {
       // construct services menu
-      mBoxItemMap.clear();
+      mBoxItemVec.clear();
       auto now = mTs->getCurTime();
       struct tm nowTime = *localtime (&now);
 
-      int lineIndex = 0;
       int serviceIndex = 1;
       for (auto &service : mTs->mServiceMap) {
         //{{{  add serviceNameItem
         auto serviceNameItem = new cServiceNameItem (this, &service.second, serviceIndex++);
-        mBoxItemMap.insert (std::map<int,cBoxItem*>::value_type (lineIndex++, serviceNameItem));
+        mBoxItemVec.push_back (serviceNameItem);
         //}}}
         if (service.second.getNow()) {
           //{{{  add serviceNowItem
           auto serviceNowItem = new cServiceNowItem (this, &service.second, mTs);
-          mBoxItemMap.insert (std::map<int, cBoxItem*>::value_type (lineIndex++, serviceNowItem));
+          mBoxItemVec.push_back (serviceNowItem);
           }
           //}}}
         if (service.second.getShowEpg()) {
@@ -70,16 +71,16 @@ public:
             struct tm time = *localtime (&timet);
             if ((time.tm_mday == nowTime.tm_mday) && (timet > now)) {
               auto epgEntryItem = new cEpgEntryItem (this, &service.second, &epgItem.second);
-              mBoxItemMap.insert (std::map<int, cBoxItem*>::value_type (lineIndex++, epgEntryItem));
+              mBoxItemVec.push_back (epgEntryItem);
               }
             }
           //}}}
           }
         }
 
-      // draw services
-      for (auto boxItem : mBoxItemMap)
-        serviceWidth = max (boxItem.second->onDraw (dc, r), serviceWidth);
+      // draw services boxItems
+      for (auto boxItem : mBoxItemVec)
+        serviceWidth = max (boxItem->onDraw (dc, r), serviceWidth);
       serviceWidth += mLineHeight;
       }
 
@@ -127,11 +128,13 @@ private:
     cBoxItem (cTransportStreamBox* box, cService* service) :
       mBox(box), mService(service) {}
 
+    bool inside(cPoint pos) { return mRect.inside (pos); }
     virtual void onDown() = 0;
     //{{{
     virtual float onDraw (ID2D1DeviceContext* dc, cRect& r) {
       auto width = mBox->drawText (dc, mStr, mBox->mTextFormat, r, mBrush, mBox->mLineHeight);
       mRect = r;
+      mRect.right = r.left + width;
       r.top = r.bottom;
       r.bottom += mBox->mLineHeight;
       return width;
@@ -212,5 +215,5 @@ private:
   int mContDigits = 0;
   int mPacketDigits = 1;
 
-  std::map<int,cBoxItem*> mBoxItemMap;
+  std::vector<cBoxItem*> mBoxItemVec;
   };

@@ -11,7 +11,6 @@ public:
     y = 0;
     }
   //}}}
-
   //{{{
   cPoint (const float value) {
     this->x = value;
@@ -48,39 +47,55 @@ public:
     y = (float)size.height;
     }
   //}}}
+
   //{{{
-  cPoint operator- (const cPoint& rhs) const {
-    return cPoint (x - rhs.x, y - rhs.y);
+  cPoint operator - (const cPoint& point) const {
+    return cPoint (x - point.x, y - point.y);
     }
   //}}}
   //{{{
-  cPoint operator+ (const cPoint& rhs) const {
+  cPoint operator + (const cPoint& rhs) const {
     return cPoint (x + rhs.x, y + rhs.y);
     }
   //}}}
   //{{{
-  cPoint operator* (const float f) const {
+  cPoint operator * (const float f) const {
     return cPoint (x * f, y * f);
     }
   //}}}
   //{{{
-  cPoint operator* (const double f) const {
+  cPoint operator * (const double f) const {
     return cPoint (float(x * f), float(y * f));
     }
   //}}}
   //{{{
-  cPoint operator* (const cPoint& rhs) const {
-    return cPoint (x * rhs.x, y * rhs.y);
+  cPoint operator * (const cPoint& point) const {
+    return cPoint (x * point.x, y * point.y);
     }
   //}}}
   //{{{
-  cPoint operator/ (const float f) const {
+  cPoint operator / (const float f) const {
     return cPoint (x / f, y / f);
     }
   //}}}
   //{{{
-  cPoint operator/ (const double f) const {
+  cPoint operator / (const double f) const {
     return cPoint (float(x / f), float(y / f));
+    }
+  //}}}
+
+  //{{{
+  const cPoint& operator += (const cPoint& point)  {
+    x += point.x;
+    y += point.y;
+    return *this;
+    }
+  //}}}
+  //{{{
+  const cPoint& operator -= (const cPoint& point)  {
+    x -= point.x;
+    y -= point.y;
+    return *this;
     }
   //}}}
 
