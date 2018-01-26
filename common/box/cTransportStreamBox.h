@@ -11,7 +11,7 @@ public:
 
     mPin = true;
 
-    mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
+    window->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
       DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
       mLineHeight, L"en-us",
       &mTextFormat);
@@ -26,86 +26,65 @@ public:
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
-    auto actionIt = mActionMap.find (int(pos.y / mLineHeight));
-    if (actionIt != mActionMap.end())
-      actionIt->second->onDown();
+    auto itemIt = mItemMap.find (int(pos.y / mLineHeight));
+    if (itemIt != mItemMap.end())
+      itemIt->second->onDown();
     return true;
     }
   //}}}
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    auto r = cRect (mRect.left, mRect.top, mRect.right, mRect.top + mLineHeight);
-    auto serviceWidth = 0.f;
-
-    {
     lock_guard<mutex> lockGuard (mTs->mMutex);
-    mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
-    if (mTs->mServiceMap.size() > 1) {
-      //{{{  draw services
-      mActionMap.clear();
 
+    auto r = cRect (mRect.left, mRect.top, mRect.right, mRect.top + mLineHeight);
+    mLineHeight = mTs->mServiceMap.size() >= 10 ? kDefaultLineHeight : kLargeLineHeight;
+
+    auto serviceWidth = 0.f;
+    if (mTs->mServiceMap.size() > 1) {
+      // draw services
+      mItemMap.clear();
       auto now = mTs->getCurTime();
       struct tm nowTime = *localtime (&now);
 
-      int i = 1;
+      int index = 1;
       for (auto &service : mTs->mServiceMap) {
-        auto str = dec(i, mTs->mServiceMap.size() >= 10 ? 2:1) + " " + service.second.getNameString();
-        auto brush = service.second.getShowEpg() ? mWindow->getBlueBrush() : mWindow->getWhiteBrush();
-        serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
-        mActionMap.insert (std::map<int,cAction*>::value_type (int((r.top-mRect.top)/mLineHeight),
-                                                               new cServiceNameAction (&service.second)));
-        r.top = r.bottom;
-        r.bottom += mLineHeight;
-
-        auto epgItem = service.second.getNow();
-        if (epgItem) {
-          str = "  - now - " + epgItem->getStartTimeString() +
-                " " + epgItem->getDurationString() +
-                " " + epgItem->getTitleString();
-          auto brush = epgItem->getRecord() ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
-          serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
-          mActionMap.insert (std::map<int,cAction*>::value_type (int((r.top-mRect.top)/mLineHeight),
-                                                                 new cServiceNowAction (&service.second, mTs)));
-          r.top = r.bottom;
-          r.bottom += mLineHeight;
+        //{{{  add serviceNameItem
+        auto serviceNameItem = new cServiceNameItem (this, &service.second, index++);
+        mItemMap.insert (std::map<int,cItem*>::value_type (int((r.top-mRect.top)/mLineHeight), serviceNameItem));
+        serviceWidth = max (serviceNameItem->onDraw (dc, r), serviceWidth);
+        //}}}
+        if (service.second.getNow()) {
+          //{{{  add serviceNowItem
+          auto serviceNowItem = new cServiceNowItem (this, &service.second, mTs);
+          mItemMap.insert (std::map<int,cItem*>::value_type (int((r.top-mRect.top)/mLineHeight), serviceNowItem));
+          serviceWidth = max (serviceNowItem->onDraw (dc, r), serviceWidth);
           }
-
+          //}}}
         if (service.second.getShowEpg()) {
+          //{{{  add service epgEntryItems
           for (auto &epgItem : service.second.getEpgItemMap()) {
             auto timet = epgItem.second.getStartTime();
             struct tm time = *localtime (&timet);
             if ((time.tm_mday == nowTime.tm_mday) && (timet > now)) {
-              std::string str = "        - " + dec(time.tm_hour,2,' ') +
-                                ":" + dec(time.tm_min,2,'0') +
-                                " "+ epgItem.second.getTitleString();
-              auto brush = epgItem.second.getRecord() ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
-              serviceWidth = max (drawText (dc, str, mTextFormat, r, brush, mLineHeight), serviceWidth);
-              mActionMap.insert (std::map<int,cAction*>::value_type (int((r.top-mRect.top)/mLineHeight),
-                                                                     new cEpgAction (&epgItem.second)));
-              r.top = r.bottom;
-              r.bottom += mLineHeight;
+              auto epgEntryItem = new cEpgEntryItem (this, &service.second, &epgItem.second);
+              mItemMap.insert (std::map<int,cItem*>::value_type (int((r.top-mRect.top)/mLineHeight), epgEntryItem));
+              serviceWidth = max (epgEntryItem->onDraw (dc, r), serviceWidth);
               }
             }
+          //}}}
           }
-
-        i++;
         }
       serviceWidth += mLineHeight;
       }
-      //}}}
-    }
 
-    {
-    lock_guard<mutex> lockGuard (mTs->mMutex);
     if (mTs->mPidInfoMap.size()) {
       //{{{  draw pids
       auto maxPidPackets = 10000;
       for (auto &pidInfo : mTs->mPidInfoMap)
         maxPidPackets = max (maxPidPackets, pidInfo.second.mPackets);
 
-      auto r = cRect (mRect.left + serviceWidth, mRect.top,
-                      mRect.right, mRect.top + mLineHeight);
+      auto r = cRect (mRect.left + serviceWidth, mRect.top, mRect.right, mRect.top + mLineHeight);
       for (auto &pidInfo : mTs->mPidInfoMap) {
         auto str = wdec (pidInfo.second.mPackets,mPacketDigits) +
                    (mContDigits ? (L":" + wdec(pidInfo.second.mDisContinuity, mContDigits)) : L"") +
@@ -134,30 +113,50 @@ public:
       }
       //}}}
     }
-    }
   //}}}
 
 private:
   //{{{
-  class cAction {
+  class cItem {
   public:
-    virtual void onDown() = 0;
-    };
-  //}}}
-  //{{{
-  class cServiceNameAction : public cAction {
-  public:
-    cServiceNameAction (cService* service) : mService(service) {}
-    virtual void onDown() { mService->toggleShowEpg(); }
+    cItem (cTransportStreamBox* box, cService* service) :
+      mBox(box), mService(service) {}
 
-  private:
+    virtual void onDown() = 0;
+    virtual float onDraw (ID2D1DeviceContext* dc, cRect& r) = 0;
+
+  protected:
+    cTransportStreamBox* mBox;
     cService* mService;
     };
   //}}}
   //{{{
-  class cServiceNowAction : public cAction {
+  class cServiceNameItem : public cItem {
   public:
-    cServiceNowAction (cService* service, cTransportStream* ts) : mService(service), mTs(ts) {}
+    cServiceNameItem (cTransportStreamBox* box, cService* service, int index) :
+      cItem(box, service), mIndex(index) {}
+
+    virtual void onDown() { mService->toggleShowEpg(); }
+
+    virtual float onDraw (ID2D1DeviceContext* dc, cRect& r) {
+      auto str = dec(mIndex, 2) + " " + mService->getNameString();
+      auto brush = mService->getShowEpg() ? mBox->getWindow()->getBlueBrush() : mBox->getWindow()->getWhiteBrush();
+      auto width = mBox->drawText (dc, str, mBox->mTextFormat, r, brush, mBox->mLineHeight);
+      r.top = r.bottom;
+      r.bottom += mBox->mLineHeight;
+      return width;
+      }
+
+  private:
+    int mIndex = 0;
+    };
+  //}}}
+  //{{{
+  class cServiceNowItem : public cItem {
+  public:
+    cServiceNowItem (cTransportStreamBox* box, cService* service, cTransportStream* ts) :
+      cItem(box, service), mTs(ts) {}
+
     virtual void onDown() {
       mService->getNow()->toggleRecord();
       mTs->startProgram (mService,
@@ -165,16 +164,45 @@ private:
                          mService->getNow()->getStartTime(),
                          mService->getNow()->getRecord());
       }
+
+    virtual float onDraw (ID2D1DeviceContext* dc, cRect& r) {
+      auto epgItem = mService->getNow();
+
+      auto str = "  - now - " + epgItem->getStartTimeString() +
+                 " " + epgItem->getDurationString() +
+                 " " + epgItem->getTitleString();
+      auto brush = epgItem->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
+      auto width = mBox->drawText (dc, str, mBox->mTextFormat, r, brush, mBox->mLineHeight);
+      r.top = r.bottom;
+      r.bottom += mBox->mLineHeight;
+      return width;
+      }
+
   private:
-    cService* mService;
     cTransportStream* mTs;
     };
   //}}}
   //{{{
-  class cEpgAction : public cAction {
+  class cEpgEntryItem : public cItem {
   public:
-    cEpgAction (cEpgItem* epgItem) : mEpgItem(epgItem) {}
+    cEpgEntryItem (cTransportStreamBox* box, cService* service, cEpgItem* epgItem) :
+      cItem(box, service), mEpgItem(epgItem) {}
+
     virtual void onDown() { mEpgItem->toggleRecord(); }
+
+    virtual float onDraw (ID2D1DeviceContext* dc, cRect& r) {
+      auto timet = mEpgItem->getStartTime();
+      struct tm time = *localtime (&timet);
+
+      auto str = "        - " + dec(time.tm_hour,2,' ') +
+                 ":" + dec(time.tm_min,2,'0') +
+                 " "+ mEpgItem->getTitleString();
+      auto brush = mEpgItem->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
+      auto width = mBox->drawText (dc, str, mBox->mTextFormat, r, brush, mBox->mLineHeight);
+      r.top = r.bottom;
+      r.bottom += mBox->mLineHeight;
+      return width;
+      }
 
   private:
     cEpgItem* mEpgItem;
@@ -192,5 +220,5 @@ private:
   int mContDigits = 0;
   int mPacketDigits = 1;
 
-  std::map<int,cAction*> mActionMap;
+  std::map<int,cItem*> mItemMap;
   };

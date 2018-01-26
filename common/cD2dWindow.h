@@ -41,6 +41,7 @@ public:
 
     // gets
     string getName() { return mName; }
+    cD2dWindow* getWindow() { return mWindow; }
 
     bool getEnable() { return mEnable; }
     bool getPick() { return mPick; }

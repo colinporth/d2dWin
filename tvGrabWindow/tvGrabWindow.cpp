@@ -150,8 +150,20 @@ private:
       GetFileSizeEx (fileHandle, (PLARGE_INTEGER)(&streamSize));
 
       setChangeCountDown (20);
-      auto analyseStreamPos = mTs->demux (streamBuf, streamSize, 0, false, -1);
-      cLog::log (LOGINFO, "%d of %d", analyseStreamPos, streamSize);
+
+      int64_t streamPos = 0;
+      int64_t chunkSize = 240*188;
+      auto streamPtr = streamBuf;
+      while (streamPos < streamSize) {
+        if (streamSize - streamPos < chunkSize)
+          chunkSize = streamSize - streamPos;
+        streamPos = mTs->demux (streamPtr, chunkSize, 0, false, -1);
+        streamPtr += chunkSize;
+        changed();
+        Sleep (1);
+        }
+
+      cLog::log (LOGINFO, "%d of %d", streamPos, streamSize);
       changed();
 
       UnmapViewOfFile (streamBuf);
