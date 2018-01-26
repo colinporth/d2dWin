@@ -149,18 +149,16 @@ private:
       int64_t streamSize;
       GetFileSizeEx (fileHandle, (PLARGE_INTEGER)(&streamSize));
 
-      setChangeCountDown (20);
-
       int64_t streamPos = 0;
       int64_t chunkSize = 240*188*4;
       auto streamPtr = streamBuf;
       while (streamPos < streamSize) {
         if (streamSize - streamPos < chunkSize)
           chunkSize = streamSize - streamPos;
-        streamPos = mTs->demux (streamPtr, chunkSize, 0, false, -1);
+        streamPos += mTs->demux (streamPtr, chunkSize, streamPos, false, -1);
         streamPtr += chunkSize;
         changed();
-        Sleep (1);
+        //Sleep (1);
         }
 
       cLog::log (LOGINFO, "%d of %d", streamPos, streamSize);

@@ -170,10 +170,10 @@ private:
 
     virtual void onDown() {
       mService->getNow()->toggleRecord();
-      mTs->startProgram (mService,
-                         mService->getNow()->getTitleString(),
-                         mService->getNow()->getStartTime(),
-                         mService->getNow()->getRecord());
+      mTs->start (mService,
+                  mService->getNow()->getTitleString(),
+                  mService->getNow()->getStartTime(),
+                  mService->getNow()->getRecord());
       }
 
   private:
