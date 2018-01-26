@@ -194,7 +194,7 @@ public:
   float getCentreX() const { return (left + right)/2.f; }
   float getCentreY() const { return (top + bottom)/2.f; }
   //{{{
-  bool inside (cPoint& pos) const {
+  bool inside (const cPoint& pos) const {
   // return pos inside rect
     return (pos.x >= left) && (pos.x < right) && (pos.y >= top) && (pos.y < bottom);
     }
