@@ -50,11 +50,11 @@ public:
     auto serviceWidth = 0.f;
     if (mTs->mServiceMap.size() > 1) {
       // construct services menu, !!! could check for ts service change here to cull rebuilding menu !!!
-      mBoxItemVec.clear();
-
       auto nowTime = mTs->getCurTime();
       struct tm nowTm = *localtime (&nowTime);
       int nowDay = nowTm.tm_mday;
+
+      mBoxItemVec.clear();
 
       int serviceIndex = 1;
       for (auto& service : mTs->mServiceMap) {
@@ -150,7 +150,7 @@ private:
   class cServiceName : public cBoxItem {
   public:
     cServiceName (cTransportStreamBox* box, cService* service, int index) : cBoxItem(box, service) {
-      mStr = dec(index, 2) + " " + service->getNameString();
+      mStr = dec(index,2) + " " + service->getNameString();
       mBrush = mService->getShowEpg() ? mBox->getWindow()->getBlueBrush() : mBox->getWindow()->getWhiteBrush();
       }
 
