@@ -50,32 +50,24 @@ public:
       // construct services menu
       // !!! could check for ts service change here to cull rebuilding menu !!!
       mBoxItemVec.clear();
-      auto now = mTs->getCurTime();
-      struct tm nowTime = *localtime (&now);
+      auto nowTime = mTs->getCurTime();
+      struct tm nowTm = *localtime (&nowTime);
+      int nowDay = nowTm.tm_mday;
 
       int serviceIndex = 1;
       for (auto &service : mTs->mServiceMap) {
-        //{{{  add serviceNameItem
-        auto serviceNameItem = new cServiceNameItem (this, &service.second, serviceIndex++);
-        mBoxItemVec.push_back (serviceNameItem);
-        //}}}
-        if (service.second.getNow()) {
-          //{{{  add serviceNowItem
-          auto serviceNowItem = new cServiceNowItem (this, &service.second, mTs);
-          mBoxItemVec.push_back (serviceNowItem);
-          }
-          //}}}
+        mBoxItemVec.push_back (new cServiceNameItem (this, &service.second, serviceIndex++));
+
+        if (service.second.getNow()) 
+          mBoxItemVec.push_back (new cServiceNowItem (this, &service.second, mTs));
+
         if (service.second.getShowEpg()) {
-          //{{{  add service epgEntryItems
           for (auto &epgItem : service.second.getEpgItemMap()) {
             auto timet = epgItem.second.getStartTime();
             struct tm time = *localtime (&timet);
-            if ((time.tm_mday == nowTime.tm_mday) && (timet > now)) {
-              auto epgEntryItem = new cEpgEntryItem (this, &service.second, &epgItem.second);
-              mBoxItemVec.push_back (epgEntryItem);
-              }
+            if ((time.tm_mday == nowDay) && (timet > nowTime)) // later today
+              mBoxItemVec.push_back (new cServiceEpgItem (this, &service.second, &epgItem.second));
             }
-          //}}}
           }
         }
 
@@ -186,9 +178,9 @@ private:
     };
   //}}}
   //{{{
-  class cEpgEntryItem : public cBoxItem {
+  class cServiceEpgItem : public cBoxItem {
   public:
-    cEpgEntryItem (cTransportStreamBox* box, cService* service, cEpgItem* epgItem) :
+    cServiceEpgItem (cTransportStreamBox* box, cService* service, cEpgItem* epgItem) :
         cBoxItem(box, service), mEpgItem(epgItem) {
       auto timet = mEpgItem->getStartTime();
       struct tm time = *localtime (&timet);
