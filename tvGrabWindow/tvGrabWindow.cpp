@@ -152,7 +152,7 @@ private:
       setChangeCountDown (20);
 
       int64_t streamPos = 0;
-      int64_t chunkSize = 240*188;
+      int64_t chunkSize = 240*188*4;
       auto streamPtr = streamBuf;
       while (streamPos < streamSize) {
         if (streamSize - streamPos < chunkSize)
