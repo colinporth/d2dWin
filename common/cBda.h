@@ -42,9 +42,10 @@ DEFINE_GUID (CLSID_Dump, 0x36a5f770, 0xfe4c, 0x11ce, 0xa8, 0xed, 0x00, 0xaa, 0x0
 class cBda {
 public:
   //{{{
-  void createGraph (int frequency)  {
+  bool createGraph (int frequency)  {
 
-    createGraphDvbT (frequency);
+    if (!createGraphDvbT (frequency))
+      return false;
 
     createFilter (mGrabberFilter, CLSID_SampleGrabber, L"grabber", mDvbCapture);
     mGrabberFilter.As (&mGrabber);
@@ -65,12 +66,15 @@ public:
     createFilter (mMpeg2Demux, CLSID_MPEG2Demultiplexer, L"MPEG2demux", mGrabberFilter);
     createFilter (mBdaTif, CLSID_BDAtif, L"BDAtif", mMpeg2Demux);
     mGraphBuilder.As (&mMediaControl);
+
+    return true;
     }
   //}}}
   //{{{
-  void createGraph (int frequency, const std::string& fileName) {
+  bool createGraph (int frequency, const std::string& fileName) {
 
-    createGraphDvbT (frequency);
+    if (!createGraphDvbT (frequency))
+      return false;
 
     createFilter (mInfTeeFilter, CLSID_InfTee, L"infTee", mDvbCapture);
 
@@ -82,6 +86,7 @@ public:
     createFilter (mMpeg2Demux, CLSID_MPEG2Demultiplexer, L"MPEG2demux", mInfTeeFilter);
     createFilter (mBdaTif, CLSID_BDAtif, L"BDAtif", mMpeg2Demux);
     mGraphBuilder.As (&mMediaControl);
+    return true;
     }
   //}}}
 
@@ -463,7 +468,7 @@ private:
   //}}}
 
   //{{{
-  bool connectPins (Microsoft::WRL::ComPtr<IBaseFilter> fromFilter, 
+  bool connectPins (Microsoft::WRL::ComPtr<IBaseFilter> fromFilter,
                     Microsoft::WRL::ComPtr<IBaseFilter> toFilter,
                     wchar_t* fromPinName = NULL, wchar_t* toPinName = NULL) {
   // if name == NULL use first correct direction unconnected pin
@@ -520,7 +525,7 @@ private:
     }
   //}}}
   //{{{
-  void findFilter (Microsoft::WRL::ComPtr<IBaseFilter>& filter, 
+  void findFilter (Microsoft::WRL::ComPtr<IBaseFilter>& filter,
                    const CLSID& clsid, wchar_t* name,
                    Microsoft::WRL::ComPtr<IBaseFilter> fromFilter) {
   // Find instance of filter of type CLSID by name, add to graphBuilder, connect fromFilter
@@ -570,8 +575,8 @@ private:
     }
   //}}}
   //{{{
-  void createFilter (Microsoft::WRL::ComPtr<IBaseFilter>& filter, 
-                     const CLSID& clsid, wchar_t* title, 
+  void createFilter (Microsoft::WRL::ComPtr<IBaseFilter>& filter,
+                     const CLSID& clsid, wchar_t* title,
                      Microsoft::WRL::ComPtr<IBaseFilter> fromFilter) {
   // createFilter type clsid, add to graphBuilder, connect fromFilter
 
@@ -583,26 +588,32 @@ private:
   //}}}
 
   //{{{
-  void createGraphDvbT (int frequency) {
+  bool createGraphDvbT (int frequency) {
 
     auto hr = CoCreateInstance (CLSID_FilterGraph, nullptr,
                                 CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mGraphBuilder.GetAddressOf()));
-    //{{{  error 
-    if (hr != S_OK)
+    //{{{  error
+    if (hr != S_OK) {
       cLog::log (LOGERROR, "createGraphDvbT - CoCreateInstance graph failed " + dec(hr));
+      return false;
+      }
     //}}}
 
     hr = CoCreateInstance (CLSID_DVBTNetworkProvider, nullptr,
                            CLSCTX_INPROC_SERVER, IID_PPV_ARGS (mDvbNetworkProvider.GetAddressOf()));
-    //{{{  error 
-    if (hr != S_OK)
+    //{{{  error
+    if (hr != S_OK) {
       cLog::log (LOGERROR, "createGraphDvbT - CoCreateInstance dvbNetworkProvider failed " + dec(hr));
+      return false;
+      }
     //}}}
 
     hr = mGraphBuilder->AddFilter (mDvbNetworkProvider.Get(), L"dvbtNetworkProvider");
-    //{{{   error
-    if (hr != S_OK)
+    //{{{  error
+    if (hr != S_OK) {
       cLog::log (LOGERROR, "createGraphDvbT - AddFilter failed " + dec(hr));
+      return false;
+      }
     //}}}
     mDvbNetworkProvider.As (&mScanningTuner);
 
@@ -615,7 +626,7 @@ private:
 
     mTuningSpace.As (&mDvbTuningSpace2);
     hr = mDvbTuningSpace2->put__NetworkType (CLSID_DVBTNetworkProvider);
-    //{{{   error
+    //{{{  error
     if (hr != S_OK)
       cLog::log (LOGERROR, "createGraphDvbT - put__NetworkType failed " + dec(hr));
     //}}}
@@ -693,11 +704,12 @@ private:
     if (!mDvbTuner) {
       //{{{  error
       cLog::log (LOGERROR, "createGraphDvbT - unable to find dvbtuner filter");
-      return;
+      return false;
       }
       //}}}
 
     findFilter (mDvbCapture, KSCATEGORY_BDA_RECEIVER_COMPONENT, L"DVBTcapture", mDvbTuner);
+    return true;
     }
   //}}}
 

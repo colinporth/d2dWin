@@ -72,13 +72,13 @@ public:
     initialise (title, width, height, false);
     add (new cVidFrameView (this, 0.f,0.f));
     //add (new cFramesDebugBox (this, 0.f,getHeight()/4.f), 0.f,kTextHeight);
-    add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
+    add (new cLogBox (this, 200.f,-200.f, true), 0.f,200.f);
 
     int frequency = atoi (param.c_str());
     if (param.empty() || frequency) {
       updateFiles();
       cLog::log (LOGNOTICE, "getFiles %d files", mFileList.size());
-      add (new cListBox (this, getWidth()/2.f,0.f, mFileList, mFileIndex, mFileIndexChanged));
+      add (new cListBox (this, getWidth()/2.f,-4.f*kTextHeight, mFileList, mFileIndex, mFileIndexChanged));
       if (!mFileList.empty())
         mFileName = mFileList[0];
       }
@@ -86,17 +86,18 @@ public:
       mFileName = param;
 
     if (frequency) {
-      mTs = new cDumpTransportStream ("C:/tv", false);
-      add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), 126.f,0.f);
-      add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mTs->mPackets), 248.f,0.f);
-      add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mTs->mDiscontinuity), 370.f,0.f);
-      add (new cTsEpgBox (this, getWidth()/2.f,0.f, mAnalTs), getWidth()/2.f,kTextHeight)->setPin (false);
-
       mBda = new cBda();
-      thread ([=]() { bdaGrabThread (mBda, frequency*1000); }).detach();
-      thread ([=]() { bdaSignalThread (mBda); }).detach();
-      // wait for file create
-      Sleep (2000);
+      if (mBda->createGraph (frequency * 1000)) {
+        mTs = new cDumpTransportStream ("C:/tv", false);
+
+        add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), 126.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mTs->mPackets), 248.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mTs->mDiscontinuity), 370.f,0.f);
+        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mAnalTs), getWidth()/2.f,kTextHeight)->setPin (false);
+
+        thread ([=]() { bdaGrabThread (mBda); }).detach();
+        thread ([=]() { bdaSignalThread (mBda); }).detach();
+        }
       }
 
     add (new cTimecodeBox (this, 600.f,60.f, mPlayPts, mAnalTs->mLengthPts), -600.f,-60.f)->setPin (true);
@@ -1189,12 +1190,11 @@ private:
     }
   //}}}
   //{{{
-  void bdaGrabThread (cBda* bda, int frequency) {
+  void bdaGrabThread (cBda* bda) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("grab");
 
-    bda->createGraph (frequency);
     bda->run();
 
     int64_t streamPos = 0;
