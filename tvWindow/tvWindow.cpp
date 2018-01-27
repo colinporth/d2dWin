@@ -93,7 +93,7 @@ public:
         add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), 126.f,0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mTs->mPackets), 248.f,0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mTs->mDiscontinuity), 370.f,0.f);
-        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mAnalTs), getWidth()/2.f,kTextHeight)->setPin (false);
+        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mTs), getWidth()/2.f,kTextHeight);
 
         thread ([=]() { bdaGrabThread (mBda); }).detach();
         thread ([=]() { bdaSignalThread (mBda); }).detach();
