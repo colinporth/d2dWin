@@ -197,7 +197,6 @@ private:
     cAnalTransportStream () {}
     //{{{
     virtual ~cAnalTransportStream() {
-
       mBasePts = -1;
       mLengthPid = -1;
       mStreamPosVector.clear();
@@ -247,9 +246,17 @@ private:
       }
     //}}}
     //{{{
-    void clear() {
+    void clearPosCounts() {
       mStreamPosVector.clear();
       clearCounts();
+      }
+    //}}}
+    //{{{
+    void clear() {
+      mBasePts = -1;
+      mLengthPid = -1;
+      cTransportStream::clear();
+      clearPosCounts();
       }
     //}}}
 
@@ -1211,10 +1218,10 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("anal");
 
-    while (true) {
-      mAudTs->clear();
-      mVidTs->clear();
+    const auto kChunkSize = 2048*188;
+    const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
 
+    while (true) {
       // launch threads
       thread ([=]() { audThread(); }).detach();
       thread ([=]() { vidThread(); }).detach();
@@ -1229,8 +1236,6 @@ private:
       mStreamSize = buf.st_size ;
       //}}}
 
-      const auto kChunkSize = 2048*188;
-      const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
       //{{{  parse front of stream until first service
       int64_t streamPos = 0;
 
@@ -1253,7 +1258,7 @@ private:
       mAudTs->setPid (service->getAudPid());
       cLog::log (LOGNOTICE, "first service - vidPid:" + dec(service->getVidPid()) +
                             " audPid:" + dec(service->getAudPid()));
-      mAnalTs->clear();
+      mAnalTs->clearPosCounts();
       //}}}
       //{{{  parse end of stream for initial lastPts
       streamPos = mStreamSize - (kChunkSize * 8);
@@ -1270,7 +1275,7 @@ private:
           }
         }
 
-      mAnalTs->clear();
+      mAnalTs->clearPosCounts();
       //}}}
 
       // analyse stream from start, chase tail, update progress bar
@@ -1303,10 +1308,6 @@ private:
                 mFirstVidPtsSem.notifyAll();
                 cLog::log (LOGERROR, "mFirstVidPtsSem.notifyAll");
                 }
-              //else
-              //  cLog::log (LOGERROR, " nnnnnnnnnnn %d %d %d %d",
-              //             mAnalTs->getFirstPts (service->getAudPid()), service->getAudPid(),
-              //             mAnalTs->getFirstPts (service->getVidPid()), service->getVidPid());
               }
             }
           }
@@ -1336,7 +1337,6 @@ private:
         }
 
       _close (file);
-      free (chunkBuf);
 
       while (!mFileIndexChanged)
         Sleep (10);
@@ -1347,10 +1347,15 @@ private:
       mAudStoppedSem.wait();
       mVidStoppedSem.wait();
 
+      mAudTs->clear();
+      mVidTs->clear();
+      mAnalTs->clear();
+
       mFileName = mFileList[mFileIndex];
       mFileIndexChanged = false;
       }
 
+    free (chunkBuf);
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
