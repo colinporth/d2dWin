@@ -158,7 +158,7 @@ private:
         streamPos += mTs->demux (streamPtr, chunkSize, streamPos, false, -1);
         streamPtr += chunkSize;
         changed();
-        //Sleep (1);
+        //Sleep (10);
         }
 
       cLog::log (LOGINFO, "%d of %d", streamPos, streamSize);
