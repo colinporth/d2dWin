@@ -18,6 +18,7 @@
 #include "../common/box/cLogBox.h"
 #include "../common/box/cWindowBox.h"
 #include "../common/box/cAudFrameBox.h"
+#include "../common/box/cListBox.h"
 
 extern "C" {
   #include <libavcodec/avcodec.h>
@@ -74,8 +75,15 @@ public:
     add (new cFramesDebugBox (this, 0.f,getHeight()/4.f), 0.f,kTextHeight);
     add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
 
-    int frequency = param.empty() ? 674 : atoi (param.c_str());
-    if (frequency) {
+    if (param.empty()) {
+      mFileList = getFiles ("C:/tv", "*.ts");
+      cLog::log (LOGNOTICE, "getFiles %d files", mFileList.size());
+      add (new cListBox (this, 0,250.0f, mFileList, mFileIndex, mFileIndexChanged));
+      if (!mFileList.empty())
+        mFileName = mFileList[0];
+      }
+    else if (atoi (param.c_str()) > 0) {
+      int frequency = atoi (param.c_str());
       add (new cIntBox (this, 70.f,kTextHeight, "sig ", mSignal), -70.f,0.f);
 
       mFileName = "C:/videos/tune.ts";
@@ -118,8 +126,34 @@ protected:
 
       case  ' ': togglePlay(); break;
 
-      case 0x21: incPlayPts (-90000*10); break; // page up
-      case 0x22: incPlayPts (90000*10); break; // page down
+      case 0x0d:
+        //{{{  enter
+        cLog::log (LOGINFO, "enter key");
+        mFileName = mFileList[mFileIndex];
+        mFileChanged = true;
+        break;
+        //}}}
+      case 0x21:
+        //{{{  page up - prev file
+        if (!mFileList.empty()) {
+          mFileIndex = mFileIndex-- % mFileList.size();
+          mFileIndexChanged = true;
+          changed();
+          }
+        break;
+        //}}}
+      case 0x22:
+        //{{{  page down - next file
+        if (!mFileList.empty()) {
+          mFileIndex = mFileIndex++ % mFileList.size();
+          mFileIndexChanged = true;
+          changed();
+          }
+        break;
+        //}}}
+
+      //case 0x21: incPlayPts (-90000*10); break; // page up
+      //case 0x22: incPlayPts (90000*10); break; // page down
       case 0x23: setPlayPts (mAnalTs->getLengthPts()); break; // end
       case 0x24: setPlayPts (0); break; // home
       case 0x25: incPlayPts (-90000/25); mPlaying = ePause; break; // left arrow
@@ -148,7 +182,7 @@ protected:
 
       case  'F': toggleFullScreen(); break;
 
-      default:   printf ("key %x\n", key);
+      default: cLog::log (LOGINFO, "key %x", key);
       }
 
     return false;
@@ -1167,123 +1201,130 @@ private:
     CoUninitialize();
     }
   //}}}
+
   //{{{
   void analThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("anal");
 
-    auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
-    //{{{  get streamSize
-    struct _stat64 buf;
-    _fstat64 (file, &buf);
-    mStreamSize = buf.st_size ;
-    //}}}
+    while (true) {
+      cLog::log (LOGINFO, "anal " + mFileName);
+      auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
+      //{{{  get streamSize
+      struct _stat64 buf;
+      _fstat64 (file, &buf);
+      mStreamSize = buf.st_size ;
+      //}}}
 
-    const auto kChunkSize = 2048*188;
-    const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
-    //{{{  parse front of stream until first service
-    int64_t streamPos = 0;
+      const auto kChunkSize = 2048*188;
+      const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
+      //{{{  parse front of stream until first service
+      int64_t streamPos = 0;
 
-    cService* service = nullptr;
-    while (!service) {
-      auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
-      auto chunkPtr = chunkBuf;
-      while (chunkBytesLeft >= 188) {
-        auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, false, -1);
-        streamPos += bytesUsed;
-        chunkPtr += bytesUsed;
-        chunkBytesLeft -= (int)bytesUsed;
+      cService* service = nullptr;
+      while (!service) {
+        auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
+        auto chunkPtr = chunkBuf;
+        while (chunkBytesLeft >= 188) {
+          auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, false, -1);
+          streamPos += bytesUsed;
+          chunkPtr += bytesUsed;
+          chunkBytesLeft -= (int)bytesUsed;
+          }
+
+        service = mAnalTs->getService (0);
         }
 
-      service = mAnalTs->getService (0);
-      }
+      // select first service
+      mVidTs->setPid (service->getVidPid());
+      mAudTs->setPid (service->getAudPid());
+      cLog::log (LOGNOTICE, "first service - vidPid:" + dec(service->getVidPid()) +
+                            " audPid:" + dec(service->getAudPid()));
 
-    // select first service
-    mVidTs->setPid (service->getVidPid());
-    mAudTs->setPid (service->getAudPid());
-    cLog::log (LOGNOTICE, "first service - vidPid:" + dec(service->getVidPid()) +
-                          " audPid:" + dec(service->getAudPid()));
+      mAnalTs->clear();
+      //}}}
+      //{{{  parse end of stream for initial lastPts
+      streamPos = mStreamSize - (kChunkSize * 8);
+      _lseeki64 (file, streamPos, SEEK_SET);
 
-    mAnalTs->clear();
-    //}}}
-    //{{{  parse end of stream for initial lastPts
-    streamPos = mStreamSize - (kChunkSize * 8);
-    _lseeki64 (file, streamPos, SEEK_SET);
-
-    while (streamPos < mStreamSize) {
-      auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
-      auto chunkPtr = chunkBuf;
-      while (chunkBytesLeft >= 188) {
-        auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, chunkPtr == chunkBuf, -1);
-        streamPos += bytesUsed;
-        chunkPtr += bytesUsed;
-        chunkBytesLeft -= (int)bytesUsed;
+      while (streamPos < mStreamSize) {
+        auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
+        auto chunkPtr = chunkBuf;
+        while (chunkBytesLeft >= 188) {
+          auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, chunkPtr == chunkBuf, -1);
+          streamPos += bytesUsed;
+          chunkPtr += bytesUsed;
+          chunkBytesLeft -= (int)bytesUsed;
+          }
         }
-      }
 
-    mAnalTs->clear();
-    //}}}
+      mAnalTs->clear();
+      //}}}
 
-    // analyse stream from start, chase tail, update progress bar
-    mStreamPos = 0;
-    _lseeki64 (file, mStreamPos, SEEK_SET);
+      // analyse stream from start, chase tail, update progress bar
+      mStreamPos = 0;
+      _lseeki64 (file, mStreamPos, SEEK_SET);
 
-    int sameCount = 0;
-    int firstVidSignalCount = 0;
-    while (sameCount < 10) {
-      int64_t bytesToRead = mStreamSize - mStreamPos;
-      if (bytesToRead > kChunkSize) // trim to kChunkSize
-        bytesToRead = kChunkSize;
-      if (bytesToRead >= 188) {
-        // at least 1 packet to read, trim read to packet boundary
-        bytesToRead -= bytesToRead % 188;
-        auto chunkBytesLeft = _read (file, chunkBuf, (unsigned int)bytesToRead);
-        if (chunkBytesLeft >= 188) {
-          auto chunkPtr = chunkBuf;
-          while (chunkBytesLeft >= 188) {
-            auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, mStreamPos, mStreamPos == 0, -1);
-            mStreamPos += bytesUsed;
-            chunkPtr += bytesUsed;
-            chunkBytesLeft -= (int)bytesUsed;
-            changed();
+      int sameCount = 0;
+      int firstVidSignalCount = 0;
+      while (sameCount < 10) {
+        int64_t bytesToRead = mStreamSize - mStreamPos;
+        if (bytesToRead > kChunkSize) // trim to kChunkSize
+          bytesToRead = kChunkSize;
+        if (bytesToRead >= 188) {
+          // at least 1 packet to read, trim read to packet boundary
+          bytesToRead -= bytesToRead % 188;
+          auto chunkBytesLeft = _read (file, chunkBuf, (unsigned int)bytesToRead);
+          if (chunkBytesLeft >= 188) {
+            auto chunkPtr = chunkBuf;
+            while (chunkBytesLeft >= 188) {
+              auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, mStreamPos, mStreamPos == 0, -1);
+              mStreamPos += bytesUsed;
+              chunkPtr += bytesUsed;
+              chunkBytesLeft -= (int)bytesUsed;
+              changed();
 
-            if ((firstVidSignalCount < 3) &&
-                (mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
-                (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
-              firstVidSignalCount++;
-              mFirstVidPtsSem.notifyAll();
+              if ((firstVidSignalCount < 3) &&
+                  (mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
+                  (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
+                firstVidSignalCount++;
+                mFirstVidPtsSem.notifyAll();
+                }
               }
             }
           }
-        }
-      else {
-        //{{{  check fileSize changed
-        while (true) {
-          Sleep (1000);
-          _fstat64 (file, &buf);
-          if (buf.st_size > mStreamSize) {
-            cLog::log (LOGINFO, "fileSize now " + dec(mStreamSize));
-            mStreamSize = buf.st_size;
-            sameCount = 0;
-            break;
-            }
-          else {
-            sameCount++;
-            if (sameCount >= 10) {
-              cLog::log (LOGINFO, "fileSize sameCount expired " + dec(sameCount));
+        else {
+          //{{{  check fileSize changed
+          while (true) {
+            Sleep (1000);
+            _fstat64 (file, &buf);
+            if (buf.st_size > mStreamSize) {
+              cLog::log (LOGINFO, "fileSize now " + dec(mStreamSize));
+              mStreamSize = buf.st_size;
+              sameCount = 0;
               break;
               }
-            else
-              cLog::log (LOGINFO, "fileSize same " + dec(sameCount));
+            else {
+              sameCount++;
+              if (sameCount >= 10) {
+                cLog::log (LOGINFO, "fileSize sameCount expired " + dec(sameCount));
+                break;
+                }
+              else
+                cLog::log (LOGINFO, "fileSize same " + dec(sameCount));
+              }
             }
           }
+          //}}}
         }
-        //}}}
-      }
 
-    _close (file);
-    free (chunkBuf);
+      _close (file);
+      free (chunkBuf);
+
+      while (!mFileChanged)
+        Sleep (10);
+      }
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -1296,73 +1337,76 @@ private:
     cLog::setThreadName ("aud ");
     av_register_all();
 
-    const int kChunkSize = 2048*188;
-    const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
-
-    mFirstVidPtsSem.wait();
-
-    bool skip = false;
-    int64_t lastJumpStreamPos = -1;
-
-    int64_t streamPos = 0;
-    auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
     while (true) {
-      auto chunkPtr = chunkBuf;
-      auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
-      if (chunkBytesLeft < 188) {
-        // end of file
-        while (mAudTs->isLoaded (getPlayPts(), 1))
-          mPlayPtsSem.wait();
-        //{{{  jump to pts in stream
-        auto jumpStreamPos = mAnalTs->findStreamPos (mAudTs->getPid(), getPlayPts());
-        streamPos = jumpStreamPos;
-        _lseeki64 (file, streamPos, SEEK_SET);
-        lastJumpStreamPos = jumpStreamPos;
+      cLog::log (LOGINFO, "aud " + mFileName);
+      const int kChunkSize = 2048*188;
+      const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
 
-        chunkBytesLeft = 0;
-        skip = true;
-        //}}}
-        }
-      else {
-        while (chunkBytesLeft >= 188) {
-          //{{{  demux up to a frame
-          // decode a frame
-          auto bytesUsed = mAudTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mAudTs->getPid());
-          streamPos += bytesUsed;
-          chunkPtr += bytesUsed;
-          chunkBytesLeft -= (int)bytesUsed;
-          skip = false;
-          //}}}
-          changed();
+      mFirstVidPtsSem.wait();
 
-          while (mAudTs->isLoaded (getPlayPts(), kAudMaxFrames/2))
+      bool skip = false;
+      int64_t lastJumpStreamPos = -1;
+
+      int64_t streamPos = 0;
+      auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
+      while (!mFileChanged) {
+        auto chunkPtr = chunkBuf;
+        auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
+        if (chunkBytesLeft < 188) {
+          // end of file
+          while (mAudTs->isLoaded (getPlayPts(), 1))
             mPlayPtsSem.wait();
+          //{{{  jump to pts in stream
+          auto jumpStreamPos = mAnalTs->findStreamPos (mAudTs->getPid(), getPlayPts());
+          streamPos = jumpStreamPos;
+          _lseeki64 (file, streamPos, SEEK_SET);
+          lastJumpStreamPos = jumpStreamPos;
 
-          bool loaded = mAudTs->isLoaded (getPlayPts(), 1);
-          if (!loaded || (getPlayPts() > mAudTs->getLastLoadedPts() + 100000)) {
-            auto jumpStreamPos = mAnalTs->findStreamPos (mAudTs->getPid(), getPlayPts());
-            if (jumpStreamPos != lastJumpStreamPos) {
-              //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
-              cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
-                         (loaded ? " after ":" notLoaded ") + getPtsString(mAudTs->getLastLoadedPts()));
+          chunkBytesLeft = 0;
+          skip = true;
+          //}}}
+          }
+        else {
+          while (chunkBytesLeft >= 188) {
+            //{{{  demux up to a frame
+            // decode a frame
+            auto bytesUsed = mAudTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mAudTs->getPid());
+            streamPos += bytesUsed;
+            chunkPtr += bytesUsed;
+            chunkBytesLeft -= (int)bytesUsed;
+            skip = false;
+            //}}}
+            changed();
 
-              _lseeki64 (file, jumpStreamPos, SEEK_SET);
+            while (mAudTs->isLoaded (getPlayPts(), kAudMaxFrames/2))
+              mPlayPtsSem.wait();
 
-              streamPos = jumpStreamPos;
-              lastJumpStreamPos = jumpStreamPos;
-              chunkBytesLeft = 0;
-              skip = true;
+            bool loaded = mAudTs->isLoaded (getPlayPts(), 1);
+            if (!loaded || (getPlayPts() > mAudTs->getLastLoadedPts() + 100000)) {
+              auto jumpStreamPos = mAnalTs->findStreamPos (mAudTs->getPid(), getPlayPts());
+              if (jumpStreamPos != lastJumpStreamPos) {
+                //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
+                cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
+                           (loaded ? " after ":" notLoaded ") + getPtsString(mAudTs->getLastLoadedPts()));
 
-              break;
+                _lseeki64 (file, jumpStreamPos, SEEK_SET);
+
+                streamPos = jumpStreamPos;
+                lastJumpStreamPos = jumpStreamPos;
+                chunkBytesLeft = 0;
+                skip = true;
+
+                break;
+                }
+                //}}}
               }
-              //}}}
             }
           }
         }
-      }
 
-    _close (file);
-    free (chunkBuf);
+      _close (file);
+      free (chunkBuf);
+      }
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -1374,72 +1418,75 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("vid ");
 
-    const int kChunkSize = 2048*188;
-    const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
-
-    mFirstVidPtsSem.wait();
-
-    bool skip = false;
-    int64_t lastJumpStreamPos = -1;
-
-    int64_t streamPos = 0;
-    auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
     while (true) {
-      auto chunkPtr = chunkBuf;
-      auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
-      if (chunkBytesLeft < 188) {
-        // end of file
-        while (mVidTs->isLoaded (getPlayPts(), 1))
-          mPlayPtsSem.wait();
-        //{{{  jump to pts in stream
-        auto jumpStreamPos = mAnalTs->findStreamPos (mVidTs->getPid(), getPlayPts());
-        streamPos = jumpStreamPos;
-        _lseeki64 (file, streamPos, SEEK_SET);
-        lastJumpStreamPos = jumpStreamPos;
+      cLog::log (LOGINFO, "vid " + mFileName);
+      const int kChunkSize = 2048*188;
+      const auto chunkBuf = (uint8_t*)malloc (kChunkSize);
 
-        chunkBytesLeft = 0;
-        skip = true;
-        //}}}
-        }
-      else {
-        while (chunkBytesLeft >= 188) {
-          //{{{  demux up to a frame
-          auto bytesUsed = mVidTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mVidTs->getPid());
-          streamPos += bytesUsed;
-          chunkPtr += bytesUsed;
-          chunkBytesLeft -= (int)bytesUsed;
-          skip = false;
-          //}}}
-          changed();
+      mFirstVidPtsSem.wait();
 
-          while (mVidTs->isLoaded (getPlayPts(), 4))
+      bool skip = false;
+      int64_t lastJumpStreamPos = -1;
+
+      int64_t streamPos = 0;
+      auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
+      while (!mFileChanged) {
+        auto chunkPtr = chunkBuf;
+        auto chunkBytesLeft = _read (file, chunkBuf, kChunkSize);
+        if (chunkBytesLeft < 188) {
+          // end of file
+          while (mVidTs->isLoaded (getPlayPts(), 1))
             mPlayPtsSem.wait();
+          //{{{  jump to pts in stream
+          auto jumpStreamPos = mAnalTs->findStreamPos (mVidTs->getPid(), getPlayPts());
+          streamPos = jumpStreamPos;
+          _lseeki64 (file, streamPos, SEEK_SET);
+          lastJumpStreamPos = jumpStreamPos;
 
-          bool loaded = mVidTs->isLoaded (getPlayPts(), 1);
-          if (!loaded || (getPlayPts() > mVidTs->getLastLoadedPts() + 100000)) {
-            auto jumpStreamPos = mAnalTs->findStreamPos (mVidTs->getPid(), getPlayPts());
-            if (jumpStreamPos != lastJumpStreamPos) {
-              //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
-              cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
-                         (loaded ? " after ":" notLoaded ") + getPtsString(mVidTs->getLastLoadedPts()));
+          chunkBytesLeft = 0;
+          skip = true;
+          //}}}
+          }
+        else {
+          while (chunkBytesLeft >= 188) {
+            //{{{  demux up to a frame
+            auto bytesUsed = mVidTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mVidTs->getPid());
+            streamPos += bytesUsed;
+            chunkPtr += bytesUsed;
+            chunkBytesLeft -= (int)bytesUsed;
+            skip = false;
+            //}}}
+            changed();
 
-              _lseeki64 (file, jumpStreamPos, SEEK_SET);
+            while (mVidTs->isLoaded (getPlayPts(), 4))
+              mPlayPtsSem.wait();
 
-              streamPos = jumpStreamPos;
-              lastJumpStreamPos = jumpStreamPos;
-              chunkBytesLeft = 0;
-              skip = true;
+            bool loaded = mVidTs->isLoaded (getPlayPts(), 1);
+            if (!loaded || (getPlayPts() > mVidTs->getLastLoadedPts() + 100000)) {
+              auto jumpStreamPos = mAnalTs->findStreamPos (mVidTs->getPid(), getPlayPts());
+              if (jumpStreamPos != lastJumpStreamPos) {
+                //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
+                cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
+                           (loaded ? " after ":" notLoaded ") + getPtsString(mVidTs->getLastLoadedPts()));
 
-              break;
+                _lseeki64 (file, jumpStreamPos, SEEK_SET);
+
+                streamPos = jumpStreamPos;
+                lastJumpStreamPos = jumpStreamPos;
+                chunkBytesLeft = 0;
+                skip = true;
+
+                break;
+                }
+                //}}}
               }
-              //}}}
             }
           }
         }
-      }
 
-    _close (file);
-    free (chunkBuf);
+      _close (file);
+      free (chunkBuf);
+      }
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -1451,30 +1498,33 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("play");
 
-    audOpen (2, 48000);
-
-    mFirstVidPtsSem.wait();
-    mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
 
     while (true) {
-      auto pts = getPlayPts();
-      mPlayAudFrame = (cAudFrame*)mAudTs->findFrame (pts);
+      cLog::log (LOGINFO, "play" + mFileName);
+      audOpen (2, 48000);
+      mFirstVidPtsSem.wait();
+      mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
 
-      // play using frame where available, else play silence
-      audPlay (mPlayAudFrame ? mPlayAudFrame->mChannels : getSrcChannels(),
-               mPlayAudFrame && (mPlaying != ePause) ?  mPlayAudFrame->mSamples : nullptr,
-               mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
-               1.f);
+      while (!mFileChanged) {
+        auto pts = getPlayPts();
+        mPlayAudFrame = (cAudFrame*)mAudTs->findFrame (pts);
 
-      if ((mPlaying == ePlay) && (mPlayPts < getLengthPts()))
-        incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
-      if (mPlayPts > getLengthPts())
-        mPlayPts = getLengthPts();
+        // play using frame where available, else play silence
+        audPlay (mPlayAudFrame ? mPlayAudFrame->mChannels : getSrcChannels(),
+                 mPlayAudFrame && (mPlaying != ePause) ?  mPlayAudFrame->mSamples : nullptr,
+                 mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
+                 1.f);
 
-      mPlayPtsSem.notifyAll();
+        if ((mPlaying == ePlay) && (mPlayPts < getLengthPts()))
+          incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
+        if (mPlayPts > getLengthPts())
+          mPlayPts = getLengthPts();
+
+        mPlayPtsSem.notifyAll();
+        }
+
+      audClose();
       }
-
-    audClose();
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -1504,6 +1554,11 @@ private:
 
   cSemaphore mFirstVidPtsSem;
   cSemaphore mPlayPtsSem;
+
+  vector <string> mFileList;
+  int mFileIndex = 0;
+  bool mFileIndexChanged = false;
+  bool mFileChanged = false;
   //}}}
   };
 
