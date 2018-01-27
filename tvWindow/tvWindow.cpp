@@ -1301,7 +1301,7 @@ private:
               chunkBytesLeft -= (int)bytesUsed;
               changed();
 
-              if ((firstVidSignalCount < 3) &&
+              if (
                   (mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
                   (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
                 firstVidSignalCount++;
