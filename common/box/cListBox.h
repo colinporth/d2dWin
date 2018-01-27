@@ -62,24 +62,24 @@ public:
   //}}}
 
   void onDraw (ID2D1DeviceContext* dc) {
+
     if (!mTextPressed && mScrollInc)
       incScroll (mScrollInc * 0.9f);
 
-    int index = int(mScroll) / (int)kTextHeight;
-    float y = mRect.top - (int(mScroll) % (int)kTextHeight);
-    for (int i = 0; (y < mRect.bottom) && (index < (int)mNames.size()); i++, index++, y += kTextHeight) {
-      if (i >= (int)mMeasure.size())
+    int nameIndex = int(mScroll) / (int)kTextHeight;
+    float y = mRect.top + 1.f - (int(mScroll) % (int)kTextHeight);
+
+    for (int row = 0; (y < mRect.bottom) && (nameIndex < (int)mNames.size()); row++, nameIndex++, y += kTextHeight) {
+      if (row >= (int)mMeasure.size())
         mMeasure.push_back (0);
+      mMeasure[row] = 200;
 
-      mMeasure[i] = 200;
-      string str = mNames[index];
-      auto brush = mTextPressed && !mMoved && (index == mPressedIndex) ?
-                     mWindow->getYellowBrush() : (index == mIndex) ?
+      std::string str = mNames[nameIndex];
+      auto brush = mTextPressed && !mMoved && (nameIndex == mPressedIndex) ?
+                     mWindow->getYellowBrush() : (nameIndex == mIndex) ?
                        mWindow->getWhiteBrush() : mWindow->getLightGreyBrush();
-
       dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
-                    cRect(mRect.left+2, mRect.top+y+1.f, mRect.right, mRect.top+y+1.f + kTextHeight),
-                    brush);
+                    cRect(mRect.left+2, y, mRect.right, y + kTextHeight), brush);
       }
     }
 
@@ -91,14 +91,16 @@ private:
 
     if (mScroll < 0.f)
       mScroll = 0.f;
-    else if (mScroll > ((mNames.size() * kTextHeight) - (mRect.bottom - mRect.top)))
-      mScroll = float(((int)mNames.size() * kTextHeight) - (mRect.bottom - mRect.top));
+    else if ((mNames.size() * kTextHeight) < mRect.getHeight())
+      mScroll = 0.f;
+    else if (mScroll > ((mNames.size() * kTextHeight) - mRect.getHeight()))
+      mScroll = float(((int)mNames.size() * kTextHeight) - mRect.getHeight());
 
     mScrollInc = fabs(inc) < 0.2f ? 0 : inc;
     }
   //}}}
 
-  vector <string>& mNames;
+  std::vector <std::string>& mNames;
   int& mIndex;
   bool& mIndexChanged;
 
@@ -107,7 +109,7 @@ private:
   bool mMoved = false;
   float mMoveInc = 0;
 
-  vector <int> mMeasure;
+  std::vector <int> mMeasure;
 
   float mScroll = 0.f;
   float mScrollInc = 0.f;
