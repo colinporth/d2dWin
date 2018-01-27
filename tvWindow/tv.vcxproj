@@ -41,12 +41,13 @@
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h" />
     <ClInclude Include="..\..\shared\utils\cWinAudio.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
+    <ClInclude Include="..\common\box\cTsEpgBox.h" />
+    <ClInclude Include="..\common\box\cTsPidBox.h" />
     <ClInclude Include="..\common\cAudFrame.h" />
     <ClInclude Include="..\common\cBoxes.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cLogBox.h" />
     <ClInclude Include="..\common\cTitleBox.h" />
-    <ClInclude Include="..\common\cTransportStreamBox.h" />
     <ClInclude Include="..\common\cVidFrame.h" />
     <ClInclude Include="..\common\cWindowBox.h" />
     <ClInclude Include="stdafx.h" />

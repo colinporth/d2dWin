@@ -11,7 +11,7 @@
 #include "../common/cVidFrame.h"
 #include "../common/cAudFrame.h"
 
-#include "../common/box/cTransportStreamBox.h"
+#include "../common/box/cTsEpgBox.h"
 #include "../common/box/cToggleBox.h"
 #include "../common/box/cIntBox.h"
 #include "../common/box/cValueBox.h"
@@ -70,7 +70,7 @@ public:
     // init d2dWindow, boxes
     initialise (title, width, height, false);
     add (new cVidFrameView (this, 0.f,0.f));
-    add (new cTransportStreamBox (this, 0, getHeight()/2.f, mAnalTs))->setPin (false);
+    add (new cTsEpgBox (this, 0, getHeight()/2.f, mAnalTs))->setPin (false);
     add (new cFramesDebugBox (this, 0.f,getHeight()/4.f), 0.f,kTextHeight);
     add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
 

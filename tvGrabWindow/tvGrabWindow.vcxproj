@@ -43,10 +43,11 @@
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\timer.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
+    <ClInclude Include="..\common\box\cTsEpgBox.h" />
+    <ClInclude Include="..\common\box\cTsPidBox.h" />
     <ClInclude Include="..\common\cBda.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cLogBox.h" />
-    <ClInclude Include="..\common\cTransportStreamBox.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

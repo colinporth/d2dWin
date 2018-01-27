@@ -26,9 +26,6 @@
     <ClInclude Include="..\..\shared\utils\cBipBuffer.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\cTransportStreamBox.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\cLogBox.h">
       <Filter>header</Filter>
     </ClInclude>
@@ -36,6 +33,12 @@
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\box\cTsEpgBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\box\cTsPidBox.h">
       <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>
