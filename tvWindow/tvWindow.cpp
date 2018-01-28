@@ -74,8 +74,7 @@ public:
     int frequency = atoi (param.c_str());
     if (param.empty() || frequency) {
       updateFileList();
-      cLog::log (LOGNOTICE, "getFiles %d files", mFileList.size());
-      add (new cListBox (this, getWidth()/2.f, 0.f, mFileList, mFileIndex, mFileIndexChanged), 0.f,kTextHeight);
+      add (new cListBox (this, getWidth()/2.f, 0.f, mFileList, mFileIndex, mFileIndexChanged));
       threadHandle = thread ([=](){ filesPlayerThread(); });
       //threadHandle = thread ([=](){ muliplePlayerThread(); });
       }
@@ -90,10 +89,10 @@ public:
       if (mDvb->createGraph (frequency * 1000)) {
         mDvbTs = new cDumpTransportStream ("C:/tv", false);
 
-        add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), 0.f,0.f);
-        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvbTs->mPackets), 122.f,0.f);
-        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvbTs->mDiscontinuity), 224.f,0.f);
-        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvbTs), getWidth()/2.f,kTextHeight);
+        add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), 0.f,-120.f);
+        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvbTs->mPackets), -224.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvbTs->mDiscontinuity), -326.f,0.f);
+        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvbTs), getWidth()/2.f,0.f);
 
         thread ([=]() { dvbGrabThread (mDvb); }).detach();
         thread ([=]() { dvbSignalThread (mDvb); }).detach();
@@ -230,122 +229,6 @@ protected:
   //}}}
 
 private:
-  //{{{
-  class cAnalTransportStream : public cTransportStream {
-  public:
-    cAnalTransportStream () {}
-    //{{{
-    virtual ~cAnalTransportStream() {
-      mBasePts = -1;
-      mLengthPid = -1;
-      mStreamPosVector.clear();
-      }
-    //}}}
-
-    int64_t getBasePts() { return mBasePts; }
-    int64_t getLengthPts() { return mLengthPts; }
-    //{{{
-    int64_t getFirstPts (int pid) {
-    // return pts of first streamPos matching pid,
-    // - return -1 if none
-
-      for (auto &streamPos : mStreamPosVector)
-        if (pid == streamPos.mPid)
-          return streamPos.mPts;
-
-      return -1;
-      }
-    //}}}
-    //{{{
-    cService* getService (int index) {
-
-      int64_t firstPts;
-      int64_t lastPts;
-      auto service = cTransportStream::getService (index, firstPts, lastPts);
-      if (service) {
-        mLengthPid = service->getAudPid();
-        mBasePts = firstPts;
-        mLengthPts = lastPts - firstPts;
-        }
-
-      return service;
-      }
-    //}}}
-
-    //{{{
-    int64_t findStreamPos (int pid, int64_t pts) {
-    // return streamPos for first streamPos, matching pid, on or after pts
-    // - return 0 if none
-
-      for (auto streamPos = mStreamPosVector.rbegin(); streamPos != mStreamPosVector.rend(); ++streamPos)
-        if ((pid == streamPos->mPid) && (pts >= streamPos->mPts))
-          return streamPos->mPos;
-
-      return 0;
-      }
-    //}}}
-    //{{{
-    void clearPosCounts() {
-      mStreamPosVector.clear();
-      clearCounts();
-      }
-    //}}}
-    //{{{
-    void clear() {
-      mBasePts = -1;
-      mLengthPid = -1;
-      cTransportStream::clear();
-      clearPosCounts();
-      }
-    //}}}
-
-    // public only for box
-    int64_t mLengthPts = -1;
-
-  protected:
-    //{{{
-    bool audDecodePes (cPidInfo* pidInfo, bool skip) {
-
-      mStreamPosVector.push_back (cStreamPos (pidInfo->mPid, pidInfo->mPts, pidInfo->mStreamPos));
-      if (pidInfo->mPid == mLengthPid)
-        mLengthPts = pidInfo->mLastPts - pidInfo->mFirstPts;
-      //cLog::log (LOGINFO, "anal audPes " + dec(mStreamPosVector.size()) +
-      //                    " " + getPtsString (pidInfo->mPts));
-
-      return true;
-      }
-    //}}}
-    //{{{
-    bool vidDecodePes (cPidInfo* pidInfo, bool skip) {
-
-      char frameType = getFrameType (pidInfo->mBuffer, pidInfo->mBufPtr - pidInfo->mBuffer, pidInfo->mStreamType);
-      if ((frameType == 'I') || (frameType == '?')) {
-        mStreamPosVector.push_back (cStreamPos (pidInfo->mPid, pidInfo->mPts, pidInfo->mStreamPos));
-        //cLog::log (LOGINFO, "anal vidPes " + dec(mStreamPosVector.size()) +
-        //                    " " + getPtsString (pidInfo->mPts));
-        }
-
-      return true;
-      }
-    //}}}
-
-  private:
-    int64_t mBasePts = -1;
-    int mLengthPid = -1;
-
-    //{{{
-    class cStreamPos {
-    public:
-      cStreamPos (int pid, int64_t pts, int64_t pos) : mPid(pid), mPts(pts), mPos(pos) {}
-
-      int mPid;
-      int64_t mPts;
-      int64_t mPos;
-      };
-    //}}}
-    concurrent_vector<cStreamPos> mStreamPosVector;
-    };
-  //}}}
   //{{{
   class cDecodeTransportStream : public cTransportStream {
   public:
@@ -903,6 +786,122 @@ private:
     mfxFrameSurface1** mSurfaces2;
     };
   //}}}
+  //{{{
+  class cAnalTransportStream : public cTransportStream {
+  public:
+    cAnalTransportStream () {}
+    //{{{
+    virtual ~cAnalTransportStream() {
+      mBasePts = -1;
+      mLengthPid = -1;
+      mStreamPosVector.clear();
+      }
+    //}}}
+
+    int64_t getBasePts() { return mBasePts; }
+    int64_t getLengthPts() { return mLengthPts; }
+    //{{{
+    int64_t getFirstPts (int pid) {
+    // return pts of first streamPos matching pid,
+    // - return -1 if none
+
+      for (auto &streamPos : mStreamPosVector)
+        if (pid == streamPos.mPid)
+          return streamPos.mPts;
+
+      return -1;
+      }
+    //}}}
+    //{{{
+    cService* getService (int index) {
+
+      int64_t firstPts;
+      int64_t lastPts;
+      auto service = cTransportStream::getService (index, firstPts, lastPts);
+      if (service) {
+        mLengthPid = service->getAudPid();
+        mBasePts = firstPts;
+        mLengthPts = lastPts - firstPts;
+        }
+
+      return service;
+      }
+    //}}}
+
+    //{{{
+    int64_t findStreamPos (int pid, int64_t pts) {
+    // return streamPos for first streamPos, matching pid, on or after pts
+    // - return 0 if none
+
+      for (auto streamPos = mStreamPosVector.rbegin(); streamPos != mStreamPosVector.rend(); ++streamPos)
+        if ((pid == streamPos->mPid) && (pts >= streamPos->mPts))
+          return streamPos->mPos;
+
+      return 0;
+      }
+    //}}}
+    //{{{
+    void clearPosCounts() {
+      mStreamPosVector.clear();
+      clearCounts();
+      }
+    //}}}
+    //{{{
+    void clear() {
+      mBasePts = -1;
+      mLengthPid = -1;
+      cTransportStream::clear();
+      clearPosCounts();
+      }
+    //}}}
+
+    // public only for box
+    int64_t mLengthPts = -1;
+
+  protected:
+    //{{{
+    bool audDecodePes (cPidInfo* pidInfo, bool skip) {
+
+      mStreamPosVector.push_back (cStreamPos (pidInfo->mPid, pidInfo->mPts, pidInfo->mStreamPos));
+      if (pidInfo->mPid == mLengthPid)
+        mLengthPts = pidInfo->mLastPts - pidInfo->mFirstPts;
+      //cLog::log (LOGINFO, "anal audPes " + dec(mStreamPosVector.size()) +
+      //                    " " + getPtsString (pidInfo->mPts));
+
+      return true;
+      }
+    //}}}
+    //{{{
+    bool vidDecodePes (cPidInfo* pidInfo, bool skip) {
+
+      char frameType = getFrameType (pidInfo->mBuffer, pidInfo->mBufPtr - pidInfo->mBuffer, pidInfo->mStreamType);
+      if ((frameType == 'I') || (frameType == '?')) {
+        mStreamPosVector.push_back (cStreamPos (pidInfo->mPid, pidInfo->mPts, pidInfo->mStreamPos));
+        //cLog::log (LOGINFO, "anal vidPes " + dec(mStreamPosVector.size()) +
+        //                    " " + getPtsString (pidInfo->mPts));
+        }
+
+      return true;
+      }
+    //}}}
+
+  private:
+    int64_t mBasePts = -1;
+    int mLengthPid = -1;
+
+    //{{{
+    class cStreamPos {
+    public:
+      cStreamPos (int pid, int64_t pts, int64_t pos) : mPid(pid), mPts(pts), mPos(pos) {}
+
+      int mPid;
+      int64_t mPts;
+      int64_t mPos;
+      };
+    //}}}
+    concurrent_vector<cStreamPos> mStreamPosVector;
+    };
+  //}}}
 
   //{{{
   class cPlayContext {
@@ -1424,8 +1423,11 @@ private:
     //}}}
     //{{{  delete resources
     delete playContext->mAudTs;
+    playContext->mAudTs = nullptr;
     delete playContext->mVidTs;
+    playContext->mVidTs = nullptr;
     delete playContext->mAnalTs;
+    playContext->mAnalTs = nullptr;
     //}}}
     }
   //}}}
