@@ -66,7 +66,6 @@ public:
 
     // init d2dWindow, boxes
     initialise (title, width, height, false);
-    add (new cLogBox (this, 200.f,0.f, true), 0.f,0.f);
     //add (new cFramesDebugBox (this, 0.f,getHeight()/4.f), 0.f,kTextHeight);
 
     // launch file player
@@ -100,6 +99,7 @@ public:
       }
 
     // exit, maximise box
+    add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
     // loop till quit
@@ -235,11 +235,16 @@ private:
     //{{{
     virtual ~cDecodeTransportStream() {
 
-      mFrames.clear();
       mPid = -1;
       mLastLoadedPts = -1;
       mLoadFrame = 0;
-      }
+
+      for (auto frame : mFrames) {
+        delete frame;
+        frame = nullptr;
+        }
+      mFrames.clear();
+    }
     //}}}
 
     int getPid() { return mPid; }
@@ -772,7 +777,6 @@ private:
 
     // mfx decoder
     MFXVideoSession mSession;
-    mfxFrameAllocator mAllocator;
     mfxVideoParam mVideoParams;
 
     mfxBitstream mBitstream;

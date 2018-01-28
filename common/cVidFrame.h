@@ -5,8 +5,11 @@
 class cVidFrame : public iFrame {
 public:
   //{{{
-  virtual ~cVidFrame() {
-    freeResources();
+  virtual ~cVidFrame() { 
+    _aligned_free (mYbuf);
+    _aligned_free (mUbuf);
+    _aligned_free (mVbuf);
+    _aligned_free (mBgra);
     }
   //}}}
 
@@ -235,34 +238,6 @@ public:
     mPts = 0;
     mPesSize = 0;
     mFrameType = '?';
-    }
-  //}}}
-  //{{{
-  void freeResources() {
-
-    mOk = false;
-
-    mPts = 0;
-    mPesSize = 0;
-    mFrameType = '?';
-
-    mWidth = 0;
-    mHeight = 0;
-
-    mYStride = 0;
-    mUVStride = 0;
-
-    _aligned_free (mYbuf);
-    mYbuf = nullptr;
-
-    _aligned_free (mUbuf);
-    mUbuf = nullptr;
-
-    _aligned_free (mVbuf);
-    mVbuf = nullptr;
-
-    _aligned_free (mBgra);
-    mBgra = nullptr;
     }
   //}}}
 

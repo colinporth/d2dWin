@@ -43,7 +43,6 @@ public:
   //}}}
 
   virtual void invalidate() = 0;
-  virtual void freeResources() = 0;
 
 protected:
   // vars

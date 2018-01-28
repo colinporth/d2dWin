@@ -5,11 +5,7 @@
 class cAudFrame : public iFrame {
 public:
   cAudFrame() {}
-  //{{{
-  virtual ~cAudFrame() {
-    freeResources();
-    }
-  //}}}
+  virtual ~cAudFrame() { free (mSamples); }
 
   bool isFirstPesFrame() { return mPts == mPesPts; }
 
@@ -48,11 +44,6 @@ public:
     mPts = 0;
     mChannels = 0;
     mNumSamples = 0;
-    }
-  //}}}
-  //{{{
-  void freeResources() {
-    free (mSamples);
     }
   //}}}
 
