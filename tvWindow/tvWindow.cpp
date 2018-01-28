@@ -115,40 +115,88 @@ protected:
       case 0x00: break;
       case 0x1B: return true;
 
-      case  ' ': mPlayContext.togglePlay(); break;
-
-      case 0x24: mPlayContext.setPlayPts (0); changed(); break; // home
-      case 0x23: mPlayContext.setPlayPts (mPlayContext.mAnalTs->getLengthPts()); changed(); break; // end
-      case 0x21: mPlayContext.incPlayPts (-90000*10); changed(); break; // page up
-      case 0x22: mPlayContext.incPlayPts (90000*10); changed(); break; // page down
-      case 0x25: mPlayContext.incPlayPts (-90000/25); mPlayContext.mPlaying = ePause; changed(); break; // left arrow
-      case 0x27: mPlayContext.incPlayPts (90000/25); mPlayContext.mPlaying = ePause;  changed();break; // right arrow
-      case 0x26: // up arrow
-        //{{{  prev file
+      //{{{
+      case  ' ': // space - toggle play
+        if (mPlayContextFocus)
+          mPlayContextFocus->togglePlay();
+        break;
+      //}}}
+      //{{{
+      case 0x24: // home
+        if (mPlayContextFocus) {
+          mPlayContextFocus->setPlayPts (0);
+          changed();
+          }
+        break;
+      //}}}
+      //{{{
+      case 0x23: // end
+        if (mPlayContextFocus) {
+          mPlayContextFocus->setPlayPts (mPlayContextFocus->mAnalTs->getLengthPts());
+          changed();
+          }
+        break;
+      //}}}
+      //{{{
+      case 0x21: // page up
+        if (mPlayContextFocus) {
+          mPlayContextFocus->incPlayPts (-90000*10);
+          changed();
+          }
+        break;
+      //}}}
+      //{{{
+      case 0x22: // page down
+        if (mPlayContextFocus) {
+          mPlayContextFocus->incPlayPts (90000*10);
+          changed();
+          }
+        break;
+      //}}}
+      //{{{
+      case 0x25: // left arrow
+        if (mPlayContextFocus) {
+          mPlayContextFocus->incPlayPts (-90000/25);
+          mPlayContextFocus->mPlaying = ePause;
+          changed();
+          }
+        break;
+      //}}}
+      //{{{
+      case 0x27: // right arrow
+        if (mPlayContextFocus) {
+          mPlayContextFocus->incPlayPts (90000/25);
+          mPlayContextFocus->mPlaying = ePause;
+          changed();
+          }
+        break;
+      //}}}
+      //{{{
+      case 0x26: // up arrow - prev file
         updateFileList();
         if (!mFileList.empty() && (mFileIndex > 0)) {
           mFileIndex = mFileIndex--;
           changed();
           }
         break;
-        //}}}
-      case 0x28: // down arrow
-        //{{{  next file
+      //}}}
+      //{{{
+      case 0x28: // down arrow - next file
         updateFileList();
         if (!mFileList.empty() && mFileIndex < mFileList.size()-1) {
           mFileIndex = mFileIndex++;
           changed();
           }
         break;
-        //}}}
-      case 0x0d: // enter
-        //{{{  enter
+      //}}}
+      //{{{
+      case 0x0d: // enter - play file
         if (!mFileList.empty()) {
           cLog::log (LOGINFO, "enter key");
           mFileIndexChanged = true;
           }
         break;
-        //}}}
+      //}}}
 
       case  '0': key += 10; // nasty trick to wrap '0' as channel 10
       case  '1':
@@ -160,11 +208,13 @@ protected:
       case  '7':
       case  '8':
       case  '9': {
-        auto service = mPlayContext.mAnalTs->getService (key - '1');
-        if (service) {
-          mPlayContext.mAudTs->setPid (service->getAudPid());
-          mPlayContext.mVidTs->setPid (service->getVidPid());
-          changed();
+        if (mPlayContextFocus) {
+          auto service = mPlayContextFocus->mAnalTs->getService (key - '1');
+          if (service) {
+            mPlayContextFocus->mAudTs->setPid (service->getAudPid());
+            mPlayContextFocus->mVidTs->setPid (service->getVidPid());
+            changed();
+            }
           }
         break;
         }
@@ -1390,7 +1440,10 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("file");
 
-    playFile (fileName, &mPlayContext);
+    cPlayContext playContext;
+    mPlayContextFocus = &playContext;
+    playFile (fileName, &playContext);
+    mPlayContextFocus = nullptr;
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -1404,7 +1457,12 @@ private:
 
     while (true) {
       mFileIndexChanged = false;
-      playFile (mFileList[mFileIndex], &mPlayContext);
+
+      cPlayContext playContext;
+      mPlayContextFocus = &playContext;
+      playFile (mFileList[mFileIndex], &playContext);
+      mPlayContextFocus = nullptr;
+
       if (!mFileIndexChanged) {
         if (mFileIndex < mFileList.size()-1) // play next file
           mFileIndex++;
@@ -1651,7 +1709,7 @@ private:
   //}}}
 
   //{{{  vars
-  cPlayContext mPlayContext;
+  cPlayContext* mPlayContextFocus;
 
   vector <string> mFileList;
   int mFileIndex = 0;
