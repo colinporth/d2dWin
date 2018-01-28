@@ -117,12 +117,12 @@ protected:
 
       case  ' ': mPlayContext.togglePlay(); break;
 
-      case 0x24: setPlayPts (0); break; // home
-      case 0x23: setPlayPts (mPlayContext.mAnalTs->getLengthPts()); break; // end
-      case 0x21: incPlayPts (-90000*10); break; // page up
-      case 0x22: incPlayPts (90000*10); break; // page down
-      case 0x25: incPlayPts (-90000/25); mPlayContext.mPlaying = ePause; break; // left arrow
-      case 0x27: incPlayPts (90000/25); mPlayContext.mPlaying = ePause; break; // right arrow
+      case 0x24: mPlayContext.setPlayPts (0); changed(); break; // home
+      case 0x23: mPlayContext.setPlayPts (mPlayContext.mAnalTs->getLengthPts()); changed(); break; // end
+      case 0x21: mPlayContext.incPlayPts (-90000*10); changed(); break; // page up
+      case 0x22: mPlayContext.incPlayPts (90000*10); changed(); break; // page down
+      case 0x25: mPlayContext.incPlayPts (-90000/25); mPlayContext.mPlaying = ePause; changed(); break; // left arrow
+      case 0x27: mPlayContext.incPlayPts (90000/25); mPlayContext.mPlaying = ePause;  changed();break; // right arrow
       case 0x26: // up arrow
         //{{{  prev file
         updateFileList();
@@ -855,11 +855,77 @@ private:
   //}}}
 
   //{{{
+  class cPlayContext {
+  public:
+    //{{{
+    cPlayContext() : 
+      mFirstVidPtsSem("firstVidPts"), mPlayStoppedSem("playStopped"),
+      mAudStoppedSem("audStopped"), mVidStoppedSem("vidStopped") {}
+    //}}}
+
+    // gets
+    ePlaying getPlaying() { return mPlaying; }
+    int64_t getPlayPts() { return mPlayPts + mAnalTs->getBasePts(); }
+    int64_t getLengthPts() { return mAnalTs->getLengthPts(); }
+    float getStreamPosFrac() { return float(mStreamPos) / float(mStreamSize); }
+
+    // sets
+    void setPlaying (ePlaying playing) { mPlaying = playing; }
+    //{{{
+    void togglePlay() {
+      switch (mPlaying) {
+        case ePause: mPlaying = ePlay; break;
+        case eScrub: mPlaying = ePlay; break;
+        case ePlay:  mPlaying = ePause; break;
+        }
+      }
+    //}}}
+    //{{{
+    void setPlayPts (int64_t playPts) {
+    // mPlayPts is offset from mBasePts
+
+      if (playPts < 0)
+        mPlayPts = 0;
+      else if (playPts > getLengthPts())
+        mPlayPts = getLengthPts();
+      else
+        mPlayPts = playPts;
+
+      mPlayPtsSem.notifyAll();
+      }
+    //}}}
+    void incPlayPts (int64_t incPts) { setPlayPts (mPlayPts + incPts); }
+
+    // vars
+    ePlaying mPlaying = ePlay;
+    int64_t mPlayPts = 0;
+
+    cAudFrame* mPlayAudFrame = nullptr;
+
+    int64_t mBitmapPts = -1;
+    ID2D1Bitmap* mBitmap = nullptr;
+
+    int64_t mStreamPos = 0;
+    int64_t mStreamSize = 0;
+
+    cAnalTransportStream* mAnalTs;
+    cAudTransportStream* mAudTs;
+    cVidTransportStream* mVidTs;
+
+    cSemaphore mPlayPtsSem;
+    cSemaphore mFirstVidPtsSem;
+    cSemaphore mPlayStoppedSem;
+    cSemaphore mAudStoppedSem;
+    cSemaphore mVidStoppedSem;
+    };
+  //}}}
+
+  //{{{
   class cVidFrameView : public cView {
   public:
     //{{{
-    cVidFrameView (cD2dWindow* window, float width, float height)
-        : cView("vidFrame", window, width, height) {
+    cVidFrameView (cD2dWindow* window, float width, float height, cPlayContext* playContext)
+        : cView("vidFrame", window, width, height), mPlayContext(playContext) {
       mPin = true;
       }
     //}}}
@@ -867,20 +933,18 @@ private:
 
     //{{{
     cPoint getSrcSize() {
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      return appWindow->mPlayContext.mBitmap ? appWindow->mPlayContext.mBitmap->GetPixelSize() : cPoint();
+      return mPlayContext->mBitmap ? mPlayContext->mBitmap->GetPixelSize() : cPoint();
       }
     //}}}
     //{{{
     bool onWheel (int delta, cPoint pos) {
 
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
       if (mWindow->getControl())
         return cView::onWheel (delta, pos);
       else {
-        appWindow->mPlayContext.mPlaying = ePause;
-        appWindow->incPlayPts (-int64_t(delta * (90000/25) / 120));
+        mPlayContext->mPlaying = ePause;
+        mPlayContext->incPlayPts (-int64_t(delta * (90000/25) / 120));
+        mWindow->changed();
         }
 
       return true;
@@ -892,9 +956,9 @@ private:
       if (mWindow->getControl())
         return cView::onMove (right, pos, inc);
       else {
-        auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-        appWindow->mPlayContext.mPlaying = ePause;
-        appWindow->incPlayPts (int64_t (-inc.x * kAudSamplesPerAacFrame * 48 / 90 / 8));
+        mPlayContext->mPlaying = ePause;
+        mPlayContext->incPlayPts (int64_t (-inc.x * kAudSamplesPerAacFrame * 48 / 90 / 8));
+        mWindow->changed();
         return true;
         }
       }
@@ -902,9 +966,8 @@ private:
     //{{{
     bool onUp (bool right, bool mouseMoved, cPoint pos) {
 
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
       if (!mouseMoved)
-        appWindow->mPlayContext.togglePlay();
+        mPlayContext->togglePlay();
 
       return false;
       }
@@ -913,32 +976,33 @@ private:
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
 
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
-      auto vidTs = appWindow->mPlayContext.mVidTs;
+      auto vidTs = mPlayContext->mVidTs;
       //if (vidTs) {
-        auto vidframe = (cVidFrame*)vidTs->findNearestFrame (appWindow->mPlayContext.getPlayPts());
-        if (vidframe && (vidframe->getPts() != appWindow->mPlayContext.mBitmapPts)) {
-          appWindow->mPlayContext.mBitmap = vidframe->makeBitmap (dc, appWindow->mPlayContext.mBitmap);
-          appWindow->mPlayContext.mBitmapPts = vidframe->getPts();
+        auto vidframe = (cVidFrame*)vidTs->findNearestFrame (mPlayContext->getPlayPts());
+        if (vidframe && (vidframe->getPts() != mPlayContext->mBitmapPts)) {
+          mPlayContext->mBitmap = vidframe->makeBitmap (dc, mPlayContext->mBitmap);
+          mPlayContext->mBitmapPts = vidframe->getPts();
           }
 
         dc->SetTransform (mView2d.mTransform);
-        if (appWindow->mPlayContext.mBitmap)
-          dc->DrawBitmap (appWindow->mPlayContext.mBitmap, cRect(mWindow->getSize()));
+        if (mPlayContext->mBitmap)
+          dc->DrawBitmap (mPlayContext->mBitmap, cRect(mWindow->getSize()));
 
         dc->SetTransform (Matrix3x2F::Identity());
       //  }
       }
     //}}}
+
+  private:
+    cPlayContext* mPlayContext;
     };
   //}}}
   //{{{
   class cFramesDebugBox : public cBox {
   public:
     //{{{
-    cFramesDebugBox (cD2dWindow* window, float width, float height)
-        : cBox("frames", window, width, height) {
+    cFramesDebugBox (cD2dWindow* window, float width, float height, cPlayContext* playContext)
+        : cBox("frames", window, width, height), mPlayContext(playContext) {
 
       mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
         DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 11.f, L"en-us",
@@ -960,21 +1024,19 @@ private:
 
       auto ptsInc = (pos.y > 40.f) ? (90000/25) : (kAudSamplesPerAacFrame * 90 / 48);
 
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      appWindow->incPlayPts (-int64_t(delta * ptsInc / 120));
-      appWindow->mPlayContext.setPlaying (cAppWindow::ePause);
-
+      mPlayContext->incPlayPts (-int64_t(delta * ptsInc / 120));
+      mPlayContext->setPlaying (cAppWindow::ePause);
+      mWindow->changed();
       return true;
       }
     //}}}
     //{{{
     bool onMove (bool right, cPoint pos, cPoint inc) {
 
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
-      appWindow->mPlayContext.setPlaying (cAppWindow::ePause);
+      mPlayContext->setPlaying (cAppWindow::ePause);
       auto pixPerPts = 18.f * 48 / (kAudSamplesPerAacFrame * 90);
-      appWindow->incPlayPts (int64_t (-inc.x / pixPerPts));
+      mPlayContext->incPlayPts (int64_t (-inc.x / pixPerPts));
+      mWindow->changed();
 
       return true;
       }
@@ -994,14 +1056,13 @@ private:
 
       float maxY = 0;
 
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      appWindow->mPlayContext.mAudTs->drawFrames (dc, mRect, mTextFormat,
+      mPlayContext->mAudTs->drawFrames (dc, mRect, mTextFormat,
         mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
-        appWindow->mPlayContext.getPlayPts(), maxY);
+        mPlayContext->getPlayPts(), maxY);
 
-      appWindow->mPlayContext.mVidTs->drawFrames (dc, mRect, mTextFormat,
+      mPlayContext->mVidTs->drawFrames (dc, mRect, mTextFormat,
         mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
-        appWindow->mPlayContext.getPlayPts(), maxY);
+        mPlayContext->getPlayPts(), maxY);
 
       dc->FillRectangle (RectF((getWidth()/2)-1, 0, (getWidth()/2)+1, maxY),
                          mPin ? mWindow->getYellowBrush() : mWindow->getGreyBrush());
@@ -1012,16 +1073,100 @@ private:
     //}}}
 
   private:
+    cPlayContext* mPlayContext;
+
     IDWriteTextFormat* mTextFormat = nullptr;
     ID2D1SolidColorBrush* mBrush = nullptr;
+    };
+  //}}}
+  //{{{
+  class cProgressBox : public cBox {
+  public:
+    //{{{
+    cProgressBox (cD2dWindow* window, float width, float height, cPlayContext* playContext)
+        : cBox("progress", window, width, height), mPlayContext(playContext) {
+      mPin = true;
+      }
+    //}}}
+    virtual ~cProgressBox() {}
+
+    //{{{
+    bool onDown (bool right, cPoint pos)  {
+
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+
+      mPlayContext->setPlaying (cAppWindow::eScrub);
+      mPlayContext->setPlayPts (int64_t ((pos.x / getWidth()) * mPlayContext->getLengthPts()));
+      mWindow->changed();
+
+      return true;
+      }
+    //}}}
+    //{{{
+    bool onMove (bool right, cPoint pos, cPoint inc) {
+
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+
+      mPlayContext->setPlayPts (int64_t ((pos.x / getWidth()) * mPlayContext->getLengthPts()));
+      mWindow->changed();
+      return true;
+      }
+    //}}}
+    //{{{
+    bool onUp (bool right, bool mouseMoved, cPoint pos) {
+
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+
+      mPlayContext->setPlaying (cAppWindow::ePause);
+      return true;
+      }
+    //}}}
+    //{{{
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+
+      const float ylen = 2.f;
+
+      // draw analPos blueBar
+      auto r = mRect;
+      r.left = getWidth() * mPlayContext->getStreamPosFrac();
+      r.top = r.bottom - 3*ylen;
+      dc->FillRectangle (r, mWindow->getBlueBrush());
+
+      // draw vidLastPts yellowBar
+      r.left = mRect.left;
+      r.right = getWidth() * (float)(mPlayContext->mVidTs->getLastLoadedPts() - mPlayContext->mAnalTs->getBasePts())
+                                     / (float)mPlayContext->getLengthPts();
+      r.top = r.bottom - ylen;
+      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
+
+      // draw audLastPts yellowBar
+      r.bottom = r.top;
+      r.top -= ylen;
+      r.right = getWidth() * (float)(mPlayContext->mAudTs->getLastLoadedPts() - mPlayContext->mAnalTs->getBasePts())
+                                    / (float)mPlayContext->getLengthPts();
+      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
+
+      // draw playPts yellowBar
+      r.bottom = r.top;
+      r.top -= ylen;
+      r.right = getWidth() * (float)(mPlayContext->getPlayPts() - mPlayContext->mAnalTs->getBasePts())
+                                    / (float)mPlayContext->getLengthPts();
+      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
+      }
+    //}}}
+
+  private:
+    cPlayContext* mPlayContext;
     };
   //}}}
   //{{{
   class cTimecodeBox : public cBox {
   public:
     //{{{
-    cTimecodeBox (cD2dWindow* window, float width, float height, int64_t& playPts, int64_t& lengthPts)
-        : cBox("timecode", window, width, height), mPlayPts(playPts), mLengthPts(lengthPts) {
+    cTimecodeBox (cD2dWindow* window, float width, float height, cPlayContext* playContext)
+        : cBox("timecode", window, width, height), mPlayContext(playContext) {
 
       mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
         DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
@@ -1047,7 +1192,7 @@ private:
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
 
-      string str = getPtsString(mPlayPts) + " " + getPtsString(mLengthPts);
+      string str = getPtsString(mPlayContext->mPlayPts) + " " + getPtsString(mPlayContext->mAnalTs->mLengthPts);
       wstring wstr(str.begin(), str.end());
 
       IDWriteTextLayout* textLayout;
@@ -1072,154 +1217,12 @@ private:
     //}}}
 
   private:
-    int64_t& mPlayPts;
-    int64_t& mLengthPts;
+    cPlayContext* mPlayContext;
 
     IDWriteTextFormat* mTextFormat = nullptr;
     ID2D1SolidColorBrush* mBrush = nullptr;
     };
   //}}}
-  //{{{
-  class cProgressBox : public cBox {
-  public:
-    //{{{
-    cProgressBox (cD2dWindow* window, float width, float height)
-        : cBox("progress", window, width, height) {
-      mPin = true;
-      }
-    //}}}
-    virtual ~cProgressBox() {}
-
-    //{{{
-    bool onDown (bool right, cPoint pos)  {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
-      appWindow->mPlayContext.setPlaying (cAppWindow::eScrub);
-      appWindow->setPlayPts (int64_t ((pos.x / getWidth()) * appWindow->mPlayContext.getLengthPts()));
-
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onMove (bool right, cPoint pos, cPoint inc) {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
-      appWindow->setPlayPts (int64_t ((pos.x / getWidth()) * appWindow->mPlayContext.getLengthPts()));
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onUp (bool right, bool mouseMoved, cPoint pos) {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
-      appWindow->mPlayContext.setPlaying (cAppWindow::ePause);
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
-      const float ylen = 2.f;
-
-      // draw analPos blueBar
-      auto r = mRect;
-      r.left = getWidth() * appWindow->mPlayContext.getStreamPosFrac();
-      r.top = r.bottom - 3*ylen;
-      dc->FillRectangle (r, mWindow->getBlueBrush());
-
-      // draw vidLastPts yellowBar
-      r.left = mRect.left;
-      r.right = getWidth() * (float)(appWindow->mPlayContext.mVidTs->getLastLoadedPts() - appWindow->mPlayContext.mAnalTs->getBasePts())
-                                     / (float)appWindow->mPlayContext.getLengthPts();
-      r.top = r.bottom - ylen;
-      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
-
-      // draw audLastPts yellowBar
-      r.bottom = r.top;
-      r.top -= ylen;
-      r.right = getWidth() * (float)(appWindow->mPlayContext.mAudTs->getLastLoadedPts() - appWindow->mPlayContext.mAnalTs->getBasePts())
-                                    / (float)appWindow->mPlayContext.getLengthPts();
-      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
-
-      // draw playPts yellowBar
-      r.bottom = r.top;
-      r.top -= ylen;
-      r.right = getWidth() * (float)(appWindow->mPlayContext.getPlayPts() - appWindow->mPlayContext.mAnalTs->getBasePts())
-                                    / (float)appWindow->mPlayContext.getLengthPts();
-      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
-      }
-    //}}}
-    };
-  //}}}
-
-  //{{{
-  class cPlayContext {
-  public:
-    cPlayContext() : mFirstVidPtsSem("firstVidPts"), mPlayStoppedSem("playStopped"),
-                     mAudStoppedSem("audStopped"), mVidStoppedSem("vidStopped") {}
-    // gets
-    ePlaying getPlaying() { return mPlaying; }
-    int64_t getPlayPts() { return mPlayPts + mAnalTs->getBasePts(); }
-    int64_t getLengthPts() { return mAnalTs->getLengthPts(); }
-    float getStreamPosFrac() { return float(mStreamPos) / float(mStreamSize); }
-
-    // sets
-    void setPlaying (ePlaying playing) { mPlaying = playing; }
-    //{{{
-    void togglePlay() {
-      switch (mPlaying) {
-        case ePause: mPlaying = ePlay; break;
-        case eScrub: mPlaying = ePlay; break;
-        case ePlay:  mPlaying = ePause; break;
-        }
-      }
-    //}}}
-
-    ePlaying mPlaying = ePlay;
-    int64_t mPlayPts = 0;
-
-    cAudFrame* mPlayAudFrame;
-
-    int64_t mBitmapPts = -1;
-    ID2D1Bitmap* mBitmap = nullptr;
-
-    int64_t mStreamPos = 0;
-    int64_t mStreamSize = 0;
-
-    cAnalTransportStream* mAnalTs;
-    cAudTransportStream* mAudTs;
-    cVidTransportStream* mVidTs;
-
-    cSemaphore mPlayPtsSem;
-    cSemaphore mFirstVidPtsSem;
-    cSemaphore mPlayStoppedSem;
-    cSemaphore mAudStoppedSem;
-    cSemaphore mVidStoppedSem;
-    };
-  //}}}
-
-  //{{{
-  void setPlayPts (int64_t playPts) {
-  // mPlayPts is offset from mBasePts
-
-    if (playPts < 0)
-      mPlayContext.mPlayPts = 0;
-    else if (playPts > mPlayContext.getLengthPts())
-      mPlayContext.mPlayPts = mPlayContext.getLengthPts();
-    else
-      mPlayContext.mPlayPts = playPts;
-
-    mPlayContext.mPlayPtsSem.notifyAll();
-
-    changed();
-    }
-  //}}}
-  void incPlayPts (int64_t incPts) { setPlayPts (mPlayContext.mPlayPts + incPts); }
 
   //{{{
   void updateFileList() {
@@ -1230,21 +1233,21 @@ private:
   void playFile (const string& fileName, cPlayContext* playContext) {
 
     // init transportStreams
-    mPlayContext.mAnalTs = new cAnalTransportStream();
-    mPlayContext.mAudTs = new cAudTransportStream (kAudMaxFrames);
-    mPlayContext.mVidTs = new cVidTransportStream (kVidMaxFrames);
+    playContext->mAnalTs = new cAnalTransportStream();
+    playContext->mAudTs = new cAudTransportStream (kAudMaxFrames);
+    playContext->mVidTs = new cVidTransportStream (kVidMaxFrames);
 
     // init boxes
-    auto vidFrameView = addFront (new cVidFrameView (this, 0.f,0.f));
-    auto timecodeBox = add (new cTimecodeBox (this, 600.f,60.f, mPlayContext.mPlayPts, mPlayContext.mAnalTs->mLengthPts), -600.f,-60.f);
+    auto vidFrameView = addFront (new cVidFrameView (this, 0.f,0.f, playContext));
+    auto timecodeBox = add (new cTimecodeBox (this, 600.f,60.f, playContext), -600.f,-60.f);
     timecodeBox->setPin (true);
-    auto progressBox = add (new cProgressBox (this, 0.f,6.f), 0.f,-6.f);
-    auto audFrameBox = add (new cAudFrameBox (this, 82.f,240.0f, mPlayContext.mPlayAudFrame), -84.f,-240.f-6.0f);
+    auto progressBox = add (new cProgressBox (this, 0.f,6.f, playContext), 0.f,-6.f);
+    auto audFrameBox = add (new cAudFrameBox (this, 82.f,240.0f, playContext->mPlayAudFrame), -84.f,-240.f-6.0f);
 
     // launch threads
     thread ([=]() { audThread (fileName, playContext); }).detach();
     thread ([=]() { vidThread (fileName, playContext); }).detach();
-    auto threadHandle = thread ([=](){ playThread(); });
+    auto threadHandle = thread ([=](){ playThread (playContext); });
     SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_HIGHEST);
     threadHandle.detach();
 
@@ -1255,7 +1258,7 @@ private:
     //{{{  get streamSize
     struct _stat64 buf;
     _fstat64 (file, &buf);
-    mPlayContext.mStreamSize = buf.st_size ;
+    playContext->mStreamSize = buf.st_size ;
     //}}}
 
     //{{{  parse front of stream until first service
@@ -1266,48 +1269,48 @@ private:
       auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
       auto chunkPtr = fileChunkBuffer;
       while (chunkBytesLeft >= 188) {
-        auto bytesUsed = mPlayContext.mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, false, -1);
+        auto bytesUsed = playContext->mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, false, -1);
         streamPos += bytesUsed;
         chunkPtr += bytesUsed;
         chunkBytesLeft -= (int)bytesUsed;
         }
 
-      service = mPlayContext.mAnalTs->getService (0);
+      service = playContext->mAnalTs->getService (0);
       }
 
     // select first service
-    mPlayContext.mVidTs->setPid (service->getVidPid());
-    mPlayContext.mAudTs->setPid (service->getAudPid());
+    playContext->mVidTs->setPid (service->getVidPid());
+    playContext->mAudTs->setPid (service->getAudPid());
     cLog::log (LOGNOTICE, "first service - vidPid:" + dec(service->getVidPid()) +
                           " audPid:" + dec(service->getAudPid()));
-    mPlayContext.mAnalTs->clearPosCounts();
+    playContext->mAnalTs->clearPosCounts();
     //}}}
     //{{{  parse end of stream for initial lastPts
-    streamPos = mPlayContext.mStreamSize - (kChunkSize * 8);
+    streamPos = playContext->mStreamSize - (kChunkSize * 8);
     _lseeki64 (file, streamPos, SEEK_SET);
 
-    while (streamPos < mPlayContext.mStreamSize) {
+    while (streamPos < playContext->mStreamSize) {
       auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
       auto chunkPtr = fileChunkBuffer;
       while (chunkBytesLeft >= 188) {
-        auto bytesUsed = mPlayContext.mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, chunkPtr == fileChunkBuffer, -1);
+        auto bytesUsed = playContext->mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, chunkPtr == fileChunkBuffer, -1);
         streamPos += bytesUsed;
         chunkPtr += bytesUsed;
         chunkBytesLeft -= (int)bytesUsed;
         }
       }
 
-    mPlayContext.mAnalTs->clearPosCounts();
+    playContext->mAnalTs->clearPosCounts();
     //}}}
 
     // analyse stream from start, chase tail, update progress bar
-    mPlayContext.mStreamPos = 0;
-    _lseeki64 (file, mPlayContext.mStreamPos, SEEK_SET);
+    playContext->mStreamPos = 0;
+    _lseeki64 (file, playContext->mStreamPos, SEEK_SET);
 
     int sameCount = 0;
     int firstVidSignalCount = 0;
     while (!mFileIndexChanged && (sameCount < 10)) {
-      int64_t bytesToRead = mPlayContext.mStreamSize - mPlayContext.mStreamPos;
+      int64_t bytesToRead = playContext->mStreamSize - playContext->mStreamPos;
       if (bytesToRead > kChunkSize) // trim to kChunkSize
         bytesToRead = kChunkSize;
       if (bytesToRead >= 188) {
@@ -1317,17 +1320,17 @@ private:
         if (chunkBytesLeft >= 188) {
           auto chunkPtr = fileChunkBuffer;
           while (chunkBytesLeft >= 188) {
-            auto bytesUsed = mPlayContext.mAnalTs->demux (chunkPtr, chunkBytesLeft, mPlayContext.mStreamPos, mPlayContext.mStreamPos == 0, -1);
-            mPlayContext.mStreamPos += bytesUsed;
+            auto bytesUsed = playContext->mAnalTs->demux (chunkPtr, chunkBytesLeft, playContext->mStreamPos, playContext->mStreamPos == 0, -1);
+            playContext->mStreamPos += bytesUsed;
             chunkPtr += bytesUsed;
             chunkBytesLeft -= (int)bytesUsed;
             changed();
 
             if ((firstVidSignalCount < 3) &&
-                (mPlayContext.mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
-                (mPlayContext.mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
+                (playContext->mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
+                (playContext->mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
               firstVidSignalCount++;
-              mPlayContext.mFirstVidPtsSem.notifyAll();
+              playContext->mFirstVidPtsSem.notifyAll();
               cLog::log (LOGERROR, "mFirstVidPtsSem.notifyAll");
               }
             }
@@ -1338,9 +1341,9 @@ private:
         while (!mFileIndexChanged) {
           Sleep (1000);
           _fstat64 (file, &buf);
-          if (buf.st_size > mPlayContext.mStreamSize) {
-            cLog::log (LOGINFO, "fileSize now " + dec(mPlayContext.mStreamSize));
-            mPlayContext.mStreamSize = buf.st_size;
+          if (buf.st_size > playContext->mStreamSize) {
+            cLog::log (LOGINFO, "fileSize now " + dec(playContext->mStreamSize));
+            playContext->mStreamSize = buf.st_size;
             sameCount = 0;
             break;
             }
@@ -1363,20 +1366,20 @@ private:
     while (!mFileIndexChanged)
       Sleep (10);
 
-    mPlayContext.mPlayStoppedSem.wait();
-    mPlayContext.mPlayPtsSem.notifyAll();
-    mPlayContext.mPlayPtsSem.notifyAll();
-    mPlayContext.mAudStoppedSem.wait();
-    mPlayContext.mVidStoppedSem.wait();
+    playContext->mPlayStoppedSem.wait();
+    playContext->mPlayPtsSem.notifyAll();
+    playContext->mPlayPtsSem.notifyAll();
+    playContext->mAudStoppedSem.wait();
+    playContext->mVidStoppedSem.wait();
 
     removeBox (timecodeBox);
     removeBox (progressBox);
     removeBox (audFrameBox);
     removeBox (vidFrameView);
 
-    delete mPlayContext.mAudTs;
-    delete mPlayContext.mVidTs;
-    delete mPlayContext.mAnalTs;
+    delete playContext->mAudTs;
+    delete playContext->mVidTs;
+    delete playContext->mAnalTs;
     }
   //}}}
 
@@ -1399,8 +1402,14 @@ private:
     cLog::setThreadName ("fils");
 
     while (true) {
-      playFile (mFileList[mFileIndex], &mPlayContext);
       mFileIndexChanged = false;
+      playFile (mFileList[mFileIndex], &mPlayContext);
+      if (!mFileIndexChanged) {
+        if (mFileIndex < mFileList.size()-1) // play next file
+          mFileIndex++;
+        else
+          break;
+        }
       }
 
     cLog::log (LOGNOTICE, "exit");
@@ -1527,7 +1536,7 @@ private:
           //}}}
           changed();
 
-          while (!mFileIndexChanged && mPlayContext.mVidTs->isLoaded (playContext->getPlayPts(), 4))
+          while (!mFileIndexChanged && playContext->mVidTs->isLoaded (playContext->getPlayPts(), 4))
             playContext->mPlayPtsSem.wait();
 
           bool loaded = playContext->mVidTs->isLoaded (playContext->getPlayPts(), 1);
@@ -1562,36 +1571,37 @@ private:
     }
   //}}}
   //{{{
-  void playThread() {
+  void playThread (cPlayContext* playContext) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("play");
 
     audOpen (2, 48000);
 
-    mPlayContext.mFirstVidPtsSem.wait();
-    mPlayContext.mPlayPts = mPlayContext.mAnalTs->getFirstPts (mPlayContext.mVidTs->getPid()) - mPlayContext.mAnalTs->getBasePts();
+    playContext->mFirstVidPtsSem.wait();
+    playContext->mPlayPts = playContext->mAnalTs->getFirstPts (playContext->mVidTs->getPid()) - playContext->mAnalTs->getBasePts();
 
     while (!mFileIndexChanged) {
-      auto pts = mPlayContext.getPlayPts();
-      mPlayContext.mPlayAudFrame = (cAudFrame*)mPlayContext.mAudTs->findFrame (pts);
+      auto pts = playContext->getPlayPts();
+      playContext->mPlayAudFrame = (cAudFrame*)playContext->mAudTs->findFrame (pts);
 
       // play using frame where available, else play silence
-      audPlay (mPlayContext.mPlayAudFrame ? mPlayContext.mPlayAudFrame->mChannels : getSrcChannels(),
-        mPlayContext.mPlayAudFrame && (mPlayContext.mPlaying != ePause) ? mPlayContext.mPlayAudFrame->mSamples : nullptr,
-        mPlayContext.mPlayAudFrame ? mPlayContext.mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
+      audPlay (playContext->mPlayAudFrame ? playContext->mPlayAudFrame->mChannels : getSrcChannels(),
+        playContext->mPlayAudFrame && (playContext->mPlaying != ePause) ? playContext->mPlayAudFrame->mSamples : nullptr,
+        playContext->mPlayAudFrame ? playContext->mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
                1.f);
 
-      if ((mPlayContext.mPlaying == ePlay) && (mPlayContext.mPlayPts < mPlayContext.getLengthPts()))
-        incPlayPts (int64_t (((mPlayContext.mPlayAudFrame ? mPlayContext.mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
-      if (mPlayContext.mPlayPts > mPlayContext.getLengthPts())
-        mPlayContext.mPlayPts = mPlayContext.getLengthPts();
+      if ((playContext->mPlaying == ePlay) && (playContext->mPlayPts < playContext->getLengthPts()))
+        playContext->incPlayPts (int64_t (((playContext->mPlayAudFrame ? playContext->mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
+      if (playContext->mPlayPts > playContext->getLengthPts())
+        playContext->mPlayPts = playContext->getLengthPts();
+      changed();
 
-      mPlayContext.mPlayPtsSem.notifyAll();
+      playContext->mPlayPtsSem.notifyAll();
       }
 
     audClose();
-    mPlayContext.mPlayStoppedSem.notifyAll();
+    playContext->mPlayStoppedSem.notifyAll();
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
