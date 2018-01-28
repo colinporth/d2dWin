@@ -962,7 +962,7 @@ private:
 
       auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
       appWindow->incPlayPts (-int64_t(delta * ptsInc / 120));
-      appWindow->setPlaying (cAppWindow::ePause);
+      appWindow->mPlayContext.setPlaying (cAppWindow::ePause);
 
       return true;
       }
@@ -972,7 +972,7 @@ private:
 
       auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
 
-      appWindow->setPlaying (cAppWindow::ePause);
+      appWindow->mPlayContext.setPlaying (cAppWindow::ePause);
       auto pixPerPts = 18.f * 48 / (kAudSamplesPerAacFrame * 90);
       appWindow->incPlayPts (int64_t (-inc.x / pixPerPts));
 
@@ -1095,7 +1095,7 @@ private:
 
       auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
 
-      appWindow->setPlaying (cAppWindow::eScrub);
+      appWindow->mPlayContext.setPlaying (cAppWindow::eScrub);
       appWindow->setPlayPts (int64_t ((pos.x / getWidth()) * appWindow->mPlayContext.getLengthPts()));
 
       return true;
@@ -1115,7 +1115,7 @@ private:
 
       auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
 
-      appWindow->setPlaying (cAppWindow::ePause);
+      appWindow->mPlayContext.setPlaying (cAppWindow::ePause);
       return true;
       }
     //}}}
@@ -1162,16 +1162,16 @@ private:
   public:
     cPlayContext() : mFirstVidPtsSem("firstVidPts"), mPlayStoppedSem("playStopped"),
                      mAudStoppedSem("audStopped"), mVidStoppedSem("vidStopped") {}
-
     // gets
     ePlaying getPlaying() { return mPlaying; }
     int64_t getPlayPts() { return mPlayPts + mAnalTs->getBasePts(); }
     int64_t getLengthPts() { return mAnalTs->getLengthPts(); }
     float getStreamPosFrac() { return float(mStreamPos) / float(mStreamSize); }
 
+    // sets
+    void setPlaying (ePlaying playing) { mPlaying = playing; }
     //{{{
     void togglePlay() {
-
       switch (mPlaying) {
         case ePause: mPlaying = ePlay; break;
         case eScrub: mPlaying = ePlay; break;
@@ -1203,11 +1203,6 @@ private:
     };
   //}}}
 
-  //{{{  gets
-  //}}}
-  //{{{  sets
-  void setPlaying (ePlaying playing) { mPlayContext.mPlaying = playing; }
-
   //{{{
   void setPlayPts (int64_t playPts) {
   // mPlayPts is offset from mBasePts
@@ -1225,7 +1220,6 @@ private:
     }
   //}}}
   void incPlayPts (int64_t incPts) { setPlayPts (mPlayContext.mPlayPts + incPts); }
-  //}}}
 
   //{{{
   void updateFileList() {
@@ -1248,8 +1242,8 @@ private:
     auto audFrameBox = add (new cAudFrameBox (this, 82.f,240.0f, mPlayContext.mPlayAudFrame), -84.f,-240.f-6.0f);
 
     // launch threads
-    thread ([=]() { audThread (fileName); }).detach();
-    thread ([=]() { vidThread (fileName); }).detach();
+    thread ([=]() { audThread (fileName, playContext); }).detach();
+    thread ([=]() { vidThread (fileName, playContext); }).detach();
     auto threadHandle = thread ([=](){ playThread(); });
     SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_HIGHEST);
     threadHandle.detach();
@@ -1414,14 +1408,14 @@ private:
     }
   //}}}
   //{{{
-  void audThread (const string& fileName) {
+  void audThread (const string& fileName, cPlayContext* playContext) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("aud ");
     av_register_all();
 
     const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
-    mPlayContext.mFirstVidPtsSem.wait();
+    playContext->mFirstVidPtsSem.wait();
 
     bool skip = false;
     int64_t lastJumpStreamPos = -1;
@@ -1433,10 +1427,10 @@ private:
       auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
       if (chunkBytesLeft < 188) {
         // end of file
-        while (!mFileIndexChanged && mPlayContext.mAudTs->isLoaded (mPlayContext.getPlayPts(), 1))
-          mPlayContext.mPlayPtsSem.wait();
+        while (!mFileIndexChanged && playContext->mAudTs->isLoaded (playContext->getPlayPts(), 1))
+          playContext->mPlayPtsSem.wait();
         //{{{  jump to pts in stream
-        auto jumpStreamPos = mPlayContext.mAnalTs->findStreamPos (mPlayContext.mAudTs->getPid(), mPlayContext.getPlayPts());
+        auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mAudTs->getPid(), playContext->getPlayPts());
         streamPos = jumpStreamPos;
         _lseeki64 (file, streamPos, SEEK_SET);
         lastJumpStreamPos = jumpStreamPos;
@@ -1449,7 +1443,7 @@ private:
         while (chunkBytesLeft >= 188) {
           //{{{  demux up to a frame
           // decode a frame
-          auto bytesUsed = mPlayContext.mAudTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mPlayContext.mAudTs->getPid());
+          auto bytesUsed = playContext->mAudTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, playContext->mAudTs->getPid());
           streamPos += bytesUsed;
           chunkPtr += bytesUsed;
           chunkBytesLeft -= (int)bytesUsed;
@@ -1457,16 +1451,16 @@ private:
           //}}}
           changed();
 
-          while (!mFileIndexChanged && mPlayContext.mAudTs->isLoaded (mPlayContext.getPlayPts(), kAudMaxFrames/2))
-            mPlayContext.mPlayPtsSem.wait();
+          while (!mFileIndexChanged && playContext->mAudTs->isLoaded (playContext->getPlayPts(), kAudMaxFrames/2))
+            playContext->mPlayPtsSem.wait();
 
-          bool loaded = mPlayContext.mAudTs->isLoaded (mPlayContext.getPlayPts(), 1);
-          if (!loaded || (mPlayContext.getPlayPts() > mPlayContext.mAudTs->getLastLoadedPts() + 100000)) {
-            auto jumpStreamPos = mPlayContext.mAnalTs->findStreamPos (mPlayContext.mAudTs->getPid(), mPlayContext.getPlayPts());
+          bool loaded = playContext->mAudTs->isLoaded (playContext->getPlayPts(), 1);
+          if (!loaded || (playContext->getPlayPts() > playContext->mAudTs->getLastLoadedPts() + 100000)) {
+            auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mAudTs->getPid(), playContext->getPlayPts());
             if (jumpStreamPos != lastJumpStreamPos) {
               //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
-              cLog::log (LOGINFO, "jump playPts:" + getPtsString(mPlayContext.getPlayPts()) +
-                         (loaded ? " after ":" notLoaded ") + getPtsString(mPlayContext.mAudTs->getLastLoadedPts()));
+              cLog::log (LOGINFO, "jump playPts:" + getPtsString(playContext->getPlayPts()) +
+                         (loaded ? " after ":" notLoaded ") + getPtsString(playContext->mAudTs->getLastLoadedPts()));
 
               _lseeki64 (file, jumpStreamPos, SEEK_SET);
 
@@ -1485,20 +1479,20 @@ private:
 
     _close (file);
     free (fileChunkBuffer);
-    mPlayContext.mAudStoppedSem.notifyAll();
+    playContext->mAudStoppedSem.notifyAll();
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
   //{{{
-  void vidThread (const string& fileName) {
+  void vidThread (const string& fileName, cPlayContext* playContext) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("vid ");
 
     const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
-    mPlayContext.mFirstVidPtsSem.wait();
+    playContext->mFirstVidPtsSem.wait();
 
     bool skip = false;
     int64_t lastJumpStreamPos = -1;
@@ -1510,10 +1504,10 @@ private:
       auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
       if (chunkBytesLeft < 188) {
         // end of file
-        while (!mFileIndexChanged && mPlayContext.mVidTs->isLoaded (mPlayContext.getPlayPts(), 1))
-          mPlayContext.mPlayPtsSem.wait();
+        while (!mFileIndexChanged && playContext->mVidTs->isLoaded (playContext->getPlayPts(), 1))
+          playContext->mPlayPtsSem.wait();
         //{{{  jump to pts in stream
-        auto jumpStreamPos = mPlayContext.mAnalTs->findStreamPos (mPlayContext.mVidTs->getPid(), mPlayContext.getPlayPts());
+        auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mVidTs->getPid(), playContext->getPlayPts());
         streamPos = jumpStreamPos;
         _lseeki64 (file, streamPos, SEEK_SET);
         lastJumpStreamPos = jumpStreamPos;
@@ -1525,7 +1519,7 @@ private:
       else {
         while (chunkBytesLeft >= 188) {
           //{{{  demux up to a frame
-          auto bytesUsed = mPlayContext.mVidTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mPlayContext.mVidTs->getPid());
+          auto bytesUsed = playContext->mVidTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, playContext->mVidTs->getPid());
           streamPos += bytesUsed;
           chunkPtr += bytesUsed;
           chunkBytesLeft -= (int)bytesUsed;
@@ -1533,16 +1527,16 @@ private:
           //}}}
           changed();
 
-          while (!mFileIndexChanged && mPlayContext.mVidTs->isLoaded (mPlayContext.getPlayPts(), 4))
-            mPlayContext.mPlayPtsSem.wait();
+          while (!mFileIndexChanged && mPlayContext.mVidTs->isLoaded (playContext->getPlayPts(), 4))
+            playContext->mPlayPtsSem.wait();
 
-          bool loaded = mPlayContext.mVidTs->isLoaded (mPlayContext.getPlayPts(), 1);
-          if (!loaded || (mPlayContext.getPlayPts() > mPlayContext.mVidTs->getLastLoadedPts() + 100000)) {
-            auto jumpStreamPos = mPlayContext.mAnalTs->findStreamPos (mPlayContext.mVidTs->getPid(), mPlayContext.getPlayPts());
+          bool loaded = playContext->mVidTs->isLoaded (playContext->getPlayPts(), 1);
+          if (!loaded || (playContext->getPlayPts() > playContext->mVidTs->getLastLoadedPts() + 100000)) {
+            auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mVidTs->getPid(), playContext->getPlayPts());
             if (jumpStreamPos != lastJumpStreamPos) {
               //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
-              cLog::log (LOGINFO, "jump playPts:" + getPtsString(mPlayContext.getPlayPts()) +
-                         (loaded ? " after ":" notLoaded ") + getPtsString(mPlayContext.mVidTs->getLastLoadedPts()));
+              cLog::log (LOGINFO, "jump playPts:" + getPtsString(playContext->getPlayPts()) +
+                         (loaded ? " after ":" notLoaded ") + getPtsString(playContext->mVidTs->getLastLoadedPts()));
 
               _lseeki64 (file, jumpStreamPos, SEEK_SET);
 
@@ -1561,7 +1555,7 @@ private:
 
     _close (file);
     free (fileChunkBuffer);
-    mPlayContext.mVidStoppedSem.notifyAll();
+    playContext->mVidStoppedSem.notifyAll();
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
