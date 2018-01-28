@@ -47,6 +47,9 @@
     <ClInclude Include="..\common\box\cTsPidBox.h">
       <Filter>header</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\cDvb.h">
+      <Filter>header</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="header">

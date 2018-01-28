@@ -178,6 +178,7 @@ void cD2dWindow::initialise (string title, int width, int height, bool fullScree
 //}}}
 //{{{
 cD2dWindow::cBox* cD2dWindow::add (cBox* box, cPoint pos) {
+
   mBoxes.push_back (box);
   box->setPos (pos);
   return box;
@@ -200,6 +201,24 @@ cD2dWindow::cBox* cD2dWindow::addBelow (cBox* box) {
   auto lastBox = mBoxes.back();
   box->setPos (lastBox->getBL());
   return box;
+  }
+//}}}
+//{{{
+cD2dWindow::cBox* cD2dWindow::addFront (cBox* box) {
+
+  mBoxes.push_front (box);
+  box->setPos (cPoint());
+  return box;
+  }
+//}}}
+//{{{
+void cD2dWindow::removeBox (cBox* box) {
+
+  for (auto boxIt = mBoxes.begin(); boxIt != mBoxes.end(); ++boxIt)
+    if (*boxIt == box) {
+      mBoxes.erase (boxIt);
+      return;
+      }
   }
 //}}}
 
@@ -645,15 +664,15 @@ bool cD2dWindow::onMouseProx (bool inClient, cPoint pos) {
 
   // search for prox in reverse draw order
   mProxBox = nullptr;
-  for (auto box = mBoxes.rbegin(); box != mBoxes.rend(); ++box) {
-    bool wasPicked = (*box)->getPick();
-    if (!mProxBox && (*box)->getEnable() && (*box)->pick (inClient, pos, change)) {
-      mProxBox = *box;
+  for (auto boxIt = mBoxes.rbegin(); boxIt != mBoxes.rend(); ++boxIt) {
+    bool wasPicked = (*boxIt)->getPick();
+    if (!mProxBox && (*boxIt)->getEnable() && (*boxIt)->pick (inClient, pos, change)) {
+      mProxBox = *boxIt;
       change |= mProxBox->onProx (inClient, pos - mProxBox->getTL());
       }
     else if (wasPicked) {
-      (*box)->setUnPick();
-      change |= (*box)->onProxExit();
+      (*boxIt)->setUnPick();
+      change |= (*boxIt)->onProxExit();
       }
     }
   return change || (mProxBox != lastProxBox);

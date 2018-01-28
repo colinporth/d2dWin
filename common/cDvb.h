@@ -1,4 +1,4 @@
-// cBda.h
+// cDvb.h
 //{{{  includes
 #pragma once
 
@@ -39,7 +39,7 @@ DEFINE_GUID (CLSID_Dump, 0x36a5f770, 0xfe4c, 0x11ce, 0xa8, 0xed, 0x00, 0xaa, 0x0
 #pragma comment (lib,"strmiids")
 //}}}
 
-class cBda {
+class cDvb {
 public:
   //{{{
   bool createGraph (int frequency)  {

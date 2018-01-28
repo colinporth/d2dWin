@@ -2,7 +2,7 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "../common/cBda.h"
+#include "../common/cDvb.h"
 
 #include "../../shared/dvb/cDumpTransportStream.h"
 
@@ -74,9 +74,9 @@ public:
 
     auto frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
-      mBda = new cBda();
-      thread ([=]() { bdaGrabThread (mBda, frequency*1000); }).detach();
-      thread ([=]() { bdaSignalThread (mBda); }).detach();
+      mDvb = new cDvb();
+      thread ([=]() { dvbGrabThread (mDvb, frequency*1000); }).detach();
+      thread ([=]() { dvbSignalThread (mDvb); }).detach();
       }
     else
       thread ([=]() { fileThread (param); }).detach();
@@ -101,21 +101,21 @@ protected:
 
 private:
   //{{{
-  void bdaGrabThread (cBda* bda, int frequency) {
+  void dvbGrabThread (cDvb* dvb, int frequency) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("grab");
 
-    bda->createGraph (frequency);
-    bda->run();
+    dvb->createGraph (frequency);
+    dvb->run();
 
     int64_t streamPos = 0;
     auto blockSize = 0;
     while (true) {
-      auto ptr = bda->getBlock (blockSize);
+      auto ptr = dvb->getBlock (blockSize);
       if (blockSize) {
         streamPos += mTs->demux (ptr, blockSize, streamPos, false, -1);
-        bda->releaseBlock (blockSize);
+        dvb->releaseBlock (blockSize);
         changed();
         }
       else
@@ -127,13 +127,13 @@ private:
     }
   //}}}
   //{{{
-  void bdaSignalThread (cBda* bda) {
+  void dvbSignalThread (cDvb* dvb) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("sign");
 
     while (true)
-      mSignal = bda->getSignal();
+      mSignal = dvb->getSignal();
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -180,10 +180,10 @@ private:
   //}}}
   //{{{
   void retune (int frequency) {
-    mBda->stop();
+    mDvb->stop();
     mTs->clear();
-    mBda->tune (frequency * 1000);
-    mBda->run();
+    mDvb->tune (frequency * 1000);
+    mDvb->run();
     }
   //}}}
 
@@ -191,7 +191,7 @@ private:
   HANDLE mFile = 0;
 
   cTransportStream* mTs = nullptr;
-  cBda* mBda = nullptr;
+  cDvb* mDvb = nullptr;
   int mSignal = 0;
   };
 

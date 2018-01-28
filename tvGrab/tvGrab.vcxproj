@@ -159,7 +159,7 @@
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\date.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
-    <ClInclude Include="..\common\cBda.h" />
+    <ClInclude Include="..\common\cDvb.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\shared\utils\cLog.cpp" />

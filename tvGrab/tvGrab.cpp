@@ -1,4 +1,4 @@
-// tvGrab.cpp - minimal console bda grab
+// tvGrab.cpp - minimal console dvb grab
 //{{{  includes
 #define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
@@ -17,7 +17,7 @@
 
 #include "../../shared/dvb/cDumpTransportStream.h"
 
-#include "../common/cBda.h"
+#include "../common/cDvb.h"
 
 #pragma comment(lib,"common.lib")
 
@@ -25,7 +25,7 @@ using namespace std;
 //}}}
 
 //{{{
-void bdaGrabThread (cBda* bda, cTransportStream* ts) {
+void dvbGrabThread (cDvb* dvb, cTransportStream* ts) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::setThreadName ("grab");
@@ -33,10 +33,10 @@ void bdaGrabThread (cBda* bda, cTransportStream* ts) {
   int64_t streamPos = 0;
   while (true) {
     auto blockSize = 0;
-    auto ptr = bda->getBlock (blockSize);
+    auto ptr = dvb->getBlock (blockSize);
     if (blockSize) {
       streamPos += ts->demux (ptr, blockSize, streamPos, false, -1);
-      bda->releaseBlock (blockSize);
+      dvb->releaseBlock (blockSize);
       if (blockSize != 240 * 188)
         cLog::log (LOGINFO, "blocksize " + dec(blockSize));
       }
@@ -49,13 +49,13 @@ void bdaGrabThread (cBda* bda, cTransportStream* ts) {
   }
 //}}}
 //{{{
-void bdaSignalThread (cBda* bda, cTransportStream* ts) {
+void dvbSignalThread (cDvb* dvb, cTransportStream* ts) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::setThreadName ("sign");
 
   while (true)
-    cLog::log (LOGINFO, dec(bda->getSignal()) +
+    cLog::log (LOGINFO, dec(dvb->getSignal()) +
                         (ts ? (" " + dec(ts->getDiscontinuity()) +
                                " " + dec(ts->getPackets())) : ""));
 
@@ -76,14 +76,14 @@ int main (int argc, char* argv[]) {
 
   if (dumpFilter) {
     //{{{  use dump filter
-    auto mBda = new cBda();
-    mBda->createGraph (frequency * 1000, fileName + "/tune.ts");
-    if (mBda->run()) {
-      cLog::log (LOGNOTICE, "created bda- dump - tuned to " + dec(frequency) + "mhz");
-      thread ([=]() { bdaSignalThread (mBda, nullptr); }).detach();
+    auto mDvb = new cDvb();
+    mDvb->createGraph (frequency * 1000, fileName + "/tune.ts");
+    if (mDvb->run()) {
+      cLog::log (LOGNOTICE, "created dvb- dump - tuned to " + dec(frequency) + "mhz");
+      thread ([=]() { dvbSignalThread (mDvb, nullptr); }).detach();
       }
     else
-      cLog::log (LOGERROR, "failed to create bda graph");
+      cLog::log (LOGERROR, "failed to create dvb graph");
     }
     //}}}
   else {
@@ -91,15 +91,15 @@ int main (int argc, char* argv[]) {
     auto mTs = new cDumpTransportStream (fileName, true);
     cLog::log (LOGNOTICE, "Created dumpTransportStream");
 
-    auto mBda = new cBda();
-    mBda->createGraph (frequency * 1000);
-    if (mBda->run()) {
-      cLog::log (LOGNOTICE, "Created bda- sampleGrabber - tuned to " + dec(frequency) + "mhz");
-      thread ([=]() { bdaGrabThread (mBda, mTs); }).detach();
-      thread ([=]() { bdaSignalThread (mBda, mTs); }).detach();
+    auto mDvb = new cDvb();
+    mDvb->createGraph (frequency * 1000);
+    if (mDvb->run()) {
+      cLog::log (LOGNOTICE, "Created dvb- sampleGrabber - tuned to " + dec(frequency) + "mhz");
+      thread ([=]() { dvbGrabThread (mDvb, mTs); }).detach();
+      thread ([=]() { dvbSignalThread (mDvb, mTs); }).detach();
       }
     else
-      cLog::log (LOGERROR, "failed to create bda graph");
+      cLog::log (LOGERROR, "failed to create dvb graph");
     }
     //}}}
 

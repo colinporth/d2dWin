@@ -338,6 +338,8 @@ public:
   cBox* add (cBox* box, float x, float y);
   cBox* add (cBox* box);
   cBox* addBelow (cBox* box);
+  cBox* addFront (cBox* box);
+  void removeBox (cBox* box);
 
   // iChanged
   void changed() { mCountDown = 0; }

@@ -7,9 +7,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\common\cBda.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\utils\cLog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -23,6 +20,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cDvb.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
