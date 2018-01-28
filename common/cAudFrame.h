@@ -6,7 +6,7 @@ class cAudFrame : public iFrame {
 public:
   cAudFrame() {}
   //{{{
-  ~cAudFrame() {
+  virtual ~cAudFrame() {
     freeResources();
     }
   //}}}

@@ -5,7 +5,7 @@
 class cVidFrame : public iFrame {
 public:
   //{{{
-  ~cVidFrame() {
+  virtual ~cVidFrame() {
     freeResources();
     }
   //}}}

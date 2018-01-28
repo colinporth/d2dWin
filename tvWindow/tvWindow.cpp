@@ -234,6 +234,7 @@ private:
   public:
     //{{{
     virtual ~cDecodeTransportStream() {
+
       mFrames.clear();
       mPid = -1;
       mLastLoadedPts = -1;
@@ -909,8 +910,22 @@ private:
     enum ePlaying { ePause, eScrub, ePlay };
     //{{{
     cPlayContext() :
-      mFirstVidPtsSem("firstVidPts"), mPlayStoppedSem("playStopped"),
-      mAudStoppedSem("audStopped"), mVidStoppedSem("vidStopped") {}
+        mFirstVidPtsSem("firstVidPts"), mPlayStoppedSem("playStopped"),
+        mAudStoppedSem("audStopped"), mVidStoppedSem("vidStopped") {
+
+      // create transportStreams
+      mAnalTs = new cAnalTransportStream();
+      mAudTs = new cAudTransportStream (kAudMaxFrames);
+      mVidTs = new cVidTransportStream (kVidMaxFrames);
+      }
+    //}}}
+    //{{{
+
+    ~cPlayContext() {
+      delete mAudTs;
+      delete mVidTs;
+      delete mAnalTs;
+      }
     //}}}
 
     // gets
@@ -1265,11 +1280,6 @@ private:
   //{{{
   void playFile (const string& fileName, cPlayContext* playContext, float width, float height) {
 
-    //{{{  create transportStreams
-    playContext->mAnalTs = new cAnalTransportStream();
-    playContext->mAudTs = new cAudTransportStream (kAudMaxFrames);
-    playContext->mVidTs = new cVidTransportStream (kVidMaxFrames);
-    //}}}
     //{{{  create boxes
     auto vidFrameView = addFront (new cVidFrameView (this, width,height, playContext));
 
@@ -1412,14 +1422,6 @@ private:
     removeBox (progressBox);
     removeBox (audFrameBox);
     removeBox (vidFrameView);
-    //}}}
-    //{{{  delete resources
-    delete playContext->mAudTs;
-    playContext->mAudTs = nullptr;
-    delete playContext->mVidTs;
-    playContext->mVidTs = nullptr;
-    delete playContext->mAnalTs;
-    playContext->mAnalTs = nullptr;
     //}}}
     }
   //}}}

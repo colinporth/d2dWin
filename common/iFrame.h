@@ -3,6 +3,8 @@
 
 class iFrame {
 public:
+  virtual ~iFrame() {}
+
   bool isOk() { return mOk; }
 
   //{{{
