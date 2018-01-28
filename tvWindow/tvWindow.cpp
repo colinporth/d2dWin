@@ -1057,14 +1057,11 @@ private:
         DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 11.f, L"en-us",
         &mTextFormat);
       mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_CENTER);
-
-      mWindow->getDc()->CreateSolidColorBrush (kTransparentBlack, &mBrush);
       }
     //}}}
     //{{{
     virtual ~cFramesDebugBox() {
       mTextFormat->Release();
-      mBrush->Release();
       }
     //}}}
 
@@ -1101,7 +1098,7 @@ private:
     void onDraw (ID2D1DeviceContext* dc) {
 
       if (mPin)
-        dc->FillRectangle (mRect, mBrush);
+        dc->FillRectangle (mRect, mWindow->getTransparentBgndBrush());
 
       float maxY = 0;
 
@@ -1125,7 +1122,6 @@ private:
     cPlayContext* mPlayContext;
 
     IDWriteTextFormat* mTextFormat = nullptr;
-    ID2D1SolidColorBrush* mBrush = nullptr;
     };
   //}}}
   //{{{
@@ -1213,14 +1209,11 @@ private:
         DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
         &mTextFormat);
       mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
-
-      mWindow->getDc()->CreateSolidColorBrush (kTransparentBlack, &mBrush);
       }
     //}}}
     //{{{
     virtual ~cTimecodeBox() {
       mTextFormat->Release();
-      mBrush->Release();
       }
     //}}}
 
@@ -1246,7 +1239,7 @@ private:
         auto r = mRect;
         r.left = mRect.right - textMetrics.width - 2.f;
         r.top = mRect.bottom - textMetrics.height + textMetrics.top;
-        dc->FillRectangle (r, mBrush);
+        dc->FillRectangle (r, mWindow->getTransparentBgndBrush());
         }
       else
         dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
@@ -1261,7 +1254,6 @@ private:
     cPlayContext* mPlayContext;
 
     IDWriteTextFormat* mTextFormat = nullptr;
-    ID2D1SolidColorBrush* mBrush = nullptr;
     };
   //}}}
 

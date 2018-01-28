@@ -65,12 +65,12 @@ public:
       for (auto& service : mTs->mServiceMap) {
         r.bottom = r.top + mLineHeight;
         mBoxItemVec.push_back (new cServiceName (this, &service.second, serviceIndex++, r));
-        r.top = r.bottom;
+        r.top = r.bottom + 1.f;
 
         if (service.second.getNowEpgItem()) {
           r.bottom = r.top + mLineHeight;
           mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs, r));
-          r.top = r.bottom;
+          r.top = r.bottom + 1.f;
           }
         if (service.second.getShowEpg()) {
           for (auto epgItem : service.second.getEpgItemMap()) {
@@ -79,7 +79,7 @@ public:
             if ((time.tm_mday == nowDay) && (timet > nowTime)) { // later today
               r.bottom = r.top + mLineHeight;
               mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, r));
-              r.top = r.bottom;
+              r.top = r.bottom + 1.f;
               }
             }
           }
@@ -96,7 +96,10 @@ private:
   //{{{
   class cBoxItem {
   public:
-    cBoxItem (cTsEpgBox* box, cService* service, const cRect& r) : mBox(box), mService(service), mRect(r) {}
+    //{{{
+    cBoxItem (cTsEpgBox* box, cService* service, const cRect& r) :
+      mBox(box), mService(service), mRect(r) {}
+    //}}}
     ~cBoxItem() {}
 
     bool inside (const cPoint& pos) { return mRect.inside (pos); }
@@ -105,6 +108,7 @@ private:
     virtual void onDown() = 0;
     //{{{
     virtual void onDraw (ID2D1DeviceContext* dc) {
+      dc->FillRectangle (mRect, mBox->getWindow()->getTransparentBgndBrush());
       mRect.right = mRect.left + mBox->drawText (dc, mStr, mBox->mTextFormat, mRect, mBrush, mBox->mLineHeight);
       }
     //}}}
@@ -115,6 +119,7 @@ private:
     cRect mRect;
 
     std::string mStr;
+    ID2D1SolidColorBrush* mBgndBrush;
     ID2D1SolidColorBrush* mBrush;
     };
   //}}}

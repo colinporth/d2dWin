@@ -77,9 +77,11 @@ public:
       std::string str = mNames[nameIndex];
       auto brush = mTextPressed && !mMoved && (nameIndex == mPressedIndex) ?
                      mWindow->getYellowBrush() : (nameIndex == mIndex) ?
-                       mWindow->getWhiteBrush() : mWindow->getLightGreyBrush();
+                       mWindow->getWhiteBrush() : mWindow->getLightGreyBrush(); 
+      auto r = cRect(mRect.left+2, y, mRect.right, y + kTextHeight);
+      dc->FillRectangle (r, mWindow->getTransparentBgndBrush());
       dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
-                    cRect(mRect.left+2, y, mRect.right, y + kTextHeight), brush);
+                    r, brush);
       }
     }
 

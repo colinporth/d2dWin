@@ -15,7 +15,6 @@ public:
       20.f, L"en-us",
       &mTextFormat);
 
-    window->getDc()->CreateSolidColorBrush (kTransparentBlack, &mBgndBrush);
     window->getDc()->CreateSolidColorBrush (ColorF (ColorF::CornflowerBlue), &mBrush);
     layout();
     }
@@ -23,7 +22,6 @@ public:
   //{{{
   virtual ~cLogBox() {
     mTextFormat->Release();
-    mBgndBrush->Release();
     mBrush->Release();
     }
   //}}}
@@ -111,7 +109,8 @@ public:
       y -= textHeight;
 
       if (mPin)
-        dc->FillRectangle (RectF(0, y+4.f, textMetrics.width+2.f, y+4.f + textHeight), mBgndBrush);
+        dc->FillRectangle (RectF(0, y+4.f, textMetrics.width+2.f, y+4.f + textHeight), 
+                           mWindow->getTransparentBgndBrush());
       dc->DrawTextLayout (Point2F(0, y), textLayout, mBrush);
       textLayout->Release();
 
@@ -155,5 +154,4 @@ private:
 
   IDWriteTextFormat* mTextFormat = nullptr;
   ID2D1SolidColorBrush* mBrush = nullptr;
-  ID2D1SolidColorBrush* mBgndBrush = nullptr;
   };

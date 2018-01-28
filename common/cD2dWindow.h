@@ -248,8 +248,6 @@ public:
       }
     //}}}
 
-    const ColorF kTransparentBlack = {0.f, 0.f, 0.f, 0.8f };
-
     string mName;
     cD2dWindow* mWindow;
 
@@ -356,7 +354,8 @@ public:
   float getHeight() { return mClientF.y; }
 
   IDWriteTextFormat* getTextFormat() { return mTextFormat.Get(); }
-  //{{{  get brushes
+
+  // brushes
   ID2D1SolidColorBrush* getBlackBrush() { return mBlackBrush.Get(); }
   ID2D1SolidColorBrush* getDarkGreyBrush() { return mDarkGreyBrush.Get(); }
   ID2D1SolidColorBrush* getGreyBrush() { return mGreyBrush.Get(); }
@@ -367,8 +366,7 @@ public:
   ID2D1SolidColorBrush* getYellowBrush() { return mYellowBrush.Get(); }
   ID2D1SolidColorBrush* getRedBrush() { return mRedBrush.Get(); }
   ID2D1SolidColorBrush* getOrangeBrush() { return mOrangeBrush.Get(); }
-  ID2D1SolidColorBrush* getTransparentBlackBrush() { return mTransparentBlackBrush.Get(); }
-  //}}}
+  ID2D1SolidColorBrush* getTransparentBgndBrush() { return mTransparentBgndBrush.Get(); }
 
   bool getShift() { return mShiftKeyDown; }
   bool getControl() { return mControlKeyDown; }
@@ -456,7 +454,7 @@ private:
   ComPtr<ID2D1SolidColorBrush> mYellowBrush;
   ComPtr<ID2D1SolidColorBrush> mRedBrush;
   ComPtr<ID2D1SolidColorBrush> mOrangeBrush;
-  ComPtr<ID2D1SolidColorBrush> mTransparentBlackBrush;
+  ComPtr<ID2D1SolidColorBrush> mTransparentBgndBrush;
   //}}}
   //{{{  boxes
   cBox* mProxBox = nullptr;

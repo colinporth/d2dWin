@@ -890,7 +890,7 @@ public:
     // cMapView dimensions in TileXY cordinates, how do we get them here
     auto viewSize = mMap->getView();
 
-    dc->FillRectangle (mRect, mWindow->getTransparentBlackBrush());
+    dc->FillRectangle (mRect, mWindow->getTransparentBgndBrush());
 
     auto colour = ColorF(0.1f,0,0.1f, 1.f);
     auto zoomTileSet = mMap->getZoomTileSet();
