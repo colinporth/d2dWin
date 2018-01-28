@@ -28,7 +28,7 @@ public:
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
-    if (getTimedOn() && mWindow->getTimedMenuOn()) {
+    if (!getTimedOn() || mWindow->getTimedMenuOn()) {
       pos += getTL();
 
       for (auto boxItem : mBoxItemVec)
@@ -46,7 +46,7 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    if (getTimedOn() && mWindow->getTimedMenuOn()) {
+    if (!getTimedOn() || mWindow->getTimedMenuOn()) {
       lock_guard<mutex> lockGuard (mTs->mMutex);
 
       if (mTs->mServiceMap.size() > 1) {
