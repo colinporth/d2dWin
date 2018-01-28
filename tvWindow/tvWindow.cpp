@@ -77,9 +77,10 @@ public:
       cLog::log (LOGNOTICE, "getFiles %d files", mFileList.size());
       add (new cListBox (this, getWidth()/2.f, 0.f, mFileList, mFileIndex, mFileIndexChanged), 0.f,kTextHeight);
       threadHandle = thread ([=](){ filesPlayerThread(); });
+      //threadHandle = thread ([=](){ muliplePlayerThread(); });
       }
     else
-      threadHandle = thread ([=](){ filePlayerThread (param); });
+      threadHandle = thread ([=](){ filePlayerThread (param, 0.f); });
     SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
     threadHandle.detach();
 
@@ -1280,7 +1281,7 @@ private:
     }
   //}}}
   //{{{
-  void playFile (const string& fileName, cPlayContext* playContext) {
+  void playFile (const string& fileName, cPlayContext* playContext, float width, float height) {
 
     //{{{  create transportStreams
     playContext->mAnalTs = new cAnalTransportStream();
@@ -1288,9 +1289,11 @@ private:
     playContext->mVidTs = new cVidTransportStream (kVidMaxFrames);
     //}}}
     //{{{  create boxes
-    auto vidFrameView = addFront (new cVidFrameView (this, 0.f,0.f, playContext));
+    auto vidFrameView = addFront (new cVidFrameView (this, width,height, playContext));
+
     auto timecodeBox = add (new cTimecodeBox (this, 600.f,60.f, playContext), -600.f,-60.f);
     timecodeBox->setPin (true);
+
     auto progressBox = add (new cProgressBox (this, 0.f,6.f, playContext), 0.f,-6.f);
     auto audFrameBox = add (new cAudFrameBox (this, 82.f,240.0f, playContext->mPlayAudFrame), -84.f,-240.f-6.0f);
     //}}}
@@ -1301,6 +1304,7 @@ private:
     SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_HIGHEST);
     threadHandle.detach();
     //}}}
+    mPlayContextFocus = playContext;
 
     const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
     auto file = _open (fileName.c_str(), _O_RDONLY | _O_BINARY);
@@ -1414,6 +1418,7 @@ private:
     while (!mFileIndexChanged)
       Sleep (10);
     //{{{  wait for threads to close down
+    mPlayContextFocus = nullptr;
     playContext->mPlayStoppedSem.wait();
     playContext->mPlayPtsSem.notifyAll();
     playContext->mPlayPtsSem.notifyAll();
@@ -1435,15 +1440,13 @@ private:
   //}}}
 
   //{{{
-  void filePlayerThread (const string& fileName) {
+  void filePlayerThread (const string& fileName, float size) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("file");
 
     cPlayContext playContext;
-    mPlayContextFocus = &playContext;
-    playFile (fileName, &playContext);
-    mPlayContextFocus = nullptr;
+    playFile (fileName, &playContext, size, size);
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -1459,9 +1462,7 @@ private:
       mFileIndexChanged = false;
 
       cPlayContext playContext;
-      mPlayContextFocus = &playContext;
-      playFile (mFileList[mFileIndex], &playContext);
-      mPlayContextFocus = nullptr;
+      playFile (mFileList[mFileIndex], &playContext, 0.f,0.f);
 
       if (!mFileIndexChanged) {
         if (mFileIndex < mFileList.size()-1) // play next file
@@ -1475,6 +1476,21 @@ private:
     CoUninitialize();
     }
   //}}}
+  //{{{
+  void muliplePlayerThread() {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("mult");
+
+    for (auto i = 1; i <= 4; i++)
+      thread ([=]() { filePlayerThread (mFileList[i], i*100.f); }).detach();
+    Sleep (100000);
+
+    cLog::log (LOGNOTICE, "exit");
+    CoUninitialize();
+    }
+  //}}}
+
   //{{{
   void audThread (const string& fileName, cPlayContext* playContext) {
 
