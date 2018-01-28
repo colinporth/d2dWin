@@ -858,7 +858,7 @@ private:
   class cPlayContext {
   public:
     //{{{
-    cPlayContext() : 
+    cPlayContext() :
       mFirstVidPtsSem("firstVidPts"), mPlayStoppedSem("playStopped"),
       mAudStoppedSem("audStopped"), mVidStoppedSem("vidStopped") {}
     //}}}
@@ -1232,35 +1232,33 @@ private:
   //{{{
   void playFile (const string& fileName, cPlayContext* playContext) {
 
-    // init transportStreams
+    //{{{  create transportStreams
     playContext->mAnalTs = new cAnalTransportStream();
     playContext->mAudTs = new cAudTransportStream (kAudMaxFrames);
     playContext->mVidTs = new cVidTransportStream (kVidMaxFrames);
-
-    // init boxes
+    //}}}
+    //{{{  create boxes
     auto vidFrameView = addFront (new cVidFrameView (this, 0.f,0.f, playContext));
     auto timecodeBox = add (new cTimecodeBox (this, 600.f,60.f, playContext), -600.f,-60.f);
     timecodeBox->setPin (true);
     auto progressBox = add (new cProgressBox (this, 0.f,6.f, playContext), 0.f,-6.f);
     auto audFrameBox = add (new cAudFrameBox (this, 82.f,240.0f, playContext->mPlayAudFrame), -84.f,-240.f-6.0f);
-
-    // launch threads
+    //}}}
+    //{{{  launch threads
     thread ([=]() { audThread (fileName, playContext); }).detach();
     thread ([=]() { vidThread (fileName, playContext); }).detach();
     auto threadHandle = thread ([=](){ playThread (playContext); });
     SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_HIGHEST);
     threadHandle.detach();
+    //}}}
 
-    // allocate file buffer
     const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
-
     auto file = _open (fileName.c_str(), _O_RDONLY | _O_BINARY);
     //{{{  get streamSize
     struct _stat64 buf;
     _fstat64 (file, &buf);
     playContext->mStreamSize = buf.st_size ;
     //}}}
-
     //{{{  parse front of stream until first service
     int64_t streamPos = 0;
 
@@ -1313,8 +1311,7 @@ private:
       int64_t bytesToRead = playContext->mStreamSize - playContext->mStreamPos;
       if (bytesToRead > kChunkSize) // trim to kChunkSize
         bytesToRead = kChunkSize;
-      if (bytesToRead >= 188) {
-        // at least 1 packet to read, trim read to packet boundary
+      if (bytesToRead >= 188) { // at least 1 packet to read, trim read to packet boundary
         bytesToRead -= bytesToRead % 188;
         auto chunkBytesLeft = _read (file, fileChunkBuffer, (unsigned int)bytesToRead);
         if (chunkBytesLeft >= 188) {
@@ -1363,23 +1360,27 @@ private:
     _close (file);
     free (fileChunkBuffer);
 
+    // analyse finished, wait for fileChange or exit
     while (!mFileIndexChanged)
       Sleep (10);
-
+    //{{{  wait for threads to close down
     playContext->mPlayStoppedSem.wait();
     playContext->mPlayPtsSem.notifyAll();
     playContext->mPlayPtsSem.notifyAll();
     playContext->mAudStoppedSem.wait();
     playContext->mVidStoppedSem.wait();
-
+    //}}}
+    //{{{  remove boxes
     removeBox (timecodeBox);
     removeBox (progressBox);
     removeBox (audFrameBox);
     removeBox (vidFrameView);
-
+    //}}}
+    //{{{  delete resources
     delete playContext->mAudTs;
     delete playContext->mVidTs;
     delete playContext->mAnalTs;
+    //}}}
     }
   //}}}
 
