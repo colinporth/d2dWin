@@ -158,7 +158,7 @@ protected:
       case 0x25: // left arrow
         if (mPlayContextFocus) {
           mPlayContextFocus->incPlayPts (-90000/25);
-          mPlayContextFocus->mPlaying = ePause;
+          mPlayContextFocus->mPlaying = cPlayContext::ePause;
           changed();
           }
         break;
@@ -167,7 +167,7 @@ protected:
       case 0x27: // right arrow
         if (mPlayContextFocus) {
           mPlayContextFocus->incPlayPts (90000/25);
-          mPlayContextFocus->mPlaying = ePause;
+          mPlayContextFocus->mPlaying = cPlayContext::ePause;
           changed();
           }
         break;
@@ -230,7 +230,6 @@ protected:
   //}}}
 
 private:
-  enum ePlaying { ePause, eScrub, ePlay };
   //{{{
   class cAnalTransportStream : public cTransportStream {
   public:
@@ -908,6 +907,7 @@ private:
   //{{{
   class cPlayContext {
   public:
+    enum ePlaying { ePause, eScrub, ePlay };
     //{{{
     cPlayContext() :
       mFirstVidPtsSem("firstVidPts"), mPlayStoppedSem("playStopped"),
@@ -970,7 +970,6 @@ private:
     cSemaphore mVidStoppedSem;
     };
   //}}}
-
   //{{{
   class cVidFrameView : public cView {
   public:
@@ -993,7 +992,7 @@ private:
       if (mWindow->getControl())
         return cView::onWheel (delta, pos);
       else {
-        mPlayContext->mPlaying = ePause;
+        mPlayContext->mPlaying = cPlayContext::ePause;
         mPlayContext->incPlayPts (-int64_t(delta * (90000/25) / 120));
         mWindow->changed();
         }
@@ -1007,7 +1006,7 @@ private:
       if (mWindow->getControl())
         return cView::onMove (right, pos, inc);
       else {
-        mPlayContext->mPlaying = ePause;
+        mPlayContext->mPlaying = cPlayContext::ePause;
         mPlayContext->incPlayPts (int64_t (-inc.x * kAudSamplesPerAacFrame * 48 / 90 / 8));
         mWindow->changed();
         return true;
@@ -1076,7 +1075,7 @@ private:
       auto ptsInc = (pos.y > 40.f) ? (90000/25) : (kAudSamplesPerAacFrame * 90 / 48);
 
       mPlayContext->incPlayPts (-int64_t(delta * ptsInc / 120));
-      mPlayContext->setPlaying (cAppWindow::ePause);
+      mPlayContext->setPlaying (cPlayContext::ePause);
       mWindow->changed();
       return true;
       }
@@ -1084,7 +1083,7 @@ private:
     //{{{
     bool onMove (bool right, cPoint pos, cPoint inc) {
 
-      mPlayContext->setPlaying (cAppWindow::ePause);
+      mPlayContext->setPlaying (cPlayContext::ePause);
       auto pixPerPts = 18.f * 48 / (kAudSamplesPerAacFrame * 90);
       mPlayContext->incPlayPts (int64_t (-inc.x / pixPerPts));
       mWindow->changed();
@@ -1144,9 +1143,7 @@ private:
     //{{{
     bool onDown (bool right, cPoint pos)  {
 
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
-      mPlayContext->setPlaying (cAppWindow::eScrub);
+      mPlayContext->setPlaying (cPlayContext::eScrub);
       mPlayContext->setPlayPts (int64_t ((pos.x / getWidth()) * mPlayContext->getLengthPts()));
       mWindow->changed();
 
@@ -1156,8 +1153,6 @@ private:
     //{{{
     bool onMove (bool right, cPoint pos, cPoint inc) {
 
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
       mPlayContext->setPlayPts (int64_t ((pos.x / getWidth()) * mPlayContext->getLengthPts()));
       mWindow->changed();
       return true;
@@ -1166,16 +1161,12 @@ private:
     //{{{
     bool onUp (bool right, bool mouseMoved, cPoint pos) {
 
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-
-      mPlayContext->setPlaying (cAppWindow::ePause);
+      mPlayContext->setPlaying (cPlayContext::ePause);
       return true;
       }
     //}}}
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
 
       const float ylen = 2.f;
 
@@ -1662,11 +1653,11 @@ private:
 
       // play using frame where available, else play silence
       audPlay (playContext->mPlayAudFrame ? playContext->mPlayAudFrame->mChannels : getSrcChannels(),
-        playContext->mPlayAudFrame && (playContext->mPlaying != ePause) ? playContext->mPlayAudFrame->mSamples : nullptr,
+        playContext->mPlayAudFrame && (playContext->mPlaying != cPlayContext::ePause) ? playContext->mPlayAudFrame->mSamples : nullptr,
         playContext->mPlayAudFrame ? playContext->mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
                1.f);
 
-      if ((playContext->mPlaying == ePlay) && (playContext->mPlayPts < playContext->getLengthPts()))
+      if ((playContext->mPlaying == cPlayContext::ePlay) && (playContext->mPlayPts < playContext->getLengthPts()))
         playContext->incPlayPts (int64_t (((playContext->mPlayAudFrame ? playContext->mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
       if (playContext->mPlayPts > playContext->getLengthPts())
         playContext->mPlayPts = playContext->getLengthPts();
