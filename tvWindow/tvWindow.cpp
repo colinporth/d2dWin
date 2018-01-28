@@ -92,7 +92,7 @@ public:
         add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), 0.f,-120.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvbTs->mPackets), -224.f,0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvbTs->mDiscontinuity), -326.f,0.f);
-        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvbTs), getWidth()/2.f,0.f);
+        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvbTs), getWidth()/2.f,0.f)->setTimedOn();
 
         thread ([=]() { dvbGrabThread (mDvb); }).detach();
         thread ([=]() { dvbSignalThread (mDvb); }).detach();

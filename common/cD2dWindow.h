@@ -46,6 +46,7 @@ public:
     bool getEnable() { return mEnable; }
     bool getPick() { return mPick; }
     bool getShow() { return mEnable && (mPick || mPin); }
+    bool getTimedOn() { return mTimedOn; }
 
     cPoint getSize() { return mRect.getSize(); }
     float getWidth() { return mRect.getWidth(); }
@@ -79,6 +80,7 @@ public:
     void setUnPick() { mPick = false; }
     void setPin (bool pin) { mPin = pin; }
     void togglePin() { mPin = !mPin; }
+    void setTimedOn() { mTimedOn = true; }
 
     // overrides
     //{{{
@@ -254,6 +256,7 @@ public:
     bool mEnable = true;
     bool mPick = false;
     bool mPin = false;
+    bool mTimedOn = false;
 
     float mLayoutWidth;
     float mLayoutHeight;
@@ -371,6 +374,7 @@ public:
   bool getShift() { return mShiftKeyDown; }
   bool getControl() { return mControlKeyDown; }
   bool getMouseDown() { return mMouseDown; }
+  bool getTimedMenuOn() { return mTimedMenuOn; }
   //}}}
   //{{{  full screen
   bool getFullScreen() { return mFullScreen; }
@@ -383,9 +387,10 @@ public:
   bool getExit() { return mExit; }
   void setExit() { mExit = true; }
 
-  void setChangeCountDown (int countDown) { mChangeCountDown = countDown; }
-
+  void keyChanged() { mCursorDown = mCursorCountDown; }
   void cursorChanged() { mCursorDown = mCursorCountDown; }
+  void setTimedMenuOff() { mTimedMenuOn = false; }
+  void setChangeCountDown (int countDown) { mChangeCountDown = countDown; }
 
   LRESULT wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lparam);
   void messagePump();
@@ -486,6 +491,7 @@ private:
   uint32_t mChangeCountDown = 100;
 
   bool mCursorOn = true;
+  bool mTimedMenuOn = true;
   uint32_t mCursorDown = 50;
   uint32_t mCursorCountDown = 50;
 

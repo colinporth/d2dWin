@@ -28,66 +28,70 @@ public:
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
-    pos += getTL();
+    if (getTimedOn() && mWindow->getTimedMenuOn()) {
+      pos += getTL();
 
-    for (auto boxItem : mBoxItemVec)
-      if (boxItem->inside (pos)) {
-        boxItem->onDown();
-        getWindow()->changed();
-        return true;
-        }
+      for (auto boxItem : mBoxItemVec)
+        if (boxItem->inside (pos)) {
+          boxItem->onDown();
+          getWindow()->changed();
+          return true;
+          }
+      togglePin();
+      }
 
-    togglePin();
     return true;
     }
   //}}}
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    lock_guard<mutex> lockGuard (mTs->mMutex);
+    if (getTimedOn() && mWindow->getTimedMenuOn()) {
+      lock_guard<mutex> lockGuard (mTs->mMutex);
 
-    if (mTs->mServiceMap.size() > 1) {
-      // construct services menu, !!! could check for ts service change here to cull rebuilding menu !!!
-      auto nowTime = mTs->getCurTime();
-      struct tm nowTm = *localtime (&nowTime);
-      int nowDay = nowTm.tm_mday;
+      if (mTs->mServiceMap.size() > 1) {
+        // construct services menu, !!! could check for ts service change here to cull rebuilding menu !!!
+        auto nowTime = mTs->getCurTime();
+        struct tm nowTm = *localtime (&nowTime);
+        int nowDay = nowTm.tm_mday;
 
-      while (!mBoxItemVec.empty()) {
-        auto boxItem = mBoxItemVec.back();
-        delete boxItem;
-        mBoxItemVec.pop_back();
-        }
-
-      mLineHeight = (mTs->mServiceMap.size() >= 10) ? kDefaultLineHeight : kLargeLineHeight;
-      auto r = mRect;
-
-      int serviceIndex = 1;
-      for (auto& service : mTs->mServiceMap) {
-        r.bottom = r.top + mLineHeight;
-        mBoxItemVec.push_back (new cServiceName (this, &service.second, serviceIndex++, r));
-        r.top = r.bottom + 1.f;
-
-        if (service.second.getNowEpgItem()) {
-          r.bottom = r.top + mLineHeight;
-          mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs, r));
-          r.top = r.bottom + 1.f;
+        while (!mBoxItemVec.empty()) {
+          auto boxItem = mBoxItemVec.back();
+          delete boxItem;
+          mBoxItemVec.pop_back();
           }
-        if (service.second.getShowEpg()) {
-          for (auto epgItem : service.second.getEpgItemMap()) {
-            auto timet = epgItem.second->getStartTime();
-            struct tm time = *localtime (&timet);
-            if ((time.tm_mday == nowDay) && (timet > nowTime)) { // later today
-              r.bottom = r.top + mLineHeight;
-              mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, r));
-              r.top = r.bottom + 1.f;
+
+        mLineHeight = (mTs->mServiceMap.size() >= 10) ? kDefaultLineHeight : kLargeLineHeight;
+        auto r = mRect;
+
+        int serviceIndex = 1;
+        for (auto& service : mTs->mServiceMap) {
+          r.bottom = r.top + mLineHeight;
+          mBoxItemVec.push_back (new cServiceName (this, &service.second, serviceIndex++, r));
+          r.top = r.bottom + 1.f;
+
+          if (service.second.getNowEpgItem()) {
+            r.bottom = r.top + mLineHeight;
+            mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs, r));
+            r.top = r.bottom + 1.f;
+            }
+          if (service.second.getShowEpg()) {
+            for (auto epgItem : service.second.getEpgItemMap()) {
+              auto timet = epgItem.second->getStartTime();
+              struct tm time = *localtime (&timet);
+              if ((time.tm_mday == nowDay) && (timet > nowTime)) { // later today
+                r.bottom = r.top + mLineHeight;
+                mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, r));
+                r.top = r.bottom + 1.f;
+                }
               }
             }
           }
-        }
 
-      // draw services boxItems
-      for (auto boxItem : mBoxItemVec)
-        boxItem->onDraw (dc);
+        // draw services boxItems
+        for (auto boxItem : mBoxItemVec)
+          boxItem->onDraw (dc);
+        }
       }
     }
   //}}}

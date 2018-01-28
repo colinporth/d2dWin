@@ -295,6 +295,7 @@ LRESULT cD2dWindow::wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM 
       if (onKey ((int)wparam))
         PostQuitMessage (0) ;
 
+      keyChanged();
       return 0;
     //}}}
     //{{{
@@ -307,6 +308,7 @@ LRESULT cD2dWindow::wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM 
         mControlKeyDown = false;
       onKeyUp ((int)wparam);
 
+      keyChanged();
       return 0;
     //}}}
 
@@ -415,11 +417,13 @@ LRESULT cD2dWindow::wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM 
         mCursorDown--;
         if (!mCursorOn) {
           mCursorOn = true;
+          mTimedMenuOn = true;
           ShowCursor (mCursorOn);
           }
         }
       else if (mCursorOn) {
         mCursorOn = false;
+        mTimedMenuOn = false;
         ShowCursor (mCursorOn);
         }
       return 0;
