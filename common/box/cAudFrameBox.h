@@ -9,8 +9,8 @@ const float kBarsScale = 3.0f;  // need to work out power scaling derivation
 class cAudFrameBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cAudFrameBox (cD2dWindow* window, float width, float height, cAudFrame*& audFrame)
-      : cBox("audioBox", window, width, height), mAudFrame(audFrame) {
+  cAudFrameBox (cD2dWindow* window, float width, float height, cAudFrame*& audFrame, iAudio* audio)
+      : cBox("audioBox", window, width, height), mAudFrame(audFrame), mAudio(audio) {
     mPin = true;
 
     mWindow->getDc()->CreateSolidColorBrush (ColorF (0.8f, 0.1f, 0.1f, 0.5f), &mBrush);
@@ -28,6 +28,11 @@ public:
     if (mAudFrame) {
       if (mAudFrame->mChannels == 6) {
         auto audio = dynamic_cast<iAudio*>(mWindow);
+        if (!audio)
+          audio = dynamic_cast<iAudio*>(this);
+        if (!audio)
+          return false;
+
         if ((1.f - (pos.y / getHeight())) > (audio->getVolume() / audio->getMaxVolume()))
           audio->setMixDown (iAudio::eBestMix);
         else {
@@ -45,13 +50,26 @@ public:
   //}}}
   //{{{
   bool onProxExit() {
-    dynamic_cast<iAudio*>(mWindow)->setMixDown (iAudio::eBestMix);
+
+    auto audio = dynamic_cast<iAudio*>(mWindow);
+    if (!audio)
+      audio = dynamic_cast<iAudio*>(this);
+    if (!audio)
+      return false;
+
+    audio->setMixDown (iAudio::eBestMix);
     return true;
     }
   //}}}
   //{{{
   bool onWheel (int delta, cPoint posy)  {
+
     auto audio = dynamic_cast<iAudio*>(mWindow);
+    if (!audio)
+      audio = dynamic_cast<iAudio*>(this);
+    if (!audio)
+      return false;
+
     audio->setVolume (audio->getVolume() + delta/1200.f);
     return true;
     }
@@ -62,11 +80,9 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    auto audio = dynamic_cast<iAudio*>(mWindow);
-
     if (mPick) {
       //{{{  show out chans
-      auto str = dec(audio->getDstChannels()) + " out chans";
+      auto str = dec(mAudio->getDstChannels()) + " out chans";
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
@@ -101,39 +117,39 @@ public:
         // BL
         r.left = mRect.left + 1.f;
         r.right = r.left + widthPerChannel;
-        drawChanBar (dc, r, audio->getMixedBL(), mAudFrame->mPower[4]);
+        drawChanBar (dc, r, mAudio->getMixedBL(), mAudFrame->mPower[4]);
 
         // FL
         r.left = r.right;
         r.right += widthPerChannel;
-        drawChanBar (dc, r, audio->getMixedFL(), mAudFrame->mPower[0]);
+        drawChanBar (dc, r, mAudio->getMixedFL(), mAudFrame->mPower[0]);
 
         // C
         r.left = r.right;
         r.right += widthPerChannel;
-        drawChanBar (dc, r, audio->getMixedC(), mAudFrame->mPower[2]);
+        drawChanBar (dc, r, mAudio->getMixedC(), mAudFrame->mPower[2]);
 
         // FR
         r.left = r.right;
         r.right += widthPerChannel;
-        drawChanBar (dc, r, audio->getMixedFR(), mAudFrame->mPower[1]);
+        drawChanBar (dc, r, mAudio->getMixedFR(), mAudFrame->mPower[1]);
 
         // BR
         r.left = r.right;
         r.right = mRect.right - 1.0f;
-        drawChanBar (dc, r, audio->getMixedBL(), mAudFrame->mPower[5]);
+        drawChanBar (dc, r, mAudio->getMixedBL(), mAudFrame->mPower[5]);
 
         // W overlay
         r.left = mRect.left + 1.f;
         r.right = mRect.right - 1.f;
-        drawWooferBar (dc, r, audio->getMixedW(), mAudFrame->mPower[3]);
+        drawWooferBar (dc, r, mAudio->getMixedW(), mAudFrame->mPower[3]);
         }
         //}}}
       }
 
     if (mPick) {
       auto r = mRect;
-      r.top = r.bottom - (getHeight() * audio->getVolume() / audio->getMaxVolume());
+      r.top = r.bottom - (getHeight() * mAudio->getVolume() / mAudio->getMaxVolume());
       dc->DrawRectangle (r, mWindow->getYellowBrush());
       }
     }
@@ -142,8 +158,7 @@ public:
 private:
   //{{{
   bool setFromPos (cPoint pos) {
-    auto audio = dynamic_cast<iAudio*>(mWindow);
-    audio->setVolume ((1.f - (pos.y / getHeight())) * audio->getMaxVolume());
+    mAudio->setVolume ((1.f - (pos.y / getHeight())) * mAudio->getMaxVolume());
     return true;
     }
   //}}}
@@ -163,6 +178,7 @@ private:
   //}}}
 
   cAudFrame*& mAudFrame;
+  iAudio* mAudio;
 
   ID2D1SolidColorBrush* mBrush = nullptr;
   };

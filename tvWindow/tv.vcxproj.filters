@@ -3,6 +3,7 @@
   <ItemGroup>
     <ClCompile Include="tvWindow.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="cPlayView.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\utils\utils.h">
