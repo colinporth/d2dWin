@@ -1378,7 +1378,6 @@ private:
                 (playContext->mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
               firstVidSignalCount++;
               playContext->mFirstVidPtsSem.notifyAll();
-              cLog::log (LOGERROR, "mFirstVidPtsSem.notifyAll");
               }
             }
           }
