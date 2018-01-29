@@ -217,6 +217,7 @@ void cD2dWindow::removeBox (cBox* box) {
   for (auto boxIt = mBoxes.begin(); boxIt != mBoxes.end(); ++boxIt)
     if (*boxIt == box) {
       mBoxes.erase (boxIt);
+      changed();
       return;
       }
   }

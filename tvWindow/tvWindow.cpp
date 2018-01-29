@@ -24,7 +24,6 @@ public:
     // init d2dWindow, boxes
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f);
-    //add (new cFramesDebugBox (this, 0.f,getHeight()/4.f), 0.f,kTextHeight);
 
     // launch file player
     thread threadHandle;
@@ -33,13 +32,19 @@ public:
       mFileList = getFiles (mRoot, "*.ts");
       add (new cListBox (this, getWidth()/2.f, 0.f, mFileList, mFileIndex, mFileIndexChanged));
       thread ([=]() { fileWatchThread(); }).detach();
+
+      if (!mFileList.empty()) {
+        mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]);
+        addFront (mPlayFocus, 0.f, 0.f);
+        }
+
       threadHandle = thread ([=](){ fileSelectThread(); });
       SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
       threadHandle.detach();
       }
     else {
       mPlayFocus = new cPlayView (this, 0.f,0.f, param);
-      addFront (mPlayFocus, 0.f, 0.f);
+      addFront (mPlayFocus, 0.f,0.f);
       }
 
     if (frequency) {
@@ -72,8 +77,21 @@ protected:
 
     switch (key) {
       case 0x00: break;
-      case 0x1B: return true;
       case  'F': toggleFullScreen(); break ;
+
+      //{{{
+      case 0x1B: // escape - exit
+        if (mPlayFocus) {
+          //{{{  exit playView
+          removeBox (mPlayFocus);
+          delete mPlayFocus;
+          mPlayFocus = nullptr;
+          }
+          //}}}
+        else 
+          return true;
+        break;
+      //}}}
       //{{{
       case 0x26: // up arrow - prev file
         if (!mFileList.empty() && (mFileIndex > 0)) {
@@ -93,11 +111,18 @@ protected:
       //{{{
       case 0x0d: // enter - play file
         if (!mFileList.empty()) {
-          cLog::log (LOGINFO, "enter key");
-          mFileIndexChanged = true;
+          if (mPlayFocus) {
+            removeBox (mPlayFocus);
+            delete mPlayFocus;
+            mPlayFocus = nullptr;
+            }
+
+          mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]);
+          addFront (mPlayFocus, 0.f, 0.f);
           }
         break;
       //}}}
+
       default: if (mPlayFocus) mPlayFocus->onKey (key);
       }
 
@@ -143,20 +168,20 @@ private:
 
     while (!getExit()) {
       mFileIndexChanged = false;
+      while (!mFileIndexChanged)
+        Sleep (1);
 
       if (mFileList.empty())
         Sleep (100);
       else {
-        auto playerView = new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]);
-        addFront (playerView, 0.f, 0.f);
-        mPlayFocus = playerView;
+        if (mPlayFocus) {
+          removeBox (mPlayFocus);
+          delete mPlayFocus;
+          mPlayFocus = nullptr;
+          }
 
-        while (!mFileIndexChanged)
-          Sleep (1);
-
-        mPlayFocus = nullptr;
-        removeBox (playerView);
-        delete playerView;
+        mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]);
+        addFront (mPlayFocus, 0.f, 0.f);
         }
       }
 
