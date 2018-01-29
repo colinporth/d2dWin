@@ -10,12 +10,24 @@
 class cListBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cListBox (cD2dWindow* window, float width, float height, vector<string>& names, int& index, bool& indexChanged)
-      : cBox ("list", window, width, height), mNames(names), mIndex(index), mIndexChanged(indexChanged) {
+  cListBox (cD2dWindow* window, float width, float height,
+            vector<string>& items, int& itemIndex, bool& itemIndexChanged)
+      : cBox ("list", window, width, height),
+        mItems(items), mItemIndex(itemIndex), mItemIndexChanged(itemIndexChanged) {
+
+    mWindow->getDwriteFactory()->CreateTextFormat (L"FreeSans", NULL,
+      DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+      16.0f, L"en-us",
+      &mTextFormat);
+
     mPin = true;
     }
   //}}}
-  virtual ~cListBox() {}
+  //{{{
+  virtual ~cListBox() {
+    mTextFormat->Release();
+    }
+  //}}}
 
   //{{{
   bool onDown (bool right, cPoint pos)  {
@@ -40,14 +52,11 @@ public:
 
     if (mWindow->getTimedMenuOn()) {
       mMoveInc += inc.y;
-
       if (abs(mMoveInc) > 2)
         mMoved = true;
-
       if (mMoved)
         incScroll (-(float)inc.y);
       }
-
     return true;
     }
   //}}}
@@ -56,11 +65,9 @@ public:
 
     if (mWindow->getTimedMenuOn()) {
       if (mTextPressed && !mMoved) {
-        mIndex = mPressedIndex;
-        mIndexChanged = true;
-        //mWindow->setTimedMenuOff();
+        mItemIndex = mPressedIndex;
+        mItemIndexChanged = true;
         }
-
       mTextPressed = false;
       mPressedIndex = -1;
       mMoved = false;
@@ -75,26 +82,44 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     if (mWindow->getTimedMenuOn()) {
+
       if (!mTextPressed && mScrollInc)
         incScroll (mScrollInc * 0.9f);
 
-      int nameIndex = int(mScroll) / (int)kTextHeight;
+      dc->FillRectangle (mRect, mWindow->getTransparentBgndBrush());
+
+      int itemIndex = int(mScroll) / (int)kTextHeight;
       float y = mRect.top + 1.f - (int(mScroll) % (int)kTextHeight);
 
-      for (int row = 0; (y < mRect.bottom) && (nameIndex < (int)mNames.size()); row++, nameIndex++, y += kTextHeight) {
+      auto maxWidth = 0.f;
+      auto point = cPoint (mRect.left+2, y);
+
+      for (int row = 0; (y < mRect.bottom) && (itemIndex < (int)mItems.size()); row++, itemIndex++, y += kTextHeight) {
         if (row >= (int)mMeasure.size())
           mMeasure.push_back (0);
-        mMeasure[row] = 200;
 
-        std::string str = mNames[nameIndex];
-        auto brush = mTextPressed && !mMoved && (nameIndex == mPressedIndex) ?
-                       mWindow->getYellowBrush() : (nameIndex == mIndex) ?
-                         mWindow->getWhiteBrush() : mWindow->getLightGreyBrush();
-        auto r = cRect(mRect.left+2, y, mRect.right, y + kTextHeight);
-        dc->FillRectangle (r, mWindow->getTransparentBgndBrush());
-        dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
-                      r, brush);
+        std::string str = mItems[itemIndex];
+        auto brush = (mTextPressed && !mMoved && (itemIndex == mPressedIndex)) ?
+          mWindow->getYellowBrush() : (itemIndex == mItemIndex) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
+
+        IDWriteTextLayout* textLayout;
+        mWindow->getDwriteFactory()->CreateTextLayout (
+          wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mTextFormat,
+          mRect.getWidth(), kTextHeight, &textLayout);
+
+        struct DWRITE_TEXT_METRICS textMetrics;
+        textLayout->GetMetrics (&textMetrics);
+        mMeasure[row] = textMetrics.width;
+        maxWidth = max (textMetrics.width, maxWidth);
+
+        dc->DrawTextLayout (point, textLayout, brush);
+        textLayout->Release();
+
+        point.y += kTextHeight;
         }
+
+      mRect.right = maxWidth + 4.0f;
+      mRect.bottom = point.y;
       }
     }
   //}}}
@@ -104,28 +129,30 @@ private:
   void incScroll (float inc) {
 
     mScroll += inc;
-
     if (mScroll < 0.f)
       mScroll = 0.f;
-    else if ((mNames.size() * kTextHeight) < mRect.getHeight())
+    else if ((mItems.size() * kTextHeight) < mRect.getHeight())
       mScroll = 0.f;
-    else if (mScroll > ((mNames.size() * kTextHeight) - mRect.getHeight()))
-      mScroll = float(((int)mNames.size() * kTextHeight) - mRect.getHeight());
+    else if (mScroll > ((mItems.size() * kTextHeight) - mRect.getHeight()))
+      mScroll = float(((int)mItems.size() * kTextHeight) - mRect.getHeight());
 
     mScrollInc = fabs(inc) < 0.2f ? 0 : inc;
     }
   //}}}
 
-  std::vector <std::string>& mNames;
-  int& mIndex;
-  bool& mIndexChanged;
+  IDWriteTextFormat* mTextFormat = nullptr;
+
+  std::vector <std::string>& mItems;
+  int& mItemIndex;
+  bool& mItemIndexChanged;
 
   bool mTextPressed = false;
   int mPressedIndex = -1;
   bool mMoved = false;
   float mMoveInc = 0;
 
-  std::vector <int> mMeasure;
+  std::vector<float> mMeasure;
+  cRect mBgndRect;
 
   float mScroll = 0.f;
   float mScrollInc = 0.f;

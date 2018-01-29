@@ -68,12 +68,12 @@ public:
         for (auto& service : mTs->mServiceMap) {
           r.bottom = r.top + mLineHeight;
           mBoxItemVec.push_back (new cServiceName (this, &service.second, serviceIndex++, r));
-          r.top = r.bottom + 1.f;
+          r.top = r.bottom;
 
           if (service.second.getNowEpgItem()) {
             r.bottom = r.top + mLineHeight;
             mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs, r));
-            r.top = r.bottom + 1.f;
+            r.top = r.bottom;
             }
           if (service.second.getShowEpg()) {
             for (auto epgItem : service.second.getEpgItemMap()) {
@@ -82,13 +82,16 @@ public:
               if ((time.tm_mday == nowDay) && (timet > nowTime)) { // later today
                 r.bottom = r.top + mLineHeight;
                 mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, r));
-                r.top = r.bottom + 1.f;
+                r.top = r.bottom;
                 }
               }
             }
           }
+        mBgndRect = r;
+        mBgndRect.top = mRect.top;
 
         // draw services boxItems
+        dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
         for (auto boxItem : mBoxItemVec)
           boxItem->onDraw (dc);
         }
@@ -112,7 +115,6 @@ private:
     virtual void onDown() = 0;
     //{{{
     virtual void onDraw (ID2D1DeviceContext* dc) {
-      dc->FillRectangle (mRect, mBox->getWindow()->getTransparentBgndBrush());
       mRect.right = mRect.left + mBox->drawText (dc, mStr, mBox->mTextFormat, mRect, mBrush, mBox->mLineHeight);
       }
     //}}}
@@ -195,12 +197,12 @@ private:
 
   // vars
   cTransportStream* mTs;
+  IDWriteTextFormat* mTextFormat = nullptr;
 
   const float kLargeLineHeight = 16.f;
   const float kDefaultLineHeight = 13.f;
   float mLineHeight = kDefaultLineHeight;
-
-  IDWriteTextFormat* mTextFormat = nullptr;
+  cRect mBgndRect;
 
   std::vector<cBoxItem*> mBoxItemVec;
   };
