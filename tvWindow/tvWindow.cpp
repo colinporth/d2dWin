@@ -1275,6 +1275,7 @@ private:
     };
   //}}}
 
+  bool playOk() { return !getExit() && !mFileIndexChanged; }
   //{{{
   void updateFileList() {
     mFileList = getFiles ("C:/tv", "*.ts");
@@ -1289,6 +1290,8 @@ private:
 
     cPlayContext playContext;
     playFile (fileName, &playContext, size, size);
+
+    cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
     }
   //}}}
@@ -1298,7 +1301,7 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("fils");
 
-    while (true) {
+    while (!getExit()) {
       mFileIndexChanged = false;
 
       cPlayContext playContext;
@@ -1393,7 +1396,7 @@ private:
 
     int sameStreamSizeCount = 0;
     int firstVidSignalCount = 0;
-    while (!mFileIndexChanged && (sameStreamSizeCount < 10)) {
+    while (playOk() && (sameStreamSizeCount < 10)) {
       int64_t bytesToRead = playContext->mStreamSize - playContext->mStreamPos;
       if (bytesToRead > kChunkSize) // trim to kChunkSize
         bytesToRead = kChunkSize;
@@ -1420,23 +1423,29 @@ private:
         }
       else {
         //{{{  check fileSize changed
-        while (!mFileIndexChanged) {
+        while (playOk()) {
+          // check size
           _fstat64 (file, &buf);
           if (buf.st_size > playContext->mStreamSize) {
+            // bigger
             cLog::log (LOGINFO, "fileSize now " + dec(playContext->mStreamSize));
             playContext->mStreamSize = buf.st_size;
             sameStreamSizeCount = 0;
             break;
             }
+
           else {
+            // same
             sameStreamSizeCount++;
-            if (sameStreamSizeCount >= 1000) {
+            if (sameStreamSizeCount >= 10) {
               cLog::log (LOGINFO, "fileSize sameCount expired " + dec(sameStreamSizeCount));
               break;
               }
             }
+
+          // wait with abort
           int i = 0;
-          while (!mFileIndexChanged && (i++ < 1000))
+          while (playOk() && (i++ < 1000))
             Sleep (1);
           }
         }
@@ -1446,8 +1455,8 @@ private:
     free (fileChunkBuffer);
 
     // analyse finished, wait for fileChange or exit
-    while (!mFileIndexChanged)
-      Sleep (10);
+    while (playOk())
+      Sleep (1);
     //{{{  wait for threads to close down
     mPlayContextFocus = nullptr;
     playContext->mPlayStoppedSem.wait();
@@ -1479,12 +1488,12 @@ private:
 
     int64_t streamPos = 0;
     auto file = _open (fileName.c_str(), _O_RDONLY | _O_BINARY);
-    while (!mFileIndexChanged) {
+    while (playOk()) {
       auto chunkPtr = fileChunkBuffer;
       auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
       if (chunkBytesLeft < 188) {
         // end of file
-        while (!mFileIndexChanged && playContext->mAudTs->isLoaded (playContext->getPlayPts(), 1))
+        while (playOk() && playContext->mAudTs->isLoaded (playContext->getPlayPts(), 1))
           playContext->mPlayPtsSem.wait();
         //{{{  jump to pts in stream
         auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mAudTs->getPid(), playContext->getPlayPts());
@@ -1508,7 +1517,7 @@ private:
           //}}}
           changed();
 
-          while (!mFileIndexChanged && playContext->mAudTs->isLoaded (playContext->getPlayPts(), kAudMaxFrames/2))
+          while (playOk() && playContext->mAudTs->isLoaded (playContext->getPlayPts(), kAudMaxFrames/2))
             playContext->mPlayPtsSem.wait();
 
           bool loaded = playContext->mAudTs->isLoaded (playContext->getPlayPts(), 1);
@@ -1556,12 +1565,12 @@ private:
 
     int64_t streamPos = 0;
     auto file = _open (fileName.c_str(), _O_RDONLY | _O_BINARY);
-    while (!mFileIndexChanged) {
+    while (playOk()) {
       auto chunkPtr = fileChunkBuffer;
       auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
       if (chunkBytesLeft < 188) {
         // end of file
-        while (!mFileIndexChanged && playContext->mVidTs->isLoaded (playContext->getPlayPts(), 1))
+        while (playOk() && playContext->mVidTs->isLoaded (playContext->getPlayPts(), 1))
           playContext->mPlayPtsSem.wait();
         //{{{  jump to pts in stream
         auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mVidTs->getPid(), playContext->getPlayPts());
@@ -1584,7 +1593,7 @@ private:
           //}}}
           changed();
 
-          while (!mFileIndexChanged && playContext->mVidTs->isLoaded (playContext->getPlayPts(), 4))
+          while (playOk() && playContext->mVidTs->isLoaded (playContext->getPlayPts(), 4))
             playContext->mPlayPtsSem.wait();
 
           bool loaded = playContext->mVidTs->isLoaded (playContext->getPlayPts(), 1);
@@ -1629,7 +1638,7 @@ private:
     playContext->mFirstVidPtsSem.wait();
     playContext->mPlayPts = playContext->mAnalTs->getFirstPts (playContext->mVidTs->getPid()) - playContext->mAnalTs->getBasePts();
 
-    while (!mFileIndexChanged) {
+    while (playOk()) {
       auto pts = playContext->getPlayPts();
       playContext->mPlayAudFrame = (cAudFrame*)playContext->mAudTs->findFrame (pts);
 
