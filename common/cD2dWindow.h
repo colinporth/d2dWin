@@ -262,7 +262,7 @@ public:
     float mLayoutX = 0;
     float mLayoutY = 0;
 
-    cRect mRect = { 0 };
+    cRect mRect = { 0.f };
     };
   //}}}
   //{{{

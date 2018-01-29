@@ -117,56 +117,56 @@ protected:
 
       //{{{
       case  ' ': // space - toggle play
-        if (mPlayContextFocus)
-          mPlayContextFocus->togglePlay();
+        if (mPlayerFocus)
+          mPlayerFocus->togglePlay();
         break;
       //}}}
       //{{{
       case 0x24: // home
-        if (mPlayContextFocus) {
-          mPlayContextFocus->setPlayPts (0);
+        if (mPlayerFocus) {
+          mPlayerFocus->setPlayPts (0);
           changed();
           }
         break;
       //}}}
       //{{{
       case 0x23: // end
-        if (mPlayContextFocus) {
-          mPlayContextFocus->setPlayPts (mPlayContextFocus->mAnalTs->getLengthPts());
+        if (mPlayerFocus) {
+          mPlayerFocus->setPlayPts (mPlayerFocus->mAnalTs->getLengthPts());
           changed();
           }
         break;
       //}}}
       //{{{
       case 0x21: // page up
-        if (mPlayContextFocus) {
-          mPlayContextFocus->incPlayPts (-90000*10);
+        if (mPlayerFocus) {
+          mPlayerFocus->incPlayPts (-90000*10);
           changed();
           }
         break;
       //}}}
       //{{{
       case 0x22: // page down
-        if (mPlayContextFocus) {
-          mPlayContextFocus->incPlayPts (90000*10);
+        if (mPlayerFocus) {
+          mPlayerFocus->incPlayPts (90000*10);
           changed();
           }
         break;
       //}}}
       //{{{
       case 0x25: // left arrow
-        if (mPlayContextFocus) {
-          mPlayContextFocus->incPlayPts (-90000/25);
-          mPlayContextFocus->mPlaying = cPlayContext::ePause;
+        if (mPlayerFocus) {
+          mPlayerFocus->incPlayPts (-90000/25);
+          mPlayerFocus->mPlaying = cPlayer::ePause;
           changed();
           }
         break;
       //}}}
       //{{{
       case 0x27: // right arrow
-        if (mPlayContextFocus) {
-          mPlayContextFocus->incPlayPts (90000/25);
-          mPlayContextFocus->mPlaying = cPlayContext::ePause;
+        if (mPlayerFocus) {
+          mPlayerFocus->incPlayPts (90000/25);
+          mPlayerFocus->mPlaying = cPlayer::ePause;
           changed();
           }
         break;
@@ -206,11 +206,11 @@ protected:
       case  '7':
       case  '8':
       case  '9': {
-        if (mPlayContextFocus) {
-          auto service = mPlayContextFocus->mAnalTs->getService (key - '1');
+        if (mPlayerFocus) {
+          auto service = mPlayerFocus->mAnalTs->getService (key - '1');
           if (service) {
-            mPlayContextFocus->mAudTs->setPid (service->getAudPid());
-            mPlayContextFocus->mVidTs->setPid (service->getVidPid());
+            mPlayerFocus->mAudTs->setPid (service->getAudPid());
+            mPlayerFocus->mVidTs->setPid (service->getVidPid());
             changed();
             }
           }
@@ -907,11 +907,12 @@ private:
   //}}}
 
   //{{{
-  class cPlayContext {
+  class cPlayer {
   public:
     enum ePlaying { ePause, eScrub, ePlay };
     //{{{
-    cPlayContext() :
+    cPlayer (cAppWindow* window, const string& fileName, float width, float height) :
+        mWindow(window), mFileName(fileName), mWidth(width), mHeight(height),
         mFirstVidPtsSem("firstVidPts"), mPlayStoppedSem("playStopped"),
         mAudStoppedSem("audStopped"), mVidStoppedSem("vidStopped") {
 
@@ -922,21 +923,14 @@ private:
       }
     //}}}
     //{{{
-
-    ~cPlayContext() {
+    ~cPlayer() {
       delete mAudTs;
       delete mVidTs;
       delete mAnalTs;
       }
     //}}}
 
-    // gets
-    ePlaying getPlaying() { return mPlaying; }
-    int64_t getPlayPts() { return mPlayPts + mAnalTs->getBasePts(); }
-    int64_t getLengthPts() { return mAnalTs->getLengthPts(); }
-    float getStreamPosFrac() { return float(mStreamPos) / float(mStreamSize); }
-
-    // sets
+    //{{{  sets
     void setPlaying (ePlaying playing) { mPlaying = playing; }
     //{{{
     void togglePlay() {
@@ -962,9 +956,659 @@ private:
       }
     //}}}
     void incPlayPts (int64_t incPts) { setPlayPts (mPlayPts + incPts); }
+    //}}}
+    //{{{
+    void run() {
+
+      //{{{  create boxes
+      auto vidFrameView = mWindow->addFront (new cVidFrameView (mWindow, mWidth,mHeight, this));
+
+      auto timecodeBox = mWindow->add (new cTimecodeBox (mWindow, 600.f,60.f, this), -600.f,-60.f);
+      timecodeBox->setPin (true);
+
+      auto progressBox = mWindow->add (new cProgressBox (mWindow, 0.f,6.f, this), 0.f,-6.f);
+      auto audFrameBox = mWindow->add (new cAudFrameBox (mWindow, 82.f,240.0f, mPlayAudFrame), -84.f,-240.f-6.0f);
+      //}}}
+      //{{{  launch threads
+      thread ([=]() { audThread(); }).detach();
+      thread ([=]() { vidThread(); }).detach();
+      auto threadHandle = thread ([=](){ playThread(); });
+      SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_HIGHEST);
+      threadHandle.detach();
+      //}}}
+      mWindow->mPlayerFocus = this;
+
+      const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
+      auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
+      //{{{  get streamSize
+      struct _stat64 buf;
+      _fstat64 (file, &buf);
+      mStreamSize = buf.st_size ;
+      //}}}
+      //{{{  parse front of stream until first service
+      int64_t streamPos = 0;
+
+      cService* service = nullptr;
+      while (!service) {
+        auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
+        auto chunkPtr = fileChunkBuffer;
+        while (chunkBytesLeft >= 188) {
+          auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, false, -1);
+          streamPos += bytesUsed;
+          chunkPtr += bytesUsed;
+          chunkBytesLeft -= (int)bytesUsed;
+          }
+
+        service = mAnalTs->getService (0);
+        }
+
+      // select first service
+      mVidTs->setPid (service->getVidPid());
+      mAudTs->setPid (service->getAudPid());
+      cLog::log (LOGNOTICE, "first service - vidPid:" + dec(service->getVidPid()) +
+                            " audPid:" + dec(service->getAudPid()));
+      mAnalTs->clearPosCounts();
+      //}}}
+      //{{{  parse end of stream for initial lastPts
+      streamPos = mStreamSize - (kChunkSize * 8);
+      _lseeki64 (file, streamPos, SEEK_SET);
+
+      while (streamPos < mStreamSize) {
+        auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
+        auto chunkPtr = fileChunkBuffer;
+        while (chunkBytesLeft >= 188) {
+          auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, chunkPtr == fileChunkBuffer, -1);
+          streamPos += bytesUsed;
+          chunkPtr += bytesUsed;
+          chunkBytesLeft -= (int)bytesUsed;
+          }
+        }
+
+      mAnalTs->clearPosCounts();
+      //}}}
+
+      // analyse stream from start, chase tail, update progress bar
+      mStreamPos = 0;
+      _lseeki64 (file, mStreamPos, SEEK_SET);
+
+      int sameStreamSizeCount = 0;
+      int firstVidSignalCount = 0;
+      while (!abort() && (sameStreamSizeCount < 10)) {
+        int64_t bytesToRead = mStreamSize - mStreamPos;
+        if (bytesToRead > kChunkSize) // trim to kChunkSize
+          bytesToRead = kChunkSize;
+        if (bytesToRead >= 188) { // at least 1 packet to read, trim read to packet boundary
+          bytesToRead -= bytesToRead % 188;
+          auto chunkBytesLeft = _read (file, fileChunkBuffer, (unsigned int)bytesToRead);
+          if (chunkBytesLeft >= 188) {
+            auto chunkPtr = fileChunkBuffer;
+            while (chunkBytesLeft >= 188) {
+              auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, mStreamPos, mStreamPos == 0, -1);
+              mStreamPos += bytesUsed;
+              chunkPtr += bytesUsed;
+              chunkBytesLeft -= (int)bytesUsed;
+              mWindow->changed();
+
+              if ((firstVidSignalCount < 3) &&
+                  (mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
+                  (mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
+                firstVidSignalCount++;
+                mFirstVidPtsSem.notifyAll();
+                }
+              }
+            }
+          }
+        else {
+          //{{{  check fileSize changed
+          while (!abort()) {
+            // check size
+            _fstat64 (file, &buf);
+            if (buf.st_size > mStreamSize) {
+              // bigger
+              cLog::log (LOGINFO, "fileSize now " + dec(mStreamSize));
+              mStreamSize = buf.st_size;
+              sameStreamSizeCount = 0;
+              break;
+              }
+
+            else {
+              // same
+              sameStreamSizeCount++;
+              if (sameStreamSizeCount >= 10) {
+                cLog::log (LOGINFO, "fileSize sameCount expired " + dec(sameStreamSizeCount));
+                break;
+                }
+              }
+
+            // wait with abort
+            int i = 0;
+            while (!abort() && (i++ < 1000))
+              Sleep (1);
+            }
+          }
+          //}}}
+        }
+      _close (file);
+      free (fileChunkBuffer);
+
+      // analyse finished, wait for fileChange or exit
+      while (!abort())
+        Sleep (1);
+      //{{{  wait for threads to close down
+      mWindow->mPlayerFocus = nullptr;
+      mPlayStoppedSem.wait();
+      mPlayPtsSem.notifyAll();
+      mPlayPtsSem.notifyAll();
+      mAudStoppedSem.wait();
+      mVidStoppedSem.wait();
+      //}}}
+      //{{{  remove boxes
+      mWindow->removeBox (timecodeBox);
+      mWindow->removeBox (progressBox);
+      mWindow->removeBox (audFrameBox);
+      mWindow->removeBox (vidFrameView);
+      //}}}
+      }
+    //}}}
+
+    ePlaying mPlaying = ePlay;
+    cAnalTransportStream* mAnalTs;
+    cAudTransportStream* mAudTs;
+    cVidTransportStream* mVidTs;
+
+  private:
+    //{{{
+    class cVidFrameView : public cView {
+    public:
+      //{{{
+      cVidFrameView (cD2dWindow* window, float width, float height, cPlayer* playContext)
+          : cView("vidFrame", window, width, height), mPlayer(playContext) {
+        mPin = true;
+        }
+      //}}}
+      virtual ~cVidFrameView() {}
+
+      //{{{
+      cPoint getSrcSize() {
+        return mPlayer->mBitmap ? mPlayer->mBitmap->GetPixelSize() : cPoint();
+        }
+      //}}}
+      //{{{
+      bool onWheel (int delta, cPoint pos) {
+
+        if (mWindow->getControl())
+          return cView::onWheel (delta, pos);
+        else {
+          mPlayer->mPlaying = cPlayer::ePause;
+          mPlayer->incPlayPts (-int64_t(delta * (90000/25) / 120));
+          mWindow->changed();
+          }
+
+        return true;
+        }
+      //}}}
+      //{{{
+      bool onMove (bool right, cPoint pos, cPoint inc) {
+
+        if (mWindow->getControl())
+          return cView::onMove (right, pos, inc);
+        else {
+          mPlayer->mPlaying = cPlayer::ePause;
+          mPlayer->incPlayPts (int64_t (-inc.x * kAudSamplesPerAacFrame * 48 / 90 / 8));
+          mWindow->changed();
+          return true;
+          }
+        }
+      //}}}
+      //{{{
+      bool onUp (bool right, bool mouseMoved, cPoint pos) {
+
+        if (!mouseMoved)
+          mPlayer->togglePlay();
+
+        return false;
+        }
+      //}}}
+
+      //{{{
+      void onDraw (ID2D1DeviceContext* dc) {
+
+        auto vidTs = mPlayer->mVidTs;
+        //if (vidTs) {
+          auto vidframe = (cVidFrame*)vidTs->findNearestFrame (mPlayer->getPlayPts());
+          if (vidframe && (vidframe->getPts() != mPlayer->mBitmapPts)) {
+            mPlayer->mBitmap = vidframe->makeBitmap (dc, mPlayer->mBitmap);
+            mPlayer->mBitmapPts = vidframe->getPts();
+            }
+
+          dc->SetTransform (mView2d.mTransform);
+          if (mPlayer->mBitmap)
+            dc->DrawBitmap (mPlayer->mBitmap, cRect(mWindow->getSize()));
+
+          dc->SetTransform (Matrix3x2F::Identity());
+        //  }
+        }
+      //}}}
+
+    private:
+      cPlayer* mPlayer;
+      };
+    //}}}
+    //{{{
+    class cFramesDebugBox : public cBox {
+    public:
+      //{{{
+      cFramesDebugBox (cD2dWindow* window, float width, float height, cPlayer* playContext)
+          : cBox("frames", window, width, height), mPlayer(playContext) {
+
+        mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
+          DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 11.f, L"en-us",
+          &mTextFormat);
+        mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_CENTER);
+        }
+      //}}}
+      //{{{
+      virtual ~cFramesDebugBox() {
+        mTextFormat->Release();
+        }
+      //}}}
+
+      //{{{
+      bool onWheel (int delta, cPoint pos)  {
+
+        auto ptsInc = (pos.y > 40.f) ? (90000/25) : (kAudSamplesPerAacFrame * 90 / 48);
+
+        mPlayer->incPlayPts (-int64_t(delta * ptsInc / 120));
+        mPlayer->setPlaying (cPlayer::ePause);
+        mWindow->changed();
+        return true;
+        }
+      //}}}
+      //{{{
+      bool onMove (bool right, cPoint pos, cPoint inc) {
+
+        mPlayer->setPlaying (cPlayer::ePause);
+        auto pixPerPts = 18.f * 48 / (kAudSamplesPerAacFrame * 90);
+        mPlayer->incPlayPts (int64_t (-inc.x / pixPerPts));
+        mWindow->changed();
+
+        return true;
+        }
+      //}}}
+      //{{{
+      bool onUp (bool right, bool mouseMoved, cPoint pos) {
+        if (!mouseMoved)
+          togglePin();
+        return true;
+        }
+      //}}}
+      //{{{
+      void onDraw (ID2D1DeviceContext* dc) {
+
+        if (mPin)
+          dc->FillRectangle (mRect, mWindow->getTransparentBgndBrush());
+
+        float maxY = 0;
+
+        mPlayer->mAudTs->drawFrames (dc, mRect, mTextFormat,
+          mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
+          mPlayer->getPlayPts(), maxY);
+
+        mPlayer->mVidTs->drawFrames (dc, mRect, mTextFormat,
+          mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
+          mPlayer->getPlayPts(), maxY);
+
+        dc->FillRectangle (RectF((getWidth()/2)-1, 0, (getWidth()/2)+1, maxY),
+                           mPin ? mWindow->getYellowBrush() : mWindow->getGreyBrush());
+
+        mLayoutHeight = maxY;
+        layout();
+        }
+      //}}}
+
+    private:
+      cPlayer* mPlayer;
+
+      IDWriteTextFormat* mTextFormat = nullptr;
+      };
+    //}}}
+    //{{{
+    class cProgressBox : public cBox {
+    public:
+      //{{{
+      cProgressBox (cD2dWindow* window, float width, float height, cPlayer* playContext)
+          : cBox("progress", window, width, height), mPlayer(playContext) {
+        mPin = true;
+        }
+      //}}}
+      virtual ~cProgressBox() {}
+
+      //{{{
+      bool onDown (bool right, cPoint pos)  {
+
+        mPlayer->setPlaying (cPlayer::eScrub);
+        mPlayer->setPlayPts (int64_t ((pos.x / getWidth()) * mPlayer->getLengthPts()));
+        mWindow->changed();
+
+        return true;
+        }
+      //}}}
+      //{{{
+      bool onMove (bool right, cPoint pos, cPoint inc) {
+
+        mPlayer->setPlayPts (int64_t ((pos.x / getWidth()) * mPlayer->getLengthPts()));
+        mWindow->changed();
+        return true;
+        }
+      //}}}
+      //{{{
+      bool onUp (bool right, bool mouseMoved, cPoint pos) {
+
+        mPlayer->setPlaying (cPlayer::ePause);
+        return true;
+        }
+      //}}}
+      //{{{
+      void onDraw (ID2D1DeviceContext* dc) {
+
+        const float ylen = 2.f;
+
+        // draw analPos blueBar
+        auto r = mRect;
+        r.left = getWidth() * mPlayer->getStreamPosFrac();
+        r.top = r.bottom - 3*ylen;
+        dc->FillRectangle (r, mWindow->getBlueBrush());
+
+        // draw vidLastPts yellowBar
+        r.left = mRect.left;
+        r.right = getWidth() * (float)(mPlayer->mVidTs->getLastLoadedPts() - mPlayer->mAnalTs->getBasePts())
+                                       / (float)mPlayer->getLengthPts();
+        r.top = r.bottom - ylen;
+        dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
+
+        // draw audLastPts yellowBar
+        r.bottom = r.top;
+        r.top -= ylen;
+        r.right = getWidth() * (float)(mPlayer->mAudTs->getLastLoadedPts() - mPlayer->mAnalTs->getBasePts())
+                                      / (float)mPlayer->getLengthPts();
+        dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
+
+        // draw playPts yellowBar
+        r.bottom = r.top;
+        r.top -= ylen;
+        r.right = getWidth() * (float)(mPlayer->getPlayPts() - mPlayer->mAnalTs->getBasePts())
+                                      / (float)mPlayer->getLengthPts();
+        dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
+        }
+      //}}}
+
+    private:
+      cPlayer* mPlayer;
+      };
+    //}}}
+    //{{{
+    class cTimecodeBox : public cBox {
+    public:
+      //{{{
+      cTimecodeBox (cD2dWindow* window, float width, float height, cPlayer* playContext)
+          : cBox("timecode", window, width, height), mPlayer(playContext) {
+
+        mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
+          DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
+          &mTextFormat);
+        mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+        }
+      //}}}
+      //{{{
+      virtual ~cTimecodeBox() {
+        mTextFormat->Release();
+        }
+      //}}}
+
+      //{{{
+      bool onDown (bool right, cPoint pos)  {
+        togglePin();
+        return true;
+        }
+      //}}}
+      //{{{
+      void onDraw (ID2D1DeviceContext* dc) {
+
+        string str = getPtsString(mPlayer->mPlayPts) + " " + getPtsString(mPlayer->mAnalTs->mLengthPts);
+        wstring wstr(str.begin(), str.end());
+
+        IDWriteTextLayout* textLayout;
+        mWindow->getDwriteFactory()->CreateTextLayout (wstr.data(), (uint32_t)wstr.size(), mTextFormat,
+                                                       getWidth(), getHeight(), &textLayout);
+
+        if (mPin) {
+          struct DWRITE_TEXT_METRICS textMetrics;
+          textLayout->GetMetrics (&textMetrics);
+          auto r = mRect;
+          r.left = mRect.right - textMetrics.width - 2.f;
+          r.top = mRect.bottom - textMetrics.height + textMetrics.top;
+          dc->FillRectangle (r, mWindow->getTransparentBgndBrush());
+          }
+        else
+          dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
+
+        dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+
+        textLayout->Release();
+        }
+      //}}}
+
+    private:
+      cPlayer* mPlayer;
+
+      IDWriteTextFormat* mTextFormat = nullptr;
+      };
+    //}}}
+
+    ePlaying getPlaying() { return mPlaying; }
+    int64_t getPlayPts() { return mPlayPts + mAnalTs->getBasePts(); }
+    int64_t getLengthPts() { return mAnalTs->getLengthPts(); }
+    float getStreamPosFrac() { return float(mStreamPos) / float(mStreamSize); }
+    bool abort() { return mWindow->getExit() || mWindow->mFileIndexChanged; }
+
+    //{{{
+    void audThread() {
+
+      CoInitializeEx (NULL, COINIT_MULTITHREADED);
+      cLog::setThreadName ("aud ");
+      av_register_all();
+
+      const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
+      mFirstVidPtsSem.wait();
+
+      bool skip = false;
+      int64_t lastJumpStreamPos = -1;
+
+      int64_t streamPos = 0;
+      auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
+      while (!abort()) {
+        auto chunkPtr = fileChunkBuffer;
+        auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
+        if (chunkBytesLeft < 188) {
+          // end of file
+          while (!abort() && mAudTs->isLoaded (getPlayPts(), 1))
+            mPlayPtsSem.wait();
+          //{{{  jump to pts in stream
+          auto jumpStreamPos = mAnalTs->findStreamPos (mAudTs->getPid(), getPlayPts());
+          streamPos = jumpStreamPos;
+          _lseeki64 (file, streamPos, SEEK_SET);
+          lastJumpStreamPos = jumpStreamPos;
+
+          chunkBytesLeft = 0;
+          skip = true;
+          //}}}
+          }
+        else {
+          while (chunkBytesLeft >= 188) {
+            //{{{  demux up to a frame
+            // decode a frame
+            auto bytesUsed = mAudTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mAudTs->getPid());
+            streamPos += bytesUsed;
+            chunkPtr += bytesUsed;
+            chunkBytesLeft -= (int)bytesUsed;
+            skip = false;
+            //}}}
+            mWindow->changed();
+
+            while (!abort() && mAudTs->isLoaded (getPlayPts(), kAudMaxFrames/2))
+              mPlayPtsSem.wait();
+
+            bool loaded = mAudTs->isLoaded (getPlayPts(), 1);
+            if (!loaded || (getPlayPts() > mAudTs->getLastLoadedPts() + 100000)) {
+              auto jumpStreamPos = mAnalTs->findStreamPos (mAudTs->getPid(), getPlayPts());
+              if (jumpStreamPos != lastJumpStreamPos) {
+                //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
+                cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
+                           (loaded ? " after ":" notLoaded ") + getPtsString(mAudTs->getLastLoadedPts()));
+
+                _lseeki64 (file, jumpStreamPos, SEEK_SET);
+
+                streamPos = jumpStreamPos;
+                lastJumpStreamPos = jumpStreamPos;
+                chunkBytesLeft = 0;
+                skip = true;
+
+                break;
+                }
+                //}}}
+              }
+            }
+          }
+        }
+
+      _close (file);
+      free (fileChunkBuffer);
+      mAudStoppedSem.notifyAll();
+
+      cLog::log (LOGNOTICE, "exit");
+      CoUninitialize();
+      }
+    //}}}
+    //{{{
+    void vidThread() {
+
+      CoInitializeEx (NULL, COINIT_MULTITHREADED);
+      cLog::setThreadName ("vid ");
+
+      const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
+      mFirstVidPtsSem.wait();
+
+      bool skip = false;
+      int64_t lastJumpStreamPos = -1;
+
+      int64_t streamPos = 0;
+      auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
+      while (!abort()) {
+        auto chunkPtr = fileChunkBuffer;
+        auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
+        if (chunkBytesLeft < 188) {
+          // end of file
+          while (!abort() && mVidTs->isLoaded (getPlayPts(), 1))
+            mPlayPtsSem.wait();
+          //{{{  jump to pts in stream
+          auto jumpStreamPos = mAnalTs->findStreamPos (mVidTs->getPid(), getPlayPts());
+          streamPos = jumpStreamPos;
+          _lseeki64 (file, streamPos, SEEK_SET);
+          lastJumpStreamPos = jumpStreamPos;
+
+          chunkBytesLeft = 0;
+          skip = true;
+          //}}}
+          }
+        else {
+          while (chunkBytesLeft >= 188) {
+            //{{{  demux up to a frame
+            auto bytesUsed = mVidTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mVidTs->getPid());
+            streamPos += bytesUsed;
+            chunkPtr += bytesUsed;
+            chunkBytesLeft -= (int)bytesUsed;
+            skip = false;
+            //}}}
+            mWindow->changed();
+
+            while (!abort() && mVidTs->isLoaded (getPlayPts(), 4))
+              mPlayPtsSem.wait();
+
+            bool loaded = mVidTs->isLoaded (getPlayPts(), 1);
+            if (!loaded || (getPlayPts() > mVidTs->getLastLoadedPts() + 100000)) {
+              auto jumpStreamPos = mAnalTs->findStreamPos (mVidTs->getPid(), getPlayPts());
+              if (jumpStreamPos != lastJumpStreamPos) {
+                //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
+                cLog::log (LOGINFO, "jump playPts:" + getPtsString(getPlayPts()) +
+                           (loaded ? " after ":" notLoaded ") + getPtsString(mVidTs->getLastLoadedPts()));
+
+                _lseeki64 (file, jumpStreamPos, SEEK_SET);
+
+                streamPos = jumpStreamPos;
+                lastJumpStreamPos = jumpStreamPos;
+                chunkBytesLeft = 0;
+                skip = true;
+
+                break;
+                }
+                //}}}
+              }
+            }
+          }
+        }
+
+      _close (file);
+      free (fileChunkBuffer);
+      mVidStoppedSem.notifyAll();
+
+      cLog::log (LOGNOTICE, "exit");
+      CoUninitialize();
+      }
+    //}}}
+    //{{{
+    void playThread() {
+
+      CoInitializeEx (NULL, COINIT_MULTITHREADED);
+      cLog::setThreadName ("play");
+
+      mWindow->audOpen (2, 48000);
+
+      mFirstVidPtsSem.wait();
+      mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
+
+      while (!abort()) {
+        auto pts = getPlayPts();
+        mPlayAudFrame = (cAudFrame*)mAudTs->findFrame (pts);
+
+        // play using frame where available, else play silence
+        mWindow->audPlay (mPlayAudFrame ? mPlayAudFrame->mChannels : mWindow->getSrcChannels(),
+          mPlayAudFrame && (mPlaying != cPlayer::ePause) ? mPlayAudFrame->mSamples : nullptr,
+          mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
+                 1.f);
+
+        if ((mPlaying == cPlayer::ePlay) && (mPlayPts < getLengthPts()))
+          incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
+        if (mPlayPts > getLengthPts())
+          mPlayPts = getLengthPts();
+        mWindow->changed();
+
+        mPlayPtsSem.notifyAll();
+        }
+
+      mWindow->audClose();
+      mPlayStoppedSem.notifyAll();
+
+      cLog::log (LOGNOTICE, "exit");
+      CoUninitialize();
+      }
+    //}}}
 
     // vars
-    ePlaying mPlaying = ePlay;
+    cAppWindow* mWindow;
+    string mFileName;
+    float mWidth;
+    float mHeight;
+
     int64_t mPlayPts = 0;
 
     cAudFrame* mPlayAudFrame = nullptr;
@@ -975,10 +1619,6 @@ private:
     int64_t mStreamPos = 0;
     int64_t mStreamSize = 0;
 
-    cAnalTransportStream* mAnalTs;
-    cAudTransportStream* mAudTs;
-    cVidTransportStream* mVidTs;
-
     cSemaphore mPlayPtsSem;
     cSemaphore mFirstVidPtsSem;
     cSemaphore mPlayStoppedSem;
@@ -986,295 +1626,7 @@ private:
     cSemaphore mVidStoppedSem;
     };
   //}}}
-  //{{{
-  class cVidFrameView : public cView {
-  public:
-    //{{{
-    cVidFrameView (cD2dWindow* window, float width, float height, cPlayContext* playContext)
-        : cView("vidFrame", window, width, height), mPlayContext(playContext) {
-      mPin = true;
-      }
-    //}}}
-    virtual ~cVidFrameView() {}
 
-    //{{{
-    cPoint getSrcSize() {
-      return mPlayContext->mBitmap ? mPlayContext->mBitmap->GetPixelSize() : cPoint();
-      }
-    //}}}
-    //{{{
-    bool onWheel (int delta, cPoint pos) {
-
-      if (mWindow->getControl())
-        return cView::onWheel (delta, pos);
-      else {
-        mPlayContext->mPlaying = cPlayContext::ePause;
-        mPlayContext->incPlayPts (-int64_t(delta * (90000/25) / 120));
-        mWindow->changed();
-        }
-
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onMove (bool right, cPoint pos, cPoint inc) {
-
-      if (mWindow->getControl())
-        return cView::onMove (right, pos, inc);
-      else {
-        mPlayContext->mPlaying = cPlayContext::ePause;
-        mPlayContext->incPlayPts (int64_t (-inc.x * kAudSamplesPerAacFrame * 48 / 90 / 8));
-        mWindow->changed();
-        return true;
-        }
-      }
-    //}}}
-    //{{{
-    bool onUp (bool right, bool mouseMoved, cPoint pos) {
-
-      if (!mouseMoved)
-        mPlayContext->togglePlay();
-
-      return false;
-      }
-    //}}}
-
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      auto vidTs = mPlayContext->mVidTs;
-      //if (vidTs) {
-        auto vidframe = (cVidFrame*)vidTs->findNearestFrame (mPlayContext->getPlayPts());
-        if (vidframe && (vidframe->getPts() != mPlayContext->mBitmapPts)) {
-          mPlayContext->mBitmap = vidframe->makeBitmap (dc, mPlayContext->mBitmap);
-          mPlayContext->mBitmapPts = vidframe->getPts();
-          }
-
-        dc->SetTransform (mView2d.mTransform);
-        if (mPlayContext->mBitmap)
-          dc->DrawBitmap (mPlayContext->mBitmap, cRect(mWindow->getSize()));
-
-        dc->SetTransform (Matrix3x2F::Identity());
-      //  }
-      }
-    //}}}
-
-  private:
-    cPlayContext* mPlayContext;
-    };
-  //}}}
-  //{{{
-  class cFramesDebugBox : public cBox {
-  public:
-    //{{{
-    cFramesDebugBox (cD2dWindow* window, float width, float height, cPlayContext* playContext)
-        : cBox("frames", window, width, height), mPlayContext(playContext) {
-
-      mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-        DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 11.f, L"en-us",
-        &mTextFormat);
-      mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_CENTER);
-      }
-    //}}}
-    //{{{
-    virtual ~cFramesDebugBox() {
-      mTextFormat->Release();
-      }
-    //}}}
-
-    //{{{
-    bool onWheel (int delta, cPoint pos)  {
-
-      auto ptsInc = (pos.y > 40.f) ? (90000/25) : (kAudSamplesPerAacFrame * 90 / 48);
-
-      mPlayContext->incPlayPts (-int64_t(delta * ptsInc / 120));
-      mPlayContext->setPlaying (cPlayContext::ePause);
-      mWindow->changed();
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onMove (bool right, cPoint pos, cPoint inc) {
-
-      mPlayContext->setPlaying (cPlayContext::ePause);
-      auto pixPerPts = 18.f * 48 / (kAudSamplesPerAacFrame * 90);
-      mPlayContext->incPlayPts (int64_t (-inc.x / pixPerPts));
-      mWindow->changed();
-
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onUp (bool right, bool mouseMoved, cPoint pos) {
-      if (!mouseMoved)
-        togglePin();
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      if (mPin)
-        dc->FillRectangle (mRect, mWindow->getTransparentBgndBrush());
-
-      float maxY = 0;
-
-      mPlayContext->mAudTs->drawFrames (dc, mRect, mTextFormat,
-        mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
-        mPlayContext->getPlayPts(), maxY);
-
-      mPlayContext->mVidTs->drawFrames (dc, mRect, mTextFormat,
-        mWindow->getWhiteBrush(), mWindow->getBlueBrush(), mWindow->getBlackBrush(), mWindow->getYellowBrush(),
-        mPlayContext->getPlayPts(), maxY);
-
-      dc->FillRectangle (RectF((getWidth()/2)-1, 0, (getWidth()/2)+1, maxY),
-                         mPin ? mWindow->getYellowBrush() : mWindow->getGreyBrush());
-
-      mLayoutHeight = maxY;
-      layout();
-      }
-    //}}}
-
-  private:
-    cPlayContext* mPlayContext;
-
-    IDWriteTextFormat* mTextFormat = nullptr;
-    };
-  //}}}
-  //{{{
-  class cProgressBox : public cBox {
-  public:
-    //{{{
-    cProgressBox (cD2dWindow* window, float width, float height, cPlayContext* playContext)
-        : cBox("progress", window, width, height), mPlayContext(playContext) {
-      mPin = true;
-      }
-    //}}}
-    virtual ~cProgressBox() {}
-
-    //{{{
-    bool onDown (bool right, cPoint pos)  {
-
-      mPlayContext->setPlaying (cPlayContext::eScrub);
-      mPlayContext->setPlayPts (int64_t ((pos.x / getWidth()) * mPlayContext->getLengthPts()));
-      mWindow->changed();
-
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onMove (bool right, cPoint pos, cPoint inc) {
-
-      mPlayContext->setPlayPts (int64_t ((pos.x / getWidth()) * mPlayContext->getLengthPts()));
-      mWindow->changed();
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onUp (bool right, bool mouseMoved, cPoint pos) {
-
-      mPlayContext->setPlaying (cPlayContext::ePause);
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      const float ylen = 2.f;
-
-      // draw analPos blueBar
-      auto r = mRect;
-      r.left = getWidth() * mPlayContext->getStreamPosFrac();
-      r.top = r.bottom - 3*ylen;
-      dc->FillRectangle (r, mWindow->getBlueBrush());
-
-      // draw vidLastPts yellowBar
-      r.left = mRect.left;
-      r.right = getWidth() * (float)(mPlayContext->mVidTs->getLastLoadedPts() - mPlayContext->mAnalTs->getBasePts())
-                                     / (float)mPlayContext->getLengthPts();
-      r.top = r.bottom - ylen;
-      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
-
-      // draw audLastPts yellowBar
-      r.bottom = r.top;
-      r.top -= ylen;
-      r.right = getWidth() * (float)(mPlayContext->mAudTs->getLastLoadedPts() - mPlayContext->mAnalTs->getBasePts())
-                                    / (float)mPlayContext->getLengthPts();
-      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
-
-      // draw playPts yellowBar
-      r.bottom = r.top;
-      r.top -= ylen;
-      r.right = getWidth() * (float)(mPlayContext->getPlayPts() - mPlayContext->mAnalTs->getBasePts())
-                                    / (float)mPlayContext->getLengthPts();
-      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
-      }
-    //}}}
-
-  private:
-    cPlayContext* mPlayContext;
-    };
-  //}}}
-  //{{{
-  class cTimecodeBox : public cBox {
-  public:
-    //{{{
-    cTimecodeBox (cD2dWindow* window, float width, float height, cPlayContext* playContext)
-        : cBox("timecode", window, width, height), mPlayContext(playContext) {
-
-      mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-        DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
-        &mTextFormat);
-      mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
-      }
-    //}}}
-    //{{{
-    virtual ~cTimecodeBox() {
-      mTextFormat->Release();
-      }
-    //}}}
-
-    //{{{
-    bool onDown (bool right, cPoint pos)  {
-      togglePin();
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      string str = getPtsString(mPlayContext->mPlayPts) + " " + getPtsString(mPlayContext->mAnalTs->mLengthPts);
-      wstring wstr(str.begin(), str.end());
-
-      IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (wstr.data(), (uint32_t)wstr.size(), mTextFormat,
-                                                     getWidth(), getHeight(), &textLayout);
-
-      if (mPin) {
-        struct DWRITE_TEXT_METRICS textMetrics;
-        textLayout->GetMetrics (&textMetrics);
-        auto r = mRect;
-        r.left = mRect.right - textMetrics.width - 2.f;
-        r.top = mRect.bottom - textMetrics.height + textMetrics.top;
-        dc->FillRectangle (r, mWindow->getTransparentBgndBrush());
-        }
-      else
-        dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
-
-      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-
-      textLayout->Release();
-      }
-    //}}}
-
-  private:
-    cPlayContext* mPlayContext;
-
-    IDWriteTextFormat* mTextFormat = nullptr;
-    };
-  //}}}
-
-  bool playOk() { return !getExit() && !mFileIndexChanged; }
   //{{{
   void filePlayerThread (const string& fileName, float size) {
 
@@ -1282,8 +1634,8 @@ private:
     cLog::setThreadName ("file");
 
     if (!fileName.empty()) {
-      cPlayContext playContext;
-      playFile (fileName, &playContext, size, size);
+      cPlayer player (this, fileName, size, size);
+      player.run();
       }
 
     cLog::log (LOGNOTICE, "exit");
@@ -1302,8 +1654,8 @@ private:
       if (mFileList.empty())
         Sleep (100);
       else {
-        cPlayContext playContext;
-        playFile (mFileList[mFileIndex], &playContext, 0.f,0.f);
+        cPlayer player (this, mFileList[mFileIndex], 0.f, 0.f);
+        player.run();
 
         if (!mFileIndexChanged) {
           if (mFileIndex < mFileList.size()-1) // play next file
@@ -1313,351 +1665,6 @@ private:
           }
         }
       }
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-
-  //{{{
-  void playFile (const string& fileName, cPlayContext* playContext, float width, float height) {
-
-    //{{{  create boxes
-    auto vidFrameView = addFront (new cVidFrameView (this, width,height, playContext));
-
-    auto timecodeBox = add (new cTimecodeBox (this, 600.f,60.f, playContext), -600.f,-60.f);
-    timecodeBox->setPin (true);
-
-    auto progressBox = add (new cProgressBox (this, 0.f,6.f, playContext), 0.f,-6.f);
-    auto audFrameBox = add (new cAudFrameBox (this, 82.f,240.0f, playContext->mPlayAudFrame), -84.f,-240.f-6.0f);
-    //}}}
-    //{{{  launch threads
-    thread ([=]() { audThread (fileName, playContext); }).detach();
-    thread ([=]() { vidThread (fileName, playContext); }).detach();
-    auto threadHandle = thread ([=](){ playThread (playContext); });
-    SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_HIGHEST);
-    threadHandle.detach();
-    //}}}
-    mPlayContextFocus = playContext;
-
-    const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
-    auto file = _open (fileName.c_str(), _O_RDONLY | _O_BINARY);
-    //{{{  get streamSize
-    struct _stat64 buf;
-    _fstat64 (file, &buf);
-    playContext->mStreamSize = buf.st_size ;
-    //}}}
-    //{{{  parse front of stream until first service
-    int64_t streamPos = 0;
-
-    cService* service = nullptr;
-    while (!service) {
-      auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
-      auto chunkPtr = fileChunkBuffer;
-      while (chunkBytesLeft >= 188) {
-        auto bytesUsed = playContext->mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, false, -1);
-        streamPos += bytesUsed;
-        chunkPtr += bytesUsed;
-        chunkBytesLeft -= (int)bytesUsed;
-        }
-
-      service = playContext->mAnalTs->getService (0);
-      }
-
-    // select first service
-    playContext->mVidTs->setPid (service->getVidPid());
-    playContext->mAudTs->setPid (service->getAudPid());
-    cLog::log (LOGNOTICE, "first service - vidPid:" + dec(service->getVidPid()) +
-                          " audPid:" + dec(service->getAudPid()));
-    playContext->mAnalTs->clearPosCounts();
-    //}}}
-    //{{{  parse end of stream for initial lastPts
-    streamPos = playContext->mStreamSize - (kChunkSize * 8);
-    _lseeki64 (file, streamPos, SEEK_SET);
-
-    while (streamPos < playContext->mStreamSize) {
-      auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
-      auto chunkPtr = fileChunkBuffer;
-      while (chunkBytesLeft >= 188) {
-        auto bytesUsed = playContext->mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, chunkPtr == fileChunkBuffer, -1);
-        streamPos += bytesUsed;
-        chunkPtr += bytesUsed;
-        chunkBytesLeft -= (int)bytesUsed;
-        }
-      }
-
-    playContext->mAnalTs->clearPosCounts();
-    //}}}
-
-    // analyse stream from start, chase tail, update progress bar
-    playContext->mStreamPos = 0;
-    _lseeki64 (file, playContext->mStreamPos, SEEK_SET);
-
-    int sameStreamSizeCount = 0;
-    int firstVidSignalCount = 0;
-    while (playOk() && (sameStreamSizeCount < 10)) {
-      int64_t bytesToRead = playContext->mStreamSize - playContext->mStreamPos;
-      if (bytesToRead > kChunkSize) // trim to kChunkSize
-        bytesToRead = kChunkSize;
-      if (bytesToRead >= 188) { // at least 1 packet to read, trim read to packet boundary
-        bytesToRead -= bytesToRead % 188;
-        auto chunkBytesLeft = _read (file, fileChunkBuffer, (unsigned int)bytesToRead);
-        if (chunkBytesLeft >= 188) {
-          auto chunkPtr = fileChunkBuffer;
-          while (chunkBytesLeft >= 188) {
-            auto bytesUsed = playContext->mAnalTs->demux (chunkPtr, chunkBytesLeft, playContext->mStreamPos, playContext->mStreamPos == 0, -1);
-            playContext->mStreamPos += bytesUsed;
-            chunkPtr += bytesUsed;
-            chunkBytesLeft -= (int)bytesUsed;
-            changed();
-
-            if ((firstVidSignalCount < 3) &&
-                (playContext->mAnalTs->getFirstPts (service->getAudPid()) != -1) &&
-                (playContext->mAnalTs->getFirstPts (service->getVidPid()) != -1)) {
-              firstVidSignalCount++;
-              playContext->mFirstVidPtsSem.notifyAll();
-              }
-            }
-          }
-        }
-      else {
-        //{{{  check fileSize changed
-        while (playOk()) {
-          // check size
-          _fstat64 (file, &buf);
-          if (buf.st_size > playContext->mStreamSize) {
-            // bigger
-            cLog::log (LOGINFO, "fileSize now " + dec(playContext->mStreamSize));
-            playContext->mStreamSize = buf.st_size;
-            sameStreamSizeCount = 0;
-            break;
-            }
-
-          else {
-            // same
-            sameStreamSizeCount++;
-            if (sameStreamSizeCount >= 10) {
-              cLog::log (LOGINFO, "fileSize sameCount expired " + dec(sameStreamSizeCount));
-              break;
-              }
-            }
-
-          // wait with abort
-          int i = 0;
-          while (playOk() && (i++ < 1000))
-            Sleep (1);
-          }
-        }
-        //}}}
-      }
-    _close (file);
-    free (fileChunkBuffer);
-
-    // analyse finished, wait for fileChange or exit
-    while (playOk())
-      Sleep (1);
-    //{{{  wait for threads to close down
-    mPlayContextFocus = nullptr;
-    playContext->mPlayStoppedSem.wait();
-    playContext->mPlayPtsSem.notifyAll();
-    playContext->mPlayPtsSem.notifyAll();
-    playContext->mAudStoppedSem.wait();
-    playContext->mVidStoppedSem.wait();
-    //}}}
-    //{{{  remove boxes
-    removeBox (timecodeBox);
-    removeBox (progressBox);
-    removeBox (audFrameBox);
-    removeBox (vidFrameView);
-    //}}}
-    }
-  //}}}
-  //{{{
-  void audThread (const string& fileName, cPlayContext* playContext) {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("aud ");
-    av_register_all();
-
-    const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
-    playContext->mFirstVidPtsSem.wait();
-
-    bool skip = false;
-    int64_t lastJumpStreamPos = -1;
-
-    int64_t streamPos = 0;
-    auto file = _open (fileName.c_str(), _O_RDONLY | _O_BINARY);
-    while (playOk()) {
-      auto chunkPtr = fileChunkBuffer;
-      auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
-      if (chunkBytesLeft < 188) {
-        // end of file
-        while (playOk() && playContext->mAudTs->isLoaded (playContext->getPlayPts(), 1))
-          playContext->mPlayPtsSem.wait();
-        //{{{  jump to pts in stream
-        auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mAudTs->getPid(), playContext->getPlayPts());
-        streamPos = jumpStreamPos;
-        _lseeki64 (file, streamPos, SEEK_SET);
-        lastJumpStreamPos = jumpStreamPos;
-
-        chunkBytesLeft = 0;
-        skip = true;
-        //}}}
-        }
-      else {
-        while (chunkBytesLeft >= 188) {
-          //{{{  demux up to a frame
-          // decode a frame
-          auto bytesUsed = playContext->mAudTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, playContext->mAudTs->getPid());
-          streamPos += bytesUsed;
-          chunkPtr += bytesUsed;
-          chunkBytesLeft -= (int)bytesUsed;
-          skip = false;
-          //}}}
-          changed();
-
-          while (playOk() && playContext->mAudTs->isLoaded (playContext->getPlayPts(), kAudMaxFrames/2))
-            playContext->mPlayPtsSem.wait();
-
-          bool loaded = playContext->mAudTs->isLoaded (playContext->getPlayPts(), 1);
-          if (!loaded || (playContext->getPlayPts() > playContext->mAudTs->getLastLoadedPts() + 100000)) {
-            auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mAudTs->getPid(), playContext->getPlayPts());
-            if (jumpStreamPos != lastJumpStreamPos) {
-              //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
-              cLog::log (LOGINFO, "jump playPts:" + getPtsString(playContext->getPlayPts()) +
-                         (loaded ? " after ":" notLoaded ") + getPtsString(playContext->mAudTs->getLastLoadedPts()));
-
-              _lseeki64 (file, jumpStreamPos, SEEK_SET);
-
-              streamPos = jumpStreamPos;
-              lastJumpStreamPos = jumpStreamPos;
-              chunkBytesLeft = 0;
-              skip = true;
-
-              break;
-              }
-              //}}}
-            }
-          }
-        }
-      }
-
-    _close (file);
-    free (fileChunkBuffer);
-    playContext->mAudStoppedSem.notifyAll();
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-  //{{{
-  void vidThread (const string& fileName, cPlayContext* playContext) {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("vid ");
-
-    const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
-    playContext->mFirstVidPtsSem.wait();
-
-    bool skip = false;
-    int64_t lastJumpStreamPos = -1;
-
-    int64_t streamPos = 0;
-    auto file = _open (fileName.c_str(), _O_RDONLY | _O_BINARY);
-    while (playOk()) {
-      auto chunkPtr = fileChunkBuffer;
-      auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
-      if (chunkBytesLeft < 188) {
-        // end of file
-        while (playOk() && playContext->mVidTs->isLoaded (playContext->getPlayPts(), 1))
-          playContext->mPlayPtsSem.wait();
-        //{{{  jump to pts in stream
-        auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mVidTs->getPid(), playContext->getPlayPts());
-        streamPos = jumpStreamPos;
-        _lseeki64 (file, streamPos, SEEK_SET);
-        lastJumpStreamPos = jumpStreamPos;
-
-        chunkBytesLeft = 0;
-        skip = true;
-        //}}}
-        }
-      else {
-        while (chunkBytesLeft >= 188) {
-          //{{{  demux up to a frame
-          auto bytesUsed = playContext->mVidTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, playContext->mVidTs->getPid());
-          streamPos += bytesUsed;
-          chunkPtr += bytesUsed;
-          chunkBytesLeft -= (int)bytesUsed;
-          skip = false;
-          //}}}
-          changed();
-
-          while (playOk() && playContext->mVidTs->isLoaded (playContext->getPlayPts(), 4))
-            playContext->mPlayPtsSem.wait();
-
-          bool loaded = playContext->mVidTs->isLoaded (playContext->getPlayPts(), 1);
-          if (!loaded || (playContext->getPlayPts() > playContext->mVidTs->getLastLoadedPts() + 100000)) {
-            auto jumpStreamPos = playContext->mAnalTs->findStreamPos (playContext->mVidTs->getPid(), playContext->getPlayPts());
-            if (jumpStreamPos != lastJumpStreamPos) {
-              //{{{  jump to jumpStreamPos, unless same as last, wait for rest of GOP or chunk to demux
-              cLog::log (LOGINFO, "jump playPts:" + getPtsString(playContext->getPlayPts()) +
-                         (loaded ? " after ":" notLoaded ") + getPtsString(playContext->mVidTs->getLastLoadedPts()));
-
-              _lseeki64 (file, jumpStreamPos, SEEK_SET);
-
-              streamPos = jumpStreamPos;
-              lastJumpStreamPos = jumpStreamPos;
-              chunkBytesLeft = 0;
-              skip = true;
-
-              break;
-              }
-              //}}}
-            }
-          }
-        }
-      }
-
-    _close (file);
-    free (fileChunkBuffer);
-    playContext->mVidStoppedSem.notifyAll();
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-  //{{{
-  void playThread (cPlayContext* playContext) {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("play");
-
-    audOpen (2, 48000);
-
-    playContext->mFirstVidPtsSem.wait();
-    playContext->mPlayPts = playContext->mAnalTs->getFirstPts (playContext->mVidTs->getPid()) - playContext->mAnalTs->getBasePts();
-
-    while (playOk()) {
-      auto pts = playContext->getPlayPts();
-      playContext->mPlayAudFrame = (cAudFrame*)playContext->mAudTs->findFrame (pts);
-
-      // play using frame where available, else play silence
-      audPlay (playContext->mPlayAudFrame ? playContext->mPlayAudFrame->mChannels : getSrcChannels(),
-        playContext->mPlayAudFrame && (playContext->mPlaying != cPlayContext::ePause) ? playContext->mPlayAudFrame->mSamples : nullptr,
-        playContext->mPlayAudFrame ? playContext->mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
-               1.f);
-
-      if ((playContext->mPlaying == cPlayContext::ePlay) && (playContext->mPlayPts < playContext->getLengthPts()))
-        playContext->incPlayPts (int64_t (((playContext->mPlayAudFrame ? playContext->mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
-      if (playContext->mPlayPts > playContext->getLengthPts())
-        playContext->mPlayPts = playContext->getLengthPts();
-      changed();
-
-      playContext->mPlayPtsSem.notifyAll();
-      }
-
-    audClose();
-    playContext->mPlayStoppedSem.notifyAll();
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -1732,7 +1739,7 @@ private:
   //{{{  vars
   string mRoot = "c:/tv";
 
-  cPlayContext* mPlayContextFocus;
+  cPlayer* mPlayerFocus;
 
   vector <string> mFileList;
   int mFileIndex = 0;
