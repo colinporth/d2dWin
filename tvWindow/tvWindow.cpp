@@ -132,7 +132,7 @@ protected:
       //{{{
       case 0x23: // end
         if (mPlayerFocus) {
-          mPlayerFocus->setPlayPts (mPlayerFocus->mAnalTs->getLengthPts());
+          mPlayerFocus->setEnd();
           changed();
           }
         break;
@@ -157,7 +157,7 @@ protected:
       case 0x25: // left arrow
         if (mPlayerFocus) {
           mPlayerFocus->incPlayPts (-90000/25);
-          mPlayerFocus->mPlaying = cPlayer::ePause;
+          mPlayerFocus->setPause();
           changed();
           }
         break;
@@ -166,7 +166,7 @@ protected:
       case 0x27: // right arrow
         if (mPlayerFocus) {
           mPlayerFocus->incPlayPts (90000/25);
-          mPlayerFocus->mPlaying = cPlayer::ePause;
+          mPlayerFocus->setPause();
           changed();
           }
         break;
@@ -207,12 +207,8 @@ protected:
       case  '8':
       case  '9': {
         if (mPlayerFocus) {
-          auto service = mPlayerFocus->mAnalTs->getService (key - '1');
-          if (service) {
-            mPlayerFocus->mAudTs->setPid (service->getAudPid());
-            mPlayerFocus->mVidTs->setPid (service->getVidPid());
-            changed();
-            }
+          mPlayerFocus->setService (key - '1');
+          changed();
           }
         break;
         }
@@ -909,7 +905,6 @@ private:
   //{{{
   class cPlayer {
   public:
-    enum ePlaying { ePause, eScrub, ePlay };
     //{{{
     cPlayer (cAppWindow* window, const string& fileName, float width, float height) :
         mWindow(window), mFileName(fileName), mWidth(width), mHeight(height),
@@ -931,7 +926,9 @@ private:
     //}}}
 
     //{{{  sets
-    void setPlaying (ePlaying playing) { mPlaying = playing; }
+    void setPause() { mPlaying = ePause; }
+    void setScrub() { mPlaying = eScrub; }
+
     //{{{
     void togglePlay() {
       switch (mPlaying) {
@@ -956,6 +953,17 @@ private:
       }
     //}}}
     void incPlayPts (int64_t incPts) { setPlayPts (mPlayPts + incPts); }
+
+    void setEnd() { setPlayPts (mAnalTs->getLengthPts()); }
+    //{{{
+    void setService (int index) {
+      auto service = mAnalTs->getService (index);
+      if (service) {
+        mAudTs->setPid (service->getAudPid());
+        mVidTs->setPid (service->getVidPid());
+        }
+      }
+    //}}}
     //}}}
     //{{{
     void run() {
@@ -1111,11 +1119,6 @@ private:
       }
     //}}}
 
-    ePlaying mPlaying = ePlay;
-    cAnalTransportStream* mAnalTs;
-    cAudTransportStream* mAudTs;
-    cVidTransportStream* mVidTs;
-
   private:
     //{{{
     class cVidFrameView : public cView {
@@ -1219,7 +1222,7 @@ private:
         auto ptsInc = (pos.y > 40.f) ? (90000/25) : (kAudSamplesPerAacFrame * 90 / 48);
 
         mPlayer->incPlayPts (-int64_t(delta * ptsInc / 120));
-        mPlayer->setPlaying (cPlayer::ePause);
+        mPlayer->setPause();
         mWindow->changed();
         return true;
         }
@@ -1227,7 +1230,7 @@ private:
       //{{{
       bool onMove (bool right, cPoint pos, cPoint inc) {
 
-        mPlayer->setPlaying (cPlayer::ePause);
+        mPlayer->setPause();
         auto pixPerPts = 18.f * 48 / (kAudSamplesPerAacFrame * 90);
         mPlayer->incPlayPts (int64_t (-inc.x / pixPerPts));
         mWindow->changed();
@@ -1286,7 +1289,7 @@ private:
       //{{{
       bool onDown (bool right, cPoint pos)  {
 
-        mPlayer->setPlaying (cPlayer::eScrub);
+        mPlayer->setScrub();
         mPlayer->setPlayPts (int64_t ((pos.x / getWidth()) * mPlayer->getLengthPts()));
         mWindow->changed();
 
@@ -1304,7 +1307,7 @@ private:
       //{{{
       bool onUp (bool right, bool mouseMoved, cPoint pos) {
 
-        mPlayer->setPlaying (cPlayer::ePause);
+        mPlayer->setPause();
         return true;
         }
       //}}}
@@ -1405,7 +1408,6 @@ private:
       };
     //}}}
 
-    ePlaying getPlaying() { return mPlaying; }
     int64_t getPlayPts() { return mPlayPts + mAnalTs->getBasePts(); }
     int64_t getLengthPts() { return mAnalTs->getLengthPts(); }
     float getStreamPosFrac() { return float(mStreamPos) / float(mStreamSize); }
@@ -1609,6 +1611,8 @@ private:
     float mWidth;
     float mHeight;
 
+    enum ePlaying { ePause, eScrub, ePlay };
+    ePlaying mPlaying = ePlay;
     int64_t mPlayPts = 0;
 
     cAudFrame* mPlayAudFrame = nullptr;
@@ -1618,6 +1622,10 @@ private:
 
     int64_t mStreamPos = 0;
     int64_t mStreamSize = 0;
+
+    cAnalTransportStream* mAnalTs;
+    cAudTransportStream* mAudTs;
+    cVidTransportStream* mVidTs;
 
     cSemaphore mPlayPtsSem;
     cSemaphore mFirstVidPtsSem;
