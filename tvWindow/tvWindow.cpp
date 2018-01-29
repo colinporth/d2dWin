@@ -73,8 +73,9 @@ public:
     thread threadHandle;
     int frequency = atoi (param.c_str());
     if (param.empty() || frequency) {
-      updateFileList();
+      mFileList = getFiles (mRoot, "*.ts");
       add (new cListBox (this, getWidth()/2.f, 0.f, mFileList, mFileIndex, mFileIndexChanged));
+      thread ([=]() { fileWatchThread(); }).detach();
       threadHandle = thread ([=](){ filesPlayerThread(); });
       }
     else
@@ -86,7 +87,7 @@ public:
       // launch dvb
       mDvb = new cDvb();
       if (mDvb->createGraph (frequency * 1000)) {
-        mDvbTs = new cDumpTransportStream ("C:/tv", false);
+        mDvbTs = new cDumpTransportStream (mRoot, false);
 
         add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), -120.f, 0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvbTs->mPackets), -242.f,0.f);
@@ -172,7 +173,6 @@ protected:
       //}}}
       //{{{
       case 0x26: // up arrow - prev file
-        updateFileList();
         if (!mFileList.empty() && (mFileIndex > 0)) {
           mFileIndex = mFileIndex--;
           changed();
@@ -181,7 +181,6 @@ protected:
       //}}}
       //{{{
       case 0x28: // down arrow - next file
-        updateFileList();
         if (!mFileList.empty() && mFileIndex < mFileList.size()-1) {
           mFileIndex = mFileIndex++;
           changed();
@@ -1277,19 +1276,15 @@ private:
 
   bool playOk() { return !getExit() && !mFileIndexChanged; }
   //{{{
-  void updateFileList() {
-    mFileList = getFiles ("C:/tv", "*.ts");
-    }
-  //}}}
-
-  //{{{
   void filePlayerThread (const string& fileName, float size) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("file");
 
-    cPlayContext playContext;
-    playFile (fileName, &playContext, size, size);
+    if (!fileName.empty()) {
+      cPlayContext playContext;
+      playFile (fileName, &playContext, size, size);
+      }
 
     cLog::log (LOGNOTICE, "exit");
     CoUninitialize();
@@ -1304,14 +1299,18 @@ private:
     while (!getExit()) {
       mFileIndexChanged = false;
 
-      cPlayContext playContext;
-      playFile (mFileList[mFileIndex], &playContext, 0.f,0.f);
+      if (mFileList.empty())
+        Sleep (100);
+      else {
+        cPlayContext playContext;
+        playFile (mFileList[mFileIndex], &playContext, 0.f,0.f);
 
-      if (!mFileIndexChanged) {
-        if (mFileIndex < mFileList.size()-1) // play next file
-          mFileIndex++;
-        else
-          break;
+        if (!mFileIndexChanged) {
+          if (mFileIndex < mFileList.size()-1) // play next file
+            mFileIndex++;
+          else
+            break;
+          }
         }
       }
 
@@ -1706,7 +1705,33 @@ private:
     }
   //}}}
 
+  //{{{
+  void fileWatchThread() {
+
+    auto lpDir = mRoot.c_str();
+    // Watch the directory for file creation and deletion.
+    HANDLE dwChangeHandle = FindFirstChangeNotification (
+      lpDir, TRUE, FILE_NOTIFY_CHANGE_FILE_NAME| FILE_NOTIFY_CHANGE_DIR_NAME);
+    if (dwChangeHandle == INVALID_HANDLE_VALUE)
+     cLog::log (LOGERROR, "FindFirstChangeNotification function failed");
+
+    while (!getExit()) {
+      cLog::log (LOGINFO, "Waiting for notification");
+      if (WaitForSingleObject (dwChangeHandle, INFINITE) == WAIT_OBJECT_0) {
+        // A file was created, renamed, or deleted in the directory.
+        mFileList = getFiles (mRoot, "*.ts");
+        cLog::log (LOGINFO, "fileWatch changed " + dec(mFileList.size()));
+        if (FindNextChangeNotification (dwChangeHandle) == FALSE)
+          cLog::log (LOGERROR, "FindNextChangeNotification function failed");
+        }
+      else
+        cLog::log (LOGERROR, "No changes in the timeout period");
+      }
+    }
+  //}}}
   //{{{  vars
+  string mRoot = "c:/tv";
+
   cPlayContext* mPlayContextFocus;
 
   vector <string> mFileList;

@@ -30,6 +30,17 @@ public:
   //}}}
 
   //{{{
+  bool pick (bool inClient, cPoint pos, bool& change) {
+
+    bool lastPick = mPick;
+    mPick = inClient && mBgndRect.inside (pos);
+    if (!change && (mPick != lastPick))
+      change = true;
+
+    return mPick;
+    }
+  //}}}
+  //{{{
   bool onDown (bool right, cPoint pos)  {
 
     if (mWindow->getTimedMenuOn()) {
@@ -82,11 +93,10 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     if (mWindow->getTimedMenuOn()) {
-
       if (!mTextPressed && mScrollInc)
         incScroll (mScrollInc * 0.9f);
 
-      dc->FillRectangle (mRect, mWindow->getTransparentBgndBrush());
+      dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
 
       int itemIndex = int(mScroll) / (int)kTextHeight;
       float y = mRect.top + 1.f - (int(mScroll) % (int)kTextHeight);
@@ -118,8 +128,9 @@ public:
         point.y += kTextHeight;
         }
 
-      mRect.right = maxWidth + 4.0f;
-      mRect.bottom = point.y;
+      mBgndRect = mRect;
+      mBgndRect.right = mRect.left + maxWidth + 4.0f;
+      mBgndRect.bottom = point.y;
       }
     }
   //}}}

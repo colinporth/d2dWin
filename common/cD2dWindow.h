@@ -108,8 +108,7 @@ public:
 
       bool lastPick = mPick;
 
-      mPick = inClient && pos.x >= mRect.left && pos.y >= mRect.top &&
-                          pos.x < mRect.right && pos.y < mRect.bottom;
+      mPick = inClient && mRect.inside (pos);
       if (!change && (mPick != lastPick))
         change = true;
 
