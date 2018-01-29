@@ -76,7 +76,6 @@ public:
       updateFileList();
       add (new cListBox (this, getWidth()/2.f, 0.f, mFileList, mFileIndex, mFileIndexChanged));
       threadHandle = thread ([=](){ filesPlayerThread(); });
-      //threadHandle = thread ([=](){ muliplePlayerThread(); });
       }
     else
       threadHandle = thread ([=](){ filePlayerThread (param, 0.f); });
@@ -1281,6 +1280,43 @@ private:
     mFileList = getFiles ("C:/tv", "*.ts");
     }
   //}}}
+
+  //{{{
+  void filePlayerThread (const string& fileName, float size) {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("file");
+
+    cPlayContext playContext;
+    playFile (fileName, &playContext, size, size);
+    CoUninitialize();
+    }
+  //}}}
+  //{{{
+  void filesPlayerThread() {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("fils");
+
+    while (true) {
+      mFileIndexChanged = false;
+
+      cPlayContext playContext;
+      playFile (mFileList[mFileIndex], &playContext, 0.f,0.f);
+
+      if (!mFileIndexChanged) {
+        if (mFileIndex < mFileList.size()-1) // play next file
+          mFileIndex++;
+        else
+          break;
+        }
+      }
+
+    cLog::log (LOGNOTICE, "exit");
+    CoUninitialize();
+    }
+  //}}}
+
   //{{{
   void playFile (const string& fileName, cPlayContext* playContext, float width, float height) {
 
@@ -1355,9 +1391,9 @@ private:
     playContext->mStreamPos = 0;
     _lseeki64 (file, playContext->mStreamPos, SEEK_SET);
 
-    int sameCount = 0;
+    int sameStreamSizeCount = 0;
     int firstVidSignalCount = 0;
-    while (!mFileIndexChanged && (sameCount < 10)) {
+    while (!mFileIndexChanged && (sameStreamSizeCount < 10)) {
       int64_t bytesToRead = playContext->mStreamSize - playContext->mStreamPos;
       if (bytesToRead > kChunkSize) // trim to kChunkSize
         bytesToRead = kChunkSize;
@@ -1385,23 +1421,23 @@ private:
       else {
         //{{{  check fileSize changed
         while (!mFileIndexChanged) {
-          Sleep (1000);
           _fstat64 (file, &buf);
           if (buf.st_size > playContext->mStreamSize) {
             cLog::log (LOGINFO, "fileSize now " + dec(playContext->mStreamSize));
             playContext->mStreamSize = buf.st_size;
-            sameCount = 0;
+            sameStreamSizeCount = 0;
             break;
             }
           else {
-            sameCount++;
-            if (sameCount >= 10) {
-              cLog::log (LOGINFO, "fileSize sameCount expired " + dec(sameCount));
+            sameStreamSizeCount++;
+            if (sameStreamSizeCount >= 1000) {
+              cLog::log (LOGINFO, "fileSize sameCount expired " + dec(sameStreamSizeCount));
               break;
               }
-            else
-              cLog::log (LOGINFO, "fileSize same " + dec(sameCount));
             }
+          int i = 0;
+          while (!mFileIndexChanged && (i++ < 1000))
+            Sleep (1);
           }
         }
         //}}}
@@ -1428,59 +1464,6 @@ private:
     //}}}
     }
   //}}}
-
-  //{{{
-  void filePlayerThread (const string& fileName, float size) {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("file");
-
-    cPlayContext playContext;
-    playFile (fileName, &playContext, size, size);
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-  //{{{
-  void filesPlayerThread() {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("fils");
-
-    while (true) {
-      mFileIndexChanged = false;
-
-      cPlayContext playContext;
-      playFile (mFileList[mFileIndex], &playContext, 0.f,0.f);
-
-      if (!mFileIndexChanged) {
-        if (mFileIndex < mFileList.size()-1) // play next file
-          mFileIndex++;
-        else
-          break;
-        }
-      }
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-  //{{{
-  void muliplePlayerThread() {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("mult");
-
-    for (auto i = 1; i <= 4; i++)
-      thread ([=]() { filePlayerThread (mFileList[i], i*100.f); }).detach();
-    Sleep (100000);
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-
   //{{{
   void audThread (const string& fileName, cPlayContext* playContext) {
 
