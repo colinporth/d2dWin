@@ -59,7 +59,7 @@ const bool kRgba = false;
 const int kChunkSize = 2048*188;
 //}}}
 
-class cAppWindow : public cD2dWindow, public cWinAudio {
+class cAppWindow : public cD2dWindow {
 public:
   //{{{
   void run (string title, int width, int height, const string& param) {
@@ -116,63 +116,7 @@ protected:
     switch (key) {
       case 0x00: break;
       case 0x1B: return true;
-
-      //{{{
-      case  ' ': // space - toggle play
-        if (mPlayFocus)
-          mPlayFocus->togglePlay();
-        break;
-      //}}}
-      //{{{
-      case 0x24: // home
-        if (mPlayFocus) {
-          mPlayFocus->setPlayPts (0);
-          changed();
-          }
-        break;
-      //}}}
-      //{{{
-      case 0x23: // end
-        if (mPlayFocus) {
-          mPlayFocus->setEnd();
-          changed();
-          }
-        break;
-      //}}}
-      //{{{
-      case 0x21: // page up
-        if (mPlayFocus) {
-          mPlayFocus->incPlayPts (-90000*10);
-          changed();
-          }
-        break;
-      //}}}
-      //{{{
-      case 0x22: // page down
-        if (mPlayFocus) {
-          mPlayFocus->incPlayPts (90000*10);
-          changed();
-          }
-        break;
-      //}}}
-      //{{{
-      case 0x25: // left arrow
-        if (mPlayFocus) {
-          mPlayFocus->incPlayPts (-90000/25);
-          mPlayFocus->setPause();
-          changed();
-          }
-        break;
-      //}}}
-      //{{{
-      case 0x27: // right arrow
-        if (mPlayFocus) {
-          mPlayFocus->incPlayPts (90000/25);
-          mPlayFocus->setPause();
-          changed();
-          }
-        break;
-      //}}}
+      case  'F': toggleFullScreen(); break ;
       //{{{
       case 0x26: // up arrow - prev file
         if (!mFileList.empty() && (mFileIndex > 0)) {
@@ -197,27 +141,7 @@ protected:
           }
         break;
       //}}}
-
-      case  '0': key += 10; // nasty trick to wrap '0' as channel 10
-      case  '1':
-      case  '2':
-      case  '3':
-      case  '4':
-      case  '5':
-      case  '6':
-      case  '7':
-      case  '8':
-      case  '9': {
-        if (mPlayFocus) {
-          mPlayFocus->setService (key - '1');
-          changed();
-          }
-        break;
-        }
-
-      case  'F': toggleFullScreen(); break;
-
-      default: cLog::log (LOGINFO, "key %x", key);
+      default: if (mPlayFocus) mPlayFocus->onKey (key);
       }
 
     return false;
@@ -226,7 +150,7 @@ protected:
 
 private:
   //{{{
-  class cPlayView : public cView {
+  class cPlayView : public cView, public cWinAudio {
   public:
     //{{{
     cPlayView (cAppWindow* appWindow, float width, float height, const string& fileName) :
@@ -285,42 +209,69 @@ private:
       return mBitmap ? mBitmap->GetPixelSize() : cPoint();
       }
     //}}}
-
-    // sets
-    void setPause() { mPlaying = ePause; }
-    void setScrub() { mPlaying = eScrub; }
     //{{{
-    void togglePlay() {
-      switch (mPlaying) {
-        case ePause: mPlaying = ePlay; break;
-        case eScrub: mPlaying = ePlay; break;
-        case ePlay:  mPlaying = ePause; break;
+    bool onKey (int key) {
+
+      switch (key) {
+        //{{{
+        case  ' ': // space - toggle play
+          togglePlay();
+          break;
+        //}}}
+        //{{{
+        case 0x24: // home
+          setPlayPts (0);
+          mWindow->changed();
+          break;
+        //}}}
+        //{{{
+        case 0x23: // end
+          setEnd();
+          mWindow->changed();
+          break;
+        //}}}
+        //{{{
+        case 0x21: // page up
+          incPlayPts (-90000*10);
+          mWindow->changed();
+          break;
+        //}}}
+        //{{{
+        case 0x22: // page down
+          incPlayPts (90000*10);
+          mWindow->changed();
+          break;
+        //}}}
+        //{{{
+        case 0x25: // left arrow
+          incPlayPts (-90000/25);
+          setPause();
+          mWindow->changed();
+          break;
+        //}}}
+        //{{{
+        case 0x27: // right arrow
+          incPlayPts (90000/25);
+          setPause();
+          mWindow->changed();
+          break;
+        //}}}
+
+        case  '0': key += 10; // nasty trick to wrap '0' as channel 10
+        case  '1':
+        case  '2':
+        case  '3':
+        case  '4':
+        case  '5':
+        case  '6':
+        case  '7':
+        case  '8':
+        case  '9':
+          setService (key - '1');
+          mWindow->changed();
         }
-      }
-    //}}}
-    //{{{
-    void setPlayPts (int64_t playPts) {
-    // mPlayPts is offset from mBasePts
 
-      if (playPts < 0)
-        mPlayPts = 0;
-      else if (playPts > getLengthPts())
-        mPlayPts = getLengthPts();
-      else
-        mPlayPts = playPts;
-
-      mPlayPtsSem.notifyAll();
-      }
-    //}}}
-    void incPlayPts (int64_t incPts) { setPlayPts (mPlayPts + incPts); }
-    void setEnd() { setPlayPts (mAnalTs->getLengthPts()); }
-    //{{{
-    void setService (int index) {
-      auto service = mAnalTs->getService (index);
-      if (service) {
-        mAudTs->setPid (service->getAudPid());
-        mVidTs->setPid (service->getVidPid());
-        }
+      return false;
       }
     //}}}
 
@@ -360,7 +311,6 @@ private:
       return false;
       }
     //}}}
-
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
 
@@ -1272,10 +1222,50 @@ private:
       };
     //}}}
 
+    //{{{  gets
     int64_t getPlayPts() { return mPlayPts + mAnalTs->getBasePts(); }
     int64_t getLengthPts() { return mAnalTs->getLengthPts(); }
     float getStreamPosFrac() { return float(mStreamPos) / float(mStreamSize); }
     bool abort() { return mWindow->getExit() || mAppWindow->mFileIndexChanged; }
+    //}}}
+    //{{{  sets
+    void setPause() { mPlaying = ePause; }
+    void setScrub() { mPlaying = eScrub; }
+    //{{{
+    void togglePlay() {
+      switch (mPlaying) {
+        case ePause: mPlaying = ePlay; break;
+        case eScrub: mPlaying = ePlay; break;
+        case ePlay:  mPlaying = ePause; break;
+        }
+      }
+    //}}}
+    //{{{
+    void setPlayPts (int64_t playPts) {
+    // mPlayPts is offset from mBasePts
+
+      if (playPts < 0)
+        mPlayPts = 0;
+      else if (playPts > getLengthPts())
+        mPlayPts = getLengthPts();
+      else
+        mPlayPts = playPts;
+
+      mPlayPtsSem.notifyAll();
+      }
+    //}}}
+    void incPlayPts (int64_t incPts) { setPlayPts (mPlayPts + incPts); }
+    void setEnd() { setPlayPts (mAnalTs->getLengthPts()); }
+    //{{{
+    void setService (int index) {
+      auto service = mAnalTs->getService (index);
+      if (service) {
+        mAudTs->setPid (service->getAudPid());
+        mVidTs->setPid (service->getVidPid());
+        }
+      }
+    //}}}
+    //}}}
 
     //{{{
     void analyserThread() {
@@ -1560,7 +1550,7 @@ private:
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
       cLog::setThreadName ("play");
 
-      mAppWindow->audOpen (2, 48000);
+      audOpen (2, 48000);
 
       mFirstVidPtsSem.wait();
       mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
@@ -1570,7 +1560,7 @@ private:
         mPlayAudFrame = (cAudFrame*)mAudTs->findFrame (pts);
 
         // play using frame where available, else play silence
-        mAppWindow->audPlay (mPlayAudFrame ? mPlayAudFrame->mChannels : mAppWindow->getSrcChannels(),
+        audPlay (mPlayAudFrame ? mPlayAudFrame->mChannels : getSrcChannels(),
           mPlayAudFrame && (mPlaying != ePause) ? mPlayAudFrame->mSamples : nullptr,
           mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
                  1.f);
@@ -1584,7 +1574,7 @@ private:
         mPlayPtsSem.notifyAll();
         }
 
-      mAppWindow->audClose();
+      audClose();
       mPlayStoppedSem.notifyAll();
 
       cLog::log (LOGNOTICE, "exit");
