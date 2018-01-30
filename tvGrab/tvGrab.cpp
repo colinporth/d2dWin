@@ -78,12 +78,14 @@ int main (int argc, char* argv[]) {
     //{{{  use dump filter
     auto mDvb = new cDvb();
     mDvb->createGraph (frequency * 1000, fileName + "/tune.ts");
-    if (mDvb->run()) {
-      cLog::log (LOGNOTICE, "created dvb- dump - tuned to " + dec(frequency) + "mhz");
-      thread ([=]() { dvbSignalThread (mDvb, nullptr); }).detach();
-      }
-    else
-      cLog::log (LOGERROR, "failed to create dvb graph");
+    cLog::log (LOGERROR, "not finished");
+
+    //if (mDvb->run()) {
+    //  cLog::log (LOGNOTICE, "created dvb- dump - tuned to " + dec(frequency) + "mhz");
+    //  thread ([=]() { dvbSignalThread (mDvb, nullptr); }).detach();
+    //  }
+    //else
+    //  cLog::log (LOGERROR, "failed to create dvb graph");
     }
     //}}}
   else {
@@ -93,13 +95,14 @@ int main (int argc, char* argv[]) {
 
     auto mDvb = new cDvb();
     mDvb->createGraph (frequency * 1000);
-    if (mDvb->run()) {
-      cLog::log (LOGNOTICE, "Created dvb- sampleGrabber - tuned to " + dec(frequency) + "mhz");
-      thread ([=]() { dvbGrabThread (mDvb, mTs); }).detach();
-      thread ([=]() { dvbSignalThread (mDvb, mTs); }).detach();
-      }
-    else
-      cLog::log (LOGERROR, "failed to create dvb graph");
+    cLog::log (LOGERROR, "not finished");
+    //if (mDvb->run()) {
+    //  cLog::log (LOGNOTICE, "Created dvb- sampleGrabber - tuned to " + dec(frequency) + "mhz");
+    //  thread ([=]() { dvbGrabThread (mDvb, mTs); }).detach();
+    //  thread ([=]() { dvbSignalThread (mDvb, mTs); }).detach();
+    //  }
+    //else
+    //  cLog::log (LOGERROR, "failed to create dvb graph");
     }
     //}}}
 

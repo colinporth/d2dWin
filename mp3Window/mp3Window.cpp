@@ -45,7 +45,7 @@ public:
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
     add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
 
-    mJpegImageView = add (new cJpegImageView (this, 0.f,-120.f, false, false, mFrameSet.mImage));
+    mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-120.f, false, false, mFrameSet.mImage));
 
     mFileList = getFiles (fileName, "*.mp3");
     add (new cListBox (this, 0,-220.f, mFileList, mFileIndex, mFileIndexChanged));

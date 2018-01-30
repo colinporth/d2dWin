@@ -37,6 +37,8 @@ DEFINE_GUID (CLSID_BDAtif, 0xFC772ab0, 0x0c7f, 0x11d3, 0x8F,0xf2, 0x00,0xa0,0xc9
 DEFINE_GUID (CLSID_Dump, 0x36a5f770, 0xfe4c, 0x11ce, 0xa8, 0xed, 0x00, 0xaa, 0x00, 0x2f, 0xea, 0xb5);
 
 #pragma comment (lib,"strmiids")
+
+#include "../../shared/dvb/cDumpTransportStream.h"
 //}}}
 
 class cDvb {
@@ -111,16 +113,6 @@ public:
     }
   //}}}
   //{{{
-  bool run() {
-
-    auto hr = mMediaControl->Run();
-    if (hr != S_OK)
-      cLog::log (LOGERROR, "run graph failed " + dec(hr));
-
-    return hr == S_OK;
-    }
-  //}}}
-  //{{{
   void tune (int frequency) {
 
     auto hr = mDvbLocator->put_CarrierFrequency (frequency);
@@ -158,19 +150,27 @@ public:
     if (hr != S_OK)
       cLog::log (LOGERROR, "tune - put_TuneRequest" + dec(hr));
     //}}}
+
+    hr = mMediaControl->Run();
+    //{{{  error
+    if (hr != S_OK)
+      cLog::log (LOGERROR, "tune - run" + dec(hr));
+    //}}}
     }
   //}}}
 
+  int getSignal() { return mSignal; }
   //{{{
-  int getSignal() {
+  void signalThread() {
 
-    long signal = 0;
-    if (mScanningTuner)
-      mScanningTuner->get_SignalStrength (&signal);
-
-    mSignal = signal / 0x10000;
-
-    return mSignal;
+    while (true) {
+      if (mScanningTuner) {
+        long signal = 0;
+        mScanningTuner->get_SignalStrength (&signal);
+        mSignal = signal / 0x10000;
+        }
+      Sleep (100);
+      }
     }
   //}}}
 
@@ -185,6 +185,37 @@ public:
     mGrabberCB.releaseBlock (len);
     }
   //}}}
+
+  //{{{
+  void grabThread (cDumpTransportStream* dumpTransportStream) {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("grab");
+
+    auto hr = mMediaControl->Run();
+    if (hr == S_OK) {
+      int64_t streamPos = 0;
+      auto blockSize = 0;
+      while (true) {
+        auto ptr = getBlock (blockSize);
+        if (blockSize) {
+          streamPos += dumpTransportStream->demux (ptr, blockSize, streamPos, false, -1);
+          releaseBlock (blockSize);
+          }
+        else
+          Sleep (1);
+        }
+      }
+    else
+      cLog::log (LOGERROR, "run graph failed " + dec(hr));
+
+    cLog::log (LOGNOTICE, "exit");
+    CoUninitialize();
+    }
+  //}}}
+
+  // public for widget
+  int mSignal = 0;
 
 private:
   //{{{
@@ -739,7 +770,5 @@ private:
   Microsoft::WRL::ComPtr<IFileSinkFilter> mFileSinkFilter;
 
   Microsoft::WRL::ComPtr<IMediaControl> mMediaControl;
-
-  int mSignal = 0;
   //}}}
   };

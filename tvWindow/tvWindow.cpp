@@ -32,13 +32,13 @@ public:
       if (mDvb->createGraph (frequency * 1000)) {
         mDvbTs = new cDumpTransportStream (mRoot, false);
 
-        add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), -120.f, 0.f);
+        add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mDvb->mSignal), -120.f, 0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvbTs->mPackets), -242.f,0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvbTs->mDiscontinuity), -364.f,0.f);
         add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvbTs))->setTimedOn();
 
-        thread ([=]() { dvbGrabThread (mDvb); }).detach();
-        thread ([=]() { dvbSignalThread (mDvb); }).detach();
+        thread ([=]() { mDvb->grabThread (mDvbTs); }).detach();
+        thread ([=]() { mDvb->signalThread(); }).detach();
         }
       }
 
@@ -182,47 +182,6 @@ private:
     }
   //}}}
 
-  //{{{
-  void dvbGrabThread (cDvb* dvb) {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("grab");
-
-    dvb->run();
-
-    int64_t streamPos = 0;
-    auto blockSize = 0;
-    while (true) {
-      auto ptr = dvb->getBlock (blockSize);
-      if (blockSize) {
-        streamPos += mDvbTs->demux (ptr, blockSize, streamPos, false, -1);
-        dvb->releaseBlock (blockSize);
-        changed();
-        }
-      else
-        Sleep (1);
-      }
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-  //{{{
-  void dvbSignalThread (cDvb* dvb) {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("sign");
-
-    while (true) {
-      mSignal = dvb->getSignal();
-      Sleep (100);
-      }
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-
   //{{{  vars
   string mRoot = "c:/tv";
 
@@ -234,7 +193,6 @@ private:
 
   cDumpTransportStream* mDvbTs;
   cDvb* mDvb = nullptr;
-  int mSignal = 0;
   //}}}
   };
 

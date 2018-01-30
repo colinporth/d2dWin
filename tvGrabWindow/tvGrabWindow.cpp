@@ -107,7 +107,6 @@ private:
     cLog::setThreadName ("grab");
 
     dvb->createGraph (frequency);
-    dvb->run();
 
     int64_t streamPos = 0;
     auto blockSize = 0;
@@ -183,7 +182,6 @@ private:
     mDvb->stop();
     mTs->clear();
     mDvb->tune (frequency * 1000);
-    mDvb->run();
     }
   //}}}
 
