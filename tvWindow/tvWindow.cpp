@@ -27,21 +27,21 @@ public:
     int frequency = atoi (param.c_str());
     if (frequency) {
       // launch dvb
-      mDvb = new cDvb (mRoot);
+      mDvb = new cDvb (mTvRoot);
       if (mDvb->createGraph (frequency * 1000)) {
+        thread ([=]() { mDvb->grabThread(); }).detach();
+        thread ([=]() { mDvb->signalThread(); }).detach();
+
         // turn these into a dvb monitor widget
         add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mDvb->mSignal), -120.f, 0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvb->mPackets), -242.f,0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvb->mDiscontinuity), -364.f,0.f);
         add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvb))->setTimedOn();
-
-        thread ([=]() { mDvb->grabThread(); }).detach();
-        thread ([=]() { mDvb->signalThread(); }).detach();
         }
       }
 
     // launch file player
-    mFileList = getFiles (frequency || param.empty() ? mRoot : param, "*.ts");
+    mFileList = getFiles (frequency || param.empty() ? mTvRoot : param, "*.ts");
     add (new cListBox (this, frequency ? -getWidth()/2.f : 0.f, 0.f, mFileList, mFileIndex, mFileIndexChanged),
          frequency ? getWidth()/2.f : 0.f);
     thread ([=]() { fileWatchThread(); }).detach();
@@ -128,8 +128,8 @@ private:
     cLog::setThreadName ("wtch");
 
     // Watch the directory for file creation and deletion.
-    HANDLE handle = FindFirstChangeNotification (
-      mRoot.c_str(), TRUE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME);
+    auto handle = FindFirstChangeNotification (mTvRoot.c_str(), TRUE, 
+                                               FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME);
     if (handle == INVALID_HANDLE_VALUE)
      cLog::log (LOGERROR, "FindFirstChangeNotification function failed");
 
@@ -137,7 +137,7 @@ private:
       cLog::log (LOGINFO, "Waiting for notification");
       if (WaitForSingleObject (handle, INFINITE) == WAIT_OBJECT_0) {
         // A file was created, renamed, or deleted in the directory.
-        mFileList = getFiles (mRoot, "*.ts");
+        mFileList = getFiles (mTvRoot, "*.ts");
         cLog::log (LOGINFO, "fileWatch changed " + dec(mFileList.size()));
         if (FindNextChangeNotification (handle) == FALSE)
           cLog::log (LOGERROR, "FindNextChangeNotification function failed");
@@ -181,7 +181,7 @@ private:
   //}}}
 
   //{{{  vars
-  string mRoot = "c:/tv";
+  string mTvRoot = "c:/tv";
   cDvb* mDvb = nullptr;
 
   vector <string> mFileList;

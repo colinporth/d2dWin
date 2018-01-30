@@ -142,7 +142,6 @@ private:
   //{{{
   void retune (int frequency) {
     mDvb->stop();
-    mTs->clear();
     mDvb->tune (frequency * 1000);
     }
   //}}}
