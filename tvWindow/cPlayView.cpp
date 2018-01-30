@@ -112,18 +112,32 @@ bool cPlayView::onKey (int key) {
     //}}}
     //{{{
     case 0x25: // left arrow
-      incPlayPts (-90000/25);
-      setPause();
+      incPlayPts (-90000*1);
       mWindow->changed();
       break;
     //}}}
     //{{{
     case 0x27: // right arrow
+      incPlayPts (90000*1);
+      mWindow->changed();
+      break;
+    //}}}
+    case '<':
+    case ',':
+      //{{{  single step prev
+      incPlayPts (-90000/25);
+      setPause();
+      mWindow->changed();
+      break;
+      //}}}
+    case '>':
+    case '.':
+      //{{{  single step next
       incPlayPts (90000/25);
       setPause();
       mWindow->changed();
       break;
-    //}}}
+      //}}}
 
     case  '0': key += 10; // nasty trick to wrap '0' as channel 10
     case  '1':
