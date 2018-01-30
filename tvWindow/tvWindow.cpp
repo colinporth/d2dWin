@@ -127,21 +127,21 @@ private:
   void fileWatchThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("watc");
+    cLog::setThreadName ("wtch");
 
     // Watch the directory for file creation and deletion.
-    HANDLE dwChangeHandle = FindFirstChangeNotification (
-      mRoot.c_str(), TRUE, FILE_NOTIFY_CHANGE_FILE_NAME| FILE_NOTIFY_CHANGE_DIR_NAME);
-    if (dwChangeHandle == INVALID_HANDLE_VALUE)
+    HANDLE handle = FindFirstChangeNotification (
+      mRoot.c_str(), TRUE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME);
+    if (handle == INVALID_HANDLE_VALUE)
      cLog::log (LOGERROR, "FindFirstChangeNotification function failed");
 
     while (!getExit()) {
       cLog::log (LOGINFO, "Waiting for notification");
-      if (WaitForSingleObject (dwChangeHandle, INFINITE) == WAIT_OBJECT_0) {
+      if (WaitForSingleObject (handle, INFINITE) == WAIT_OBJECT_0) {
         // A file was created, renamed, or deleted in the directory.
         mFileList = getFiles (mRoot, "*.ts");
         cLog::log (LOGINFO, "fileWatch changed " + dec(mFileList.size()));
-        if (FindNextChangeNotification (dwChangeHandle) == FALSE)
+        if (FindNextChangeNotification (handle) == FALSE)
           cLog::log (LOGERROR, "FindNextChangeNotification function failed");
         }
       else
