@@ -4,13 +4,11 @@
 
 #include "../../shared/dvb/cWinDvb.h"
 
-#include "../common/box/cTsEpgBox.h"
-#include "../common/box/cToggleBox.h"
+#include "../common/box/cListBox.h"
 #include "../common/box/cIntBox.h"
-#include "../common/box/cValueBox.h"
+#include "../common/box/cTsEpgBox.h"
 #include "../common/box/cLogBox.h"
 #include "../common/box/cWindowBox.h"
-#include "../common/box/cListBox.h"
 
 #include "cPlayView.h"
 //}}}
