@@ -44,6 +44,17 @@ DEFINE_GUID (CLSID_Dump, 0x36a5f770, 0xfe4c, 0x11ce, 0xa8, 0xed, 0x00, 0xaa, 0x0
 class cDvb {
 public:
   //{{{
+  cDvb (const std::string& root){
+    mDvbTs = new cDumpTransportStream (root, false);
+    }
+  //}}}
+  //{{{
+  ~cDvb() {
+    delete mDvbTs;
+    }
+  //}}}
+
+  //{{{
   bool createGraph (int frequency)  {
 
     if (!createGraphDvbT (frequency))
@@ -187,7 +198,7 @@ public:
   //}}}
 
   //{{{
-  void grabThread (cDumpTransportStream* dumpTransportStream) {
+  void grabThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("grab");
@@ -199,7 +210,7 @@ public:
       while (true) {
         auto ptr = getBlock (blockSize);
         if (blockSize) {
-          streamPos += dumpTransportStream->demux (ptr, blockSize, streamPos, false, -1);
+          streamPos += mDvbTs->demux (ptr, blockSize, streamPos, false, -1);
           releaseBlock (blockSize);
           }
         else
@@ -216,6 +227,7 @@ public:
 
   // public for widget
   int mSignal = 0;
+  cDumpTransportStream* mDvbTs;
 
 private:
   //{{{

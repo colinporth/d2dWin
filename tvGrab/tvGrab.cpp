@@ -76,7 +76,7 @@ int main (int argc, char* argv[]) {
 
   if (dumpFilter) {
     //{{{  use dump filter
-    auto mDvb = new cDvb();
+    auto mDvb = new cDvb ("c:/tv");
     mDvb->createGraph (frequency * 1000, fileName + "/tune.ts");
     cLog::log (LOGERROR, "not finished");
 
@@ -93,7 +93,7 @@ int main (int argc, char* argv[]) {
     auto mTs = new cDumpTransportStream (fileName, true);
     cLog::log (LOGNOTICE, "Created dumpTransportStream");
 
-    auto mDvb = new cDvb();
+    auto mDvb = new cDvb("c:/tv");
     mDvb->createGraph (frequency * 1000);
     cLog::log (LOGERROR, "not finished");
     //if (mDvb->run()) {

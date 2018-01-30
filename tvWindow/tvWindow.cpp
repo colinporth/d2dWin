@@ -28,16 +28,15 @@ public:
     int frequency = atoi (param.c_str());
     if (frequency) {
       // launch dvb
-      mDvb = new cDvb();
+      mDvb = new cDvb (mRoot);
       if (mDvb->createGraph (frequency * 1000)) {
-        mDvbTs = new cDumpTransportStream (mRoot, false);
-
+        // turn these into a dvb monitor widget
         add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mDvb->mSignal), -120.f, 0.f);
-        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvbTs->mPackets), -242.f,0.f);
-        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvbTs->mDiscontinuity), -364.f,0.f);
-        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvbTs))->setTimedOn();
+        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvb->mDvbTs->mPackets), -242.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvb->mDvbTs->mDiscontinuity), -364.f,0.f);
+        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvb->mDvbTs))->setTimedOn();
 
-        thread ([=]() { mDvb->grabThread (mDvbTs); }).detach();
+        thread ([=]() { mDvb->grabThread(); }).detach();
         thread ([=]() { mDvb->signalThread(); }).detach();
         }
       }
@@ -184,15 +183,13 @@ private:
 
   //{{{  vars
   string mRoot = "c:/tv";
-
-  cBox* mPlayFocus;
+  cDvb* mDvb = nullptr;
 
   vector <string> mFileList;
   int mFileIndex = 0;
   bool mFileIndexChanged = false;
 
-  cDumpTransportStream* mDvbTs;
-  cDvb* mDvb = nullptr;
+  cBox* mPlayFocus;
   //}}}
   };
 

@@ -74,9 +74,11 @@ public:
 
     auto frequency = param.empty() ? 674 : atoi(param.c_str());
     if (frequency) {
-      mDvb = new cDvb();
-      thread ([=]() { dvbGrabThread (mDvb, frequency*1000); }).detach();
-      thread ([=]() { dvbSignalThread (mDvb); }).detach();
+      mDvb = new cDvb ("c:/tv");
+      if (mDvb->createGraph (frequency)) {
+        thread ([=]() { mDvb->grabThread(); }).detach();
+        thread ([=]() { mDvb->signalThread(); }).detach();
+        }
       }
     else
       thread ([=]() { fileThread (param); }).detach();
@@ -100,44 +102,6 @@ protected:
   //}}}
 
 private:
-  //{{{
-  void dvbGrabThread (cDvb* dvb, int frequency) {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("grab");
-
-    dvb->createGraph (frequency);
-
-    int64_t streamPos = 0;
-    auto blockSize = 0;
-    while (true) {
-      auto ptr = dvb->getBlock (blockSize);
-      if (blockSize) {
-        streamPos += mTs->demux (ptr, blockSize, streamPos, false, -1);
-        dvb->releaseBlock (blockSize);
-        changed();
-        }
-      else
-        Sleep (1);
-      }
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
-  //{{{
-  void dvbSignalThread (cDvb* dvb) {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("sign");
-
-    while (true)
-      mSignal = dvb->getSignal();
-
-    cLog::log (LOGNOTICE, "exit");
-    CoUninitialize();
-    }
-  //}}}
   //{{{
   void fileThread (const string& fileName) {
 
