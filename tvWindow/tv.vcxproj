@@ -43,6 +43,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h" />
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h" />
+    <ClInclude Include="..\..\shared\dvb\cWinDvb.h" />
     <ClInclude Include="..\..\shared\utils\cWinAudio.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
     <ClInclude Include="..\common\box\cTsEpgBox.h" />
@@ -50,7 +51,6 @@
     <ClInclude Include="..\common\cAudFrame.h" />
     <ClInclude Include="..\common\cBoxes.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
-    <ClInclude Include="..\common\cDvb.h" />
     <ClInclude Include="..\common\cLogBox.h" />
     <ClInclude Include="..\common\cTitleBox.h" />
     <ClInclude Include="..\common\cVidFrame.h" />

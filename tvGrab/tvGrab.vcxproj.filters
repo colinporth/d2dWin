@@ -22,7 +22,7 @@
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\cDvb.h">
+    <ClInclude Include="..\..\shared\dvb\cWinDvb.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,9 +2,7 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "../common/cDvb.h"
-
-#include "../../shared/dvb/cDumpTransportStream.h"
+#include "../../shared/dvb/cWinDvb.h"
 
 #include "../common/box/cTsEpgBox.h"
 #include "../common/box/cTsPidBox.h"

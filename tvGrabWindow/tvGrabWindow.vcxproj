@@ -39,6 +39,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h" />
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h" />
+    <ClInclude Include="..\..\shared\dvb\cWinDvb.h" />
     <ClInclude Include="..\..\shared\utils\cBipBuffer.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\timer.h" />
@@ -46,7 +47,6 @@
     <ClInclude Include="..\common\box\cTsEpgBox.h" />
     <ClInclude Include="..\common\box\cTsPidBox.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
-    <ClInclude Include="..\common\cDvb.h" />
     <ClInclude Include="..\common\cLogBox.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>

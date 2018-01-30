@@ -7,6 +7,7 @@
 #include "cPlayView.h"
 
 #include "../../shared/utils/cWinAudio.h"
+#include "../common/box/cAudFrameBox.h"
 
 #pragma comment (lib,"avutil.lib")
 #pragma comment (lib,"avcodec.lib")
@@ -21,6 +22,12 @@
 #pragma comment (lib,"dxgi.lib")
 
 using namespace concurrency;
+//}}}
+//{{{  const
+const int kAudMaxFrames = 120; // just over 2secs
+const int kVidMaxFrames = 100; // 4secs
+
+const int kChunkSize = 2048*188;
 //}}}
 
 //{{{
@@ -172,6 +179,8 @@ bool cPlayView::onWheel (int delta, cPoint pos) {
 //}}}
 //{{{
 bool cPlayView::onMove (bool right, cPoint pos, cPoint inc) {
+
+  const int kAudSamplesPerAacFrame = 1152;
 
   if (mWindow->getControl())
     return cView::onMove (right, pos, inc);
@@ -528,6 +537,8 @@ void cPlayView::vidThread() {
 //{{{
 void cPlayView::playThread() {
 
+  const int kAudSamplesPerUnknownFrame = 1024;
+
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::setThreadName ("play");
 
@@ -543,8 +554,7 @@ void cPlayView::playThread() {
     // play using frame where available, else play silence
     audPlay (mPlayAudFrame ? mPlayAudFrame->mChannels : getSrcChannels(),
       mPlayAudFrame && (mPlaying != ePause) ? mPlayAudFrame->mSamples : nullptr,
-      mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame,
-             1.f);
+      mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame, 1.f);
 
     if ((mPlaying == ePlay) && (mPlayPts < getLengthPts()))
       incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));

@@ -6,32 +6,13 @@
 
 #include "../common/cVidFrame.h"
 #include "../common/cAudFrame.h"
-#include "../common/box/cAudFrameBox.h"
 
 extern "C" {
   #include <libavcodec/avcodec.h>
   #include <libavformat/avformat.h>
   }
+
 #include "mfxvideo++.h"
-//}}}
-//{{{  const
-const int kAudMaxFrames = 120; // just over 2secs
-const int kVidMaxFrames = 100; // 4secs
-
-const int kAudSamplesPerAacFrame = 1152;
-const int kAudSamplesPerUnknownFrame = 1024;
-
-// drawFrames layout const
-const float kPixPerPts = 38.f / 3600.f;
-const float kDrawFramesCentreY = 40.f;
-const float kIndexHeight = 13.f;
-
-#define MSDK_ALIGN16(value)  (((value + 15) >> 4) << 4)
-#define MSDK_ALIGN32(X)      (((mfxU32)((X)+31)) & (~ (mfxU32)31))
-
-const bool kRgba = false;
-
-const int kChunkSize = 2048*188;
 //}}}
 
 class cPlayView : public cD2dWindow::cView, public cWinAudio {
@@ -202,6 +183,7 @@ private:
     //{{{
     bool onWheel (int delta, cPoint pos)  {
 
+      const int kAudSamplesPerAacFrame = 1152;
       auto ptsInc = (pos.y > 40.f) ? (90000/25) : (kAudSamplesPerAacFrame * 90 / 48);
 
       mPlayView->incPlayPts (-int64_t(delta * ptsInc / 120));
@@ -213,6 +195,7 @@ private:
     //{{{
     bool onMove (bool right, cPoint pos, cPoint inc) {
 
+      const int kAudSamplesPerAacFrame = 1152;
       mPlayView->setPause();
       auto pixPerPts = 18.f * 48 / (kAudSamplesPerAacFrame * 90);
       mPlayView->incPlayPts (int64_t (-inc.x / pixPerPts));
@@ -386,9 +369,13 @@ private:
 
     //{{{
     void drawFrames (ID2D1DeviceContext* dc, const cRect& rect, IDWriteTextFormat* textFormat,
-                    ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
-                    ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
-                    int64_t playPts, float& maxY) {
+                     ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
+                     ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
+                     int64_t playPts, float& maxY) {
+
+      const float kPixPerPts = 38.f / 3600.f;
+      const float kDrawFramesCentreY = 40.f;
+      const float kIndexHeight = 13.f;
 
       auto y = kDrawFramesCentreY;
       auto index = 0;
@@ -568,7 +555,11 @@ private:
                      ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
                      int64_t playPts, float& maxY) {
 
+      const float kPixPerPts = 38.f / 3600.f;
       const auto vidFrameWidth = 3600.f * kPixPerPts; // 25fps
+      const float kDrawFramesCentreY = 40.f;
+      const float kIndexHeight = 13.f;
+
       auto y = kDrawFramesCentreY;
 
       maxY = y;
@@ -611,9 +602,12 @@ private:
     //}}}
 
   protected:
+    #define MSDK_ALIGN16(value)  (((value + 15) >> 4) << 4)
+    #define MSDK_ALIGN32(X)      (((mfxU32)((X)+31)) & (~ (mfxU32)31))
     //{{{
     bool vidDecodePes (cPidInfo* pidInfo, bool skip) {
 
+      const bool kRgba = false;
       bool decoded = false;
 
       if (pidInfo->mPid == mPid) {

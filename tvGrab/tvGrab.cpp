@@ -15,53 +15,11 @@
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/cSemaphore.h"
 
-#include "../../shared/dvb/cDumpTransportStream.h"
-
-#include "../common/cDvb.h"
+#include "../../shared/dvb/cWinDvb.h"
 
 #pragma comment(lib,"common.lib")
 
 using namespace std;
-//}}}
-
-//{{{
-void dvbGrabThread (cDvb* dvb, cTransportStream* ts) {
-
-  CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::setThreadName ("grab");
-
-  int64_t streamPos = 0;
-  while (true) {
-    auto blockSize = 0;
-    auto ptr = dvb->getBlock (blockSize);
-    if (blockSize) {
-      streamPos += ts->demux (ptr, blockSize, streamPos, false, -1);
-      dvb->releaseBlock (blockSize);
-      if (blockSize != 240 * 188)
-        cLog::log (LOGINFO, "blocksize " + dec(blockSize));
-      }
-    else
-      Sleep (4);
-    }
-
-  cLog::log (LOGNOTICE, "exit");
-  CoUninitialize();
-  }
-//}}}
-//{{{
-void dvbSignalThread (cDvb* dvb, cTransportStream* ts) {
-
-  CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::setThreadName ("sign");
-
-  while (true)
-    cLog::log (LOGINFO, dec(dvb->getSignal()) +
-                        (ts ? (" " + dec(ts->getDiscontinuity()) +
-                               " " + dec(ts->getPackets())) : ""));
-
-  cLog::log (LOGNOTICE, "exit");
-  CoUninitialize();
-  }
 //}}}
 
 int main (int argc, char* argv[]) {
@@ -77,15 +35,12 @@ int main (int argc, char* argv[]) {
   if (dumpFilter) {
     //{{{  use dump filter
     auto mDvb = new cDvb ("c:/tv");
-    mDvb->createGraph (frequency * 1000, fileName + "/tune.ts");
-    cLog::log (LOGERROR, "not finished");
-
-    //if (mDvb->run()) {
-    //  cLog::log (LOGNOTICE, "created dvb- dump - tuned to " + dec(frequency) + "mhz");
-    //  thread ([=]() { dvbSignalThread (mDvb, nullptr); }).detach();
-    //  }
-    //else
-    //  cLog::log (LOGERROR, "failed to create dvb graph");
+    if (mDvb->createGraph (frequency * 1000, fileName + "/tune.ts")) {
+      cLog::log (LOGNOTICE, "created dvb- dump - tuned to " + dec(frequency) + "mhz");
+      thread ([=]() { mDvb->signalThread(); }).detach();
+      }
+    else
+      cLog::log (LOGERROR, "failed to create dvb graph");
     }
     //}}}
   else {
@@ -94,15 +49,13 @@ int main (int argc, char* argv[]) {
     cLog::log (LOGNOTICE, "Created dumpTransportStream");
 
     auto mDvb = new cDvb("c:/tv");
-    mDvb->createGraph (frequency * 1000);
-    cLog::log (LOGERROR, "not finished");
-    //if (mDvb->run()) {
-    //  cLog::log (LOGNOTICE, "Created dvb- sampleGrabber - tuned to " + dec(frequency) + "mhz");
-    //  thread ([=]() { dvbGrabThread (mDvb, mTs); }).detach();
-    //  thread ([=]() { dvbSignalThread (mDvb, mTs); }).detach();
-    //  }
-    //else
-    //  cLog::log (LOGERROR, "failed to create dvb graph");
+    if (mDvb->createGraph (frequency * 1000)) {
+      cLog::log (LOGNOTICE, "Created dvb- sampleGrabber - tuned to " + dec(frequency) + "mhz");
+      thread ([=]() { mDvb->grabThread(); }).detach();
+      thread ([=]() { mDvb->signalThread(); }).detach();
+      }
+    else
+      cLog::log (LOGERROR, "failed to create dvb graph");
     }
     //}}}
 
