@@ -146,7 +146,7 @@ private:
         cLog::log (LOGERROR, "No changes in the timeout period");
       }
 
-    cLog::log (LOGNOTICE, "exit");
+    cLog::log (LOGINFO, "exit");
     CoUninitialize();
     }
   //}}}
@@ -175,7 +175,7 @@ private:
         }
       }
 
-    cLog::log (LOGNOTICE, "exit");
+    cLog::log (LOGINFO, "exit");
     CoUninitialize();
     }
   //}}}

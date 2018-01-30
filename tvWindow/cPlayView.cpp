@@ -27,7 +27,7 @@ using namespace concurrency;
 const int kChunkSize = 2048*188;
 
 const int kMaxAudFrames = 120; // just over 2secs
-const int kMaxVidFrames = 30; 
+const int kMaxVidFrames = 30;
 //}}}
 
 //{{{
@@ -375,7 +375,7 @@ void cPlayView::analyserThread() {
   _close (file);
   free (fileChunkBuffer);
 
-  cLog::log (LOGNOTICE, "exit");
+  cLog::log (LOGINFO, "exit");
   CoUninitialize();
   mAnalAborted = true;
   }
@@ -453,7 +453,7 @@ void cPlayView::audThread() {
   _close (file);
   free (fileChunkBuffer);
 
-  cLog::log (LOGNOTICE, "exit");
+  cLog::log (LOGINFO, "exit");
   CoUninitialize();
   mAudAborted = true;
   }
@@ -529,7 +529,7 @@ void cPlayView::vidThread() {
   _close (file);
   free (fileChunkBuffer);
 
-  cLog::log (LOGNOTICE, "exit");
+  cLog::log (LOGINFO, "exit");
   CoUninitialize();
   mVidAborted = true;
   }
@@ -566,7 +566,7 @@ void cPlayView::playThread() {
     }
   audClose();
 
-  cLog::log (LOGNOTICE, "exit");
+  cLog::log (LOGINFO, "exit");
   CoUninitialize();
   mPlayAborted = true;
   }
