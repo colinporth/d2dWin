@@ -63,24 +63,26 @@ public:
     float getCentreY() { return mRect.getCentreY(); }
 
     //{{{
-    void setPos (cPoint pos) {
+    cBox* setPos (cPoint pos) {
       mLayoutX = pos.x;
       mLayoutY = pos.y;
       layout();
+      return this;
       }
     //}}}
     //{{{
-    void setPos (float x, float y) {
+    cBox* setPos (float x, float y) {
       mLayoutX = x;
       mLayoutY = y;
       layout();
+      return this;
       }
     //}}}
-    void setEnable (bool enable) { mEnable = enable; }
-    void setUnPick() { mPick = false; }
-    void setPin (bool pin) { mPin = pin; }
-    void togglePin() { mPin = !mPin; }
-    void setTimedOn() { mTimedOn = true; }
+    cBox* setEnable (bool enable) { mEnable = enable; return this;  }
+    cBox* setUnPick() { mPick = false;  return this; }
+    cBox* setPin (bool pin) { mPin = pin; return this; }
+    cBox* togglePin() { mPin = !mPin;  return this; }
+    cBox* setTimedOn() { mTimedOn = true; return this;  }
 
     // overrides
     //{{{
@@ -115,6 +117,7 @@ public:
       return mPick;
       }
     //}}}
+    virtual bool onKey (int key) { return false; }
     virtual bool onProx (bool inClient, cPoint pos) { return false; }
     virtual bool onProxExit() { return false; }
     virtual bool onWheel (int delta, cPoint pos)  { return false; }

@@ -35,8 +35,7 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const strin
   mAudTs = new cAudTransportStream (kAudMaxFrames);
   mVidTs = new cVidTransportStream (kVidMaxFrames);
 
-  mTimecodeBox = window->add (new cTimecodeBox (window, 600.f,60.f, this), -600.f,-60.f);
-  mTimecodeBox->setPin (true);
+  mTimecodeBox = window->add (new cTimecodeBox (window, 600.f,60.f, this), -600.f,-60.f)->setPin (true);
   mProgressBox = window->add (new cProgressBox (window, 0.f,6.f, this), 0.f,-6.f);
   mAudFrameBox = window->add (new cAudFrameBox (window, 82.f,240.0f, mPlayAudFrame, this), -84.f,-240.f-6.0f);
 
@@ -77,6 +76,7 @@ cPoint cPlayView::getSrcSize() {
   return mBitmap ? mBitmap->GetPixelSize() : cPoint();
   }
 //}}}
+
 //{{{
 bool cPlayView::onKey (int key) {
 
@@ -142,7 +142,6 @@ bool cPlayView::onKey (int key) {
   return false;
   }
 //}}}
-
 //{{{
 bool cPlayView::onWheel (int delta, cPoint pos) {
 

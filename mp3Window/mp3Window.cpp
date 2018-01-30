@@ -40,23 +40,22 @@ public:
   //{{{
   void run (string title, int width, int height, string fileName) {
 
-    mFileList = getFiles (fileName, "*.mp3");
-    cLog::log (LOGNOTICE, "getFiles %d files", mFileList.size());
-
     initialise (title, width, height, false);
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
-    add (new cClockBox (this, 40.0f, mTimePoint), -82.f,150.f);
-    add (new cLogBox (this, 200.0f,0, true), 0,200.0f);
+    add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
+    add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
 
-    mJpegImageView = new cJpegImageView (this, 0.f,-120.f, false, false, mFrameSet.mImage);
-    add (mJpegImageView);
+    mJpegImageView = add (new cJpegImageView (this, 0.f,-120.f, false, false, mFrameSet.mImage));
 
-    add (new cListBox (this, 0,250.0f, mFileList, mFileIndex, mFileIndexChanged));
-    add (new cFrameSetLensBox (this, 0,100.0f, mFrameSet), 0,-120.0f);
-    add (new cFrameSetBox (this, 0,100.0f, mFrameSet), 0,-220.0f);
-    add (new cFrameSetTimeBox (this, 600.0f,50.0f, mFrameSet), -600.0f,-50.0f);
-    add (new cVolumeBox (this, 12.f,0), -12.f,0);
-    add (new cWindowBox (this, 60.f,24.f), -60.f,0);
+    mFileList = getFiles (fileName, "*.mp3");
+    add (new cListBox (this, 0,-220.f, mFileList, mFileIndex, mFileIndexChanged));
+    cLog::log (LOGNOTICE, "getFiles %d files", mFileList.size());
+
+    add (new cFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
+    add (new cFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
+    add (new cFrameSetTimeBox (this, 600.f,50.f, mFrameSet), -600.f,-50.f);
+    add (new cVolumeBox (this, 12.f,0.f), -12.f,0.f);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
     if (!mFileList.empty()) {
       thread ([=](){ analyseThread(); }).detach();

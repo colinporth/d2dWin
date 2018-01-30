@@ -25,28 +25,7 @@ public:
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f);
 
-    // launch file player
-    thread threadHandle;
     int frequency = atoi (param.c_str());
-    if (param.empty() || frequency) {
-      mFileList = getFiles (mRoot, "*.ts");
-      add (new cListBox (this, getWidth()/2.f, 0.f, mFileList, mFileIndex, mFileIndexChanged));
-      thread ([=]() { fileWatchThread(); }).detach();
-
-      if (!mFileList.empty()) {
-        mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]);
-        addFront (mPlayFocus, 0.f, 0.f);
-        }
-
-      threadHandle = thread ([=](){ fileSelectThread(); });
-      SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
-      threadHandle.detach();
-      }
-    else {
-      mPlayFocus = new cPlayView (this, 0.f,0.f, param);
-      addFront (mPlayFocus, 0.f,0.f);
-      }
-
     if (frequency) {
       // launch dvb
       mDvb = new cDvb();
@@ -56,12 +35,25 @@ public:
         add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), -120.f, 0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvbTs->mPackets), -242.f,0.f);
         add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvbTs->mDiscontinuity), -364.f,0.f);
-        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvbTs), getWidth()/2.f,0.f)->setTimedOn();
+        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvbTs))->setTimedOn();
 
         thread ([=]() { dvbGrabThread (mDvb); }).detach();
         thread ([=]() { dvbSignalThread (mDvb); }).detach();
         }
       }
+
+    // launch file player
+    mFileList = getFiles (frequency || param.empty() ? mRoot : param, "*.ts");
+    add (new cListBox (this, frequency ? -getWidth()/2.f : 0.f, 0.f, mFileList, mFileIndex, mFileIndexChanged),
+         frequency ? getWidth()/2.f : 0.f);
+    thread ([=]() { fileWatchThread(); }).detach();
+
+    if (!mFileList.empty())
+      mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]), 0.f,0.f);
+
+    thread threadHandle = thread ([=](){ fileSelectThread(); });
+    SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
+    threadHandle.detach();
 
     // exit, maximise box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
@@ -88,7 +80,7 @@ protected:
           mPlayFocus = nullptr;
           }
           //}}}
-        else 
+        else
           return true;
         break;
       //}}}
@@ -234,7 +226,7 @@ private:
   //{{{  vars
   string mRoot = "c:/tv";
 
-  cPlayView* mPlayFocus;
+  cBox* mPlayFocus;
 
   vector <string> mFileList;
   int mFileIndex = 0;

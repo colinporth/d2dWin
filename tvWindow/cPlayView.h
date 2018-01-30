@@ -40,8 +40,8 @@ public:
   ~cPlayView();
 
   cPoint getSrcSize();
-  bool onKey (int key);
 
+  bool onKey (int key);
   bool onWheel (int delta, cPoint pos);
   bool onMove (bool right, cPoint pos, cPoint inc);
   bool onUp (bool right, bool mouseMoved, cPoint pos);
