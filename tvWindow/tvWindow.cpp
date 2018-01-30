@@ -4,6 +4,7 @@
 
 #include "../../shared/dvb/cWinDvb.h"
 
+#include "../common/box/cClockBox.h"
 #include "../common/box/cListBox.h"
 #include "../common/box/cIntBox.h"
 #include "../common/box/cTsEpgBox.h"
@@ -21,6 +22,7 @@ public:
     // init d2dWindow, boxes
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f);
+    add (new cClockBox (this, 40.f, mTimePoint), -84.f,2.f);
 
     int frequency = atoi (param.c_str());
     if (frequency) {
