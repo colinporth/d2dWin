@@ -20,8 +20,8 @@ public:
   cPlayView (cD2dWindow* window, float width, float height, const string& fileName);
   ~cPlayView();
 
+  // cView overrides
   cPoint getSrcSize();
-
   bool onKey (int key);
   bool onWheel (int delta, cPoint pos);
   bool onMove (bool right, cPoint pos, cPoint inc);
@@ -939,13 +939,13 @@ private:
   bool getAbort() { return mAbort || mWindow->getExit(); }
 
   // sets
-  void setPause() { mPlaying = ePause; }
-  void setScrub() { mPlaying = eScrub; }
-  void togglePlay(); ;
+  void setService (int index);
   void setPlayPts (int64_t playPts);
   void incPlayPts (int64_t incPts) { setPlayPts (mPlayPts + incPts); }
   void setEnd() { setPlayPts (mAnalTs->getLengthPts()); }
-  void setService (int index);
+  void setPause() { mPlaying = ePause; }
+  void setScrub() { mPlaying = eScrub; }
+  void togglePlay();
 
   // threads
   void analyserThread();

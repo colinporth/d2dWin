@@ -24,10 +24,10 @@
 using namespace concurrency;
 //}}}
 //{{{  const
-const int kAudMaxFrames = 120; // just over 2secs
-const int kVidMaxFrames = 100; // 4secs
-
 const int kChunkSize = 2048*188;
+
+const int kMaxAudFrames = 120; // just over 2secs
+const int kMaxVidFrames = 30; 
 //}}}
 
 //{{{
@@ -39,8 +39,8 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const strin
 
   // create transportStreams
   mAnalTs = new cAnalTransportStream();
-  mAudTs = new cAudTransportStream (kAudMaxFrames);
-  mVidTs = new cVidTransportStream (kVidMaxFrames);
+  mAudTs = new cAudTransportStream (kMaxAudFrames);
+  mVidTs = new cVidTransportStream (kMaxVidFrames);
 
   mTimecodeBox = window->add (new cTimecodeBox (window, 600.f,60.f, this), -600.f,-60.f)->setPin (true);
   mProgressBox = window->add (new cProgressBox (window, 0.f,6.f, this), 0.f,-6.f);
@@ -107,25 +107,25 @@ bool cPlayView::onKey (int key) {
     //}}}
     //{{{
     case 0x21: // page up
-      incPlayPts (-90000*10);
+      incPlayPts (-90000*60);
       mWindow->changed();
       break;
     //}}}
     //{{{
     case 0x22: // page down
-      incPlayPts (90000*10);
+      incPlayPts (90000*60);
       mWindow->changed();
       break;
     //}}}
     //{{{
     case 0x25: // left arrow
-      incPlayPts (-90000*1);
+      incPlayPts (-90000*10);
       mWindow->changed();
       break;
     //}}}
     //{{{
     case 0x27: // right arrow
-      incPlayPts (90000*1);
+      incPlayPts (90000*10);
       mWindow->changed();
       break;
     //}}}
@@ -221,14 +221,14 @@ void cPlayView::onDraw (ID2D1DeviceContext* dc) {
   }
 //}}}
 
-// private
-// sets
+// private sets
 //{{{
-void cPlayView::togglePlay() {
-  switch (mPlaying) {
-    case ePause: mPlaying = ePlay; break;
-    case eScrub: mPlaying = ePlay; break;
-    case ePlay:  mPlaying = ePause; break;
+void cPlayView::setService (int index) {
+
+  auto service = mAnalTs->getService (index);
+  if (service) {
+    mAudTs->setPid (service->getAudPid());
+    mVidTs->setPid (service->getVidPid());
     }
   }
 //}}}
@@ -247,11 +247,11 @@ void cPlayView::setPlayPts (int64_t playPts) {
   }
 //}}}
 //{{{
-void cPlayView::setService (int index) {
-  auto service = mAnalTs->getService (index);
-  if (service) {
-    mAudTs->setPid (service->getAudPid());
-    mVidTs->setPid (service->getVidPid());
+void cPlayView::togglePlay() {
+  switch (mPlaying) {
+    case ePause: mPlaying = ePlay; break;
+    case eScrub: mPlaying = ePlay; break;
+    case ePlay:  mPlaying = ePause; break;
     }
   }
 //}}}
@@ -424,7 +424,7 @@ void cPlayView::audThread() {
         //}}}
         mWindow->changed();
 
-        while (!getAbort() && mAudTs->isLoaded (getPlayPts(), kAudMaxFrames/2))
+        while (!getAbort() && mAudTs->isLoaded (getPlayPts(), kMaxAudFrames/2))
           mPlayPtsSem.wait();
 
         bool loaded = mAudTs->isLoaded (getPlayPts(), 1);

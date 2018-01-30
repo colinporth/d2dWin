@@ -101,15 +101,15 @@ protected:
       //{{{
       case 0x0d: // enter - play file
         if (!mFileList.empty()) {
+
           if (mPlayFocus) {
             removeBox (mPlayFocus);
             delete mPlayFocus;
-            mPlayFocus = nullptr;
             }
-
           mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]);
           addFront (mPlayFocus, 0.f, 0.f);
           }
+
         break;
       //}}}
 

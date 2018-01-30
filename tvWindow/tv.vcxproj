@@ -55,6 +55,7 @@
     <ClInclude Include="..\common\cTitleBox.h" />
     <ClInclude Include="..\common\cVidFrame.h" />
     <ClInclude Include="..\common\cWindowBox.h" />
+    <ClInclude Include="cPlayView.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
