@@ -31,9 +31,9 @@ public:
       if (mDvb->createGraph (frequency * 1000)) {
         // turn these into a dvb monitor widget
         add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mDvb->mSignal), -120.f, 0.f);
-        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvb->mDvbTs->mPackets), -242.f,0.f);
-        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvb->mDvbTs->mDiscontinuity), -364.f,0.f);
-        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvb->mDvbTs))->setTimedOn();
+        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvb->mPackets), -242.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvb->mDiscontinuity), -364.f,0.f);
+        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvb))->setTimedOn();
 
         thread ([=]() { mDvb->grabThread(); }).detach();
         thread ([=]() { mDvb->signalThread(); }).detach();
