@@ -79,12 +79,6 @@ cPlayView::~cPlayView() {
 //}}}
 
 //{{{
-cPoint cPlayView::getSrcSize() {
-  return mBitmap ? mBitmap->GetPixelSize() : cPoint();
-  }
-//}}}
-
-//{{{
 bool cPlayView::onKey (int key) {
 
   switch (key) {

@@ -21,7 +21,7 @@ public:
   ~cPlayView();
 
   // cView overrides
-  cPoint getSrcSize();
+  cPoint getSrcSize() { return mBitmap ? mBitmap->GetPixelSize() : cPoint(); }
   bool onKey (int key);
   bool onWheel (int delta, cPoint pos);
   bool onMove (bool right, cPoint pos, cPoint inc);
@@ -602,8 +602,6 @@ private:
     //}}}
 
   protected:
-    #define MSDK_ALIGN16(value)  (((value + 15) >> 4) << 4)
-    #define MSDK_ALIGN32(X)      (((mfxU32)((X)+31)) & (~ (mfxU32)31))
     //{{{
     bool vidDecodePes (cPidInfo* pidInfo, bool skip) {
 
@@ -639,8 +637,8 @@ private:
             status =  MFXVideoDECODE_QueryIOSurf (mSession, &mVideoParams, &frameAllocRequest);
             mNumSurfaces = frameAllocRequest.NumFrameSuggested;
             //}}}
-            auto width = MSDK_ALIGN32 (frameAllocRequest.Info.Width);
-            auto height = MSDK_ALIGN32 (frameAllocRequest.Info.Height);
+            auto width = ((mfxU32)((frameAllocRequest.Info.Width)+31)) & (~(mfxU32)31);
+            auto height = ((mfxU32)((frameAllocRequest.Info.Height)+31)) & (~(mfxU32)31);
 
             mfxU16 outWidth;
             mfxU16 outHeight;
@@ -656,10 +654,10 @@ private:
               mVppParams.vpp.In.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
               mVppParams.vpp.In.FrameRateExtN = 30;
               mVppParams.vpp.In.FrameRateExtD = 1;
-              mVppParams.vpp.In.Width = MSDK_ALIGN16 (mVppParams.vpp.In.CropW);
+              mVppParams.vpp.In.Width = ((mVppParams.vpp.In.CropW + 15) >> 4) << 4;
               mVppParams.vpp.In.Height =
                 (MFX_PICSTRUCT_PROGRESSIVE == mVppParams.vpp.In.PicStruct) ?
-                  MSDK_ALIGN16(mVppParams.vpp.In.CropH) : MSDK_ALIGN32(mVppParams.vpp.In.CropH);
+                  ((mVppParams.vpp.In.CropH + 15) >> 4) << 4 : ((mfxU32)((mVppParams.vpp.In.CropH)+31)) & (~(mfxU32)31);
               //}}}
               //{{{  VPP Output data
               mVppParams.vpp.Out.FourCC = MFX_FOURCC_RGB4;
@@ -671,10 +669,10 @@ private:
               mVppParams.vpp.Out.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
               mVppParams.vpp.Out.FrameRateExtN = 30;
               mVppParams.vpp.Out.FrameRateExtD = 1;
-              mVppParams.vpp.Out.Width = MSDK_ALIGN16 (mVppParams.vpp.Out.CropW);
+              mVppParams.vpp.Out.Width = ((mVppParams.vpp.Out.CropW + 15) >> 4) << 4;
               mVppParams.vpp.Out.Height =
                 (MFX_PICSTRUCT_PROGRESSIVE == mVppParams.vpp.Out.PicStruct) ?
-                  MSDK_ALIGN16(mVppParams.vpp.Out.CropH) : MSDK_ALIGN32(mVppParams.vpp.Out.CropH);
+                  ((mVppParams.vpp.Out.CropH + 15) >> 4) << 4 : ((mfxU32)((mVppParams.vpp.Out.CropH)+31)) & (~(mfxU32)31);
               //}}}
               mVppParams.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY | MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
 
@@ -684,9 +682,8 @@ private:
               status = MFXVideoVPP_QueryIOSurf (mSession, &mVppParams, vppFrameAllocRequest);
               mNumVPPInSurfaces = vppFrameAllocRequest[0].NumFrameSuggested;
               mNumVPPOutSurfaces = vppFrameAllocRequest[1].NumFrameSuggested;
-
-              outWidth = (mfxU16)MSDK_ALIGN32(vppFrameAllocRequest[1].Info.Width);
-              outHeight = (mfxU16)MSDK_ALIGN32(vppFrameAllocRequest[1].Info.Height);
+              outWidth = (mfxU16)((mfxU32)((vppFrameAllocRequest[1].Info.Width)+31)) & (~(mfxU32)31);
+              outHeight = (mfxU16)((mfxU32)((vppFrameAllocRequest[1].Info.Height)+31)) & (~(mfxU32)31);
               }
 
             cLog::log (LOGNOTICE, "vidDecoder " + dec(width) + "," + dec(height) +
