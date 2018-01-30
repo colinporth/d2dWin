@@ -42,8 +42,8 @@ public:
 
     // launch file player
     mFileList = getFiles (frequency || param.empty() ? mTvRoot : param, "*.ts");
-    add (new cListBox (this, frequency ? -getWidth()/2.f : 0.f, 0.f, mFileList, mFileIndex, mFileIndexChanged),
-         frequency ? getWidth()/2.f : 0.f);
+    add (new cListBox (this, (frequency ? -getWidth()/2.f : 0.f),0.f, mFileList, mFileIndex, mFileIndexChanged),
+         frequency ? getWidth()/2.f : 0.f, 0.f);
     thread ([=]() { fileWatchThread(); }).detach();
 
     if (!mFileList.empty())
@@ -128,7 +128,7 @@ private:
     cLog::setThreadName ("wtch");
 
     // Watch the directory for file creation and deletion.
-    auto handle = FindFirstChangeNotification (mTvRoot.c_str(), TRUE, 
+    auto handle = FindFirstChangeNotification (mTvRoot.c_str(), TRUE,
                                                FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME);
     if (handle == INVALID_HANDLE_VALUE)
      cLog::log (LOGERROR, "FindFirstChangeNotification function failed");
