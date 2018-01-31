@@ -581,14 +581,12 @@ private:
   //{{{
   class cAppFileListBox : public cFileListBox {
   public:
-    //{{{
-    cAppFileListBox (cAppWindow* appWindow, float width, float height, cFileList* fileList) :
-      cFileListBox (appWindow, width, height, fileList), mAppWindow(appWindow) {}
-    //}}}
-    void onHit() { mAppWindow->mChanged = true; }
+    cAppFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList) :
+      cFileListBox (window, width, height, fileList) {}
 
-  private:
-    cAppWindow* mAppWindow;
+    void onHit() {
+      (dynamic_cast<cAppWindow*>(getWindow()))->mChanged = true;
+      }
     };
   //}}}
 

@@ -66,7 +66,6 @@ protected:
     switch (key) {
       case 0x00: break;
       case  'F': toggleFullScreen(); break ;
-
       //{{{
       case 0x1B: // escape - exit
         if (mPlayFocus) {
@@ -80,6 +79,7 @@ protected:
           return true;
         break;
       //}}}
+
       case 0x26: if (mFileList->prev()) changed(); break; // up arrow - prev file
       case 0x28: if (mFileList->next()) changed(); break; // down arrow - next file
       case 0x0d: selectFileItem(); break; // enter - play file
@@ -95,18 +95,15 @@ private:
   //{{{
   class cAppFileListBox : public cFileListBox {
   public:
-    //{{{
-    cAppFileListBox (cAppWindow* appWindow, float width, float height, cFileList* fileList) :
-      cFileListBox (appWindow, width, height, fileList), mAppWindow(appWindow) {}
-    //}}}
-    void onHit() { mAppWindow->selectFileItem(); }
+    cAppFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList) :
+      cFileListBox (window, width, height, fileList) {}
 
-  private:
-    cAppWindow* mAppWindow;
+    void onHit() { (dynamic_cast<cAppWindow*>(getWindow()))->selectFileItem(); }
     };
   //}}}
   //{{{
   void selectFileItem() {
+
     if (mPlayFocus) {
       removeBox (mPlayFocus);
       delete mPlayFocus;
@@ -114,7 +111,7 @@ private:
 
     if (!mFileList->empty()) {
       mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName());
-      addFront (mPlayFocus, 0.f, 0.f);
+      addFront (mPlayFocus, 0.f,0.f);
       }
     }
   //}}}
