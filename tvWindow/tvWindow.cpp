@@ -78,8 +78,8 @@ protected:
         break;
       //}}}
 
-      case 0x26: if (mFileList->prev()) changed(); break; // up arrow - prev file
-      case 0x28: if (mFileList->next()) changed(); break; // down arrow - next file
+      case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow - prev file
+      case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow - next file
       case 0x0d: selectFileItem(); break; // enter - play file
 
       default: if (mPlayFocus) mPlayFocus->onKey (key);
@@ -114,9 +114,9 @@ private:
     }
   //}}}
   //{{{  vars
-  string mTvRoot = "c:/tv";
   cDvb* mDvb = nullptr;
 
+  string mTvRoot = "c:/tv";
   cFileList* mFileList;
 
   cBox* mPlayFocus;

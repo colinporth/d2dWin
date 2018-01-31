@@ -123,6 +123,7 @@ bool cPlayView::onKey (int key) {
       mWindow->changed();
       break;
     //}}}
+
     case '<':
     case ',':
       //{{{  single step prev
@@ -149,9 +150,7 @@ bool cPlayView::onKey (int key) {
     case  '6':
     case  '7':
     case  '8':
-    case  '9':
-      setService (key - '1');
-      mWindow->changed();
+    case  '9': setService (key - '1'); mWindow->changed(); break;
     }
 
   return false;

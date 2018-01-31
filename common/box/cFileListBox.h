@@ -94,7 +94,7 @@ public:
       float y = mRect.top + 1.f - (int(mScroll) % (int)kTextHeight);
 
       auto maxWidth = 0.f;
-      auto point = cPoint (mRect.left+2, y);
+      auto point = cPoint (mRect.left + 2.f, y);
 
       for (int row = 0;
            (y < mRect.bottom) && (itemIndex < (int)mFileList->size());
@@ -151,7 +151,8 @@ private:
 
   cFileList* mFileList;
 
-  IDWriteTextFormat* mTextFormat = nullptr;
+  IDWriteTextFormat* mTextFormat;
+
   cRect mBgndRect;
   concurrency::concurrent_vector <float> mMeasure;
 

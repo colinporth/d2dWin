@@ -80,8 +80,8 @@ protected:
 
       case  ' ': mPlaying = !mPlaying; break;
 
-      case 0x21: if (mFileList->prev()) changed(); break; // page up - prev file
-      case 0x22: if (mFileList->next()) changed(); break; // page down - next file
+      case 0x21: if (mFileList->prevIndex()) changed(); break; // page up - prev file
+      case 0x22: if (mFileList->nextIndex()) changed(); break; // page down - next file
 
       case 0x25: mFrameSet.incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
       case 0x27: mFrameSet.incPlaySec (getControl() ? 10 : 1);  changed(); break; // right arrow  + 1 sec
@@ -605,13 +605,13 @@ private:
       mFrameSet.init (mFileList->getCurFileItem().getFullName());
 
       auto time = system_clock::now();
-
       cMp3Decoder mMp3Decoder;
       unsigned streamPos = mMp3Decoder.findId3tag (mStreamBuf, mStreamLen);
 
       int jpegLen;
       auto jpegBuf = mMp3Decoder.getJpeg (jpegLen);
       if (jpegBuf) {
+        //{{{  handle jpeg image
         cLog::log (LOGINFO2, "found jpeg tag");
         // delete old
         auto temp = mFrameSet.mImage;
@@ -623,6 +623,7 @@ private:
         mFrameSet.mImage->setBuf (jpegBuf, jpegLen);
         mJpegImageView->setImage (mFrameSet.mImage);
         }
+        //}}}
 
       auto frameNum = 0;
       while (!getExit() && !mChanged && (streamPos < mStreamLen)) {
@@ -643,7 +644,6 @@ private:
 
       // wait for play to end
       mPlayDoneSem.wait();
-
       //{{{  close old file mapping
       UnmapViewOfFile (mStreamBuf);
       CloseHandle (fileHandle);
@@ -651,7 +651,7 @@ private:
 
       if (mChanged) // use changed fileIndex
         mChanged = false;
-      else if (!mFileList->next())
+      else if (!mFileList->nextIndex())
         break;
       }
 
@@ -681,7 +681,7 @@ private:
 
       mPlaying = true;
       mFrameSet.setPlayFrame (0);
-      while (!getExit() && !mChanged && (mFrameSet.mPlayFrame <= mFrameSet.getNumLoadedFrames())) {
+      while (!getExit() && !mChanged && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames())) {
         if (mPlaying) {
           auto streamPos = mFrameSet.getPlayFrameStreamPos();
           mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, nullptr, samples);
