@@ -3,9 +3,10 @@
 #include "stdafx.h"
 
 #include "../../shared/dvb/cWinDvb.h"
+#include "../../shared/utils/cFileList.h"
 
 #include "../common/box/cClockBox.h"
-#include "../common/box/cListBox.h"
+#include "../common/box/cFileListBox.h"
 #include "../common/box/cIntBox.h"
 #include "../common/box/cTsEpgBox.h"
 #include "../common/box/cLogBox.h"
@@ -41,13 +42,13 @@ public:
       }
 
     // launch file player
-    mFileList = getFiles (frequency || param.empty() ? mTvRoot : param, "*.ts");
-    add (new cListBox (this, (frequency ? -getWidth()/2.f : 0.f),0.f, mFileList, mFileIndex, mFileIndexChanged),
-         frequency ? getWidth()/2.f : 0.f, 0.f);
-    thread ([=]() { fileWatchThread(); }).detach();
+    mFileList = new cFileList (frequency || param.empty() ? mTvRoot : param, "*.ts");
+    thread([=]() { mFileList->watchThread(); }).detach();
 
-    if (!mFileList.empty())
-      mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]), 0.f,0.f);
+    auto fileListBoxWidth = frequency ? getWidth()/2.f : 0.f;
+    add (new cFileListBox (this, -fileListBoxWidth,0.f, mFileList), fileListBoxWidth,0.f);
+
+    mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getPath()), 0.f,0.f);
 
     thread threadHandle = thread ([=](){ fileSelectThread(); });
     SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
@@ -82,31 +83,17 @@ protected:
           return true;
         break;
       //}}}
-      //{{{
-      case 0x26: // up arrow - prev file
-        if (!mFileList.empty() && (mFileIndex > 0)) {
-          mFileIndex = mFileIndex--;
-          changed();
-          }
-        break;
-      //}}}
-      //{{{
-      case 0x28: // down arrow - next file
-        if (!mFileList.empty() && mFileIndex < mFileList.size()-1) {
-          mFileIndex = mFileIndex++;
-          changed();
-          }
-        break;
-      //}}}
+      case 0x26: if (mFileList->prev()) changed(); break; // up arrow - prev file
+      case 0x28: if (mFileList->next()) changed(); break; // down arrow - next file
       //{{{
       case 0x0d: // enter - play file
-        if (!mFileList.empty()) {
+        if (!mFileList->empty()) {
 
           if (mPlayFocus) {
             removeBox (mPlayFocus);
             delete mPlayFocus;
             }
-          mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]);
+          mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getPath());
           addFront (mPlayFocus, 0.f, 0.f);
           }
 
@@ -122,46 +109,17 @@ protected:
 
 private:
   //{{{
-  void fileWatchThread() {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("wtch");
-
-    // Watch the directory for file creation and deletion.
-    auto handle = FindFirstChangeNotification (mTvRoot.c_str(), TRUE,
-                                               FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME);
-    if (handle == INVALID_HANDLE_VALUE)
-     cLog::log (LOGERROR, "FindFirstChangeNotification function failed");
-
-    while (!getExit()) {
-      cLog::log (LOGINFO, "Waiting for notification");
-      if (WaitForSingleObject (handle, INFINITE) == WAIT_OBJECT_0) {
-        // A file was created, renamed, or deleted in the directory.
-        mFileList = getFiles (mTvRoot, "*.ts");
-        cLog::log (LOGINFO, "fileWatch changed " + dec(mFileList.size()));
-        if (FindNextChangeNotification (handle) == FALSE)
-          cLog::log (LOGERROR, "FindNextChangeNotification function failed");
-        }
-      else
-        cLog::log (LOGERROR, "No changes in the timeout period");
-      }
-
-    cLog::log (LOGINFO, "exit");
-    CoUninitialize();
-    }
-  //}}}
-  //{{{
   void fileSelectThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("file");
 
     while (!getExit()) {
-      mFileIndexChanged = false;
-      while (!mFileIndexChanged)
+      mFileList->resetChanged();
+      while (!mFileList->isChanged())
         Sleep (1);
 
-      if (mFileList.empty())
+      if (mFileList->empty())
         Sleep (100);
       else {
         if (mPlayFocus) {
@@ -170,7 +128,7 @@ private:
           mPlayFocus = nullptr;
           }
 
-        mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList[mFileIndex]);
+        mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getPath());
         addFront (mPlayFocus, 0.f, 0.f);
         }
       }
@@ -184,9 +142,7 @@ private:
   string mTvRoot = "c:/tv";
   cDvb* mDvb = nullptr;
 
-  vector <string> mFileList;
-  int mFileIndex = 0;
-  bool mFileIndexChanged = false;
+  cFileList* mFileList;
 
   cBox* mPlayFocus;
   //}}}

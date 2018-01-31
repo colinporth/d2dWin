@@ -54,6 +54,12 @@
     <ClInclude Include="cPlayView.h">
       <Filter>header</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cFileList.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\box\cFileListBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="header">

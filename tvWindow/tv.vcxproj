@@ -44,8 +44,10 @@
     <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h" />
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h" />
     <ClInclude Include="..\..\shared\dvb\cWinDvb.h" />
+    <ClInclude Include="..\..\shared\utils\cFileList.h" />
     <ClInclude Include="..\..\shared\utils\cWinAudio.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
+    <ClInclude Include="..\common\box\cFileListBox.h" />
     <ClInclude Include="..\common\box\cTsEpgBox.h" />
     <ClInclude Include="..\common\box\cTsPidBox.h" />
     <ClInclude Include="..\common\cAudFrame.h" />

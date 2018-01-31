@@ -4,6 +4,7 @@
 
 #include "../../shared/utils/cWinAudio.h"
 #include "../../shared/decoders/cMp3Decoder.h"
+#include "../../shared/utils/cFileList.h"
 
 #include "../common/cJpegImage.h"
 
@@ -11,7 +12,7 @@
 #include "../common/box/cClockBox.h"
 
 #include "../common/cJpegImageView.h"
-#include "../common/box/cListBox.h"
+#include "../common/box/cFileListBox.h"
 #include "../common/box/cLogBox.h"
 
 #include "../common/box/cVolumeBox.h"
@@ -47,9 +48,8 @@ public:
 
     mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-120.f, false, false, mFrameSet.mImage));
 
-    mFileList = getFiles (fileName, "*.mp3");
-    add (new cListBox (this, 0,-220.f, mFileList, mFileIndex, mFileIndexChanged));
-    cLog::log (LOGNOTICE, "getFiles %d files", mFileList.size());
+    mFileList = new cFileList (fileName, "*.mp3");
+    add (new cFileListBox (this, 0,-220.f, mFileList));
 
     add (new cFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
     add (new cFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
@@ -57,7 +57,7 @@ public:
     add (new cVolumeBox (this, 12.f,0.f), -12.f,0.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
-    if (!mFileList.empty()) {
+    if (!mFileList->empty()) {
       thread ([=](){ analyseThread(); }).detach();
 
       auto threadHandle = thread ([=](){ playThread(); });
@@ -80,20 +80,8 @@ protected:
 
       case  ' ': mPlaying = !mPlaying; break;
 
-      case 0x21:
-        //{{{  page up - prev file
-        mFileIndex = mFileIndex-- % mFileList.size();
-        mFileIndexChanged = true;
-        changed();
-        break;
-        //}}}
-      case 0x22:
-        //{{{  page down - next file
-        mFileIndex = mFileIndex++ % mFileList.size();
-        mFileIndexChanged = true;
-        changed();
-        break;
-        //}}}
+      case 0x21: if (mFileList->prev()) changed(); break; // page up - prev file
+      case 0x22: if (mFileList->next()) changed(); break; // page down - next file
 
       case 0x25: mFrameSet.incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
       case 0x27: mFrameSet.incPlaySec (getControl() ? 10 : 1);  changed(); break; // right arrow  + 1 sec
@@ -599,11 +587,11 @@ private:
 
     while (!getExit()) {
       //{{{  open file mapping
-      auto fileHandle = CreateFile (mFileList[mFileIndex].c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+      auto fileHandle = CreateFile (mFileList->getCurFileItem().getPath().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
       mStreamBuf = (uint8_t*)MapViewOfFile (CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL), FILE_MAP_READ, 0, 0, 0);
       mStreamLen = (int)GetFileSize (fileHandle, NULL);
       //}}}
-      mFrameSet.init (mFileList[mFileIndex]);
+      mFrameSet.init (mFileList->getCurFileItem().getPath());
 
       auto time = system_clock::now();
 
@@ -626,7 +614,7 @@ private:
         }
 
       auto frameNum = 0;
-      while (!getExit() && !mFileIndexChanged && (streamPos < mStreamLen)) {
+      while (!getExit() && !mFileList->isChanged() && (streamPos < mStreamLen)) {
         uint8_t values[kChannels];
         int frameLen = mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, values, nullptr);
         if (frameLen <= 0)
@@ -650,11 +638,9 @@ private:
       CloseHandle (fileHandle);
       //}}}
 
-      if (mFileIndexChanged) // use changed fileIndex
-        mFileIndexChanged = false;
-      else if (mFileIndex < mFileList.size()-1) // play next file
-        mFileIndex = mFileIndex++ % mFileList.size();
-      else  // no more files, loop
+      if (mFileList->isChanged()) // use changed fileIndex
+        mFileList->resetChanged();
+      else if (!mFileList->next())
         break;
       }
 
@@ -684,7 +670,7 @@ private:
 
       mPlaying = true;
       mFrameSet.setPlayFrame (0);
-      while (!getExit() && !mFileIndexChanged && (mFrameSet.mPlayFrame <= mFrameSet.getNumLoadedFrames())) {
+      while (!getExit() && !mFileList->isChanged() && (mFrameSet.mPlayFrame <= mFrameSet.getNumLoadedFrames())) {
         if (mPlaying) {
           auto streamPos = mFrameSet.getPlayFrameStreamPos();
           mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, nullptr, samples);
@@ -712,9 +698,7 @@ private:
   //}}}
 
   //{{{  private vars
-  vector <string> mFileList;
-  int mFileIndex = 0;
-  bool mFileIndexChanged = false;
+  cFileList* mFileList;
 
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;

@@ -20,13 +20,7 @@ const float kTextHeight = 20.f;
 class cD2dWindow : public iChange {
 public:
   static cD2dWindow* mD2dWindow;
-  //{{{  static utils
-  static bool resolveShortcut (const string& shortcut, string& fullName);
-  static void scanDirectory (vector<string>& fileNames, const string& parentName,
-                             const string& directoryName, const string& pathMatchName);
-  static vector<string> getFiles (const string& fileName, const string& match);
   static void getTimeOfDay (struct timeval* tp, struct timezone* tzp);
-  //}}}
 
   //{{{
   class cBox {
