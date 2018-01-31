@@ -587,11 +587,11 @@ private:
 
     while (!getExit()) {
       //{{{  open file mapping
-      auto fileHandle = CreateFile (mFileList->getCurFileItem().getPath().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+      auto fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
       mStreamBuf = (uint8_t*)MapViewOfFile (CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL), FILE_MAP_READ, 0, 0, 0);
       mStreamLen = (int)GetFileSize (fileHandle, NULL);
       //}}}
-      mFrameSet.init (mFileList->getCurFileItem().getPath());
+      mFrameSet.init (mFileList->getCurFileItem().getFullName());
 
       auto time = system_clock::now();
 

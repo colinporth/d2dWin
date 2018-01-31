@@ -48,7 +48,7 @@ public:
     auto fileListBoxWidth = frequency ? getWidth()/2.f : 0.f;
     add (new cFileListBox (this, -fileListBoxWidth,0.f, mFileList), fileListBoxWidth,0.f);
 
-    mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getPath()), 0.f,0.f);
+    mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName()), 0.f,0.f);
 
     thread threadHandle = thread ([=](){ fileSelectThread(); });
     SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
@@ -93,7 +93,7 @@ protected:
             removeBox (mPlayFocus);
             delete mPlayFocus;
             }
-          mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getPath());
+          mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName());
           addFront (mPlayFocus, 0.f, 0.f);
           }
 
@@ -128,7 +128,7 @@ private:
           mPlayFocus = nullptr;
           }
 
-        mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getPath());
+        mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName());
         addFront (mPlayFocus, 0.f, 0.f);
         }
       }

@@ -109,7 +109,7 @@ public:
         if (row >= (int)mMeasure.size())
           mMeasure.push_back (0);
 
-        std::string str = mFileList->getFileItem (itemIndex).getPath();
+        std::string str = mFileList->getFileItem (itemIndex).getFileName();
         auto brush = (mTextPressed && !mMoved && (itemIndex == mPressedIndex)) ?
           mWindow->getYellowBrush() :
             mFileList->isCurIndex(itemIndex) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
