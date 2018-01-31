@@ -49,7 +49,7 @@ public:
     mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-120.f, false, false, mFrameSet.mImage));
 
     mFileList = new cFileList (fileName, "*.mp3");
-    add (new cFileListBox (this, 0,-220.f, mFileList));
+    add (new cAppFileListBox (this, 0,-220.f, mFileList));
 
     add (new cFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
     add (new cFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
@@ -578,6 +578,19 @@ private:
     IDWriteTextFormat* mTextFormat = nullptr;
     };
   //}}}
+  //{{{
+  class cAppFileListBox : public cFileListBox {
+  public:
+    //{{{
+    cAppFileListBox (cAppWindow* appWindow, float width, float height, cFileList* fileList) :
+      cFileListBox (appWindow, width, height, fileList), mAppWindow(appWindow) {}
+    //}}}
+    void onHit() { mAppWindow->mChanged = true; }
+
+  private:
+    cAppWindow* mAppWindow;
+    };
+  //}}}
 
   //{{{
   void analyseThread() {
@@ -614,7 +627,7 @@ private:
         }
 
       auto frameNum = 0;
-      while (!getExit() && !mFileList->isChanged() && (streamPos < mStreamLen)) {
+      while (!getExit() && !mChanged && (streamPos < mStreamLen)) {
         uint8_t values[kChannels];
         int frameLen = mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, values, nullptr);
         if (frameLen <= 0)
@@ -638,8 +651,8 @@ private:
       CloseHandle (fileHandle);
       //}}}
 
-      if (mFileList->isChanged()) // use changed fileIndex
-        mFileList->resetChanged();
+      if (mChanged) // use changed fileIndex
+        mChanged = false;
       else if (!mFileList->next())
         break;
       }
@@ -670,7 +683,7 @@ private:
 
       mPlaying = true;
       mFrameSet.setPlayFrame (0);
-      while (!getExit() && !mFileList->isChanged() && (mFrameSet.mPlayFrame <= mFrameSet.getNumLoadedFrames())) {
+      while (!getExit() && !mChanged && (mFrameSet.mPlayFrame <= mFrameSet.getNumLoadedFrames())) {
         if (mPlaying) {
           auto streamPos = mFrameSet.getPlayFrameStreamPos();
           mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, nullptr, samples);
@@ -699,6 +712,7 @@ private:
 
   //{{{  private vars
   cFileList* mFileList;
+  bool mChanged = false;
 
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;

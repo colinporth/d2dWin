@@ -1,7 +1,6 @@
 // cFileListBox.h
 //{{{  includes
 #pragma once
-
 #include "../cD2dWindow.h"
 #include "../../../shared/utils/utils.h"
 #include "../../../shared/utils/cLog.h"
@@ -11,12 +10,10 @@ class cFileListBox : public cD2dWindow::cBox {
 public:
   //{{{
   cFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList) :
-      cBox ("fileList", window, width, height),
-      mFileList(fileList) {
+      cBox ("fileList", window, width, height), mFileList(fileList) {
 
     mWindow->getDwriteFactory()->CreateTextFormat (L"FreeSans", NULL,
-      DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-      16.0f, L"en-us",
+      DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 16.0f, L"en-us",
       &mTextFormat);
 
     mPin = true;
@@ -76,7 +73,7 @@ public:
     if (mWindow->getTimedMenuOn()) {
       if (mTextPressed && !mMoved) {
         mFileList->setIndex (mPressedIndex);
-        mFileList->setChanged();
+        onHit();
         }
       mTextPressed = false;
       mPressedIndex = -1;
@@ -137,6 +134,9 @@ public:
     }
   //}}}
 
+protected:
+  virtual void onHit() = 0;
+
 private:
   //{{{
   void incScroll (float inc) {
@@ -156,15 +156,13 @@ private:
   cFileList* mFileList;
 
   IDWriteTextFormat* mTextFormat = nullptr;
+  cRect mBgndRect;
+  concurrency::concurrent_vector <float> mMeasure;
 
   bool mTextPressed = false;
   int mPressedIndex = -1;
   bool mMoved = false;
   float mMoveInc = 0;
-
-  std::vector<float> mMeasure;
-  cRect mBgndRect;
-
   float mScroll = 0.f;
   float mScrollInc = 0.f;
   };

@@ -46,13 +46,10 @@ public:
     thread([=]() { mFileList->watchThread(); }).detach();
 
     auto fileListBoxWidth = frequency ? getWidth()/2.f : 0.f;
-    add (new cFileListBox (this, -fileListBoxWidth,0.f, mFileList), fileListBoxWidth,0.f);
+    add (new cAppFileListBox (this, -fileListBoxWidth,0.f, mFileList), fileListBoxWidth,0.f);
 
-    mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName()), 0.f,0.f);
-
-    thread threadHandle = thread ([=](){ fileSelectThread(); });
-    SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
-    threadHandle.detach();
+    if (!mFileList->empty())
+      mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName()), 0.f,0.f);
 
     // exit, maximise box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
@@ -85,20 +82,7 @@ protected:
       //}}}
       case 0x26: if (mFileList->prev()) changed(); break; // up arrow - prev file
       case 0x28: if (mFileList->next()) changed(); break; // down arrow - next file
-      //{{{
-      case 0x0d: // enter - play file
-        if (!mFileList->empty()) {
-
-          if (mPlayFocus) {
-            removeBox (mPlayFocus);
-            delete mPlayFocus;
-            }
-          mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName());
-          addFront (mPlayFocus, 0.f, 0.f);
-          }
-
-        break;
-      //}}}
+      case 0x0d: selectFileItem(); break; // enter - play file
 
       default: if (mPlayFocus) mPlayFocus->onKey (key);
       }
@@ -109,35 +93,31 @@ protected:
 
 private:
   //{{{
-  void fileSelectThread() {
+  class cAppFileListBox : public cFileListBox {
+  public:
+    //{{{
+    cAppFileListBox (cAppWindow* appWindow, float width, float height, cFileList* fileList) :
+      cFileListBox (appWindow, width, height, fileList), mAppWindow(appWindow) {}
+    //}}}
+    void onHit() { mAppWindow->selectFileItem(); }
 
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("file");
-
-    while (!getExit()) {
-      mFileList->resetChanged();
-      while (!mFileList->isChanged())
-        Sleep (1);
-
-      if (mFileList->empty())
-        Sleep (100);
-      else {
-        if (mPlayFocus) {
-          removeBox (mPlayFocus);
-          delete mPlayFocus;
-          mPlayFocus = nullptr;
-          }
-
-        mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName());
-        addFront (mPlayFocus, 0.f, 0.f);
-        }
+  private:
+    cAppWindow* mAppWindow;
+    };
+  //}}}
+  //{{{
+  void selectFileItem() {
+    if (mPlayFocus) {
+      removeBox (mPlayFocus);
+      delete mPlayFocus;
       }
 
-    cLog::log (LOGINFO, "exit");
-    CoUninitialize();
+    if (!mFileList->empty()) {
+      mPlayFocus = new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName());
+      addFront (mPlayFocus, 0.f, 0.f);
+      }
     }
   //}}}
-
   //{{{  vars
   string mTvRoot = "c:/tv";
   cDvb* mDvb = nullptr;
