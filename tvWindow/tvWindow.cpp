@@ -49,6 +49,7 @@ public:
 
     if (!mFileList->empty())
       mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName()));
+
     // exit, maximise box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
