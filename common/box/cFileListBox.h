@@ -19,11 +19,7 @@ public:
     mPin = true;
     }
   //}}}
-  //{{{
-  virtual ~cFileListBox() {
-    mTextFormat->Release();
-    }
-  //}}}
+  virtual ~cFileListBox() { mTextFormat->Release(); }
 
   //{{{
   bool pick (bool inClient, cPoint pos, bool& change) {

@@ -120,6 +120,14 @@ cD2dWindow::cBox* cD2dWindow::addBelow (cBox* box) {
   }
 //}}}
 //{{{
+cD2dWindow::cBox* cD2dWindow::addFront (cBox* box) {
+
+  mBoxes.push_front (box);
+  box->setPos (cPoint());
+  return box;
+  }
+//}}}
+//{{{
 cD2dWindow::cBox* cD2dWindow::addFront (cBox* box, float x, float y) {
 
   mBoxes.push_front (box);

@@ -44,13 +44,11 @@ public:
     // launch file player
     mFileList = new cFileList (frequency || param.empty() ? mTvRoot : param, "*.ts");
     thread([=]() { mFileList->watchThread(); }).detach();
-
-    auto fileListBoxWidth = frequency ? getWidth()/2.f : 0.f;
-    add (new cAppFileListBox (this, -fileListBoxWidth,0.f, mFileList), fileListBoxWidth,0.f);
+    auto boxWidth = frequency ? getWidth()/2.f : 0.f;
+    add (new cAppFileListBox (this, -boxWidth,0.f, mFileList), boxWidth,0.f);
 
     if (!mFileList->empty())
-      mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName()), 0.f,0.f);
-
+      mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName()));
     // exit, maximise box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
