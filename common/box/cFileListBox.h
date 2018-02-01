@@ -36,13 +36,19 @@ public:
       mMoveInc = 0;
       mScrollInc = 0.f;
 
-      mPressedIndex = int((mScroll + pos.y) / kLineHeight);
-      int pressedLine = int(pos.y / kLineHeight);
-      if (pressedLine >= 0 && pressedLine < mMeasure.size()) {
-        mTextPressed = pos.x < mMeasure[pressedLine];
-        return true;
+      int row = 0;
+      for (auto& item : mRowRectVec) {
+        if (item.inside(pos)) {
+          mPressedIndex = mFirstRowIndex + row;
+          mTextPressed = true;
+          return false;
+          }
+        row++;
         }
+
+      mTextPressed = false;
       }
+
     return false;
     }
   //}}}
@@ -86,17 +92,20 @@ public:
 
       dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
 
-      auto itemIndex = int(mScroll) / (int)kLineHeight;
-      float y = mRect.top + 1.f - (int(mScroll) % (int)kLineHeight);
+      auto lineHeight = getLineHeight();
+
+      mFirstRowIndex = int(mScroll) / (int)lineHeight;
+      auto itemIndex = mFirstRowIndex;
+      float y = mRect.top + 1.f - (int(mScroll) % (int)lineHeight);
 
       auto maxWidth = 0.f;
       auto point = cPoint (mRect.left + 2.f, y);
 
       for (auto row = 0;
            (y < mRect.bottom) && (itemIndex < (int)mFileList->size());
-           row++, itemIndex++, y += kLineHeight) {
-        if (row >= (int)mMeasure.size())
-          mMeasure.push_back (0);
+           row++, itemIndex++, y += lineHeight) {
+        if (row >= (int)mRowRectVec.size())
+          mRowRectVec.push_back (cRect());
 
         auto& fileItem = mFileList->getFileItem (itemIndex);
         auto str = fileItem.getFileName() +
@@ -109,17 +118,17 @@ public:
         IDWriteTextLayout* textLayout;
         mWindow->getDwriteFactory()->CreateTextLayout (
           wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
-          mRect.getWidth(), kLineHeight, &textLayout);
+          mRect.getWidth(), lineHeight, &textLayout);
 
         struct DWRITE_TEXT_METRICS textMetrics;
         textLayout->GetMetrics (&textMetrics);
-        mMeasure[row] = textMetrics.width;
+        mRowRectVec[row] = cRect (point.x, point.y, point.x + textMetrics.width, point.y + lineHeight);
         maxWidth = max(textMetrics.width, maxWidth);
 
         dc->DrawTextLayout (point, textLayout, brush);
         textLayout->Release();
 
-        point.y += kLineHeight;
+        point.y += lineHeight;
         }
 
       mBgndRect = mRect;
@@ -133,16 +142,21 @@ protected:
   virtual void onHit() = 0;
 
 private:
+  float getLineHeight() {
+    const float kSmallLineHeight = 13.f;
+    return (getHeight() / mFileList->size() > kLineHeight) ? kLineHeight : kSmallLineHeight;
+    }
   //{{{
   void incScroll (float inc) {
 
+    auto lineHeight = getLineHeight();
     mScroll += inc;
     if (mScroll < 0.f)
       mScroll = 0.f;
-    else if ((mFileList->size() * kLineHeight) < mRect.getHeight())
+    else if ((mFileList->size() * lineHeight) < mRect.getHeight())
       mScroll = 0.f;
-    else if (mScroll > ((mFileList->size() * kLineHeight) - mRect.getHeight()))
-      mScroll = float(((int)mFileList->size() * kLineHeight) - mRect.getHeight());
+    else if (mScroll > ((mFileList->size() * lineHeight) - mRect.getHeight()))
+      mScroll = float(((int)mFileList->size() * lineHeight) - mRect.getHeight());
 
     mScrollInc = fabs(inc) < 0.2f ? 0 : inc;
     }
@@ -151,11 +165,13 @@ private:
   // vars
   cFileList* mFileList;
 
-  concurrency::concurrent_vector <float> mMeasure;
   cRect mBgndRect;
+  concurrency::concurrent_vector <cRect> mRowRectVec;
 
-  bool mTextPressed = false;
+  int mFirstRowIndex = -1;
   int mPressedIndex = -1;
+  bool mTextPressed = false;
+
   bool mMoved = false;
   float mMoveInc = 0;
   float mScroll = 0.f;
