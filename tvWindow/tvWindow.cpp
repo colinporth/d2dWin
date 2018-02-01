@@ -128,8 +128,7 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init (LOGINFO, true);
-  //cLog::init (LOGINFO, false, "C:/Users/colin/Desktop");
+  cLog::init (LOGINFO, true); // false, "C:/Users/colin/Desktop");
 
   string param;
   int numArgs;
