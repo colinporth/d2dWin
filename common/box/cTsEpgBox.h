@@ -12,18 +12,9 @@ public:
       : cBox("tsEpg", window, width, height), mTs(ts) {
 
     mPin = true;
-
-    window->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-      DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-      mLineHeight, L"en-us",
-      &mTextFormat);
     }
   //}}}
-  //{{{
-  virtual ~cTsEpgBox() {
-    mTextFormat->Release();
-    }
-  //}}}
+  virtual ~cTsEpgBox() {}
 
   //{{{
   bool onDown (bool right, cPoint pos)  {
@@ -46,6 +37,9 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
+    const float kDefaultLineHeight = 16.f;
+    const float kSmallLineHeight = 13.f;
+
     if (!getTimedOn() || mWindow->getTimedMenuOn()) {
       lock_guard<mutex> lockGuard (mTs->mMutex);
 
@@ -55,24 +49,20 @@ public:
         struct tm nowTm = *localtime (&nowTime);
         int nowDay = nowTm.tm_mday;
 
-        while (!mBoxItemVec.empty()) {
-          auto boxItem = mBoxItemVec.back();
-          delete boxItem;
-          mBoxItemVec.pop_back();
-          }
-
-        mLineHeight = (mTs->mServiceMap.size() >= 10) ? kDefaultLineHeight : kLargeLineHeight;
+        // notch line height
+        auto lineHeight = (getHeight() / mTs->mServiceMap.size() > kDefaultLineHeight) ? kDefaultLineHeight : kSmallLineHeight;
         auto r = mRect;
+        r.left += lineHeight / 5.f;
 
-        int serviceIndex = 1;
+        clear();
         for (auto& service : mTs->mServiceMap) {
-          r.bottom = r.top + mLineHeight;
-          mBoxItemVec.push_back (new cServiceName (this, &service.second, serviceIndex++, r));
+          r.bottom = r.top + lineHeight;
+          mBoxItemVec.push_back (new cServiceName (this, &service.second, lineHeight, r));
           r.top = r.bottom;
 
           if (service.second.getNowEpgItem()) {
-            r.bottom = r.top + mLineHeight;
-            mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs, r));
+            r.bottom = r.top + lineHeight;
+            mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs, lineHeight, r));
             r.top = r.bottom;
             }
           if (service.second.getShowEpg()) {
@@ -80,18 +70,20 @@ public:
               auto timet = epgItem.second->getStartTime();
               struct tm time = *localtime (&timet);
               if ((time.tm_mday == nowDay) && (timet > nowTime)) { // later today
-                r.bottom = r.top + mLineHeight;
-                mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, r));
+                r.bottom = r.top + lineHeight;
+                mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, lineHeight, r));
                 r.top = r.bottom;
                 }
               }
             }
+
+          r.top = r.bottom + lineHeight/4.f;
           }
-        mBgndRect = r;
-        mBgndRect.top = mRect.top;
 
         // draw services boxItems
-        dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
+        auto bgndRect = r;
+        bgndRect.top = mRect.top;
+        dc->FillRectangle (bgndRect, mWindow->getTransparentBgndBrush());
         for (auto boxItem : mBoxItemVec)
           boxItem->onDraw (dc);
         }
@@ -103,42 +95,40 @@ private:
   //{{{
   class cBoxItem {
   public:
-    //{{{
-    cBoxItem (cTsEpgBox* box, cService* service, const cRect& r) :
-      mBox(box), mService(service), mRect(r) {}
-    //}}}
+    cBoxItem (cTsEpgBox* box, cService* service, float textHeight, const cRect& r) :
+      mBox(box), mService(service), mRect(r), mTextHeight(textHeight) {}
     ~cBoxItem() {}
 
     bool inside (const cPoint& pos) { return mRect.inside (pos); }
     void setRect (const cRect& r) { mRect = r; }
 
     virtual void onDown() = 0;
-    //{{{
+
     virtual void onDraw (ID2D1DeviceContext* dc) {
-      mRect.right = mRect.left + mBox->drawText (dc, mStr, mBox->mTextFormat, mRect, mBrush, mBox->mLineHeight);
+      mRect.right = mRect.left + mBox->drawText (
+        dc, mStr, mBox->getWindow()->getTextFormat(), mRect, mBrush, mTextHeight);
       }
-    //}}}
 
   protected:
     cTsEpgBox* mBox;
     cService* mService;
     cRect mRect;
+    const float mTextHeight;
 
     std::string mStr;
-    ID2D1SolidColorBrush* mBgndBrush;
-    ID2D1SolidColorBrush* mBrush;
+    ID2D1SolidColorBrush* mBgndBrush = nullptr;
+    ID2D1SolidColorBrush* mBrush = nullptr;
     };
   //}}}
   //{{{
   class cServiceName : public cBoxItem {
   public:
-    //{{{
-    cServiceName (cTsEpgBox* box, cService* service, int index, const cRect& r) : cBoxItem(box, service, r) {
-      mStr = dec(index,2) + " " + service->getNameString();
+    cServiceName (cTsEpgBox* box, cService* service, float textHeight, const cRect& r) :
+        cBoxItem(box, service, textHeight, r) {
+      mStr = service->getNameString();
       mBrush = mService->getShowEpg() ? mBox->getWindow()->getBlueBrush() : mBox->getWindow()->getWhiteBrush();
       }
-    //}}}
-    ~cServiceName() {}
+    virtual ~cServiceName() {}
 
     virtual void onDown() { mService->toggleShowEpg(); }
     };
@@ -146,16 +136,14 @@ private:
   //{{{
   class cServiceNow : public cBoxItem {
   public:
-    //{{{
-    cServiceNow (cTsEpgBox* box, cService* service, cTransportStream* ts, const cRect& r) :
-        cBoxItem(box, service, r), mTs(ts) {
-      mStr = "  - now - " + mService->getNowEpgItem()->getStartTimeString() +
+    cServiceNow (cTsEpgBox* box, cService* service, cTransportStream* ts, float textHeight, const cRect& r) :
+        cBoxItem(box, service, textHeight,  r), mTs(ts) {
+      mStr = "- " + mService->getNowEpgItem()->getStartTimeString() +
              " " + mService->getNowEpgItem()->getDurationString() +
              " " + mService->getNowEpgItem()->getTitleString();
       mBrush = mService->getNowEpgItem()->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
       }
-    //}}}
-    ~cServiceNow() {}
+    virtual ~cServiceNow() {}
 
     //{{{
     virtual void onDown() {
@@ -174,19 +162,17 @@ private:
   //{{{
   class cServiceEpg : public cBoxItem {
   public:
-    //{{{
-    cServiceEpg (cTsEpgBox* box, cService* service, cEpgItem* epgItem, const cRect& r) :
-        cBoxItem(box, service,r), mEpgItem(epgItem) {
+    cServiceEpg (cTsEpgBox* box, cService* service, cEpgItem* epgItem, float textHeight, const cRect& r) :
+        cBoxItem(box, service, textHeight, r), mEpgItem(epgItem) {
       auto timet = mEpgItem->getStartTime();
       struct tm time = *localtime (&timet);
-      mStr = "        - " + dec(time.tm_hour,2,' ') +
+      mStr = "- " + dec(time.tm_hour,2,' ') +
              ":" + dec(time.tm_min,2,'0') +
              " " + mEpgItem->getTitleString();
 
       mBrush = mEpgItem->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
       }
-    //}}}
-    ~cServiceEpg() {}
+    virtual ~cServiceEpg() {}
 
     virtual void onDown() { mEpgItem->toggleRecord(); }
 
@@ -195,14 +181,17 @@ private:
     };
   //}}}
 
+  //{{{
+  void clear() {
+    while (!mBoxItemVec.empty()) {
+      auto boxItem = mBoxItemVec.back();
+      delete boxItem;
+      mBoxItemVec.pop_back();
+      }
+    }
+  //}}}
+
   // vars
   cTransportStream* mTs;
-  IDWriteTextFormat* mTextFormat = nullptr;
-
-  const float kLargeLineHeight = 16.f;
-  const float kDefaultLineHeight = 13.f;
-  float mLineHeight = kDefaultLineHeight;
-  cRect mBgndRect;
-
   std::vector<cBoxItem*> mBoxItemVec;
   };
