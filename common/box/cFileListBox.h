@@ -94,6 +94,7 @@ public:
       dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
 
       auto lineHeight = getLineHeight();
+      auto textHeight = getLineHeight()*4.f/5.f;
 
       mFirstRowIndex = int(mScroll) / (int)lineHeight;
       auto itemIndex = mFirstRowIndex;
@@ -118,6 +119,7 @@ public:
         mWindow->getDwriteFactory()->CreateTextLayout (
           wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
           mRect.getWidth(), lineHeight, &textLayout);
+        textLayout->SetFontSize (textHeight, {0, (uint32_t)str.size()});
         struct DWRITE_TEXT_METRICS textMetrics;
         textLayout->GetMetrics (&textMetrics);
         maxWidth = max(textMetrics.width, maxWidth);
@@ -143,10 +145,14 @@ protected:
   virtual void onHit() = 0;
 
 private:
+  //{{{
   float getLineHeight() {
-    const float kSmallLineHeight = 13.f;
-    return (getHeight() / mFileList->size() > kLineHeight) ? kLineHeight : kSmallLineHeight;
+    auto pixPerLine = getHeight() / mFileList->size();
+    pixPerLine = min (pixPerLine, kLineHeight);
+    pixPerLine = max (pixPerLine, kSmallLineHeight);
+    return pixPerLine;
     }
+  //}}}
   //{{{
   void incScroll (float inc) {
 
@@ -162,6 +168,8 @@ private:
     mScrollInc = fabs(inc) < 0.2f ? 0 : inc;
     }
   //}}}
+
+  const float kSmallLineHeight = 16.f;
 
   // vars
   cFileList* mFileList;

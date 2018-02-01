@@ -43,7 +43,6 @@ public:
     const float kSmallLineHeight = 13.f;
 
     if (!getTimedOn() || mWindow->getTimedMenuOn()) {
-
       if (mTs->mServiceMap.size() > 1) {
         // construct services menu, !!! could check for ts service change here to cull rebuilding menu !!!
         auto nowTime = mTs->getCurTime();
@@ -55,10 +54,9 @@ public:
         auto r = mRect;
         r.left += lineHeight / 5.f;
 
-        clear();
-
         {
         lock_guard<mutex> lockGuard (mTs->mMutex);
+        clear();
         for (auto& service : mTs->mServiceMap) {
           r.bottom = r.top + lineHeight;
           mBoxItemVec.push_back (new cServiceName (this, &service.second, lineHeight, r));

@@ -15,6 +15,8 @@
 #include "cPointRect.h"
 #include "cView2d.h"
 //}}}
+
+// easier to use in widest scope
 const float kLineHeight = 20.f;
 
 class cD2dWindow : public iChange {

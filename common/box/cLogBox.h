@@ -89,34 +89,30 @@ public:
       //}}}
 
       auto datePoint = floor<date::days>(lastTimePoint);
-      auto timeOfDay = date::make_time (chrono::duration_cast<chrono::milliseconds>(lastTimePoint - datePoint));
-      auto h = timeOfDay.hours().count();
-      auto m = timeOfDay.minutes().count();
-      auto s = timeOfDay.seconds().count();
-      auto subSec = timeOfDay.subseconds().count();
-
-      auto str = wdec(h) + L":" + wdec(m,2,L'0') + L":" + wdec(s,2,'0') + L"." + wdec(subSec,3,'0') +
+      auto timeOfDay = date::make_time (chrono::duration_cast<chrono::microseconds>(lastTimePoint - datePoint));
+      auto str = wdec(timeOfDay.hours().count()) + 
+                 L":" + wdec(timeOfDay.hours().count(),2,L'0') + 
+                 L":" + wdec(timeOfDay.seconds().count(),2,'0') + 
+                 L"." + wdec(timeOfDay.subseconds().count(),6,'0') +
                  L" " + cLog::getThreadNameWstring (logLine.mThreadId) +
                  L" " + strToWstr(logLine.mStr);
+
+      // draw text with possible trasnparent background
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (str.data(), (uint32_t)str.size(), mTextFormat,
         mWindow->getSize().x, textHeight, &textLayout);
       textLayout->SetFontSize (textHeight, {0, (uint32_t)str.size()});
-
       struct DWRITE_TEXT_METRICS textMetrics;
       textLayout->GetMetrics (&textMetrics);
-
       y -= textHeight;
-
       if (mPin)
-        dc->FillRectangle (RectF(0, y+4.f, textMetrics.width+2.f, y+4.f + textHeight), 
+        dc->FillRectangle (RectF(0, y+4.f, textMetrics.width+2.f, y+4.f + textHeight),
                            mWindow->getTransparentBgndBrush());
-      dc->DrawTextLayout (Point2F(0, y), textLayout, mBrush);
+      dc->DrawTextLayout (Point2F(0,y), textLayout, mBrush);
       textLayout->Release();
 
       logWidth = max (logWidth, textMetrics.width);
       logHeight = min (logHeight, float(y));
-
       mLayoutWidth = logWidth;
       mLayoutHeight = logHeight;
 

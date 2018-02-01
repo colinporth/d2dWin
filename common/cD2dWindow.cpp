@@ -417,7 +417,7 @@ void cD2dWindow::createDirect2d() {
   // create a textFormat
   mDWriteFactory->CreateTextFormat (L"FreeSans", NULL,
                                     DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-                                    16.f, L"en-us",
+                                    kLineHeight*4.f/5.f, L"en-us",
                                     &mTextFormat);
   mTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_EMERGENCY_BREAK);
 

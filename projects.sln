@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.27130.2027
+VisualStudioVersion = 15.0.27130.2026
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tvWindow", "tvWindow\tv.vcxproj", "{B80EBF50-0719-4408-B63F-43C64F802819}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -25,6 +25,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hlsWindow", "hlsWindow\hlsW
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tvGrabWindow", "tvGrabWindow\tvGrabWindow.vcxproj", "{C705403B-98CF-4A4A-8A3D-D7E169E73076}"
+	ProjectSection(ProjectDependencies) = postProject
+		{3E06EF44-C7ED-45EB-AC5C-3A0338D37D53} = {3E06EF44-C7ED-45EB-AC5C-3A0338D37D53}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mp3Window", "mp3Window\mp3Window.vcxproj", "{DFA05DDA-082C-40AB-8FAB-8D936C91EACA}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -41,8 +44,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fileWindow", "fileWindow\fi
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tvGrab", "tvGrab\tvGrab.vcxproj", "{04BD4C11-8602-49FC-8655-2FF43DA3330B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{3E06EF44-C7ED-45EB-AC5C-3A0338D37D53} = {3E06EF44-C7ED-45EB-AC5C-3A0338D37D53}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "webWindow", "webWindow\webWindow.vcxproj", "{9B8BEFA9-8F94-49FD-9DA1-17C683AEF072}"
+	ProjectSection(ProjectDependencies) = postProject
+		{3E06EF44-C7ED-45EB-AC5C-3A0338D37D53} = {3E06EF44-C7ED-45EB-AC5C-3A0338D37D53}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
