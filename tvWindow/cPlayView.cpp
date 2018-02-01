@@ -2,11 +2,8 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include <stdio.h>
-
 #include "cPlayView.h"
 
-#include "../../shared/utils/cWinAudio.h"
 #include "../common/box/cAudFrameBox.h"
 
 #pragma comment (lib,"avutil.lib")

@@ -1,9 +1,10 @@
 // cPlayView.h
 //{{{  includes
 #pragma once
-#include "../../shared/dvb/cTransportStream.h"
+
 #include "../../shared/utils/cWinAudio.h"
 
+#include "../../shared/dvb/cTransportStream.h"
 #include "../common/cVidFrame.h"
 #include "../common/cAudFrame.h"
 
@@ -337,10 +338,15 @@ private:
       }
     //}}}
 
+    // const
+    const float kPixPerPts = 38.f / 3600.f;
+    const float kDrawFramesCentreY = 40.f;
+    const float kIndexHeight = 13.f;
+
+    // vars
     int mPid = -1;
     int64_t mLastLoadedPts = -1;
     int mLoadFrame = 0;
-
     concurrency::concurrent_vector<iFrame*> mFrames;
     };
   //}}}
@@ -369,10 +375,6 @@ private:
                      ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
                      ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
                      int64_t playPts, float& maxY) {
-
-      const float kPixPerPts = 38.f / 3600.f;
-      const float kDrawFramesCentreY = 40.f;
-      const float kIndexHeight = 13.f;
 
       auto y = kDrawFramesCentreY;
       auto index = 0;
@@ -552,10 +554,7 @@ private:
                      ID2D1SolidColorBrush* black, ID2D1SolidColorBrush* yellow,
                      int64_t playPts, float& maxY) {
 
-      const float kPixPerPts = 38.f / 3600.f;
       const auto vidFrameWidth = 3600.f * kPixPerPts; // 25fps
-      const float kDrawFramesCentreY = 40.f;
-      const float kIndexHeight = 13.f;
 
       auto y = kDrawFramesCentreY;
 
