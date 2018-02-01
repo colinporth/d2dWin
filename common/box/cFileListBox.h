@@ -99,8 +99,8 @@ public:
           mMeasure.push_back (0);
 
         auto& fileItem = mFileList->getFileItem (itemIndex);
-        auto str = fileItem.getFileName() + 
-                   " " + fileItem.getFileSizeString() + 
+        auto str = fileItem.getFileName() +
+                   " " + fileItem.getFileSizeString() +
                    " " + fileItem.getCreationTimeString();
         auto brush = (mTextPressed && !mMoved && (itemIndex == mPressedIndex)) ?
           mWindow->getYellowBrush() :
@@ -114,7 +114,7 @@ public:
         struct DWRITE_TEXT_METRICS textMetrics;
         textLayout->GetMetrics (&textMetrics);
         mMeasure[row] = textMetrics.width;
-        maxWidth = max (textMetrics.width, maxWidth);
+        maxWidth = max(textMetrics.width, maxWidth);
 
         dc->DrawTextLayout (point, textLayout, brush);
         textLayout->Release();
@@ -148,10 +148,11 @@ private:
     }
   //}}}
 
+  // vars
   cFileList* mFileList;
 
-  cRect mBgndRect;
   concurrency::concurrent_vector <float> mMeasure;
+  cRect mBgndRect;
 
   bool mTextPressed = false;
   int mPressedIndex = -1;
