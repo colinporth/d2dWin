@@ -36,8 +36,8 @@ public:
       mMoveInc = 0;
       mScrollInc = 0.f;
 
-      mPressedIndex = int((mScroll + pos.y) / kTextHeight);
-      int pressedLine = int(pos.y / kTextHeight);
+      mPressedIndex = int((mScroll + pos.y) / kLineHeight);
+      int pressedLine = int(pos.y / kLineHeight);
       if (pressedLine >= 0 && pressedLine < mMeasure.size()) {
         mTextPressed = pos.x < mMeasure[pressedLine];
         return true;
@@ -86,15 +86,15 @@ public:
 
       dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
 
-      auto itemIndex = int(mScroll) / (int)kTextHeight;
-      float y = mRect.top + 1.f - (int(mScroll) % (int)kTextHeight);
+      auto itemIndex = int(mScroll) / (int)kLineHeight;
+      float y = mRect.top + 1.f - (int(mScroll) % (int)kLineHeight);
 
       auto maxWidth = 0.f;
       auto point = cPoint (mRect.left + 2.f, y);
 
       for (auto row = 0;
            (y < mRect.bottom) && (itemIndex < (int)mFileList->size());
-           row++, itemIndex++, y += kTextHeight) {
+           row++, itemIndex++, y += kLineHeight) {
         if (row >= (int)mMeasure.size())
           mMeasure.push_back (0);
 
@@ -109,7 +109,7 @@ public:
         IDWriteTextLayout* textLayout;
         mWindow->getDwriteFactory()->CreateTextLayout (
           wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
-          mRect.getWidth(), kTextHeight, &textLayout);
+          mRect.getWidth(), kLineHeight, &textLayout);
 
         struct DWRITE_TEXT_METRICS textMetrics;
         textLayout->GetMetrics (&textMetrics);
@@ -119,7 +119,7 @@ public:
         dc->DrawTextLayout (point, textLayout, brush);
         textLayout->Release();
 
-        point.y += kTextHeight;
+        point.y += kLineHeight;
         }
 
       mBgndRect = mRect;
@@ -139,10 +139,10 @@ private:
     mScroll += inc;
     if (mScroll < 0.f)
       mScroll = 0.f;
-    else if ((mFileList->size() * kTextHeight) < mRect.getHeight())
+    else if ((mFileList->size() * kLineHeight) < mRect.getHeight())
       mScroll = 0.f;
-    else if (mScroll > ((mFileList->size() * kTextHeight) - mRect.getHeight()))
-      mScroll = float(((int)mFileList->size() * kTextHeight) - mRect.getHeight());
+    else if (mScroll > ((mFileList->size() * kLineHeight) - mRect.getHeight()))
+      mScroll = float(((int)mFileList->size() * kLineHeight) - mRect.getHeight());
 
     mScrollInc = fabs(inc) < 0.2f ? 0 : inc;
     }

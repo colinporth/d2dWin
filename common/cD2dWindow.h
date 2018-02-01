@@ -1,21 +1,21 @@
 // cD2dWindow.h
-#pragma once
 //{{{  includes
-#include <wrl.h>
-#include <deque>
-#include <vector>
+#pragma once
 
-#include "../../shared/utils/utils.h"
+#include <wrl.h>
+
+#include <deque>
+#include <chrono>
+
 #include "../../shared/utils/date.h"
+#include "../../shared/utils/utils.h"
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/iChange.h"
 
 #include "cPointRect.h"
 #include "cView2d.h"
-
-using namespace std;
 //}}}
-const float kTextHeight = 20.f;
+const float kLineHeight = 20.f;
 
 class cD2dWindow : public iChange {
 public:
@@ -26,7 +26,7 @@ public:
   class cBox {
   public:
     //{{{
-    cBox (string name, cD2dWindow* window, float width, float height)
+    cBox (std::string name, cD2dWindow* window, float width, float height)
         : mName(name), mWindow(window), mLayoutWidth(width), mLayoutHeight(height) {
       mWindow->changed();
       }
@@ -34,7 +34,7 @@ public:
     virtual ~cBox() {}
 
     // gets
-    string getName() { return mName; }
+    std::string getName() { return mName; }
     cD2dWindow* getWindow() { return mWindow; }
 
     bool getEnable() { return mEnable; }
@@ -123,7 +123,7 @@ public:
 
   protected:
     //{{{
-    float measureText (ID2D1DeviceContext* dc, const string& str, IDWriteTextFormat* textFormat,
+    float measureText (ID2D1DeviceContext* dc, const std::string& str, IDWriteTextFormat* textFormat,
                        const cRect& r, float textHeight) {
 
       IDWriteTextLayout* textLayout;
@@ -145,7 +145,7 @@ public:
       }
     //}}}
     //{{{
-    float drawText (ID2D1DeviceContext* dc, const string& str, IDWriteTextFormat* textFormat,
+    float drawText (ID2D1DeviceContext* dc, const std::string& str, IDWriteTextFormat* textFormat,
                     const cRect& r, ID2D1SolidColorBrush* brush, float textHeight) {
 
       IDWriteTextLayout* textLayout;
@@ -170,7 +170,7 @@ public:
     //}}}
 
     //{{{
-    float measureText (ID2D1DeviceContext* dc, const wstring& wstr, IDWriteTextFormat* textFormat,
+    float measureText (ID2D1DeviceContext* dc, const std::wstring& wstr, IDWriteTextFormat* textFormat,
                        const cRect& r, float textHeight) {
 
       IDWriteTextLayout* textLayout;
@@ -190,7 +190,7 @@ public:
       }
     //}}}
     //{{{
-    float drawText (ID2D1DeviceContext* dc, const wstring& wstr, IDWriteTextFormat* textFormat,
+    float drawText (ID2D1DeviceContext* dc, const std::wstring& wstr, IDWriteTextFormat* textFormat,
                     const cRect& r, ID2D1SolidColorBrush* brush, float textHeight) {
 
       IDWriteTextLayout* textLayout;
@@ -218,17 +218,17 @@ public:
       }
     //}}}
     //{{{
-    void drawDebug (ID2D1DeviceContext* dc, const string& title, int value, cRect& r) {
+    void drawDebug (ID2D1DeviceContext* dc, const std::string& title, int value, cRect& r) {
       drawDebug (dc, title+dec(value), r);
       }
     //}}}
     //{{{
-    void drawDebug (ID2D1DeviceContext* dc, const string& str, cRect& r) {
+    void drawDebug (ID2D1DeviceContext* dc, const std::string& str, cRect& r) {
       drawDebug (dc, str, mWindow->getGreyBrush(), r);
       }
     //}}}
     //{{{
-    void drawDebug (ID2D1DeviceContext* dc, const string& str, ID2D1SolidColorBrush* brush, cRect& r) {
+    void drawDebug (ID2D1DeviceContext* dc, const std::string& str, ID2D1SolidColorBrush* brush, cRect& r) {
 
       dc->FillRectangle (r, brush);
 
@@ -242,11 +242,11 @@ public:
       textLayout->Release();
 
       r.top = r.bottom;
-      r.bottom += kTextHeight;
+      r.bottom += kLineHeight;
       }
     //}}}
 
-    string mName;
+    std::string mName;
     cD2dWindow* mWindow;
 
     bool mEnable = true;
@@ -306,20 +306,20 @@ public:
 
       if (dst.left < 0)
         dst.left = 0;
-      if (dst.top - kTextHeight < 0)
-        dst.top = kTextHeight;
+      if (dst.top - kLineHeight < 0)
+        dst.top = kLineHeight;
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
         wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
-        dst.right - dst.left, kTextHeight, &textLayout);
+        dst.right - dst.left, kLineHeight, &textLayout);
 
       struct DWRITE_TEXT_METRICS textMetrics;
       textLayout->GetMetrics (&textMetrics);
 
-      dc->FillRectangle (cRect (dst.left-1.f, dst.top - kTextHeight,
+      dc->FillRectangle (cRect (dst.left-1.f, dst.top - kLineHeight,
                                 dst.left + textMetrics.width + 4.f, dst.top), brush);
-      dc->DrawTextLayout (cPoint (dst.left-1.f, dst.top- kTextHeight), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (cPoint (dst.left-1.f, dst.top- kLineHeight), textLayout, mWindow->getBlackBrush());
 
       textLayout->Release();
       }
@@ -461,7 +461,7 @@ private:
   //{{{  boxes
   cBox* mProxBox = nullptr;
   cBox* mPressedBox = nullptr;
-  deque <cBox*> mBoxes;
+  std::deque <cBox*> mBoxes;
   //}}}
   //{{{  mouse
   bool mMouseTracking = false;

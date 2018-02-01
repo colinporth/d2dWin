@@ -28,7 +28,7 @@ public:
   //}}}
   //{{{
   bool onDown (bool right, cPoint pos)  {
-    setIndex (int(pos.y / kTextHeight));
+    setIndex (int(pos.y / kLineHeight));
     return true;
     }
   //}}}
@@ -36,7 +36,7 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     auto r = mRect;
-    r.bottom = r.top + kTextHeight;
+    r.bottom = r.top + kLineHeight;
 
     for (int index = 0; index < (int)mStrings.size(); index++) {
       string str = mStrings[index];
@@ -44,7 +44,7 @@ public:
       dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                     r, index == mIndex ? mWindow->getBlackBrush() : mWindow->getWhiteBrush());
       r.top = r.bottom;
-      r.bottom += kTextHeight;
+      r.bottom += kLineHeight;
       }
     }
   //}}}

@@ -822,7 +822,7 @@ public:
 
     dc->SetTransform (Matrix3x2F::Identity());
 
-    auto r = cRect (getTL(), getTL() + cPoint(250.f, kTextHeight));
+    auto r = cRect (getTL(), getTL() + cPoint(250.f, kLineHeight));
     drawDebug (dc, "Lat:" + dec(mMap->getCentreLat()) +
                    " Lon:" + dec(mMap->getCentreLon()) +
                    //" " + dec(xCentrePix / mMap->getTileSize()) + "." + dec(xCentrePix % mMap->getTileSize()) +
@@ -941,7 +941,7 @@ public:
       // draw debug
       auto xTiles = int(mMap->getRangeX() * zoomTileSet->mScale);
       auto yTiles = int(mMap->getRangeY() * zoomTileSet->mScale);
-      auto r = cRect (getTL(), getTL() + cPoint(100.f, kTextHeight));
+      auto r = cRect (getTL(), getTL() + cPoint(100.f, kLineHeight));
       drawDebug (dc, "tiles ", (int)zoomTileSet->mTileMap.size(), r);
       drawDebug (dc, "empty ", (int)zoomTileSet->mEmptyTileSet.size(), r);
       drawDebug (dc, "xtiles ", xTiles, r);
@@ -1012,7 +1012,7 @@ public:
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
-    add (new cFloatBox (this, 50.f,kTextHeight, mRenderTime), -50.f,-kTextHeight);
+    add (new cFloatBox (this, 50.f, kLineHeight, mRenderTime), -50.f,-kLineHeight);
 
     add (new cIndexBox (this, 100.f,3*20.f, {"os", "aerial"}, mMapIndex, &mMapIndexSem), 0.f, 80.f);
 

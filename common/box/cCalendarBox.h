@@ -44,7 +44,7 @@ public:
     dc->DrawTextLayout (p, textLayout, mWindow->getWhiteBrush());
     textLayout->Release();
 
-    p.y += kTextHeight;
+    p.y += kLineHeight;
     //}}}
     //{{{  print daysOfWeek
     p.x = r.getTL().x;
@@ -65,7 +65,7 @@ public:
       p.x += kCalendarWidth;
       } while (++titleWeekDay != date::sun);
 
-    p.y += kTextHeight;
+    p.y += kLineHeight;
     //}}}
     //{{{  print lines
     // skip leading space
@@ -89,7 +89,7 @@ public:
       if (++weekDay == date::sun) {
         // line 6 folds back to first
         line++;
-        p.y += line <= 5 ? kTextHeight : - 4*kTextHeight;
+        p.y += line <= 5 ? kLineHeight : - 4* kLineHeight;
         p.x = r.getTL().x;
         }
       else
@@ -98,7 +98,7 @@ public:
       ++curDay;
       };
 
-    p.y += kTextHeight;
+    p.y += kLineHeight;
     //}}}
     }
 

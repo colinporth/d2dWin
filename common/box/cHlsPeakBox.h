@@ -86,7 +86,7 @@ public:
   //{{{
   bool onUp (bool right, bool mouseMoved, cPoint pos) {
 
-    if (mMove < kTextHeight/2) {
+    if (mMove < kLineHeight /2) {
       mAnimation = mPressInc;
       mHls->incPlaySample (mPressInc * kSamplesPerFrame / kNormalZoom);
       mHls->setPlay();

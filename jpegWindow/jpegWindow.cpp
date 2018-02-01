@@ -73,7 +73,7 @@ public:
     add (mJpegImageView);
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
-    add (new cFloatBox (this, 50.f,kTextHeight, mRenderTime), 0.f,-kTextHeight);
+    add (new cFloatBox (this, 50.f, kLineHeight, mRenderTime), 0.f,-kLineHeight);
 
     if (name.find (".lnk") <= name.size()) {
       string fullName;
@@ -402,7 +402,7 @@ private:
       // fit half width of window
       cView::layout();
       mView2d.setScale (mImageSet.getSrcSize(), mWindow->getSize()*cPoint (0.5f, 1.f));
-      mView2d.setPos (cPoint (0.f, kTextHeight));
+      mView2d.setPos (cPoint (0.f, kLineHeight));
       }
     //}}}
     //{{{
@@ -410,7 +410,7 @@ private:
 
       auto pick = cView::pick (inClient, pos, change);
       if (!pick) {
-        cRect r(0,0, 40.f, mImageSet.mDirs.size() * kTextHeight);
+        cRect r(0,0, 40.f, mImageSet.mDirs.size() * kLineHeight);
         pick = r.inside (pos);
         }
 
@@ -457,7 +457,7 @@ private:
         else {
           cRect r(0,0, 40.f, 0);
           for (auto dir : mImageSet.mDirs) {
-            r.bottom = r.top + kTextHeight;
+            r.bottom = r.top + kLineHeight;
             if (r.inside (pos)) {
               dir->toggleSelect();
               return true;
@@ -477,7 +477,7 @@ private:
       //{{{  draw dirs
       for (auto dir : mImageSet.mDirs) {
         string str;
-        r.bottom = r.top + kTextHeight;
+        r.bottom = r.top + kLineHeight;
         for (auto i = 0; i < dir->getDepth(); i++)
           str += " -";
         str += dir->getDirName();
@@ -493,39 +493,39 @@ private:
       const auto image = mImageSet.getImageByIndex (mImageSet.getPickIndex());
       if (image) {
         //{{{  calc panel height
-        auto height = kTextHeight + kTextHeight;
+        auto height = kLineHeight + kLineHeight;
         if (!image->getMakeString().empty() || !image->getModelString().empty())
-          height += kTextHeight;
+          height += kLineHeight;
         if (image->getOrientation())
-          height += kTextHeight;
+          height += kLineHeight;
         if (image->getFocalLength() > 0)
-          height += kTextHeight;
+          height += kLineHeight;
         if (image->getExposure() > 0)
-          height += kTextHeight;
+          height += kLineHeight;
         if (image->getAperture() > 0)
-          height += kTextHeight;
+          height += kLineHeight;
         if (!image->getGpsString().empty())
-          height += kTextHeight;
+          height += kLineHeight;
 
-        height = kBorder + max (mImageSet.getThumbSize().y + kTextHeight, height) + kBorder;
+        height = kBorder + max (mImageSet.getThumbSize().y + kLineHeight, height) + kBorder;
         //}}}
 
         dc->FillRectangle (cRect(tl.x-1.f, br.y+1.f, br.x+1.f, br.y + height), mBrush);
         //{{{  draw panel text
-        cRect r (tl.x + kBorder, br.y + kBorder, br.x, br.y + kBorder + kTextHeight);
+        cRect r (tl.x + kBorder, br.y + kBorder, br.x, br.y + kBorder + kLineHeight);
         //{{{  draw fullFileName text
         string str = image->getPathFileName();
         dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                       r, mWindow->getWhiteBrush());
         r.top = r.bottom;
-        r.bottom += kTextHeight;
+        r.bottom += kLineHeight;
         //}}}
         //{{{  draw imageSize text
         str = dec(image->getImageSize().x) + "x" + dec(image->getImageSize().y);
         dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                       r, mWindow->getWhiteBrush());
         r.top = r.bottom;
-        r.bottom += kTextHeight;
+        r.bottom += kLineHeight;
         //}}}
 
         if (!image->getMakeString().empty() || !image->getModelString().empty()) {
@@ -534,7 +534,7 @@ private:
           dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
-          r.bottom += kTextHeight;
+          r.bottom += kLineHeight;
           }
           //}}}
         if (image->getOrientation()) {
@@ -543,7 +543,7 @@ private:
           dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
-          r.bottom += kTextHeight;
+          r.bottom += kLineHeight;
           }
           //}}}
         if (image->getFocalLength() > 0) {
@@ -552,7 +552,7 @@ private:
           dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
-          r.bottom += kTextHeight;
+          r.bottom += kLineHeight;
           }
           //}}}
         if (image->getExposure() > 0) {
@@ -561,7 +561,7 @@ private:
           dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
-          r.bottom += kTextHeight;
+          r.bottom += kLineHeight;
           }
           //}}}
         if (image->getAperture() > 0) {
@@ -570,7 +570,7 @@ private:
           dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
-          r.bottom += kTextHeight;
+          r.bottom += kLineHeight;
           }
           //}}}
         if (!image->getGpsString().empty()) {
@@ -595,9 +595,9 @@ private:
         if (!image->getExifTimeString().empty()) {
           auto datePoint = floor<date::days>(image->getExifTimePoint());
           //{{{  draw clock
-          auto radius = r.getHeight()/2.f - kTextHeight;
+          auto radius = r.getHeight()/2.f - kLineHeight;
           r.right = r.left;
-          r.left -= (2.f * radius) + kTextHeight;
+          r.left -= (2.f * radius) + kLineHeight;
 
           auto centre = r.getCentre();
 
@@ -652,7 +652,7 @@ private:
           dc->DrawTextLayout (p, textLayout, mWindow->getWhiteBrush());
           textLayout->Release();
 
-          p.y += kTextHeight;
+          p.y += kLineHeight;
           //}}}
           //{{{  print daysOfWeek
           p.x = r.getTL().x;
@@ -673,7 +673,7 @@ private:
             p.x += kCalendarWidth;
             } while (++titleWeekDay != date::sun);
 
-          p.y += kTextHeight;
+          p.y += kLineHeight;
           //}}}
           //{{{  print lines
           // skip leading space
@@ -696,7 +696,7 @@ private:
 
             if (++weekDay == date::sun) {
               line++;
-              p.y += line <= 5 ? kTextHeight : - 4 * kTextHeight;
+              p.y += line <= 5 ? kLineHeight : - 4 * kLineHeight;
               p.x = r.getTL().x;
               }
             else
@@ -705,7 +705,7 @@ private:
             ++curDay;
             };
 
-          p.y += kTextHeight;
+          p.y += kLineHeight;
           //}}}
           //}}}
           //{{{  draw exifTime text

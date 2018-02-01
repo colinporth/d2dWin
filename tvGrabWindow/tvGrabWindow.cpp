@@ -57,15 +57,15 @@ public:
     mTs = new cDumpTransportStream (rootName, false);
 
     initialise (title, width, height, false);
-    add (new cTuneBox (this, 40.f, kTextHeight, "bbc", 674));
-    add (new cTuneBox (this, 40.f, kTextHeight, "itv", 650), 42.f,0.f);
-    add (new cTuneBox (this, 40.f, kTextHeight, "hd", 706), 84.f,0.f);
-    add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mSignal), 126.f,0.f);
-    add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mTs->mPackets), 248.f,0.f);
-    add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mTs->mDiscontinuity), 370.f,0.f);
+    add (new cTuneBox (this, 40.f, kLineHeight, "bbc", 674));
+    add (new cTuneBox (this, 40.f, kLineHeight, "itv", 650), 42.f,0.f);
+    add (new cTuneBox (this, 40.f, kLineHeight, "hd", 706), 84.f,0.f);
+    add (new cIntBgndBox (this, 120.f, kLineHeight, "signal ", mSignal), 126.f,0.f);
+    add (new cUInt64BgndBox (this, 120.f, kLineHeight, "pkt ", mTs->mPackets), 248.f,0.f);
+    add (new cUInt64BgndBox (this, 120.f, kLineHeight, "dis ", mTs->mDiscontinuity), 370.f,0.f);
 
-    add (new cTsEpgBox (this, getHeight()/2.f, -kTextHeight, mTs), 0.f, kTextHeight);
-    add (new cTsPidBox (this, getHeight()/2.f, -kTextHeight, mTs), getHeight()/2.f, kTextHeight);
+    add (new cTsEpgBox (this, getHeight()/2.f, -kLineHeight, mTs), 0.f, kLineHeight);
+    add (new cTsPidBox (this, getHeight()/2.f, -kLineHeight, mTs), getHeight()/2.f, kLineHeight);
 
     add (new cLogBox (this, 200.f,0, true), 0,200.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);

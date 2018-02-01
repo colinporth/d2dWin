@@ -97,11 +97,11 @@ public:
 
       if (mSideBar) {
         // draw sidebar
-        auto r = cRect (dstRect.getTR(), dstRect.getTR() + cPoint(240.f, kTextHeight));
+        auto r = cRect (dstRect.getTR(), dstRect.getTR() + cPoint(240.f, kLineHeight));
         //{{{  clip to mWindow
-        if (r.top - kTextHeight < 0) {
+        if (r.top - kLineHeight < 0) {
           r.top = 0;
-          r.bottom = r.top + kTextHeight;
+          r.bottom = r.top + kLineHeight;
           }
         if (r.right > mWindow->getWidth()) {
           r.right = mWindow->getWidth();
@@ -153,7 +153,7 @@ public:
         //}}}
         //{{{  draw jpeg markers
         if (!mImage->getMarkerString().empty()) {
-          r.bottom += 2*kTextHeight;
+          r.bottom += 2.f * kLineHeight;
           drawDebug (dc, mImage->getMarkerString(), r);
           }
         //}}}

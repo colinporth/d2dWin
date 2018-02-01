@@ -34,9 +34,9 @@ public:
         thread ([=]() { mDvb->signalThread(); }).detach();
 
         // turn these into a dvb monitor widget
-        add (new cIntBgndBox (this, 120.f, kTextHeight, "signal ", mDvb->mSignal), -120.f, 0.f);
-        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "pkt ", mDvb->mPackets), -242.f,0.f);
-        add (new cUInt64BgndBox (this, 120.f, kTextHeight, "dis ", mDvb->mDiscontinuity), -364.f,0.f);
+        add (new cIntBgndBox (this, 120.f, kLineHeight, "signal ", mDvb->mSignal), -120.f, 0.f);
+        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "pkt ", mDvb->mPackets), -242.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "dis ", mDvb->mDiscontinuity), -364.f,0.f);
         add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvb))->setTimedOn();
         }
       }

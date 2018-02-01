@@ -44,8 +44,8 @@ public:
     add (new cJpegImageView (this, 0.f,0.f, &mImage));
     add (new cJpegImageView (this, 0.f,0.f, &mCompressImage));
 
-    add (new cValueBox (this, 100.f,kTextHeight, "quality", 1.f,100.f, mQuality, mQualityChanged), 0.f,-kTextHeight);
-    add (new cFloatBox (this, 50.f,kTextHeight, mRenderTime), -50.f,-kTextHeight);
+    add (new cValueBox (this, 100.f, kLineHeight, "quality", 1.f,100.f, mQuality, mQualityChanged), 0.f,-kLineHeight);
+    add (new cFloatBox (this, 50.f, kLineHeight, mRenderTime), -50.f,-kLineHeight);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     thread([=]() { changeThread(); }).detach();
