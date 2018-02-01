@@ -245,19 +245,16 @@ private:
   //{{{
   class cDecodeTransportStream : public cTransportStream {
   public:
+    cDecodeTransportStream (int maxFrames) { mFrames.reserve (maxFrames); }
     //{{{
     virtual ~cDecodeTransportStream() {
-
-      mPid = -1;
-      mLastLoadedPts = -1;
-      mLoadFrame = 0;
 
       for (auto frame : mFrames) {
         delete frame;
         frame = nullptr;
         }
       mFrames.clear();
-    }
+      }
     //}}}
 
     int getPid() { return mPid; }
@@ -351,7 +348,7 @@ private:
   class cAudTransportStream : public cDecodeTransportStream {
   public:
     //{{{
-    cAudTransportStream (int maxFrames) {
+    cAudTransportStream (int maxFrames) : cDecodeTransportStream (maxFrames) {
 
       for (auto i = 0; i < maxFrames; i++)
         mFrames.push_back (new cAudFrame());
@@ -526,13 +523,13 @@ private:
   class cVidTransportStream : public cDecodeTransportStream {
   public:
     //{{{
-    cVidTransportStream (int maxFrames) {
-
-      mfxVersion version =  {0,1};
-      mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
+    cVidTransportStream (int maxFrames) : cDecodeTransportStream (maxFrames) {
 
       for (auto i = 0; i < maxFrames; i++)
         mFrames.push_back (new cVidFrame());
+
+      mfxVersion version = { 0,1 };
+      mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
       }
     //}}}
     //{{{
@@ -815,11 +812,9 @@ private:
   //{{{
   class cAnalTransportStream : public cTransportStream {
   public:
-    cAnalTransportStream () {}
+    cAnalTransportStream() {}
     //{{{
     virtual ~cAnalTransportStream() {
-      mBasePts = -1;
-      mLengthPid = -1;
       mStreamPosVector.clear();
       }
     //}}}

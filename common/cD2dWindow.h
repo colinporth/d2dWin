@@ -34,7 +34,7 @@ public:
     virtual ~cBox() {}
 
     // gets
-    std::string getName() { return mName; }
+    std::string getName() const { return mName; }
     cD2dWindow* getWindow() { return mWindow; }
 
     bool getEnable() { return mEnable; }

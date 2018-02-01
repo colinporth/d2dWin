@@ -197,20 +197,17 @@ bool cPlayView::onUp (bool right, bool mouseMoved, cPoint pos) {
 //{{{
 void cPlayView::onDraw (ID2D1DeviceContext* dc) {
 
-  auto vidTs = mVidTs;
-  //if (vidTs) {
-    auto vidframe = (cVidFrame*)vidTs->findNearestFrame (getPlayPts());
-    if (vidframe && (vidframe->getPts() != mBitmapPts)) {
-      mBitmap = vidframe->makeBitmap (dc, mBitmap);
-      mBitmapPts = vidframe->getPts();
-      }
+  auto vidframe = (cVidFrame*)mVidTs->findNearestFrame (getPlayPts());
+  if (vidframe && (vidframe->getPts() != mBitmapPts)) {
+    mBitmap = vidframe->makeBitmap (dc, mBitmap);
+    mBitmapPts = vidframe->getPts();
+    }
 
-    dc->SetTransform (mView2d.mTransform);
-    if (mBitmap)
-      dc->DrawBitmap (mBitmap, cRect(getSize()));
+  dc->SetTransform (mView2d.mTransform);
+  if (mBitmap)
+    dc->DrawBitmap (mBitmap, cRect(getSize()));
 
-    dc->SetTransform (Matrix3x2F::Identity());
-  //  }
+  dc->SetTransform (Matrix3x2F::Identity());
   }
 //}}}
 
