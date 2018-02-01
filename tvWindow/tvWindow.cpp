@@ -19,8 +19,8 @@ class cAppWindow : public cD2dWindow {
 public:
   //{{{
   void run (string title, int width, int height, const string& param) {
+  // init d2dWindow, boxes, threads
 
-    // init d2dWindow, boxes
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f);
     add (new cClockBox (this, 40.f, mTimePoint), -84.f,2.f);
@@ -124,11 +124,10 @@ private:
   //}}}
   };
 
-//{{{
+// main
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-
   cLog::init (LOGINFO, true);
   //cLog::init (LOGINFO, false, "C:/Users/colin/Desktop");
 
@@ -146,4 +145,3 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   CoUninitialize();
   }
-//}}}

@@ -869,7 +869,7 @@ private:
     //{{{
     void clearPosCounts() {
       mStreamPosVector.clear();
-      clearCounts();
+      clearPidCounts();
       }
     //}}}
     //{{{

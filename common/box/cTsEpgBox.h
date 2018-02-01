@@ -1,6 +1,7 @@
 // cTsEpgBox.h
 //{{{  includes
 #pragma once
+
 #include "../cD2dWindow.h"
 #include "../../../shared/dvb/cTransportStream.h"
 //}}}
@@ -28,6 +29,7 @@ public:
           getWindow()->changed();
           return true;
           }
+
       togglePin();
       }
 
@@ -37,7 +39,7 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    const float kDefaultLineHeight = 16.f;
+    const float kLineHeight = 16.f;
     const float kSmallLineHeight = 13.f;
 
     if (!getTimedOn() || mWindow->getTimedMenuOn()) {
@@ -50,7 +52,7 @@ public:
         int nowDay = nowTm.tm_mday;
 
         // notch line height
-        auto lineHeight = (getHeight() / mTs->mServiceMap.size() > kDefaultLineHeight) ? kDefaultLineHeight : kSmallLineHeight;
+        auto lineHeight = (getHeight() / mTs->mServiceMap.size() > kLineHeight) ? kLineHeight : kSmallLineHeight;
         auto r = mRect;
         r.left += lineHeight / 5.f;
 

@@ -12,14 +12,10 @@ public:
   cFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList) :
       cBox ("fileList", window, width, height), mFileList(fileList) {
 
-    mWindow->getDwriteFactory()->CreateTextFormat (L"FreeSans", NULL,
-      DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 16.0f, L"en-us",
-      &mTextFormat);
-
     mPin = true;
     }
   //}}}
-  virtual ~cFileListBox() { mTextFormat->Release(); }
+  virtual ~cFileListBox() {}
 
   //{{{
   bool pick (bool inClient, cPoint pos, bool& change) {
@@ -109,7 +105,7 @@ public:
 
         IDWriteTextLayout* textLayout;
         mWindow->getDwriteFactory()->CreateTextLayout (
-          wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mTextFormat,
+          wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
           mRect.getWidth(), kTextHeight, &textLayout);
 
         struct DWRITE_TEXT_METRICS textMetrics;
@@ -150,8 +146,6 @@ private:
   //}}}
 
   cFileList* mFileList;
-
-  IDWriteTextFormat* mTextFormat;
 
   cRect mBgndRect;
   concurrency::concurrent_vector <float> mMeasure;
