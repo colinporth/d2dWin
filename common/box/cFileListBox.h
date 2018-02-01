@@ -40,13 +40,13 @@ public:
       for (auto& item : mRowRectVec) {
         if (item.inside(pos)) {
           mPressedIndex = mFirstRowIndex + row;
-          mTextPressed = true;
+          mPressed = true;
           return false;
           }
         row++;
         }
 
-      mTextPressed = false;
+      mPressed = false;
       }
 
     return false;
@@ -69,13 +69,12 @@ public:
   bool onUp (bool right, bool mouseMoved, cPoint pos) {
 
     if (mWindow->getTimedMenuOn()) {
-      if (mTextPressed && !mMoved) {
+      if (mPressed && !mMoved) {
         mFileList->setIndex (mPressedIndex);
         onHit();
         }
 
-      mTextPressed = false;
-      mPressedIndex = -1;
+      mPressed = false;
       mMoved = false;
       mMoveInc = 0;
       }
@@ -88,30 +87,32 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     if (mWindow->getTimedMenuOn()) {
-      if (!mTextPressed && mScrollInc)
-        incScroll (mScrollInc * 0.9f);
-
-      dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
-
       auto lineHeight = getLineHeight();
       auto textHeight = getLineHeight()*4.f/5.f;
 
-      mFirstRowIndex = int(mScroll) / (int)lineHeight;
-      auto itemIndex = mFirstRowIndex;
-      float y = mRect.top + 1.f - (int(mScroll) % (int)lineHeight);
+      if (!mPressed && mScrollInc)
+        incScroll (mScrollInc * 0.9f);
+
+      mFirstRowIndex = int(mScroll / lineHeight);
+      //if (!mMoved && (mFileList->getIndex() < mFirstRowIndex)) {
+      //  mScroll -= lineHeight;
+      //  mFirstRowIndex = int(mScroll / lineHeight);
+      //  }
+
+      dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
 
       auto maxWidth = 0.f;
-      auto point = cPoint (mRect.left + 2.f, y);
-
+      auto point = cPoint (mRect.left + 2.f, mRect.top + 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
+      auto itemIndex = mFirstRowIndex;
       for (auto row = 0;
-           (y < mRect.bottom) && (itemIndex < (int)mFileList->size());
-           row++, itemIndex++, y += lineHeight) {
+           (point.y < mRect.bottom) && (itemIndex < (int)mFileList->size());
+           row++, itemIndex++, point.y += lineHeight) {
 
         auto& fileItem = mFileList->getFileItem (itemIndex);
         auto str = fileItem.getFileName() +
                    " " + fileItem.getFileSizeString() +
                    " " + fileItem.getCreationTimeString();
-        auto brush = (mTextPressed && !mMoved && (itemIndex == mPressedIndex)) ?
+        auto brush = (mPressed && !mMoved && (itemIndex == mPressedIndex)) ?
           mWindow->getYellowBrush() :
             mFileList->isCurIndex(itemIndex) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
 
@@ -127,11 +128,9 @@ public:
         textLayout->Release();
 
         if (row >= (int)mRowRectVec.size())
-          mRowRectVec.push_back (cRect (point, point+ cPoint(textMetrics.width,lineHeight)));
+          mRowRectVec.push_back (cRect (point, point + cPoint(textMetrics.width,lineHeight)));
         else
-          mRowRectVec[row] = cRect (point, point+ cPoint(textMetrics.width,lineHeight));
-
-        point.y += lineHeight;
+          mRowRectVec[row] = cRect (point, point + cPoint(textMetrics.width,lineHeight));
         }
 
       mBgndRect = mRect;
@@ -177,9 +176,9 @@ private:
   cRect mBgndRect;
   concurrency::concurrent_vector <cRect> mRowRectVec;
 
-  int mFirstRowIndex = -1;
-  int mPressedIndex = -1;
-  bool mTextPressed = false;
+  unsigned mFirstRowIndex = 0;
+  unsigned mPressedIndex = 0;
+  bool mPressed = false;
 
   bool mMoved = false;
   float mMoveInc = 0;
