@@ -73,6 +73,7 @@ public:
         mFileList->setIndex (mPressedIndex);
         onHit();
         }
+
       mTextPressed = false;
       mPressedIndex = -1;
       mMoved = false;
@@ -104,8 +105,6 @@ public:
       for (auto row = 0;
            (y < mRect.bottom) && (itemIndex < (int)mFileList->size());
            row++, itemIndex++, y += lineHeight) {
-        if (row >= (int)mRowRectVec.size())
-          mRowRectVec.push_back (cRect());
 
         auto& fileItem = mFileList->getFileItem (itemIndex);
         auto str = fileItem.getFileName() +
@@ -119,14 +118,16 @@ public:
         mWindow->getDwriteFactory()->CreateTextLayout (
           wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
           mRect.getWidth(), lineHeight, &textLayout);
-
         struct DWRITE_TEXT_METRICS textMetrics;
         textLayout->GetMetrics (&textMetrics);
-        mRowRectVec[row] = cRect (point.x, point.y, point.x + textMetrics.width, point.y + lineHeight);
         maxWidth = max(textMetrics.width, maxWidth);
-
         dc->DrawTextLayout (point, textLayout, brush);
         textLayout->Release();
+
+        if (row >= (int)mRowRectVec.size())
+          mRowRectVec.push_back (cRect (point, point+ cPoint(textMetrics.width,lineHeight)));
+        else
+          mRowRectVec[row] = cRect (point, point+ cPoint(textMetrics.width,lineHeight));
 
         point.y += lineHeight;
         }
