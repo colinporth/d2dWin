@@ -580,7 +580,7 @@ void cD2dWindow::renderThread() {
       }
     }
 
-  cLog::log (LOGNOTICE, "exit");
+  cLog::log (LOGINFO, "exit");
   CoUninitialize();
   }
 //}}}
