@@ -86,19 +86,22 @@ public:
 
       dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
 
-      int itemIndex = int(mScroll) / (int)kTextHeight;
+      auto itemIndex = int(mScroll) / (int)kTextHeight;
       float y = mRect.top + 1.f - (int(mScroll) % (int)kTextHeight);
 
       auto maxWidth = 0.f;
       auto point = cPoint (mRect.left + 2.f, y);
 
-      for (int row = 0;
+      for (auto row = 0;
            (y < mRect.bottom) && (itemIndex < (int)mFileList->size());
            row++, itemIndex++, y += kTextHeight) {
         if (row >= (int)mMeasure.size())
           mMeasure.push_back (0);
 
-        std::string str = mFileList->getFileItem (itemIndex).getFileName();
+        auto& fileItem = mFileList->getFileItem (itemIndex);
+        auto str = fileItem.getFileName() + 
+                   " " + fileItem.getFileSizeString() + 
+                   " " + fileItem.getCreationTimeString();
         auto brush = (mTextPressed && !mMoved && (itemIndex == mPressedIndex)) ?
           mWindow->getYellowBrush() :
             mFileList->isCurIndex(itemIndex) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
