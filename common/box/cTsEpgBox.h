@@ -146,8 +146,9 @@ private:
   public:
     cServiceNow (cTsEpgBox* box, cService* service, cTransportStream* ts, float textHeight, const cRect& r) :
         cBoxItem(box, service, textHeight,  r), mTs(ts) {
-      mStr = "- " + mService->getNowEpgItem()->getStartTimeString() +
-             " " + mService->getNowEpgItem()->getDurationString() +
+
+      mStr = "- " + date::format ("%H:%M", floor<std::chrono::seconds>(mService->getNowEpgItem()->getStartTime())) +
+             " " + dec (std::chrono::duration_cast<std::chrono::minutes>(mService->getNowEpgItem()->getDuration()).count()) + "m" +
              " " + mService->getNowEpgItem()->getTitleString();
       mBrush = mService->getNowEpgItem()->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
       }
@@ -172,7 +173,8 @@ private:
   public:
     cServiceEpg (cTsEpgBox* box, cService* service, cEpgItem* epgItem, float textHeight, const cRect& r) :
         cBoxItem(box, service, textHeight, r), mEpgItem(epgItem) {
-      mStr = date::format ("%T", floor<chrono::seconds>(mEpgItem->getStartTime()));
+      mStr = "  " + date::format ("%H:%M", floor<chrono::seconds>(mEpgItem->getStartTime())) +
+             " " + mEpgItem->getTitleString();
       mBrush = mEpgItem->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
       }
     virtual ~cServiceEpg() {}
