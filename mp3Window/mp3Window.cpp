@@ -37,11 +37,7 @@ const int kPlayFrameThreshold = 40; // about a second of analyse before playing
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
-  //{{{
-
-  cAppWindow() :
-    mAnalyseSem("analyse"), mPlayDoneSem("playDone") {}
-  //}}}
+  cAppWindow() : mPlayDoneSem("playDone") {}
   //{{{
   void run (const string& title, int width, int height, const string& fileName) {
 
@@ -604,10 +600,6 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("anal");
 
-    auto threadHandle = thread ([=](){ playThread(); });
-    SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
-    threadHandle.detach();
-
     while (!getExit()) {
       //{{{  open file mapping
       auto fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
@@ -643,8 +635,11 @@ private:
         int frameLen = mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, values, nullptr);
         if (frameLen <= 0)
           break;
-        if (mFrameSet.addFrame (streamPos, frameLen, values, mStreamLen))
-          mAnalyseSem.notifyAll();
+        if (mFrameSet.addFrame (streamPos, frameLen, values, mStreamLen)) {
+          auto threadHandle = thread ([=](){ playThread(); });
+          SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
+          threadHandle.detach();
+          }
 
         streamPos += frameLen;
         changed();
@@ -670,6 +665,9 @@ private:
     cLog::log (LOGINFO, "exit - frames loaded:%d calc:%d streamLen:%d",
                         mFrameSet.getNumLoadedFrames(), mFrameSet.mNumFrames, mStreamLen);
     CoUninitialize();
+
+    if (mFileList->size() <= 1)
+      setExit();
     }
   //}}}
   //{{{
@@ -681,39 +679,35 @@ private:
     auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
     memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
 
-    while (!getExit()) {
-      // wait for first frame
-      mAnalyseSem.wait();
+    cMp3Decoder mMp3Decoder;
+    audOpen (kChannels, kSamplesPerSec);
 
-      cMp3Decoder mMp3Decoder;
-      audOpen (kChannels, kSamplesPerSec);
-
-      mPlaying = true;
-      mFrameSet.setPlayFrame (0);
-      while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
-        if (mPlaying) {
-          auto streamPos = mFrameSet.getPlayFrameStreamPos();
-          mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, nullptr, samples);
-          if (samples) {
-            audPlay (2, samples, kSamplesPerFrame, 1.f);
-            mFrameSet.incPlayFrame (1);
-            changed();
-            }
-          else
-            break;
+    mPlaying = true;
+    mFrameSet.setPlayFrame (0);
+    while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
+      if (mPlaying) {
+        auto streamPos = mFrameSet.getPlayFrameStreamPos();
+        mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, nullptr, samples);
+        if (samples) {
+          audPlay (2, samples, kSamplesPerFrame, 1.f);
+          mFrameSet.incPlayFrame (1);
+          changed();
           }
         else
-          audPlay (2, nullptr, kSamplesPerFrame, 1.f);
+          break;
         }
-
-      audClose();
-      mPlayDoneSem.notifyAll();
+      else
+        audPlay (2, nullptr, kSamplesPerFrame, 1.f);
       }
+
+    audClose();
 
     free (samples);
     CoUninitialize();
 
     cLog::log (LOGINFO, "exit");
+
+    mPlayDoneSem.notifyAll();
     }
   //}}}
 
@@ -728,7 +722,6 @@ private:
 
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;
-  cSemaphore mAnalyseSem;
   cSemaphore mPlayDoneSem;
   //}}}
   };
