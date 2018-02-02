@@ -666,8 +666,7 @@ private:
                         mFrameSet.getNumLoadedFrames(), mFrameSet.mNumFrames, mStreamLen);
     CoUninitialize();
 
-    if (mFileList->size() <= 1)
-      setExit();
+    setExit();
     }
   //}}}
   //{{{
