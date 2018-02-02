@@ -30,7 +30,7 @@ public:
         add (new cUInt64BgndBox (this, 120.f, kLineHeight, "pkt ", mDvb->mPackets), 248.f,0.f);
         add (new cUInt64BgndBox (this, 120.f, kLineHeight, "dis ", mDvb->mDiscontinuity), 370.f,0.f);
         add (new cTsEpgBox (this, getHeight()/2.f, -kLineHeight, mDvb), 0.f, kLineHeight);
-        add (new cTsPidBox (this, getHeight()/2.f, -kLineHeight, mDvb), getHeight()/2.f, kLineHeight);
+        add (new cTsPidBox (this, -getHeight()/2.f, -kLineHeight, mDvb), getHeight()/2.f, kLineHeight);
 
         thread ([=]() { mDvb->grabThread(); }).detach();
         thread ([=]() { mDvb->signalThread(); }).detach();
