@@ -50,10 +50,10 @@ public:
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
     add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
 
-    mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-120.f, false, false, mFrameSet.mImage));
+    mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-220.f, false, false, mFrameSet.mImage));
 
     mFileList = new cFileList (fileName, "*.mp3");
-    add (new cAppFileListBox (this, 0,-220.f, mFileList));
+    add (new cAppFileListBox (this, 0.f,-220.f, mFileList));
 
     add (new cFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
     add (new cFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
@@ -590,6 +590,7 @@ private:
     };
   //}}}
 
+  bool getAbort() { return getExit() || mChanged; }
   //{{{
   void selectFileItem() {
 
@@ -637,7 +638,7 @@ private:
         //}}}
 
       auto frameNum = 0;
-      while (!getExit() && !mChanged && (streamPos < mStreamLen)) {
+      while (!getAbort() && (streamPos < mStreamLen)) {
         uint8_t values[kChannels];
         int frameLen = mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, values, nullptr);
         if (frameLen <= 0)
@@ -677,11 +678,8 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("play");
 
-    // cleanup
-    //{{{  allocate samples, init to silence
     auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
     memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
-    //}}}
 
     while (!getExit()) {
       // wait for first frame
@@ -692,7 +690,7 @@ private:
 
       mPlaying = true;
       mFrameSet.setPlayFrame (0);
-      while (!getExit() && !mChanged && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames())) {
+      while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
         if (mPlaying) {
           auto streamPos = mFrameSet.getPlayFrameStreamPos();
           mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, nullptr, samples);

@@ -90,7 +90,7 @@ public:
       else if (mLayoutWidth == 0)
         mRect.right = mWindow->getSize().x - mLayoutX;
       else // mLayoutWidth < 0
-        mRect.right = mWindow->getSize().x;
+        mRect.right = mWindow->getSize().x + mLayoutWidth + mLayoutX;
 
       mRect.top = (mLayoutY < 0) ? mWindow->getSize().y + mLayoutY : mLayoutY;
       if (mLayoutHeight > 0)
@@ -98,7 +98,7 @@ public:
       else if (mLayoutHeight == 0)
         mRect.bottom = mWindow->getSize().y - mLayoutY;
       else // mLayoutHeight < 0
-        mRect.bottom = mWindow->getSize().y;
+        mRect.bottom = mWindow->getSize().y + mLayoutHeight + mLayoutY;
       }
     //}}}
     //{{{
