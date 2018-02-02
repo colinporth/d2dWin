@@ -173,7 +173,7 @@ private:
   public:
     cServiceEpg (cTsEpgBox* box, cService* service, cEpgItem* epgItem, float textHeight, const cRect& r) :
         cBoxItem(box, service, textHeight, r), mEpgItem(epgItem) {
-      mStr = "  " + date::format ("%H:%M", floor<chrono::seconds>(mEpgItem->getStartTime())) +
+      mStr = "  " + date::format ("%H:%M", floor<std::chrono::seconds>(mEpgItem->getStartTime())) +
              " " + mEpgItem->getTitleString();
       mBrush = mEpgItem->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
       }
