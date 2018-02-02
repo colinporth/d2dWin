@@ -68,7 +68,7 @@ public:
     auto y = logHeight + (mLogScroll % int(textHeight));
     int logLineNum = int(mLogScroll / int(textHeight));
 
-    chrono::time_point<chrono::system_clock> lastTimePoint;
+    chrono::system_clock::time_point lastTimePoint;
     cLog::cLine logLine;
     while ((y > 20.f) && cLog::getLine (logLine, logLineNum++)) {
 
@@ -90,9 +90,9 @@ public:
 
       auto datePoint = floor<date::days>(lastTimePoint);
       auto timeOfDay = date::make_time (chrono::duration_cast<chrono::microseconds>(lastTimePoint - datePoint));
-      auto str = wdec(timeOfDay.hours().count()) + 
-                 L":" + wdec(timeOfDay.hours().count(),2,L'0') + 
-                 L":" + wdec(timeOfDay.seconds().count(),2,'0') + 
+      auto str = wdec(timeOfDay.hours().count()) +
+                 L":" + wdec(timeOfDay.hours().count(),2,L'0') +
+                 L":" + wdec(timeOfDay.seconds().count(),2,'0') +
                  L"." + wdec(timeOfDay.subseconds().count(),6,'0') +
                  L" " + cLog::getThreadNameWstring (logLine.mThreadId) +
                  L" " + strToWstr(logLine.mStr);

@@ -7,7 +7,7 @@
 class cClockBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cClockBox (cD2dWindow* window, float radius, chrono::time_point<chrono::system_clock>& timePoint,
+  cClockBox (cD2dWindow* window, float radius, chrono::system_clock::time_point& timePoint,
              bool applyDaylight = true, bool showSubSec = false)
       : cBox("clock", window, radius*2, radius*2), mTimePoint(timePoint),
         mApplyDaylight(applyDaylight),  mShowSubSec(showSubSec) {
@@ -68,7 +68,7 @@ public:
 private:
   const float kPi = 3.14159265358979323846f;
 
-  chrono::time_point<chrono::system_clock>& mTimePoint;
+  chrono::system_clock::time_point& mTimePoint;
   bool mApplyDaylight;
   bool mShowSubSec;
   };

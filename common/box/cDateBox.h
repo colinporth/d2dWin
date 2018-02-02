@@ -6,7 +6,7 @@
 class cDateBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cDateBox (cD2dWindow* window, float width, float height, chrono::time_point<chrono::system_clock>& timePoint) :
+  cDateBox (cD2dWindow* window, float width, float height, chrono::system_clock::time_point& timePoint) :
       cBox("date", window, width, height), mTimePoint(timePoint) {
     mPin = true;
     }
@@ -27,5 +27,5 @@ public:
     }
 
 private:
-  chrono::time_point<chrono::system_clock>& mTimePoint;
+  chrono::system_clock::time_point& mTimePoint;
   };

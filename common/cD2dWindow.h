@@ -394,7 +394,7 @@ public:
   LRESULT wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lparam);
   void messagePump();
 
-  chrono::time_point<chrono::system_clock> mTimePoint;
+  chrono::system_clock::time_point mTimePoint;
 
 protected:
   virtual bool onKey (int key) = 0;

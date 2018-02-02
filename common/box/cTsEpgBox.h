@@ -45,10 +45,10 @@ public:
     if (!getTimedOn() || mWindow->getTimedMenuOn()) {
       if (mTs->mServiceMap.size() > 1) {
         // construct services menu, !!! could check for ts service change here to cull rebuilding menu !!!
-        auto curTime = mTs->getCurTime();
-        auto curDatePoint = date::floor<date::days>(curTime);
-        auto curYearMonthDay = date::year_month_day{curDatePoint};
-        auto curToday = curYearMonthDay.day();
+        auto todayTime = mTs->getTime();
+        auto todayDatePoint = date::floor<date::days>(todayTime);
+        auto todayYearMonthDay = date::year_month_day{todayDatePoint};
+        auto today = todayYearMonthDay.day();
 
         // line heights
         auto lineHeight = (getHeight() / mTs->mServiceMap.size() > kLineHeight) ? kLineHeight : kSmallLineHeight;
@@ -73,11 +73,11 @@ public:
 
           if (service.second.getShowEpg()) {
             for (auto epgItem : service.second.getEpgItemMap()) {
-              auto startTime = epgItem.second->getStartTime();
-              auto startDatePoint = date::floor<date::days>(startTime);
-              auto startYearMonthDay = date::year_month_day{startDatePoint};
-              auto startToday = startYearMonthDay.day();
-              if ((startToday == curToday) && (startTime > curTime)) { // later today
+              auto time = epgItem.second->getTime();
+              auto datePoint = date::floor<date::days>(time);
+              auto yearMonthDay = date::year_month_day{datePoint};
+              auto day = yearMonthDay.day();
+              if ((day == today) && (time > todayTime)) { // later today
                 r.bottom = r.top + lineHeight;
                 mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, lineHeight, r));
                 r.top = r.bottom;
@@ -147,7 +147,7 @@ private:
     cServiceNow (cTsEpgBox* box, cService* service, cTransportStream* ts, float textHeight, const cRect& r) :
         cBoxItem(box, service, textHeight,  r), mTs(ts) {
 
-      mStr = "- " + date::format ("%H:%M", floor<seconds>(mService->getNowEpgItem()->getStartTime())) +
+      mStr = "- " + date::format ("%H:%M", floor<seconds>(mService->getNowEpgItem()->getTime())) +
              " " + dec (duration_cast<minutes>(mService->getNowEpgItem()->getDuration()).count()) + "m" +
              " " + mService->getNowEpgItem()->getTitleString();
       mBrush = mService->getNowEpgItem()->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
@@ -158,7 +158,7 @@ private:
     virtual void onDown() {
 
       if (mService->getNowEpgItem()->toggleRecord())
-        mTs->start (mService, mService->getNowEpgItem()->getTitleString(), mTs->getCurTime(), true);
+        mTs->start (mService, mService->getNowEpgItem()->getTitleString(), mTs->getTime(), true);
       else
         mTs->stop (mService);
       }
@@ -173,7 +173,7 @@ private:
   public:
     cServiceEpg (cTsEpgBox* box, cService* service, cEpgItem* epgItem, float textHeight, const cRect& r) :
         cBoxItem(box, service, textHeight, r), mEpgItem(epgItem) {
-      mStr = "  " + date::format ("%H:%M", floor<seconds>(mEpgItem->getStartTime())) +
+      mStr = "  " + date::format ("%H:%M", floor<seconds>(mEpgItem->getTime())) +
              " " + mEpgItem->getTitleString();
       mBrush = mEpgItem->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
       }
