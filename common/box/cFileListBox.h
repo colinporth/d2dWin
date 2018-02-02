@@ -32,13 +32,15 @@ public:
   bool onDown (bool right, cPoint pos)  {
 
     if (mWindow->getTimedMenuOn()) {
+
       mMoved = false;
       mMoveInc = 0;
       mScrollInc = 0.f;
 
       int row = 0;
+      pos += getTL();
       for (auto& item : mRowRectVec) {
-        if (item.inside(pos)) {
+        if (item.inside (pos)) {
           mPressedIndex = mFirstRowIndex + row;
           mPressed = true;
           return false;

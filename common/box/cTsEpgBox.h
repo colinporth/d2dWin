@@ -45,12 +45,15 @@ public:
     if (!getTimedOn() || mWindow->getTimedMenuOn()) {
       if (mTs->mServiceMap.size() > 1) {
         // construct services menu, !!! could check for ts service change here to cull rebuilding menu !!!
-        auto nowTime = mTs->getCurTime();
-        struct tm nowTm = *localtime (&nowTime);
-        int nowDay = nowTm.tm_mday;
+        auto curTime = mTs->getCurTime();
+        auto curDatePoint = date::floor<date::days>(curTime);
+        auto curYearMonthDay = date::year_month_day{curDatePoint};
+        auto curToday = curYearMonthDay.day();
 
-        // notch line height
+        // line heights
         auto lineHeight = (getHeight() / mTs->mServiceMap.size() > kLineHeight) ? kLineHeight : kSmallLineHeight;
+        auto bigLineHeight = lineHeight*4.f/3.f;
+        auto bgndRect = mRect;
         auto r = mRect;
         r.left += lineHeight / 5.f;
 
@@ -58,8 +61,8 @@ public:
         lock_guard<mutex> lockGuard (mTs->mMutex);
         clear();
         for (auto& service : mTs->mServiceMap) {
-          r.bottom = r.top + lineHeight;
-          mBoxItemVec.push_back (new cServiceName (this, &service.second, lineHeight, r));
+          r.bottom = r.top + bigLineHeight;
+          mBoxItemVec.push_back (new cServiceName (this, &service.second, bigLineHeight, r));
           r.top = r.bottom;
 
           if (service.second.getNowEpgItem()) {
@@ -67,24 +70,27 @@ public:
             mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs, lineHeight, r));
             r.top = r.bottom;
             }
+
           if (service.second.getShowEpg()) {
             for (auto epgItem : service.second.getEpgItemMap()) {
-              auto timet = epgItem.second->getStartTime();
-              struct tm time = *localtime (&timet);
-              if ((time.tm_mday == nowDay) && (timet > nowTime)) { // later today
+              auto startTime = epgItem.second->getStartTime();
+              auto startDatePoint = date::floor<date::days>(startTime);
+              auto startYearMonthDay = date::year_month_day{startDatePoint};
+              auto startToday = startYearMonthDay.day();
+              if ((startToday == curToday) && (startTime > curTime)) { // later today
                 r.bottom = r.top + lineHeight;
                 mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, lineHeight, r));
                 r.top = r.bottom;
                 }
               }
             }
-          r.top = r.bottom + lineHeight/4.f;
+          r.top += lineHeight/4.f;
+          r.bottom = r.top + lineHeight;
           }
         }
 
         // draw services boxItems
-        auto bgndRect = r;
-        bgndRect.top = mRect.top;
+        bgndRect.bottom = r.bottom;
         dc->FillRectangle (bgndRect, mWindow->getTransparentBgndBrush());
         for (auto boxItem : mBoxItemVec)
           boxItem->onDraw (dc);
@@ -128,7 +134,7 @@ private:
     cServiceName (cTsEpgBox* box, cService* service, float textHeight, const cRect& r) :
         cBoxItem(box, service, textHeight, r) {
       mStr = service->getNameString();
-      mBrush = mService->getShowEpg() ? mBox->getWindow()->getBlueBrush() : mBox->getWindow()->getWhiteBrush();
+      mBrush = mService->getShowEpg() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
       }
     virtual ~cServiceName() {}
 
@@ -166,12 +172,7 @@ private:
   public:
     cServiceEpg (cTsEpgBox* box, cService* service, cEpgItem* epgItem, float textHeight, const cRect& r) :
         cBoxItem(box, service, textHeight, r), mEpgItem(epgItem) {
-      auto timet = mEpgItem->getStartTime();
-      struct tm time = *localtime (&timet);
-      mStr = "- " + dec(time.tm_hour,2,' ') +
-             ":" + dec(time.tm_min,2,'0') +
-             " " + mEpgItem->getTitleString();
-
+      mStr = date::format ("%T", floor<chrono::seconds>(mEpgItem->getStartTime()));
       mBrush = mEpgItem->getRecord() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
       }
     virtual ~cServiceEpg() {}
@@ -185,6 +186,7 @@ private:
 
   //{{{
   void clear() {
+
     while (!mBoxItemVec.empty()) {
       auto boxItem = mBoxItemVec.back();
       delete boxItem;
