@@ -90,7 +90,7 @@ public:
 
     if (mWindow->getTimedMenuOn()) {
       auto lineHeight = getLineHeight();
-      auto textHeight = getLineHeight()*4.f/5.f;
+      auto textHeight = getLineHeight()*5.f/6.f;
 
       if (!mPressed && mScrollInc)
         incScroll (mScrollInc * 0.9f);
@@ -105,18 +105,18 @@ public:
 
       auto maxWidth = 0.f;
       auto point = cPoint (mRect.left + 2.f, mRect.top + 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
-      auto itemIndex = mFirstRowIndex;
-      for (auto row = 0;
-           (point.y < mRect.bottom) && (itemIndex < (int)mFileList->size());
-           row++, itemIndex++, point.y += lineHeight) {
+      auto index = mFirstRowIndex;
+      for (auto row = 0u;
+           (point.y < mRect.bottom) && (index < mFileList->size());
+           row++, index++, point.y += lineHeight) {
 
-        auto& fileItem = mFileList->getFileItem (itemIndex);
+        auto& fileItem = mFileList->getFileItem (index);
         auto str = fileItem.getFileName() +
                    " " + fileItem.getFileSizeString() +
                    " " + fileItem.getCreationTimeString();
-        auto brush = (mPressed && !mMoved && (itemIndex == mPressedIndex)) ?
+        auto brush = (mPressed && !mMoved && (index == mPressedIndex)) ?
           mWindow->getYellowBrush() :
-            mFileList->isCurIndex(itemIndex) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
+            mFileList->isCurIndex (index) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
 
         IDWriteTextLayout* textLayout;
         mWindow->getDwriteFactory()->CreateTextLayout (
@@ -136,7 +136,7 @@ public:
         }
 
       mBgndRect = mRect;
-      mBgndRect.right = mRect.left + maxWidth + 4.0f;
+      mBgndRect.right = mRect.left + maxWidth + getLineHeight()/4.f;
       mBgndRect.bottom = point.y;
       }
     }
@@ -149,7 +149,7 @@ private:
   //{{{
   float getLineHeight() {
     auto pixPerLine = getHeight() / mFileList->size();
-    pixPerLine = min (pixPerLine, kLineHeight);
+    pixPerLine = min (pixPerLine, kLineHeight - 2.f);
     pixPerLine = max (pixPerLine, kSmallLineHeight);
     return pixPerLine;
     }

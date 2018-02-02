@@ -16,7 +16,6 @@
 #include "cView2d.h"
 //}}}
 
-// easier to use in widest scope
 const float kLineHeight = 20.f;
 
 class cD2dWindow : public iChange {
@@ -346,12 +345,13 @@ public:
 
   //{{{  gets
   ID3D11Device* getD3d11Device() { return mD3device.Get(); }
-  ID2D1Factory1* getD2d1Factory() { return mD2D1Factory.Get(); }
-  IDWriteFactory* getDwriteFactory() { return mDWriteFactory.Get(); }
   ID2D1DeviceContext* getDc() { return mDeviceContext.Get(); }
 
-  cPoint getSize() { return mClientF; }
+  ID2D1Factory1* getD2d1Factory() { return mD2D1Factory.Get(); }
+  IDWriteFactory* getDwriteFactory() { return mDWriteFactory.Get(); }
+
   cPoint getCentre() { return mClientF/2.f; }
+  cPoint getSize() { return mClientF; }
   float getWidth() { return mClientF.x; }
   float getHeight() { return mClientF.y; }
 
@@ -374,22 +374,23 @@ public:
   bool getControl() { return mControlKeyDown; }
   bool getMouseDown() { return mMouseDown; }
   bool getTimedMenuOn() { return mTimedMenuOn; }
-  //}}}
-  //{{{  full screen
-  bool getFullScreen() { return mFullScreen; }
-  void toggleFullScreen();
-  void onResize();
-  //}}}
 
   int getDaylightSeconds() { return mDaylightSeconds; }
 
-  bool getExit() { return mExit; }
-  void setExit() { mExit = true; }
+  bool getFullScreen() { return mFullScreen; }
 
+  bool getExit() { return mExit; }
+  //}}}
+  //{{{  sets
+  void toggleFullScreen();
+  void setExit() { mExit = true; }
   void keyChanged() { mCursorDown = mCursorCountDown; }
   void cursorChanged() { mCursorDown = mCursorCountDown; }
   void setTimedMenuOff() { mTimedMenuOn = false; }
   void setChangeCountDown (int countDown) { mChangeCountDown = countDown; }
+  //}}}
+
+  void onResize();
 
   LRESULT wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lparam);
   void messagePump();

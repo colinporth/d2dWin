@@ -21,10 +21,10 @@
 using namespace concurrency;
 //}}}
 //{{{  const
-const int kChunkSize = 2048*188;
+const int kMaxAudFrames = 120; // just over 2sec
+const int kMaxVidFrames = 30;  // just over 1sec
 
-const int kMaxAudFrames = 120; // just over 2secs
-const int kMaxVidFrames = 30;
+const int kChunkSize = 2048*188;
 //}}}
 
 //{{{

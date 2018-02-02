@@ -19,7 +19,6 @@ class cAppWindow : public cD2dWindow {
 public:
   //{{{
   void run (string title, int width, int height, const string& param) {
-  // init d2dWindow, boxes, threads
 
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f);
@@ -27,30 +26,32 @@ public:
 
     int frequency = atoi (param.c_str());
     if (frequency) {
-      // launch dvb
       mDvb = new cDvb (mTvRoot);
       if (mDvb->createGraph (frequency * 1000)) {
         thread ([=]() { mDvb->grabThread(); }).detach();
         thread ([=]() { mDvb->signalThread(); }).detach();
 
         // turn these into a dvb monitor widget
-        add (new cIntBgndBox (this, 120.f, kLineHeight, "signal ", mDvb->mSignal), -120.f, 0.f);
-        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "pkt ", mDvb->mPackets), -242.f,0.f);
-        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "dis ", mDvb->mDiscontinuity), -364.f,0.f);
-        add (new cTsEpgBox (this, getWidth()/2.f,0.f, mDvb))->setTimedOn();
+        add (new cTuneBox (this, 40.f, kLineHeight, "bbc", 674));
+        add (new cTuneBox (this, 40.f, kLineHeight, "itv", 650), 42.f,0.f);
+        add (new cTuneBox (this, 40.f, kLineHeight, "hd", 706), 84.f,0.f);
+        add (new cIntBgndBox (this, 120.f, kLineHeight, "signal ", mDvb->mSignal), 126.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "pkt ", mDvb->mPackets), 248.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "dis ", mDvb->mDiscontinuity), 370.f,0.f);
+        add (new cTsEpgBox (this, getWidth()/2.f,-kLineHeight, mDvb), 0.f,kLineHeight)->setTimedOn();
         }
       }
 
     // launch file player
     mFileList = new cFileList (frequency || param.empty() ? mTvRoot : param, "*.ts");
     thread([=]() { mFileList->watchThread(); }).detach();
+
     auto boxWidth = frequency ? getWidth()/2.f : 0.f;
-    add (new cAppFileListBox (this, -boxWidth,0.f, mFileList), boxWidth,0.f);
+    add (new cAppFileListBox (this, -boxWidth,0.f, mFileList), boxWidth,frequency ? kLineHeight : 0.f);
 
     if (!mFileList->empty())
       mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName()));
 
-    // exit, maximise box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
     // loop till quit
@@ -92,6 +93,44 @@ protected:
 
 private:
   //{{{
+  class cTuneBox : public cBox {
+  public:
+    //{{{
+    cTuneBox (cD2dWindow* window, float width, float height, const string& title, int frequency) :
+        cBox ("tune", window, width, height), mTitle(title), mFrequency(frequency) {
+      mPin = true;
+      }
+    //}}}
+
+    //{{{
+    bool onDown (bool right, cPoint pos)  {
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+      appWindow->retune (mFrequency);
+      return true;
+      }
+    //}}}
+    //{{{
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      IDWriteTextLayout* textLayout;
+      mWindow->getDwriteFactory()->CreateTextLayout (
+        strToWstr(mTitle).data(), (uint32_t)mTitle.size(), mWindow->getTextFormat(),
+        getSize().x, getSize().y, &textLayout);
+
+      dc->FillRectangle (mRect, mWindow->getGreyBrush());
+      dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+
+      textLayout->Release();
+      }
+    //}}}
+
+  private:
+    string mTitle;
+    int mFrequency;
+    };
+  //}}}
+  //{{{
   class cAppFileListBox : public cFileListBox {
   public:
     cAppFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList) :
@@ -99,6 +138,13 @@ private:
 
     void onHit() { (dynamic_cast<cAppWindow*>(getWindow()))->selectFileItem(); }
     };
+  //}}}
+
+  //{{{
+  void retune (int frequency) {
+    mDvb->stop();
+    mDvb->tune (frequency * 1000);
+    }
   //}}}
   //{{{
   void selectFileItem() {
@@ -114,6 +160,7 @@ private:
       }
     }
   //}}}
+
   //{{{  vars
   cDvb* mDvb = nullptr;
 

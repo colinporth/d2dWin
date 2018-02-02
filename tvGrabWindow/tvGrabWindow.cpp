@@ -14,7 +14,58 @@
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  class cTuneBox : public cD2dWindow::cBox {
+  void run (const string& title, int width, int height, const string& param, const string& rootName) {
+
+    initialise (title, width, height, false);
+    add (new cLogBox (this, 200.f,0, true), 0,200.f);
+
+    auto frequency = param.empty() ? 674 : atoi(param.c_str());
+    if (frequency) {
+      mDvb = new cDvb ("c:/tv");
+      if (mDvb->createGraph (frequency)) {
+        add (new cTuneBox (this, 40.f, kLineHeight, "bbc", 674));
+        add (new cTuneBox (this, 40.f, kLineHeight, "itv", 650), 42.f,0.f);
+        add (new cTuneBox (this, 40.f, kLineHeight, "hd", 706), 84.f,0.f);
+        add (new cIntBgndBox (this, 120.f, kLineHeight, "signal ", mDvb->mSignal), 126.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "pkt ", mDvb->mPackets), 248.f,0.f);
+        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "dis ", mDvb->mDiscontinuity), 370.f,0.f);
+        add (new cTsEpgBox (this, getHeight()/2.f, -kLineHeight, mDvb), 0.f, kLineHeight);
+        add (new cTsPidBox (this, getHeight()/2.f, -kLineHeight, mDvb), getHeight()/2.f, kLineHeight);
+
+        thread ([=]() { mDvb->grabThread(); }).detach();
+        thread ([=]() { mDvb->signalThread(); }).detach();
+        }
+      }
+    else {
+      auto ts = new cDumpTransportStream (rootName, false);
+      thread ([=]() { fileThread (param, ts); }).detach();
+      add (new cTsEpgBox (this, getHeight()/2.f, 0.f, ts), 0.f,0.f);
+      add (new cTsPidBox (this, getHeight()/2.f, 0.f, ts), getHeight()/2.f,0.f);
+      }
+
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
+
+    messagePump();
+    }
+  //}}}
+
+protected:
+  //{{{
+  bool onKey (int key) {
+
+    switch (key) {
+      case 0x00 : break;
+      case 0x1B : return true;
+
+      default   : printf ("key %x\n", key);
+      }
+    return false;
+    }
+  //}}}
+
+private:
+  //{{{
+  class cTuneBox : public cBox {
   public:
     //{{{
     cTuneBox (cD2dWindow* window, float width, float height, const string& title, int frequency) :
@@ -51,57 +102,9 @@ public:
     int mFrequency;
     };
   //}}}
+
   //{{{
-  void run (const string& title, int width, int height, const string& param, const string& rootName) {
-
-    mTs = new cDumpTransportStream (rootName, false);
-
-    initialise (title, width, height, false);
-    add (new cTuneBox (this, 40.f, kLineHeight, "bbc", 674));
-    add (new cTuneBox (this, 40.f, kLineHeight, "itv", 650), 42.f,0.f);
-    add (new cTuneBox (this, 40.f, kLineHeight, "hd", 706), 84.f,0.f);
-    add (new cIntBgndBox (this, 120.f, kLineHeight, "signal ", mSignal), 126.f,0.f);
-    add (new cUInt64BgndBox (this, 120.f, kLineHeight, "pkt ", mTs->mPackets), 248.f,0.f);
-    add (new cUInt64BgndBox (this, 120.f, kLineHeight, "dis ", mTs->mDiscontinuity), 370.f,0.f);
-
-    add (new cTsEpgBox (this, getHeight()/2.f, -kLineHeight, mTs), 0.f, kLineHeight);
-    add (new cTsPidBox (this, getHeight()/2.f, -kLineHeight, mTs), getHeight()/2.f, kLineHeight);
-
-    add (new cLogBox (this, 200.f,0, true), 0,200.f);
-    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
-
-    auto frequency = param.empty() ? 674 : atoi(param.c_str());
-    if (frequency) {
-      mDvb = new cDvb ("c:/tv");
-      if (mDvb->createGraph (frequency)) {
-        thread ([=]() { mDvb->grabThread(); }).detach();
-        thread ([=]() { mDvb->signalThread(); }).detach();
-        }
-      }
-    else
-      thread ([=]() { fileThread (param); }).detach();
-
-    messagePump();
-    }
-  //}}}
-
-protected:
-  //{{{
-  bool onKey (int key) {
-
-    switch (key) {
-      case 0x00 : break;
-      case 0x1B : return true;
-
-      default   : printf ("key %x\n", key);
-      }
-    return false;
-    }
-  //}}}
-
-private:
-  //{{{
-  void fileThread (const string& fileName) {
+  void fileThread (const string& fileName, cDumpTransportStream* ts) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("file");
@@ -119,7 +122,7 @@ private:
       while (streamPos < streamSize) {
         if (streamSize - streamPos < chunkSize)
           chunkSize = streamSize - streamPos;
-        streamPos += mTs->demux (streamPtr, chunkSize, streamPos, false, -1);
+        streamPos += ts->demux (streamPtr, chunkSize, streamPos, false, -1);
         streamPtr += chunkSize;
         changed();
         //Sleep (10);
@@ -146,12 +149,7 @@ private:
     }
   //}}}
 
-  string mFileName;
-  HANDLE mFile = 0;
-
-  cTransportStream* mTs = nullptr;
   cDvb* mDvb = nullptr;
-  int mSignal = 0;
   };
 
 // main
