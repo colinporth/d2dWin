@@ -37,9 +37,13 @@ const int kPlayFrameThreshold = 40; // about a second of analyse before playing
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
-  cAppWindow() : mAnalyseSem("analyse"), mPlayDoneSem("playDone") {}
   //{{{
-  void run (string title, int width, int height, string fileName) {
+
+  cAppWindow() :
+    mAnalyseSem("analyse"), mPlayDoneSem("playDone") {}
+  //}}}
+  //{{{
+  void run (const string& title, int width, int height, const string& fileName) {
 
     initialise (title, width, height, false);
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
@@ -54,16 +58,12 @@ public:
     add (new cFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
     add (new cFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
     add (new cFrameSetTimeBox (this, 600.f,50.f, mFrameSet), -600.f,-50.f);
+
     add (new cVolumeBox (this, 12.f,0.f), -12.f,0.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
-    if (!mFileList->empty()) {
+    if (!mFileList->empty())
       thread ([=](){ analyseThread(); }).detach();
-
-      auto threadHandle = thread ([=](){ playThread(); });
-      SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
-      threadHandle.detach();
-      }
 
     // loop till quit
     messagePump();
@@ -77,22 +77,22 @@ protected:
     switch (key) {
       case 0x00: break;
       case 0x1B: return true;
+      case  'F': toggleFullScreen(); break;
 
       case  ' ': mPlaying = !mPlaying; break;
 
-      case 0x21: if (mFileList->prevIndex()) changed(); break; // page up - prev file
-      case 0x22: if (mFileList->nextIndex()) changed(); break; // page down - next file
+      case 0x21: mFrameSet.prevSilence(); changed(); break;; // page up
+      case 0x22: mFrameSet.nextSilence(); changed(); break;; // page down
 
       case 0x25: mFrameSet.incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
-      case 0x27: mFrameSet.incPlaySec (getControl() ? 10 : 1);  changed(); break; // right arrow  + 1 sec
+      case 0x27: mFrameSet.incPlaySec (getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
 
-      case 0x23: mFrameSet.setPlayFrame (mFrameSet.mNumFrames-1); mPlaying = false; changed(); break; // end
       case 0x24: mFrameSet.setPlayFrame (0); changed(); break; // home
+      case 0x23: mFrameSet.setPlayFrame (mFrameSet.mNumFrames-1); mPlaying = false; changed(); break; // end
 
-      case 0x26: mFrameSet.prevSilence(); changed(); break;; // up arrow
-      case 0x28: mFrameSet.nextSilence(); changed(); break;; // down arrow
-
-      case  'F': toggleFullScreen(); break;
+      case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
+      case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
+      case 0x0d: selectFileItem(); changed(); break; // enter - play file
 
       default  : cLog::log (LOGINFO, "key %x", key);
       }
@@ -591,10 +591,21 @@ private:
   //}}}
 
   //{{{
+  void selectFileItem() {
+
+    mChanged = true;
+    }
+  //}}}
+
+  //{{{
   void analyseThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("anal");
+
+    auto threadHandle = thread ([=](){ playThread(); });
+    SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
+    threadHandle.detach();
 
     while (!getExit()) {
       //{{{  open file mapping
@@ -704,23 +715,23 @@ private:
     free (samples);
     CoUninitialize();
 
-    cLog::log (LOGERROR, "exit");
+    cLog::log (LOGINFO, "exit");
     }
   //}}}
 
-  //{{{  private vars
+  //{{{  vars
   cFileList* mFileList;
+  cFrameSet mFrameSet;
+
+  cJpegImageView* mJpegImageView = nullptr;
+
   bool mChanged = false;
+  bool mPlaying = true;
 
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;
   cSemaphore mAnalyseSem;
   cSemaphore mPlayDoneSem;
-
-  cJpegImageView* mJpegImageView = nullptr;
-
-  cFrameSet mFrameSet;
-  bool mPlaying = true;
   //}}}
   };
 
