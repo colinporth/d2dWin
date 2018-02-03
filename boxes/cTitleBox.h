@@ -1,6 +1,8 @@
 // cLogBox.h
+//{{{  includes
 #pragma once
 #include "../cD2dWindow.h"
+//}}}
 
 class cTitleBox : public cD2dWindow::cBox {
 public:

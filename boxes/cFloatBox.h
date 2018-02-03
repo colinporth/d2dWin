@@ -1,8 +1,10 @@
 // cInfoBox.h
+//{{{  includes
 #pragma once
 #include "../common/cD2dWindow.h"
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/cLog.h"
+//}}}
 
 class cFloatBox : public cD2dWindow::cBox {
 public:

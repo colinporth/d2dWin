@@ -1,8 +1,11 @@
 // cAudBox.h
+//{{{  includes
 #pragma once
+
 #include "../common/cD2dWindow.h"
 #include "../common/cAudFrame.h"
-#include "../../../shared/utils/iAudio.h"
+#include "../../shared/utils/iAudio.h"
+//}}}
 
 const float kBarsScale = 3.0f;  // need to work out power scaling derivation
 

@@ -1,7 +1,9 @@
 // cVolumeBox.h
+//{{{  includes
 #pragma once
 #include "../common/cD2dWindow.h"
 #include "../../shared/utils/iAudio.h"
+//}}}
 
 class cVolumeBox : public cD2dWindow::cBox {
 public:

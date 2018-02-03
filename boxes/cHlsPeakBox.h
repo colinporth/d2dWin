@@ -1,8 +1,10 @@
 // hlsPeakBox.h
+//{{{  includes
 #pragma once
 #include "../common/cD2dWindow.h"
 #include "../../shared/utils/date.h"
 #include "../../shared/hls/hls.h"
+//}}}
 
 const int kScrubFrames = 3;
 

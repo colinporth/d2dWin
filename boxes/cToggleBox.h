@@ -1,6 +1,8 @@
 // cToggleBox.h
+//{{{  includes
 #pragma once
 #include "../cD2dWindow.h"
+//}}}
 
 class cToggleBox : public cD2dWindow::cBox {
 public:

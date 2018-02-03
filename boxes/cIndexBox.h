@@ -1,6 +1,8 @@
 // cIndexBox.h
+//{{{  includes
 #pragma once
 #include "../common/cD2dWindow.h"
+//}}}
 
 class cIndexBox : public cD2dWindow::cBox {
 public:

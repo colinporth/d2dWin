@@ -1,6 +1,8 @@
 // cBitmap.h
+//{{{  includes
 #pragma once
 #include "../common/cD2dWindow.h"
+//}}}
 
 class cBitmapBox : public cD2dWindow::cBox {
 public:
