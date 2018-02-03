@@ -1,8 +1,8 @@
 // cTsPidBox.h
 //{{{  includes
 #pragma once
-#include "../cD2dWindow.h"
-#include "../../../shared/dvb/cTransportStream.h"
+#include "../common/cD2dWindow.h"
+#include "../../shared/dvb/cTransportStream.h"
 //}}}
 
 class cTsPidBox : public cD2dWindow::cBox {

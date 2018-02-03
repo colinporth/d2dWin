@@ -17,17 +17,17 @@
 #include "../../shared/hls/r5x80.h"
 #include "../../shared/hls/r6x80.h"
 
-#include "../common/box/cValueBox.h"
-#include "../common/box/cFloatBox.h"
-#include "../common/box/cLogBox.h"
-#include "../common/box/cWindowBox.h"
-#include "../common/box/cVolumeBox.h"
-#include "../common/box/cBmpBox.h"
-#include "../common/box/cClockBox.h"
-#include "../common/box/cDateBox.h"
-#include "../common/box/cCalendarBox.h"
-#include "../common/box/cHlsPeakBox.h"
-#include "../common/box/cHlsDotsBox.h"
+#include "../boxes/cValueBox.h"
+#include "../boxes/cFloatBox.h"
+#include "../boxes/cLogBox.h"
+#include "../boxes/cWindowBox.h"
+#include "../boxes/cVolumeBox.h"
+#include "../boxes/cBmpBox.h"
+#include "../boxes/cClockBox.h"
+#include "../boxes/cDateBox.h"
+#include "../boxes/cCalendarBox.h"
+#include "../boxes/cHlsPeakBox.h"
+#include "../boxes/cHlsDotsBox.h"
 //}}}
 
 class cAppWindow : public cHls, public cD2dWindow, public cWinAudio {

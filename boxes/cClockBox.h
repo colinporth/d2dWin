@@ -1,7 +1,7 @@
 // cIndexBox.h
 #pragma once
-#include "../cD2dWindow.h"
-#include "../../../shared/utils/date.h"
+#include "../common/cD2dWindow.h"
+#include "../../shared/utils/date.h"
 //#include "../../date/tz.h"
 
 class cClockBox : public cD2dWindow::cBox {

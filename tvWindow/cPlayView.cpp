@@ -4,7 +4,7 @@
 
 #include "cPlayView.h"
 
-#include "../common/box/cAudFrameBox.h"
+#include "../boxes/cAudFrameBox.h"
 
 #pragma comment (lib,"avutil.lib")
 #pragma comment (lib,"avcodec.lib")

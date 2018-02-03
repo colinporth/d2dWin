@@ -4,11 +4,11 @@
 
 #include "../../shared/dvb/cWinDvb.h"
 
-#include "../common/box/cTsEpgBox.h"
-#include "../common/box/cTsPidBox.h"
-#include "../common/box/cIntBox.h"
-#include "../common/box/cLogBox.h"
-#include "../common/box/cWindowBox.h"
+#include "../boxes/cTsEpgBox.h"
+#include "../boxes/cTsPidBox.h"
+#include "../boxes/cIntBox.h"
+#include "../boxes/cLogBox.h"
+#include "../boxes/cWindowBox.h"
 //}}}
 
 class cAppWindow : public cD2dWindow {
@@ -23,9 +23,9 @@ public:
     if (frequency) {
       mDvb = new cDvb ("c:/tv");
       if (mDvb->createGraph (frequency)) {
-        add (new cTuneBox (this, 40.f, kLineHeight, "bbc", 674));
-        add (new cTuneBox (this, 40.f, kLineHeight, "itv", 650), 42.f,0.f);
-        add (new cTuneBox (this, 40.f, kLineHeight, "hd", 706), 84.f,0.f);
+        add (new cTuneBox (this, 40.f, kLineHeight, mDvb, 650, "itv"));
+        add (new cTuneBox (this, 40.f, kLineHeight, mDvb, 674, "bbc"), 42.f,0.f);
+        add (new cTuneBox (this, 40.f, kLineHeight, mDvb, 706, "hd"), 84.f,0.f);
         add (new cIntBgndBox (this, 120.f, kLineHeight, "signal ", mDvb->mSignal), 126.f,0.f);
         add (new cUInt64BgndBox (this, 120.f, kLineHeight, "pkt ", mDvb->mPackets), 248.f,0.f);
         add (new cUInt64BgndBox (this, 120.f, kLineHeight, "dis ", mDvb->mDiscontinuity), 370.f,0.f);
@@ -68,16 +68,17 @@ private:
   class cTuneBox : public cBox {
   public:
     //{{{
-    cTuneBox (cD2dWindow* window, float width, float height, const string& title, int frequency) :
-        cBox ("tune", window, width, height), mTitle(title), mFrequency(frequency) {
+    cTuneBox (cD2dWindow* window, float width, float height, cDvb* dvb, int frequency, const string& title) :
+        cBox ("tune", window, width, height), mDvb(dvb), mFrequency(frequency), mTitle(title) {
       mPin = true;
       }
     //}}}
 
     //{{{
     bool onDown (bool right, cPoint pos)  {
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      appWindow->retune (mFrequency);
+
+      mDvb->stop();
+      mDvb->tune (mFrequency * 1000);
       return true;
       }
     //}}}
@@ -88,21 +89,19 @@ private:
       mWindow->getDwriteFactory()->CreateTextLayout (
         strToWstr(mTitle).data(), (uint32_t)mTitle.size(), mWindow->getTextFormat(),
         getSize().x, getSize().y, &textLayout);
-
       dc->FillRectangle (mRect, mWindow->getGreyBrush());
       dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
       dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-
       textLayout->Release();
       }
     //}}}
 
   private:
+    cDvb* mDvb;
     string mTitle;
     int mFrequency;
     };
   //}}}
-
   //{{{
   void fileThread (const string& fileName, cDumpTransportStream* ts) {
 
@@ -142,14 +141,9 @@ private:
     CoUninitialize();
     }
   //}}}
-  //{{{
-  void retune (int frequency) {
-    mDvb->stop();
-    mDvb->tune (frequency * 1000);
-    }
-  //}}}
-
+  //{{{  vars
   cDvb* mDvb = nullptr;
+  //}}}
   };
 
 // main

@@ -7,16 +7,14 @@
 #include "../../shared/utils/cFileList.h"
 
 #include "../common/cJpegImage.h"
-
-#include "../common/box/cCalendarBox.h"
-#include "../common/box/cClockBox.h"
-
 #include "../common/cJpegImageView.h"
-#include "../common/box/cFileListBox.h"
-#include "../common/box/cLogBox.h"
 
-#include "../common/box/cVolumeBox.h"
-#include "../common/box/cWindowBox.h"
+#include "../boxes/cCalendarBox.h"
+#include "../boxes/cClockBox.h"
+#include "../boxes/cFileListBox.h"
+#include "../boxes/cLogBox.h"
+#include "../boxes/cVolumeBox.h"
+#include "../boxes/cWindowBox.h"
 
 using namespace chrono;
 using namespace concurrency;

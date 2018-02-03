@@ -47,16 +47,14 @@
     <ClInclude Include="..\..\shared\utils\cFileList.h" />
     <ClInclude Include="..\..\shared\utils\cWinAudio.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
-    <ClInclude Include="..\common\box\cFileListBox.h" />
-    <ClInclude Include="..\common\box\cTsEpgBox.h" />
-    <ClInclude Include="..\common\box\cTsPidBox.h" />
+    <ClInclude Include="..\boxes\cClockBox.h" />
+    <ClInclude Include="..\boxes\cFileListBox.h" />
+    <ClInclude Include="..\boxes\cLogBox.h" />
+    <ClInclude Include="..\boxes\cTsEpgBox.h" />
+    <ClInclude Include="..\boxes\cWindowBox.h" />
     <ClInclude Include="..\common\cAudFrame.h" />
-    <ClInclude Include="..\common\cBoxes.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
-    <ClInclude Include="..\common\cLogBox.h" />
-    <ClInclude Include="..\common\cTitleBox.h" />
     <ClInclude Include="..\common\cVidFrame.h" />
-    <ClInclude Include="..\common\cWindowBox.h" />
     <ClInclude Include="cPlayView.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>

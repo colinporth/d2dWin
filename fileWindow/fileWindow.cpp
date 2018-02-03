@@ -11,16 +11,14 @@
 #include "../../shared/utils/format.h"
 
 #include "../common/cJpegImage.h"
-
-#include "../common/box/cCalendarBox.h"
-#include "../common/box/cClockBox.h"
-
-#include "../common/box/cLogBox.h"
 #include "../common/cJpegImageView.h"
 
-#include "../common/box/cValueBox.h"
-#include "../common/box/cFloatBox.h"
-#include "../common/box/cWindowBox.h"
+#include "../boxes/cCalendarBox.h"
+#include "../boxes/cClockBox.h"
+#include "../boxes/cLogBox.h"
+#include "../boxes/cValueBox.h"
+#include "../boxes/cFloatBox.h"
+#include "../boxes/cWindowBox.h"
 
 using namespace chrono;
 using namespace concurrency;

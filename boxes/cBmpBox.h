@@ -1,6 +1,6 @@
 // cBmpBox.h
 #pragma once
-#include "../cD2dWindow.h"
+#include "../common/cD2dWindow.h"
 
 class cBmpBox : public cD2dWindow::cBox {
 public:

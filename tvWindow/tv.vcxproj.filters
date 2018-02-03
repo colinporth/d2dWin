@@ -9,9 +9,6 @@
     <ClInclude Include="..\..\shared\utils\utils.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\cBoxes.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\cVidFrame.h">
       <Filter>header</Filter>
     </ClInclude>
@@ -24,15 +21,6 @@
     <ClInclude Include="..\common\cD2dWindow.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\cWindowBox.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\cLogBox.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\cTitleBox.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>header</Filter>
     </ClInclude>
@@ -40,12 +28,6 @@
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\box\cTsEpgBox.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\box\cTsPidBox.h">
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cWinDvb.h">
@@ -57,7 +39,19 @@
     <ClInclude Include="..\..\shared\utils\cFileList.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\box\cFileListBox.h">
+    <ClInclude Include="..\boxes\cClockBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cFileListBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cLogBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cTsEpgBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cWindowBox.h">
       <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>

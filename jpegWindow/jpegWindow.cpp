@@ -4,11 +4,11 @@
 
 #include "../common/cJpegImage.h"
 
-#include "../common/box/cFloatBox.h"
-#include "../common/box/cLogBox.h"
-#include "../common/box/cWindowBox.h"
-#include "../common/box/cClockBox.h"
-#include "../common/box/cCalendarBox.h"
+#include "../boxes/cFloatBox.h"
+#include "../boxes/cLogBox.h"
+#include "../boxes/cWindowBox.h"
+#include "../boxes/cClockBox.h"
+#include "../boxes/cCalendarBox.h"
 #include "../common/cJpegImageView.h"
 
 using namespace concurrency;

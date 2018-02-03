@@ -2,8 +2,8 @@
 //{{{  includes
 #pragma once
 
-#include "../cD2dWindow.h"
-#include "../../../shared/dvb/cTransportStream.h"
+#include "../common/cD2dWindow.h"
+#include "../../shared/dvb/cTransportStream.h"
 //}}}
 
 class cTsEpgBox : public cD2dWindow::cBox {

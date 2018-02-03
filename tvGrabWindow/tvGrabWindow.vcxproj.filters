@@ -23,22 +23,28 @@
     <ClInclude Include="..\..\shared\utils\cBipBuffer.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\cLogBox.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h">
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\box\cTsEpgBox.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\box\cTsPidBox.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cWinDvb.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cClockBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cLogBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cTsEpgBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cTsPidBox.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cWindowBox.h">
       <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>

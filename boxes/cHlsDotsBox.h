@@ -1,7 +1,7 @@
 // hlsDotsBox.h
 #pragma once
-#include "../cD2dWindow.h"
-#include "../../../shared/hls/hls.h"
+#include "../common/cD2dWindow.h"
+#include "../../shared/hls/hls.h"
 
 class cHlsDotsBox : public cD2dWindow::cBox {
 public:

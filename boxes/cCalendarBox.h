@@ -1,6 +1,6 @@
 // cCalendarBox.h
 #pragma once
-#include "../cD2dWindow.h"
+#include "../common/cD2dWindow.h"
 //#include "../../date/tz.h"
 
 class cCalendarBox : public cD2dWindow::cBox {

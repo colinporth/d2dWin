@@ -1,6 +1,6 @@
 // cWindowBox.h
 #pragma once
-#include "../cD2dWindow.h"
+#include "../common/cD2dWindow.h"
 
 class cWindowBox : public cD2dWindow::cBox {
 public:

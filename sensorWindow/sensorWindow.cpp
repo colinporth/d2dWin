@@ -2,12 +2,12 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "../common/box/cFloatBox.h"
-#include "../common/box/cValueBox.h"
-#include "../common/box/cIndexBox.h"
-#include "../common/box/cLogBox.h"
-#include "../common/box/cWindowBox.h"
-#include "../common/box/cClockBox.h"
+#include "../boxes/cFloatBox.h"
+#include "../boxes/cValueBox.h"
+#include "../boxes/cIndexBox.h"
+#include "../boxes/cLogBox.h"
+#include "../boxes/cWindowBox.h"
+#include "../boxes/cClockBox.h"
 
 #include "cSensor.h"
 //}}}
