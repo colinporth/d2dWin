@@ -60,7 +60,7 @@ private:
     cTuneSelect (cTsEpgBox* box, float textHeight, cRect r, cDvb* dvb, const string& name, int frequency) :
         cBoxItem(box, nullptr, textHeight, r), mDvb(dvb), mFrequency(frequency)  {
       mStr = name;
-      mBrush = mService->getShowEpg() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
+      mBrush = mBox->getWindow()->getWhiteBrush();
       }
     virtual ~cTuneSelect() {}
 
