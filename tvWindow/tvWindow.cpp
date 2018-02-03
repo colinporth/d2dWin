@@ -30,14 +30,14 @@ public:
       if (mDvb->createGraph (frequency * 1000)) {
         thread ([=]() { mDvb->grabThread(); }).detach();
         thread ([=]() { mDvb->signalThread(); }).detach();
-        add (new cDvbBox (this, getWidth()/2.f,0.f, mDvb))->setTimedOn();
+        add (new cDvbBox (this, 480.f,0.f, mDvb))->setTimedOn();
         }
       }
 
     // fileList
     mFileList = new cFileList (frequency || param.empty() ? mTvRoot : param, "*.ts");
     thread([=]() { mFileList->watchThread(); }).detach();
-    auto boxWidth = frequency ? getWidth()/2.f : 0.f;
+    auto boxWidth = frequency ? 480.f : 0.f;
     add (new cAppFileListBox (this, -boxWidth,0.f, mFileList), frequency ? boxWidth : 0.f, 0.f);
 
     // launch file player
