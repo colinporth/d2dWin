@@ -5,6 +5,7 @@
 #include "../../shared/dvb/cWinDvb.h"
 
 #include "../boxes/cTsEpgBox.h"
+#include "../boxes/cDvbBox.h"
 #include "../boxes/cTsPidBox.h"
 #include "../boxes/cIntBox.h"
 #include "../boxes/cLogBox.h"
@@ -23,14 +24,8 @@ public:
     if (frequency) {
       mDvb = new cDvb ("c:/tv");
       if (mDvb->createGraph (frequency)) {
-        add (new cTuneBox (this, 40.f, kLineHeight, mDvb, 650, "itv"));
-        add (new cTuneBox (this, 40.f, kLineHeight, mDvb, 674, "bbc"), 42.f,0.f);
-        add (new cTuneBox (this, 40.f, kLineHeight, mDvb, 706, "hd"), 84.f,0.f);
-        add (new cIntBgndBox (this, 120.f, kLineHeight, "signal ", mDvb->mSignal), 126.f,0.f);
-        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "pkt ", mDvb->mPackets), 248.f,0.f);
-        add (new cUInt64BgndBox (this, 120.f, kLineHeight, "dis ", mDvb->mDiscontinuity), 370.f,0.f);
-        add (new cTsEpgBox (this, getHeight()/2.f, -kLineHeight, mDvb), 0.f, kLineHeight);
-        add (new cTsPidBox (this, -getHeight()/2.f, -kLineHeight, mDvb), getHeight()/2.f, kLineHeight);
+        add (new cDvbBox (this, getHeight()/2.f, 0.f, mDvb));
+        add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
 
         thread ([=]() { mDvb->grabThread(); }).detach();
         thread ([=]() { mDvb->signalThread(); }).detach();
@@ -64,44 +59,6 @@ protected:
   //}}}
 
 private:
-  //{{{
-  class cTuneBox : public cBox {
-  public:
-    //{{{
-    cTuneBox (cD2dWindow* window, float width, float height, cDvb* dvb, int frequency, const string& title) :
-        cBox ("tune", window, width, height), mDvb(dvb), mFrequency(frequency), mTitle(title) {
-      mPin = true;
-      }
-    //}}}
-
-    //{{{
-    bool onDown (bool right, cPoint pos)  {
-
-      mDvb->stop();
-      mDvb->tune (mFrequency * 1000);
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (
-        strToWstr(mTitle).data(), (uint32_t)mTitle.size(), mWindow->getTextFormat(),
-        getSize().x, getSize().y, &textLayout);
-      dc->FillRectangle (mRect, mWindow->getGreyBrush());
-      dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
-      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-      textLayout->Release();
-      }
-    //}}}
-
-  private:
-    cDvb* mDvb;
-    string mTitle;
-    int mFrequency;
-    };
-  //}}}
   //{{{
   void fileThread (const string& fileName, cDumpTransportStream* ts) {
 

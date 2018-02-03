@@ -39,78 +39,28 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    const float kLineHeight = 16.f;
-    const float kSmallLineHeight = 13.f;
-
     if (!getTimedOn() || mWindow->getTimedMenuOn()) {
+      lock_guard<mutex> lockGuard (mTs->mMutex);
+      clear();
       if (mTs->mServiceMap.size() > 1) {
-        // construct services menu, !!! could check for ts service change here to cull rebuilding menu !!!
-        auto todayTime = mTs->getTime();
-        auto todayDatePoint = date::floor<date::days>(todayTime);
-        auto todayYearMonthDay = date::year_month_day{todayDatePoint};
-        auto today = todayYearMonthDay.day();
-
-        // line heights
-        auto lineHeight = (getHeight() / mTs->mServiceMap.size() > kLineHeight) ? kLineHeight : kSmallLineHeight;
-        auto bigLineHeight = lineHeight*4.f/3.f;
-        auto bgndRect = mRect;
-        auto r = mRect;
-        r.left += lineHeight / 5.f;
-
-        {
-        lock_guard<mutex> lockGuard (mTs->mMutex);
-        clear();
-        for (auto& service : mTs->mServiceMap) {
-          r.bottom = r.top + bigLineHeight;
-          mBoxItemVec.push_back (new cServiceName (this, &service.second, bigLineHeight, r));
-          r.top = r.bottom;
-
-          if (service.second.getNowEpgItem()) {
-            r.bottom = r.top + lineHeight;
-            mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs, lineHeight, r));
-            r.top = r.bottom;
-            }
-
-          if (service.second.getShowEpg()) {
-            for (auto epgItem : service.second.getEpgItemMap()) {
-              auto time = epgItem.second->getTime();
-              auto datePoint = date::floor<date::days>(time);
-              auto yearMonthDay = date::year_month_day{datePoint};
-              auto day = yearMonthDay.day();
-              if ((day == today) && (time > todayTime)) { // later today
-                r.bottom = r.top + lineHeight;
-                mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, lineHeight, r));
-                r.top = r.bottom;
-                }
-              }
-            }
-          r.top += lineHeight/4.f;
-          r.bottom = r.top + lineHeight;
-          }
-        }
-
-        // draw services boxItems
-        bgndRect.bottom = r.bottom;
-        dc->FillRectangle (bgndRect, mWindow->getTransparentBgndBrush());
-        for (auto boxItem : mBoxItemVec)
-          boxItem->onDraw (dc);
+        draw (dc, mRect);
         }
       }
     }
   //}}}
 
-private:
+protected:
   //{{{
   class cBoxItem {
   public:
-    cBoxItem (cTsEpgBox* box, cService* service, float textHeight, const cRect& r) :
+    cBoxItem (cTsEpgBox* box, cService* service, float textHeight, cRect r) :
       mBox(box), mService(service), mRect(r), mTextHeight(textHeight) {}
     ~cBoxItem() {}
 
     bool inside (const cPoint& pos) { return mRect.inside (pos); }
     void setRect (const cRect& r) { mRect = r; }
 
-    virtual void onDown() = 0;
+    virtual void onDown() {}
 
     virtual void onDraw (ID2D1DeviceContext* dc) {
       mRect.right = mRect.left + mBox->drawText (
@@ -129,9 +79,76 @@ private:
     };
   //}}}
   //{{{
+  void draw (ID2D1DeviceContext* dc, cRect r) {
+
+    auto todayTime = mTs->getTime();
+    auto todayDatePoint = date::floor<date::days>(todayTime);
+    auto todayYearMonthDay = date::year_month_day{todayDatePoint};
+    auto today = todayYearMonthDay.day();
+
+    const float kLineHeight = 16.f;
+    const float kSmallLineHeight = 13.f;
+
+    auto lineHeight = (getHeight() / mTs->mServiceMap.size() > kLineHeight) ? kLineHeight : kSmallLineHeight;
+    auto bigLineHeight = lineHeight*4.f/3.f;
+    r.left += lineHeight / 5.f;
+
+    for (auto& service : mTs->mServiceMap) {
+      r.bottom = r.top + bigLineHeight;
+      mBoxItemVec.push_back (new cServiceName (this, &service.second, bigLineHeight, r));
+      r.top = r.bottom;
+
+      if (service.second.getNowEpgItem()) {
+        r.bottom = r.top + lineHeight;
+        mBoxItemVec.push_back (new cServiceNow (this, &service.second, mTs, lineHeight, r));
+        r.top = r.bottom;
+        }
+
+      if (service.second.getShowEpg()) {
+        for (auto epgItem : service.second.getEpgItemMap()) {
+          auto time = epgItem.second->getTime();
+          auto datePoint = date::floor<date::days>(time);
+          auto yearMonthDay = date::year_month_day{datePoint};
+          auto day = yearMonthDay.day();
+          if ((day == today) && (time > todayTime)) { // later today
+            r.bottom = r.top + lineHeight;
+            mBoxItemVec.push_back (new cServiceEpg (this, &service.second, epgItem.second, lineHeight, r));
+            r.top = r.bottom;
+            }
+          }
+        }
+      r.top += lineHeight/4.f;
+      r.bottom = r.top + lineHeight;
+      }
+
+    // draw services boxItems
+    auto bgndRect = mRect;
+    bgndRect.bottom = r.bottom;
+    dc->FillRectangle (bgndRect, mWindow->getTransparentBgndBrush());
+    for (auto boxItem : mBoxItemVec)
+      boxItem->onDraw (dc);
+    }
+  //}}}
+  //{{{
+  void clear() {
+
+    while (!mBoxItemVec.empty()) {
+      auto boxItem = mBoxItemVec.back();
+      delete boxItem;
+      mBoxItemVec.pop_back();
+      }
+    }
+  //}}}
+
+  // vars
+  cTransportStream* mTs;
+  vector<cBoxItem*> mBoxItemVec;
+
+private:
+  //{{{
   class cServiceName : public cBoxItem {
   public:
-    cServiceName (cTsEpgBox* box, cService* service, float textHeight, const cRect& r) :
+    cServiceName (cTsEpgBox* box, cService* service, float textHeight, cRect r) :
         cBoxItem(box, service, textHeight, r) {
       mStr = service->getNameString();
       mBrush = mService->getShowEpg() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
@@ -144,7 +161,7 @@ private:
   //{{{
   class cServiceNow : public cBoxItem {
   public:
-    cServiceNow (cTsEpgBox* box, cService* service, cTransportStream* ts, float textHeight, const cRect& r) :
+    cServiceNow (cTsEpgBox* box, cService* service, cTransportStream* ts, float textHeight, cRect r) :
         cBoxItem(box, service, textHeight,  r), mTs(ts) {
 
       mStr = "- " + date::format ("%H:%M", floor<seconds>(mService->getNowEpgItem()->getTime())) +
@@ -171,7 +188,7 @@ private:
   //{{{
   class cServiceEpg : public cBoxItem {
   public:
-    cServiceEpg (cTsEpgBox* box, cService* service, cEpgItem* epgItem, float textHeight, const cRect& r) :
+    cServiceEpg (cTsEpgBox* box, cService* service, cEpgItem* epgItem, float textHeight, cRect r) :
         cBoxItem(box, service, textHeight, r), mEpgItem(epgItem) {
       mStr = "  " + date::format ("%H:%M", floor<seconds>(mEpgItem->getTime())) +
              " " + mEpgItem->getTitleString();
@@ -185,19 +202,4 @@ private:
     cEpgItem* mEpgItem;
     };
   //}}}
-
-  //{{{
-  void clear() {
-
-    while (!mBoxItemVec.empty()) {
-      auto boxItem = mBoxItemVec.back();
-      delete boxItem;
-      mBoxItemVec.pop_back();
-      }
-    }
-  //}}}
-
-  // vars
-  cTransportStream* mTs;
-  vector<cBoxItem*> mBoxItemVec;
   };
