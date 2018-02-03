@@ -48,7 +48,7 @@ public:
 
       r = mRect;
       r.top += kLineHeight;
-      cTsEpgBox::draw (dc, r);
+      draw (dc, r);
       }
     }
   //}}}
