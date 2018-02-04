@@ -20,10 +20,10 @@ public:
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,0, true), 0,200.f);
 
-    auto frequency = param.empty() ? 674 : atoi(param.c_str());
+    auto frequency = param.empty() ? 706 : atoi (param.c_str());
     if (frequency) {
-      mDvb = new cDvb ("c:/tv");
-      if (mDvb->createGraph (frequency)) {
+      mDvb = new cDvb (rootName);
+      if (mDvb->createGraph (frequency * 1000)) {
         add (new cDvbBox (this, getHeight()/2.f, 0.f, mDvb));
         add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
 
@@ -120,7 +120,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     }
 
   cAppWindow appWindow;
-  string rootName = "c:/tv";
+  string rootName = "/tv";
   appWindow.run ("tvGrabWindow", 1050, 900, param, rootName);
 
   CoUninitialize();
