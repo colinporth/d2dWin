@@ -108,7 +108,7 @@ private:
     }
   //}}}
   //{{{  vars
-  string mTvRoot = "c:/tv";
+  string mTvRoot = "/tv";
   cDvb* mDvb = nullptr;
   cFileList* mFileList;
   cBox* mPlayFocus;

@@ -16,7 +16,7 @@ public:
       : cBox("audioBox", window, width, height), mAudFrame(audFrame), mAudio(audio) {
     mPin = true;
 
-    mWindow->getDc()->CreateSolidColorBrush (ColorF (0.8f, 0.1f, 0.1f, 0.5f), &mBrush);
+    window->getDc()->CreateSolidColorBrush (ColorF (0.8f, 0.1f, 0.1f, 0.5f), &mBrush);
     }
   //}}}
   //{{{
@@ -30,20 +30,14 @@ public:
 
     if (mAudFrame) {
       if (mAudFrame->mChannels == 6) {
-        auto audio = dynamic_cast<iAudio*>(mWindow);
-        if (!audio)
-          audio = dynamic_cast<iAudio*>(this);
-        if (!audio)
-          return false;
-
-        if ((1.f - (pos.y / getHeight())) > (audio->getVolume() / audio->getMaxVolume()))
-          audio->setMixDown (iAudio::eBestMix);
+        if ((1.f - (pos.y / getHeight())) > (mAudio->getVolume() / mAudio->getMaxVolume()))
+          mAudio->setMixDown (iAudio::eBestMix);
         else {
           const iAudio::eMixDown kLookup[5] = { iAudio::eBLBR, iAudio::eFLFR,
                                                 iAudio::eCentre,
                                                 iAudio::eFLFR, iAudio::eBLBR };
           auto barIndex = int(5.f * pos.x / getWidth());
-          audio->setMixDown (kLookup[barIndex]);
+          mAudio->setMixDown (kLookup[barIndex]);
           }
         }
       }
@@ -60,7 +54,7 @@ public:
     if (!audio)
       return false;
 
-    audio->setMixDown (iAudio::eBestMix);
+    mAudio->setMixDown (iAudio::eBestMix);
     return true;
     }
   //}}}
@@ -73,7 +67,7 @@ public:
     if (!audio)
       return false;
 
-    audio->setVolume (audio->getVolume() + delta/1200.f);
+    mAudio->setVolume (mAudio->getVolume() + delta/1200.f);
     return true;
     }
   //}}}
