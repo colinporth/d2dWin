@@ -60,7 +60,7 @@ private:
     cTune (cTsEpgBox* box, float textHeight, cRect r, cDvb* dvb, const string& name, int frequency) :
         cBoxItem(box, nullptr, textHeight, r), mDvb(dvb), mFrequency(frequency)  {
       mStr = name;
-      mBrush = (mDvb->getFrequency() == frequency  * 1000) ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getGreyBrush();
+      mBrush = (mDvb->getFrequency() == (frequency*1000)) ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getGreyBrush();
       }
     virtual ~cTune() {}
 
@@ -80,7 +80,7 @@ private:
     cValue (cTsEpgBox* box, float textHeight, cRect r, const string& name) :
         cBoxItem(box, nullptr, textHeight, r) {
       mStr = name;
-      mBrush = mBox->getWindow()->getWhiteBrush();
+      mBrush = mBox->getWindow()->getBlueBrush();
       }
 
     virtual ~cValue() {}

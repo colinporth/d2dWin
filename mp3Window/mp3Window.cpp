@@ -47,6 +47,7 @@ public:
     mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-220.f, false, false, mFrameSet.mImage));
 
     mFileList = new cFileList (fileName, "*.mp3");
+    thread([=]() { mFileList->watchThread(); }).detach();
     add (new cAppFileListBox (this, 0.f,-220.f, mFileList));
 
     add (new cFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
