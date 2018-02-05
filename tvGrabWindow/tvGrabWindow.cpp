@@ -18,6 +18,7 @@ public:
   void run (const string& title, int width, int height, const string& param, const string& rootName) {
 
     initialise (title, width, height, false);
+    setChangeCountDown (4);
     add (new cLogBox (this, 200.f,0, true), 0,200.f);
 
     auto frequency = param.empty() ? 706 : atoi (param.c_str());
@@ -104,6 +105,7 @@ private:
   };
 
 // main
+//{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
@@ -125,3 +127,4 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   CoUninitialize();
   }
+//}}}
