@@ -21,7 +21,7 @@ public:
     setChangeCountDown (4);
     add (new cLogBox (this, 200.f,0, true), 0,200.f);
 
-    auto frequency = param.empty() ? 706 : atoi (param.c_str());
+    auto frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
       mDvb = new cDvb (rootName);
       if (mDvb->createGraph (frequency * 1000)) {
@@ -33,15 +33,18 @@ public:
         }
       }
     else {
-      auto ts = new cDumpTransportStream (rootName, false);
-      thread ([=]() { fileThread (param, ts); }).detach();
-      add (new cTsEpgBox (this, getHeight()/2.f, 0.f, ts), 0.f,0.f);
-      add (new cTsPidBox (this, getHeight()/2.f, 0.f, ts), getHeight()/2.f,0.f);
+      mDumpTs = new cDumpTransportStream (rootName, false);
+      thread ([=]() { fileThread (param, mDumpTs); }).detach();
+      add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDumpTs), 0.f,0.f);
+      add (new cTsPidBox (this, getHeight()/2.f, 0.f, mDumpTs), getHeight()/2.f,0.f);
       }
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
     messagePump();
+
+    delete mDvb;
+    delete mDumpTs;
     }
   //}}}
 
@@ -101,6 +104,7 @@ private:
   //}}}
   //{{{  vars
   cDvb* mDvb = nullptr;
+  cDumpTransportStream* mDumpTs;
   //}}}
   };
 
