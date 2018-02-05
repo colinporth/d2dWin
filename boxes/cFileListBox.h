@@ -48,6 +48,8 @@ public:
         row++;
         }
 
+      mFileList->nextSort();
+      mWindow->changed();
       mPressed = false;
       }
 
