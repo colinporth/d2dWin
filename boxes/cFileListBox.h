@@ -39,7 +39,7 @@ public:
 
       int row = 0;
       pos += getTL();
-      for (auto& item : mRowRectVec) {
+      for (auto& item : mRowVec) {
         if (item.inside (pos)) {
           mPressedIndex = mFirstRowIndex + row;
           mPressed = true;
@@ -92,7 +92,7 @@ public:
 
     if (mWindow->getTimedMenuOn()) {
       auto lineHeight = getLineHeight();
-      auto textHeight = getLineHeight()*5.f/6.f;
+      auto textHeight = lineHeight*5.f/6.f;
 
       if (!mPressed && mScrollInc)
         incScroll (mScrollInc * 0.9f);
@@ -107,10 +107,10 @@ public:
 
       dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
 
-      mRowRectVec.clear();
+      mRowVec.clear();
 
-      float maxFieldWidth[3] = { 0.f };
-      auto point = cPoint (mRect.left + 2.f, mRect.top + 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
+      float maxFieldWidth[cFileItem::kFields] = { 0.f };
+      auto point = cPoint (0.f, mRect.top + 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
       auto index = mFirstRowIndex;
       for (auto row = 0u;
            (point.y < mRect.bottom) && (index < mFileList->size());
@@ -121,43 +121,37 @@ public:
             mFileList->isCurIndex (index) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
 
         auto& fileItem = mFileList->getFileItem (index);
-        string str[3];
-        str[0] = fileItem.getFileName();
-        str[1] = fileItem.getFileSizeString();
-        str[2] = fileItem.getCreationString();
 
-        IDWriteTextLayout* textLayout[3];
-        struct DWRITE_TEXT_METRICS textMetrics[3];
-        for (auto i = 0; i < 3; i++) {
+        IDWriteTextLayout* textLayout[cFileItem::kFields];
+        struct DWRITE_TEXT_METRICS textMetrics[cFileItem::kFields];
+        for (auto i = 0u; i < cFileItem::kFields; i++) {
+          auto str = fileItem.getFieldString (i);
           mWindow->getDwriteFactory()->CreateTextLayout (
-            wstring (str[i].begin(), str[i].end()).data(), (uint32_t)str[i].size(), getWindow()->getTextFormat(),
+            wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
             mRect.getWidth(), lineHeight, &textLayout[i]);
-          textLayout[i]->SetFontSize (textHeight, {0, (uint32_t)str[i].size()});
+          textLayout[i]->SetFontSize (textHeight, {0, (uint32_t)str.size()});
           textLayout[i]->GetMetrics (&textMetrics[i]);
           maxFieldWidth[i] = max (textMetrics[i].width, maxFieldWidth[i]);
           }
 
         auto p = point;
-        dc->DrawTextLayout (p, textLayout[0], brush);
-        p.x = mMaxWidth - textMetrics[2].width;
-        dc->DrawTextLayout (p, textLayout[2], brush);
-        p.x = mMaxWidth - mMaxFieldWidth[2] - textHeight - textMetrics[1].width;
-        dc->DrawTextLayout (p, textLayout[1], brush);
-
-        for (auto i = 0; i < 3; i++)
+        for (auto i = 0u; i < cFileItem::kFields; i++) {
+          p.x = i ? mFieldStop[i] - textMetrics[i].width : textHeight/2.f;
+          dc->DrawTextLayout (p, textLayout[i], brush);
           textLayout[i]->Release();
+          }
 
-        mRowRectVec.push_back (cRect (point.x, point.y, p.x, point.y + lineHeight));
+        mRowVec.push_back (cRect (point.x, point.y, p.x, point.y + lineHeight));
         }
 
       mBgndRect = mRect;
-      mBgndRect.right = mRect.left + mMaxWidth + getLineHeight()/4.f;
+      mBgndRect.right = mRect.left + mMaxWidth + lineHeight/4.f;
       mBgndRect.bottom = point.y;
 
-      mMaxWidth = 2.f * textHeight;
-      for (auto i = 0; i < 3; i++) {
-        mMaxWidth += maxFieldWidth[i];
-        mMaxFieldWidth[i] = maxFieldWidth[i];
+      mMaxWidth = 0.f;
+      for (auto i = 0u; i < cFileItem::kFields; i++) {
+        mMaxWidth += maxFieldWidth[i] + textHeight/2.f;
+        mFieldStop[i] = mMaxWidth - textHeight/4.f;
         }
       }
     }
@@ -196,10 +190,10 @@ private:
   // vars
   cFileList* mFileList;
 
-  cRect mBgndRect;
+  concurrency::concurrent_vector <cRect> mRowVec;
+  float mFieldStop[cFileItem::kFields] = { 0.f };
   float mMaxWidth = 0.f;
-  float mMaxFieldWidth[3] = { 0.f };
-  concurrency::concurrent_vector <cRect> mRowRectVec;
+  cRect mBgndRect;
 
   unsigned mFirstRowIndex = 0;
   unsigned mPressedIndex = 0;
