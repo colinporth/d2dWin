@@ -18,13 +18,13 @@
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (string title, int width, int height, const string& param) {
+  void run (string title, int width, int height, const string& rootOrFrequency) {
 
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f);
     add (new cClockBox (this, 40.f, mTimePoint), -84.f,2.f);
 
-    int frequency = atoi (param.c_str());
+    int frequency = atoi (rootOrFrequency.c_str());
     if (frequency) {
       mDvb = new cDvb (mTvRoot);
       if (mDvb->createGraph (frequency * 1000)) {
@@ -35,7 +35,7 @@ public:
       }
 
     // fileList
-    mFileList = new cFileList (frequency || param.empty() ? mTvRoot : param, "*.ts");
+    mFileList = new cFileList (frequency || rootOrFrequency.empty() ? mTvRoot : rootOrFrequency, "*.ts");
     thread([=]() { mFileList->watchThread(); }).detach();
     auto boxWidth = frequency ? 480.f : 0.f;
     add (new cAppFileListBox (this, -boxWidth,0.f, mFileList), frequency ? boxWidth : 0.f, 0.f);
@@ -121,17 +121,18 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO, true); // false, "C:/Users/colin/Desktop");
 
-  string param;
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
+
+  string rootOrFrequency;
   if (numArgs > 1) {
     // get fileName from commandLine
     wstring wstr (args[1]);
-    param = string (wstr.begin(), wstr.end());
+    rootOrFrequency = string (wstr.begin(), wstr.end());
     }
 
   cAppWindow appWindow;
-  appWindow.run ("tvWindow", 1920/2, 1080/2, param);
+  appWindow.run ("tvWindow", 1920/2, 1080/2, rootOrFrequency);
 
   CoUninitialize();
   }
