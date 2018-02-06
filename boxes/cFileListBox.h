@@ -98,48 +98,67 @@ public:
         incScroll (mScrollInc * 0.9f);
 
       mFirstRowIndex = int(mScroll / lineHeight);
+      //{{{  tricky sync of scroll to curIndex
       //if (!mMoved && (mFileList->getIndex() < mFirstRowIndex)) {
       //  mScroll -= lineHeight;
       //  mFirstRowIndex = int(mScroll / lineHeight);
       //  }
+      //}}}
 
       dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
 
-      auto maxWidth = 0.f;
+      mRowRectVec.clear();
+
+      float maxFieldWidth[3] = { 0.f };
       auto point = cPoint (mRect.left + 2.f, mRect.top + 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
       auto index = mFirstRowIndex;
       for (auto row = 0u;
            (point.y < mRect.bottom) && (index < mFileList->size());
            row++, index++, point.y += lineHeight) {
 
-        auto& fileItem = mFileList->getFileItem (index);
-        auto str = fileItem.getFileName() +
-                   " " + fileItem.getFileSizeString() +
-                   " " + fileItem.getCreationTimeString();
         auto brush = (mPressed && !mMoved && (index == mPressedIndex)) ?
           mWindow->getYellowBrush() :
             mFileList->isCurIndex (index) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
 
-        IDWriteTextLayout* textLayout;
-        mWindow->getDwriteFactory()->CreateTextLayout (
-          wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
-          mRect.getWidth(), lineHeight, &textLayout);
-        textLayout->SetFontSize (textHeight, {0, (uint32_t)str.size()});
-        struct DWRITE_TEXT_METRICS textMetrics;
-        textLayout->GetMetrics (&textMetrics);
-        maxWidth = max(textMetrics.width, maxWidth);
-        dc->DrawTextLayout (point, textLayout, brush);
-        textLayout->Release();
+        auto& fileItem = mFileList->getFileItem (index);
+        string str[3];
+        str[0] = fileItem.getFileName();
+        str[1] = fileItem.getFileSizeString();
+        str[2] = fileItem.getCreationString();
 
-        if (row >= (int)mRowRectVec.size())
-          mRowRectVec.push_back (cRect (point, point + cPoint(textMetrics.width,lineHeight)));
-        else
-          mRowRectVec[row] = cRect (point, point + cPoint(textMetrics.width,lineHeight));
+        IDWriteTextLayout* textLayout[3];
+        struct DWRITE_TEXT_METRICS textMetrics[3];
+        for (auto i = 0; i < 3; i++) {
+          mWindow->getDwriteFactory()->CreateTextLayout (
+            wstring (str[i].begin(), str[i].end()).data(), (uint32_t)str[i].size(), getWindow()->getTextFormat(),
+            mRect.getWidth(), lineHeight, &textLayout[i]);
+          textLayout[i]->SetFontSize (textHeight, {0, (uint32_t)str[i].size()});
+          textLayout[i]->GetMetrics (&textMetrics[i]);
+          maxFieldWidth[i] = max (textMetrics[i].width, maxFieldWidth[i]);
+          }
+
+        auto p = point;
+        dc->DrawTextLayout (p, textLayout[0], brush);
+        p.x = mMaxWidth - textMetrics[2].width;
+        dc->DrawTextLayout (p, textLayout[2], brush);
+        p.x = mMaxWidth - mMaxFieldWidth[2] - textHeight - textMetrics[1].width;
+        dc->DrawTextLayout (p, textLayout[1], brush);
+
+        for (auto i = 0; i < 3; i++)
+          textLayout[i]->Release();
+
+        mRowRectVec.push_back (cRect (point.x, point.y, p.x, point.y + lineHeight));
         }
 
       mBgndRect = mRect;
-      mBgndRect.right = mRect.left + maxWidth + getLineHeight()/4.f;
+      mBgndRect.right = mRect.left + mMaxWidth + getLineHeight()/4.f;
       mBgndRect.bottom = point.y;
+
+      mMaxWidth = 2.f * textHeight;
+      for (auto i = 0; i < 3; i++) {
+        mMaxWidth += maxFieldWidth[i];
+        mMaxFieldWidth[i] = maxFieldWidth[i];
+        }
       }
     }
   //}}}
@@ -178,6 +197,8 @@ private:
   cFileList* mFileList;
 
   cRect mBgndRect;
+  float mMaxWidth = 0.f;
+  float mMaxFieldWidth[3] = { 0.f };
   concurrency::concurrent_vector <cRect> mRowRectVec;
 
   unsigned mFirstRowIndex = 0;
@@ -188,4 +209,5 @@ private:
   float mMoveInc = 0;
   float mScroll = 0.f;
   float mScrollInc = 0.f;
+
   };
