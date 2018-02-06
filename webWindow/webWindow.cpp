@@ -131,8 +131,8 @@ public:
 class cMap {
 public:
   //{{{
-  cMap (cMapSpec mapSpec, cMapPlace* mapPlace, cD2dWindow* window, const string& arg) :
-      mMapSpec(mapSpec), mMapPlace(mapPlace), mWindow(window), mArg(arg) {
+  cMap (cMapSpec mapSpec, cMapPlace* mapPlace, cD2dWindow* window, const string& root) :
+      mMapSpec(mapSpec), mMapPlace(mapPlace), mWindow(window), mRoot(root) {
 
     // just make zoom index the zoomTileSet, 0 never used, many others may not be used, less maths
     for (auto i = 0; i <= kMaxZoom; i++)
@@ -329,7 +329,7 @@ public:
   void dumpEmpty() {
 
     for (int zoom = mMapSpec.mMinZoom; zoom <= mMapSpec.mMaxZoom; zoom++) {
-      auto fileName = mArg + mMapSpec.mFileRoot + "/" + dec(zoom) + "/empty.txt";
+      auto fileName = mRoot + mMapSpec.mFileRoot + "/" + dec(zoom) + "/empty.txt";
       auto writeFile = fopen (fileName.c_str(), "w");
 
       for (auto tile : mTileSet[zoom]->mEmptyTileSet) {
@@ -384,7 +384,7 @@ public:
 
     auto totalFileCount = 0;
     for (auto zoom = mMapSpec.mMinZoom; zoom <= mMapSpec.mMaxZoom; zoom++) {
-      string searchStr = mArg + mMapSpec.mFileRoot + "/" + dec(zoom) + "/*";
+      string searchStr = mRoot + mMapSpec.mFileRoot + "/" + dec(zoom) + "/*";
 
       auto fileCount = 0;
       WIN32_FIND_DATA findFileData;
@@ -412,7 +412,7 @@ public:
 
     int emptyTileCount = 0;
     for (auto zoom = mMapSpec.mMinZoom; zoom <= mMapSpec.mMaxZoom; zoom++) {
-      auto fileName = mArg + mMapSpec.mFileRoot  + "/" + dec(zoom)+ "/empty.txt";
+      auto fileName = mRoot + mMapSpec.mFileRoot  + "/" + dec(zoom)+ "/empty.txt";
       auto readFile = fopen (fileName.c_str(), "r");
       if (readFile) {
         string quadKey;
@@ -451,7 +451,7 @@ public:
         mLoadSem.wait();
       else {
         auto time = system_clock::now();
-        auto fileName = mArg + mMapSpec.mFileRoot + "/" + dec(quadKey.size()) + "/" + quadKey + ".jpg";
+        auto fileName = mRoot + mMapSpec.mFileRoot + "/" + dec(quadKey.size()) + "/" + quadKey + ".jpg";
         auto fileHandle = CreateFile (fileName.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
         if (fileHandle == 0  || (fileHandle > (HANDLE)0xFFFFFFF)) {
           // no file, download
@@ -679,7 +679,7 @@ private:
   const cMapSpec mMapSpec;
   cMapPlace* mMapPlace;
   cD2dWindow* mWindow;
-  string mArg;
+  string mRoot;
 
   int mScale = 1;
 
@@ -995,14 +995,14 @@ public:
   const cMapPlace kPerranporth = { 50.3444, -5.1544, 14 };
 
   //{{{
-  void run (const string& title, int width, int height, const string& arg) {
+  void run (const string& title, int width, int height, const string& root) {
 
     initialise (title, width, height, true);
 
     auto mapPlace = new cMapPlace (kPerranporth);
 
-    mMaps.push_back (new cMap (kOrdSurveyUk, mapPlace, this, arg));
-    mMaps.push_back (new cMap (kAerial, mapPlace, this, arg));
+    mMaps.push_back (new cMap (kOrdSurveyUk, mapPlace, this, root));
+    mMaps.push_back (new cMap (kAerial, mapPlace, this, root));
     //mMaps.push_back (new cMap (kRoadUk, mapPlace, this));
     mMap = mMaps[0];
 
@@ -1103,16 +1103,13 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-
-  string arg;
+  string root;
   if (numArgs > 1) {
     // get fileName from commandLine
     wstring wstr (args[1]);
-    arg = string (wstr.begin(), wstr.end());
+    root = string (wstr.begin(), wstr.end());
     }
-  else
-    arg = "D:";
-  cLog::log (LOGNOTICE, "arg - " + arg);
+  cLog::log (LOGNOTICE, "root - " + root);
 
   WSADATA wsaData;
   if (WSAStartup (MAKEWORD(2,2), &wsaData)) {
@@ -1123,7 +1120,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     //}}}
 
   cAppWindow appWindow;
-  appWindow.run ("webWindow", 1920/2 , 1080/2, arg);
+  appWindow.run ("webWindow", 1920/2 , 1080/2, root);
 
   CoUninitialize();
   }
