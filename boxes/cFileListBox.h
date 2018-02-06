@@ -110,12 +110,10 @@ public:
       mRowVec.clear();
 
       float maxFieldWidth[cFileItem::kFields] = { 0.f };
-      auto point = cPoint (0.f, mRect.top + 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
-      auto index = mFirstRowIndex;
-      for (auto row = 0u;
-           (point.y < mRect.bottom) && (index < mFileList->size());
-           row++, index++, point.y += lineHeight) {
 
+      auto index = mFirstRowIndex;
+      auto point = cPoint (0.f, mRect.top + 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
+      while ((index < mFileList->size()) && (point.y < mRect.bottom)) {
         auto brush = (mPressed && !mMoved && (index == mPressedIndex)) ?
           mWindow->getYellowBrush() :
             mFileList->isCurIndex (index) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
@@ -141,7 +139,9 @@ public:
           textLayout[i]->Release();
           }
 
-        mRowVec.push_back (cRect (point.x, point.y, p.x, point.y + lineHeight));
+        mRowVec.push_back (cRect (point, point + cPoint(textMetrics[0].width, lineHeight)));
+        point.y += lineHeight;
+        index++;
         }
 
       mBgndRect = mRect;
