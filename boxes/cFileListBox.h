@@ -134,7 +134,7 @@ public:
 
         auto p = point;
         for (auto i = 0u; i < cFileItem::kFields; i++) {
-          p.x = i ? mFieldStop[i] - textMetrics[i].width : textHeight/2.f;
+          p.x = mRect.left + (i ? mFieldStop[i] - textMetrics[i].width : textHeight/2.f);
           dc->DrawTextLayout (p, textLayout[i], brush);
           textLayout[i]->Release();
           }
