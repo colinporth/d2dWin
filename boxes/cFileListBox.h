@@ -105,7 +105,7 @@ public:
       //  }
       //}}}
 
-      float maxFieldWidth[cFileItem::kFields] = { 0.f };
+      float maxColumnWidth[cFileItem::kFields] = { 0.f };
 
       // layout visible rows
       mRowVec.clear();
@@ -122,7 +122,7 @@ public:
             mRect.getWidth(), lineHeight, &row.mTextLayout[field]);
           row.mTextLayout[field]->SetFontSize (textHeight, {0, (uint32_t)str.size()});
           row.mTextLayout[field]->GetMetrics (&row.mTextMetrics[field]);
-          maxFieldWidth[field] = max (row.mTextMetrics[field].width, maxFieldWidth[field]);
+          maxColumnWidth[field] = max (row.mTextMetrics[field].width, maxColumnWidth[field]);
           }
         row.mRect = cRect(point, point + cPoint(row.mTextMetrics[0].width, lineHeight));
         row.mBrush = (mPressed && !mMoved && (index == mPressedIndex)) ?
@@ -134,26 +134,26 @@ public:
         index++;
         }
 
-      //{{{  layout fieldStops
-      mMaxWidth = 0.f;
+      //{{{  layout and draw rows
+      // layout fieldStops
+      mColumnsWidth = 0.f;
       for (auto field = 0u; field < cFileItem::kFields; field++) {
-        mMaxWidth += maxFieldWidth[field] + textHeight/2.f;
-        mFieldStop[field] = mMaxWidth - textHeight/4.f;
+        mColumnsWidth += maxColumnWidth[field] + textHeight/2.f;
+        mColumn[field] = mColumnsWidth - 2.f;
         }
-      //}}}
-      //{{{  layout,draw bgnd
-      mBgndRect = mRect;
-      mBgndRect.right = mRect.left + mMaxWidth + lineHeight/4.f;
-      mBgndRect.bottom = point.y;
 
+      // layout,draw bgnd
+      mBgndRect = mRect;
+      mBgndRect.right = mRect.left + mColumnsWidth + lineHeight/2.f;
+      mBgndRect.bottom = point.y;
       dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
-      //}}}
-      //{{{  layout,draw fields
+
+      // layout,draw fields
       for (auto& row : mRowVec) {
-        auto p = row.mRect.getTL();
         for (auto field = 0u; field < cFileItem::kFields; field++) {
-          p.x = mRect.left + (field ? mFieldStop[field] - row.mTextMetrics[field].width : textHeight/2.f);
-          dc->DrawTextLayout (p, row.mTextLayout[field], row.mBrush);
+          dc->DrawTextLayout (row.mRect.getTL() + 
+              cPoint (row.mRect.left + (field ? mColumn[field] - row.mTextMetrics[field].width : 2.f), 0.f),
+            row.mTextLayout[field], row.mBrush);
           row.mTextLayout[field]->Release();
           }
         }
@@ -208,8 +208,8 @@ private:
   //}}}
   concurrency::concurrent_vector <cRow> mRowVec;
 
-  float mFieldStop[cFileItem::kFields] = { 0.f };
-  float mMaxWidth = 0.f;
+  float mColumn[cFileItem::kFields] = { 0.f };
+  float mColumnsWidth = 0.f;
   cRect mBgndRect;
 
   unsigned mFirstRowIndex = 0;
