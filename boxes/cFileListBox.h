@@ -151,8 +151,8 @@ public:
       // layout,draw fields
       for (auto& row : mRowVec) {
         for (auto field = 0u; field < cFileItem::kFields; field++) {
-          dc->DrawTextLayout (row.mRect.getTL() +
-              cPoint (row.mRect.left + (field ? mColumn[field] - row.mTextMetrics[field].width : 2.f), 0.f),
+          dc->DrawTextLayout (
+            row.mRect.getTL() + cPoint (field ? mColumn[field]-row.mTextMetrics[field].width : 2.f, 0.f),
             row.mTextLayout[field], row.mBrush);
           row.mTextLayout[field]->Release();
           }

@@ -62,6 +62,9 @@ public:
 
     // loop till quit
     messagePump();
+
+    delete mFileList;
+    delete mJpegImageView;
     }
   //}}}
 
@@ -718,9 +721,10 @@ private:
   bool mChanged = false;
   bool mPlaying = true;
 
+  cSemaphore mPlayDoneSem;
+
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;
-  cSemaphore mPlayDoneSem;
   //}}}
   };
 
