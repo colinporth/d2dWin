@@ -40,7 +40,7 @@ public:
       int row = 0;
       pos += getTL();
       for (auto& item : mRowVec) {
-        if (item.inside (pos)) {
+        if (item.mRect.inside (pos)) {
           mPressedIndex = mFirstRowIndex + row;
           mPressed = true;
           return false;
@@ -105,54 +105,59 @@ public:
       //  }
       //}}}
 
-      dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
-
-      mRowVec.clear();
-
       float maxFieldWidth[cFileItem::kFields] = { 0.f };
 
+      // layout visible rows
+      mRowVec.clear();
       auto index = mFirstRowIndex;
-      auto point = cPoint (0.f, mRect.top + 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
+      auto point = mRect.getTL() + cPoint (0.f, 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
       while ((index < mFileList->size()) && (point.y < mRect.bottom)) {
-        auto brush = (mPressed && !mMoved && (index == mPressedIndex)) ?
-          mWindow->getYellowBrush() :
-            mFileList->isCurIndex (index) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
-
+        // layout row
+        cRow row;
         auto& fileItem = mFileList->getFileItem (index);
-
-        IDWriteTextLayout* textLayout[cFileItem::kFields];
-        struct DWRITE_TEXT_METRICS textMetrics[cFileItem::kFields];
-        for (auto i = 0u; i < cFileItem::kFields; i++) {
-          auto str = fileItem.getFieldString (i);
+        for (auto field = 0u; field < cFileItem::kFields; field++) {
+          auto str = fileItem.getFieldString (field);
           mWindow->getDwriteFactory()->CreateTextLayout (
             wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
-            mRect.getWidth(), lineHeight, &textLayout[i]);
-          textLayout[i]->SetFontSize (textHeight, {0, (uint32_t)str.size()});
-          textLayout[i]->GetMetrics (&textMetrics[i]);
-          maxFieldWidth[i] = max (textMetrics[i].width, maxFieldWidth[i]);
+            mRect.getWidth(), lineHeight, &row.mTextLayout[field]);
+          row.mTextLayout[field]->SetFontSize (textHeight, {0, (uint32_t)str.size()});
+          row.mTextLayout[field]->GetMetrics (&row.mTextMetrics[field]);
+          maxFieldWidth[field] = max (row.mTextMetrics[field].width, maxFieldWidth[field]);
           }
+        row.mRect = cRect(point, point + cPoint(row.mTextMetrics[0].width, lineHeight));
+        row.mBrush = (mPressed && !mMoved && (index == mPressedIndex)) ?
+          mWindow->getYellowBrush() :
+            mFileList->isCurIndex (index) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
+        mRowVec.push_back (row);
 
-        auto p = point;
-        for (auto i = 0u; i < cFileItem::kFields; i++) {
-          p.x = mRect.left + (i ? mFieldStop[i] - textMetrics[i].width : textHeight/2.f);
-          dc->DrawTextLayout (p, textLayout[i], brush);
-          textLayout[i]->Release();
-          }
-
-        mRowVec.push_back (cRect (point, point + cPoint(textMetrics[0].width, lineHeight)));
         point.y += lineHeight;
         index++;
         }
 
+      //{{{  layout fieldStops
+      mMaxWidth = 0.f;
+      for (auto field = 0u; field < cFileItem::kFields; field++) {
+        mMaxWidth += maxFieldWidth[field] + textHeight/2.f;
+        mFieldStop[field] = mMaxWidth - textHeight/4.f;
+        }
+      //}}}
+      //{{{  layout,draw bgnd
       mBgndRect = mRect;
       mBgndRect.right = mRect.left + mMaxWidth + lineHeight/4.f;
       mBgndRect.bottom = point.y;
 
-      mMaxWidth = 0.f;
-      for (auto i = 0u; i < cFileItem::kFields; i++) {
-        mMaxWidth += maxFieldWidth[i] + textHeight/2.f;
-        mFieldStop[i] = mMaxWidth - textHeight/4.f;
+      dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
+      //}}}
+      //{{{  layout,draw fields
+      for (auto& row : mRowVec) {
+        auto p = row.mRect.getTL();
+        for (auto field = 0u; field < cFileItem::kFields; field++) {
+          p.x = mRect.left + (field ? mFieldStop[field] - row.mTextMetrics[field].width : textHeight/2.f);
+          dc->DrawTextLayout (p, row.mTextLayout[field], row.mBrush);
+          row.mTextLayout[field]->Release();
+          }
         }
+      //}}}
       }
     }
   //}}}
@@ -190,7 +195,21 @@ private:
   // vars
   cFileList* mFileList;
 
-  concurrency::concurrent_vector <cRect> mRowVec;
+  //{{{
+  class cRow {
+  public:
+    cRow() {}
+    ~cRow() {}
+
+    IDWriteTextLayout* mTextLayout[cFileItem::kFields];
+    struct DWRITE_TEXT_METRICS mTextMetrics[cFileItem::kFields];
+
+    cRect mRect;
+    ID2D1SolidColorBrush* mBrush;
+    };
+  //}}}
+  concurrency::concurrent_vector <cRow> mRowVec;
+
   float mFieldStop[cFileItem::kFields] = { 0.f };
   float mMaxWidth = 0.f;
   cRect mBgndRect;
