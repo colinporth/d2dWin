@@ -168,10 +168,7 @@ protected:
 private:
   //{{{
   float getLineHeight() {
-    auto pixPerLine = getHeight() / mFileList->size();
-    pixPerLine = min (pixPerLine, kLineHeight - 2.f);
-    pixPerLine = max (pixPerLine, kSmallLineHeight);
-    return pixPerLine;
+    return min (max (getHeight() / mFileList->size(), kMinLineHeight), kMaxLineHeight);
     }
   //}}}
   //{{{
@@ -190,7 +187,8 @@ private:
     }
   //}}}
 
-  const float kSmallLineHeight = 16.f;
+  const float kMinLineHeight = 16.f;
+  const float kMaxLineHeight = 24.f;
 
   // vars
   cFileList* mFileList;
@@ -222,5 +220,4 @@ private:
   float mMoveInc = 0;
   float mScroll = 0.f;
   float mScrollInc = 0.f;
-
   };
