@@ -26,7 +26,7 @@ public:
 
     int frequency = atoi (rootOrFrequency.c_str());
     if (frequency) {
-      mDvb = new cDvb (mTvRoot);
+      mDvb = new cDvb (kTvRoot);
       if (mDvb->createGraph (frequency * 1000)) {
         thread ([=]() { mDvb->grabThread(); }).detach();
         thread ([=]() { mDvb->signalThread(); }).detach();
@@ -35,7 +35,7 @@ public:
       }
 
     // fileList
-    mFileList = new cFileList (frequency || rootOrFrequency.empty() ? mTvRoot : rootOrFrequency, "*.ts");
+    mFileList = new cFileList (frequency || rootOrFrequency.empty() ? kTvRoot : rootOrFrequency, "*.ts");
     thread([=]() { mFileList->watchThread(); }).detach();
     auto boxWidth = frequency ? 480.f : 0.f;
     add (new cAppFileListBox (this, -boxWidth,0.f, mFileList), frequency ? boxWidth : 0.f, 0.f);
@@ -49,7 +49,7 @@ public:
     // loop till exit
     messagePump();
 
-    // cleanup 
+    // cleanup
     delete mDvb;
     delete mFileList;
     }
@@ -111,10 +111,11 @@ private:
       }
     }
   //}}}
+  const string kTvRoot = "/tv";
   //{{{  vars
-  string mTvRoot = "/tv";
+  cFileList* mFileList = nullptr;
   cDvb* mDvb = nullptr;
-  cFileList* mFileList;
+
   cBox* mPlayFocus;
   //}}}
   };
