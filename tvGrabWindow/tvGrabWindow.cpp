@@ -27,16 +27,15 @@ public:
       if (mDvb->createGraph (frequency * 1000)) {
         add (new cDvbBox (this, getHeight()/2.f, 0.f, mDvb));
         add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
-
         thread ([=]() { mDvb->grabThread(); }).detach();
         thread ([=]() { mDvb->signalThread(); }).detach();
         }
       }
     else {
       mDumpTs = new cDumpTransportStream (rootName, false);
-      thread ([=]() { fileThread (param, mDumpTs); }).detach();
       add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDumpTs), 0.f,0.f);
       add (new cTsPidBox (this, -getHeight()/2.f, 0.f, mDumpTs), getHeight()/2.f,0.f);
+      thread ([=]() { fileThread (param, mDumpTs); }).detach();
       }
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
@@ -98,7 +97,7 @@ private:
     else
       cLog::log (LOGERROR, "CreateFile - failed " + fileName);
 
-    cLog::log (LOGNOTICE, "exit");
+    cLog::log (LOGINFO, "exit");
     CoUninitialize();
     }
   //}}}
