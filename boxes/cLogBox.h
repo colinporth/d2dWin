@@ -72,9 +72,10 @@ public:
     int logLineNum = int(mLogScroll / int(textHeight));
 
     chrono::system_clock::time_point lastTimePoint;
-    cLog::cLine logLine;
-    while ((y > 20.f) && cLog::getLine (logLine, logLineNum++)) {
 
+    cLog::cLine logLine;
+    unsigned lastLineIndex = 0;
+    while ((y > 20.f) && cLog::getLine (logLine, logLineNum++, lastLineIndex)) {
       textHeight = kSizes[logLine.mLogLevel];
       mBrush->SetColor (kColours[logLine.mLogLevel]);
 
