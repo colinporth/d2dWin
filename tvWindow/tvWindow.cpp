@@ -46,8 +46,12 @@ public:
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
 
-    // loop till quit
+    // loop till exit
     messagePump();
+
+    // cleanup 
+    delete mDvb;
+    delete mFileList;
     }
   //}}}
 
