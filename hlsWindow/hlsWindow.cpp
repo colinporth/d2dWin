@@ -36,8 +36,6 @@ public:
   //{{{
   void run (const string& title, int width, int height) {
 
-    cLog::log (LOGINFO, "hlsWindow");
-
     initialise (title, width, height, false);
     add (new cCalendarBox (this, 190.f,160.f, mTimePoint), -190.f - 24.f,0);
     add (new cHlsDotsBox (this, 18.f,60.f, this), -24.f, 0);
@@ -59,23 +57,19 @@ public:
 
     // launch loaderThread
     thread ([=]() {
-      //{{{  loader
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
       cWinSockHttp http;
       loader (http);
       CoUninitialize();
       }
-      //}}}
       ).detach();
 
     // launch playerThread, high priority
     auto playerThread = thread ([=]() {
-      //{{{  player
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
       player (this, this);
       CoUninitialize();
       }
-      //}}}
       );
     SetThreadPriority (playerThread.native_handle(), THREAD_PRIORITY_HIGHEST);
     playerThread.detach();
@@ -92,63 +86,17 @@ protected:
     switch (key) {
       case 0x00: break;
       case 0x1B: return true;
+      case  'F': toggleFullScreen(); break;
 
       case  ' ': togglePlay(); break;
 
-      case 0x21:
-        //{{{  page up
-         {
-          incPlaySeconds (-60);
-          mLoadSem.notify();
-          changed();
-          }
-        break;
-        //}}}
-      case 0x22:
-        //{{{  page down
-         {
-          incPlaySeconds (60);
-          mLoadSem.notify();
-          changed();
-          }
-        break;
-        //}}}
-      case 0x25:
-       //{{{  left arrow
-        {
-         incPlaySeconds (-1);
-         mLoadSem.notify();
-         changed();
-         }
-       break;
-       //}}}
-      case 0x27:
-        //{{{  right arrow
-         {
-          incPlaySeconds (1);
-          mLoadSem.notify();
-          changed();
-          }
-        break;
-        //}}}
-      case 0x26:
-        //{{{  up arrow
-        if (mChan > 1) {
-          mChan--;
-          mChanChanged = true;
-          }
-        break;
-        //}}}
-      case 0x28:
-        //{{{  down arrow
-        if (mChan < 6) {
-          mChan++;
-          mChanChanged = true;
-          }
-        break;
-        //}}}
-      case 0x23: break; // home
-      case 0x24: break; // end
+      case 0x21: incPlaySeconds (-60); mLoadSem.notify(); changed(); break; // page up
+      case 0x22: incPlaySeconds (+60); mLoadSem.notify(); changed(); break; // page down
+      case 0x25: incPlaySeconds (-1); mLoadSem.notify(); changed(); break;  // left arrow
+      case 0x27: incPlaySeconds (+1); mLoadSem.notify(); changed(); break;  // right arrow
+
+      case 0x26: if (mChan > 1) { mChan--; mChanChanged = true; } break;    // up arrow
+      case 0x28: if (mChan < 6) { mChan++; mChanChanged = true; } break;    // down arrow
 
       case  '1':
       case  '2':
@@ -156,8 +104,6 @@ protected:
       case  '4':
       case  '5':
       case  '6': mChan = key - '0'; mChanChanged = true; break;
-
-      case  'F': toggleFullScreen(); break;
 
       default  : printf ("key %x\n", key);
       }
@@ -176,18 +122,9 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     exit (0);
 
   cLog::init (LOGINFO1, true);
-  cLog::log (LOGNOTICE, "d2dHlsPlayer");
+  cLog::log (LOGNOTICE, "hlsWindow");
 
-  int numArgs;
-  auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-  if (numArgs > 1) {
-    // get fileName from commandLine
-    wstring wstr (args[1]);
-    auto fileName = string (wstr.begin(), wstr.end());
-    }
-  int chan = 4;
-
-  cAppWindow appWindow (chan, kDefaultBitrate);
+  cAppWindow appWindow (kDefaultChan, kDefaultBitrate);
   appWindow.run ("hlsWindow", 600, 340);
 
   CoUninitialize();

@@ -151,7 +151,7 @@ public:
       // layout,draw fields
       for (auto& row : mRowVec) {
         for (auto field = 0u; field < cFileItem::kFields; field++) {
-          dc->DrawTextLayout (row.mRect.getTL() + 
+          dc->DrawTextLayout (row.mRect.getTL() +
               cPoint (row.mRect.left + (field ? mColumn[field] - row.mTextMetrics[field].width : 2.f), 0.f),
             row.mTextLayout[field], row.mBrush);
           row.mTextLayout[field]->Release();
@@ -196,13 +196,9 @@ private:
   //{{{
   class cRow {
   public:
-    cRow() {}
-    ~cRow() {}
-
+    cRect mRect;
     IDWriteTextLayout* mTextLayout[cFileItem::kFields];
     struct DWRITE_TEXT_METRICS mTextMetrics[cFileItem::kFields];
-
-    cRect mRect;
     ID2D1SolidColorBrush* mBrush;
     };
   //}}}
