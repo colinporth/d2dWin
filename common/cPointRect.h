@@ -124,11 +124,19 @@ public:
     }
   //}}}
   //{{{
-  cRect (const cPoint& size)  {
+  cRect (const float sizeX, const float sizeY)  {
     left = 0;
     top = 0;
-    right = size.x;
-    bottom = size.y;
+    right = sizeX;
+    bottom = sizeY;
+    }
+  //}}}
+  //{{{
+  cRect (const float l, const float t, const float r, const float b)  {
+    left = l;
+    top = t;
+    right = r;
+    bottom = b;
     }
   //}}}
   //{{{
@@ -140,19 +148,19 @@ public:
     }
   //}}}
   //{{{
+  cRect (const cPoint& size)  {
+    left = 0;
+    top = 0;
+    right = size.x;
+    bottom = size.y;
+    }
+  //}}}
+  //{{{
   cRect (const cPoint& topLeft, const D2D1_SIZE_F& size)  {
     left = topLeft.x;
     top = topLeft.y;
     right = left + size.width;
     bottom = top + size.height;
-    }
-  //}}}
-  //{{{
-  cRect (const float sizeX, const float sizeY)  {
-    left = 0;
-    top = 0;
-    right = sizeX;
-    bottom = sizeY;
     }
   //}}}
   //{{{
@@ -163,23 +171,10 @@ public:
     bottom = bottomRight.y;
     }
   //}}}
-  //{{{
-  cRect (const float l, const float t, const float r, const float b)  {
-    left = l;
-    top = t;
-    right = r;
-    bottom = b;
-    }
-  //}}}
 
   //{{{
   cRect operator + (const cPoint& point) const {
     return cRect (left + point.x, top + point.y, right + point.x, bottom + point.y);
-    }
-  //}}}
-  //{{{
-  cRect operator + (const cRect& rect) const {
-    return cRect (left + rect.left, top + rect.top, right + rect.right, bottom + rect.bottom);
     }
   //}}}
 
