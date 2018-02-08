@@ -158,12 +158,11 @@
     <ClInclude Include="..\..\shared\utils\date.h" />
     <ClInclude Include="..\..\shared\utils\iAudio.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
-    <ClInclude Include="..\common\cBitmapBox.h" />
+    <ClInclude Include="..\boxes\cFileListBox.h" />
+    <ClInclude Include="..\boxes\cLogBox.h" />
+    <ClInclude Include="..\boxes\cWindowBox.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cJpegImage.h" />
-    <ClInclude Include="..\common\cListBox.h" />
-    <ClInclude Include="..\common\cLogBox.h" />
-    <ClInclude Include="..\common\cWindowBox.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>

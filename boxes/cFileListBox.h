@@ -1,10 +1,7 @@
 // cFileListBox.h
 //{{{  includes
 #pragma once
-
 #include "../common/cD2dWindow.h"
-#include "../../shared/utils/utils.h"
-#include "../../shared/utils/cLog.h"
 //}}}
 
 class cFileListBox : public cD2dWindow::cBox {
@@ -18,6 +15,8 @@ public:
   //{{{
   bool pick (bool inClient, cPoint pos, bool& change) {
 
+    lock_guard<mutex> lockGuard (mMutex);
+
     bool lastPick = mPick;
     mPick = inClient && mBgndRect.inside (pos);
     if (!change && (mPick != lastPick))
@@ -30,15 +29,15 @@ public:
   bool onProx (bool inClient, cPoint pos) {
 
     if (mWindow->getTimedMenuOn()) {
-      pos += getTL();
-      unsigned row = 0;
-      for (auto& item : mRowVec) {
-        if (item.mRect.inside (pos)) {
-          mProxIndex = mFirstRowIndex + row;
+      lock_guard<mutex> lockGuard (mMutex);
+      unsigned rowIndex = 0;
+      for (auto& row : mRowVec) {
+        if (row.mRect.inside (pos)) {
+          mProxIndex = mFirstRowIndex + rowIndex;
           mProxed = true;
           return false;
           }
-        row++;
+        rowIndex++;
         }
       mProxed = false;
       }
@@ -60,20 +59,15 @@ public:
       mMoveInc = 0;
       mScrollInc = 0.f;
 
-      pos += getTL();
-      unsigned row = 0;
-      for (auto& item : mRowVec) {
-        if (item.mRect.inside (pos)) {
-          mProxIndex = mFirstRowIndex + row;
-          mPressed = true;
-          return false;
-          }
-        row++;
+      if (mProxed)
+        mPressed = true;
+      else {
+        mPressed = false;
+        mFileList->nextSort();
         }
 
-      mFileList->nextSort();
       mWindow->changed();
-      mPressed = false;
+      return true;
       }
 
     return false;
@@ -131,9 +125,10 @@ public:
       float maxColumnWidth[cFileItem::kFields] = { 0.f };
 
       // layout visible rows
+      lock_guard<mutex> lockGuard (mMutex);
       mRowVec.clear();
       auto index = mFirstRowIndex;
-      auto point = mRect.getTL() + cPoint (0.f, 1.f - (mScroll - (mFirstRowIndex * mLineHeight)));
+      auto point = cPoint (0.f, 1.f - (mScroll - (mFirstRowIndex * mLineHeight)));
       while ((index < mFileList->size()) && (point.y < mRect.bottom)) {
         // layout row
         cRow row;
@@ -166,17 +161,15 @@ public:
         }
 
       // layout,draw bgnd
-      mBgndRect = mRect;
-      mBgndRect.right = mRect.left + mColumnsWidth + mLineHeight/2.f;
-      mBgndRect.bottom = point.y;
-      dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
+      mBgndRect = cRect (mColumnsWidth + mLineHeight/2.f, point.y);
+      dc->FillRectangle (mBgndRect + mRect.getTL(), mWindow->getTransparentBgndBrush());
 
       // layout,draw fields
       for (auto& row : mRowVec) {
+        auto p = mRect.getTL() + row.mRect.getTL();
         for (auto field = 0u; field < cFileItem::kFields; field++) {
-          dc->DrawTextLayout (
-            row.mRect.getTL() + cPoint (field ? mColumn[field]-row.mTextMetrics[field].width : 2.f, 0.f),
-            row.mTextLayout[field], row.mBrush);
+          p.x = field ? mColumn[field]-row.mTextMetrics[field].width : 2.f;
+          dc->DrawTextLayout (p, row.mTextLayout[field], row.mBrush);
           row.mTextLayout[field]->Release();
           }
         }
@@ -211,6 +204,7 @@ private:
   // vars
   cFileList* mFileList;
 
+  mutex mMutex; // guard mRowVec - pick,prox,down against draw
   //{{{
   class cRow {
   public:

@@ -54,8 +54,8 @@ public:
     }
   //}}}
   //{{{
-  cPoint operator + (const cPoint& rhs) const {
-    return cPoint (x + rhs.x, y + rhs.y);
+  cPoint operator + (const cPoint& point) const {
+    return cPoint (x + point.x, y + point.y);
     }
   //}}}
   //{{{
@@ -173,8 +173,13 @@ public:
   //}}}
 
   //{{{
-  cRect operator+ (const cRect& r) const {
-    return cRect (left + r.left, top + r.top, right + r.right, bottom + r.bottom);
+  cRect operator + (const cPoint& point) const {
+    return cRect (left + point.x, top + point.y, right + point.x, bottom + point.y);
+    }
+  //}}}
+  //{{{
+  cRect operator + (const cRect& rect) const {
+    return cRect (left + rect.left, top + rect.top, right + rect.right, bottom + rect.bottom);
     }
   //}}}
 
