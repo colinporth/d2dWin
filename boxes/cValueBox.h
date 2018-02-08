@@ -13,7 +13,6 @@ public:
   cValueBox (cD2dWindow* window, float width, float height, const string& title, float min, float max, float& value, bool& changed)
       : cBox("offset", window, width, height), mTitle(title), mMin(min), mMax(max),
         mValue(value), mChanged(changed) {
-    mPin = true;
     mChanged = false;
     }
   //}}}

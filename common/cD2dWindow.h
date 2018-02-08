@@ -252,7 +252,7 @@ public:
 
     bool mEnable = true;
     bool mPick = false;
-    bool mPin = false;
+    bool mPin = true;
     bool mTimedOn = false;
 
     float mLayoutWidth;

@@ -9,9 +9,7 @@ class cDateBox : public cD2dWindow::cBox {
 public:
   //{{{
   cDateBox (cD2dWindow* window, float width, float height, chrono::system_clock::time_point& timePoint) :
-      cBox("date", window, width, height), mTimePoint(timePoint) {
-    mPin = true;
-    }
+      cBox("date", window, width, height), mTimePoint(timePoint) {}
   //}}}
 
   void onDraw (ID2D1DeviceContext* dc) {

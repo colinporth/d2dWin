@@ -19,8 +19,6 @@ public:
       DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
       16.0f, L"en-us",
       &mTextFormat);
-
-    mPin = true;
     }
   //}}}
   //{{{

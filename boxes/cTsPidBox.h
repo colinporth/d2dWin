@@ -11,8 +11,6 @@ public:
   cTsPidBox (cD2dWindow* window, float width, float height, cTransportStream* ts)
       : cBox("tsPid", window, width, height), mTs(ts) {
 
-    mPin = true;
-
     window->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
       DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
       mLineHeight, L"en-us",

@@ -10,10 +10,7 @@ class cTsEpgBox : public cD2dWindow::cBox {
 public:
   //{{{
   cTsEpgBox (cD2dWindow* window, float width, float height, cTransportStream* ts)
-      : cBox("tsEpg", window, width, height), mTs(ts) {
-
-    mPin = true;
-    }
+      : cBox("tsEpg", window, width, height), mTs(ts) {}
   //}}}
   virtual ~cTsEpgBox() {}
 

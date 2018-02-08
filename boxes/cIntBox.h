@@ -10,9 +10,7 @@ class cIntBox : public cD2dWindow::cBox {
 public:
   //{{{
   cIntBox (cD2dWindow* window, float width, float height, const string& title, int& value) :
-      cBox("info", window, width, height), mTitle(title), mValue(value) {
-    mPin = true;
-    }
+      cBox("info", window, width, height), mTitle(title), mValue(value) {}
   //}}}
   virtual ~cIntBox() {}
 
@@ -59,9 +57,7 @@ class cUInt64Box : public cD2dWindow::cBox {
 public:
   //{{{
   cUInt64Box (cD2dWindow* window, float width, float height, const string& title, uint64_t& value) :
-      cBox("info", window, width, height), mTitle(title), mValue(value) {
-    mPin = true;
-    }
+      cBox("info", window, width, height), mTitle(title), mValue(value) {}
   //}}}
   virtual ~cUInt64Box() {}
 

@@ -11,8 +11,6 @@ public:
   cHlsDotsBox (cD2dWindow* window, float width, float height, cHls* hls) :
       cBox("hlsDots", window, width, height), mHls(hls) {
 
-    mPin = true;
-
     mWindow->getDwriteFactory()->CreateTextFormat (L"FreeSans", NULL,
       DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 12.f, L"en-us",
       &mTextFormat);

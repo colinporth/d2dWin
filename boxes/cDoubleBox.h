@@ -10,9 +10,7 @@ class cDoubleBox : public cD2dWindow::cBox {
 public:
   //{{{
   cDoubleBox (cD2dWindow* window, float width, float height, double& value, int digits = 6, int precision = 2) :
-      cBox("double", window, width, height), mValue(value), mDigits(digits), mPrecision(precision) {
-    mPin = true;
-    }
+      cBox("double", window, width, height), mValue(value), mDigits(digits), mPrecision(precision) {}
   //}}}
   //{{{
   cDoubleBox (cD2dWindow* window, float width, float height, const string& title, double& value, int digits = 6, int precision = 3) :

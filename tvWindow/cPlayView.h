@@ -35,9 +35,7 @@ private:
   public:
     //{{{
     cProgressBox (cD2dWindow* window, float width, float height, cPlayView* playView)
-        : cBox("progress", window, width, height), mPlayView(playView) {
-      mPin = true;
-      }
+        : cBox("progress", window, width, height), mPlayView(playView) {}
     //}}}
     virtual ~cProgressBox() {}
 

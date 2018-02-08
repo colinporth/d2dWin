@@ -14,8 +14,6 @@ public:
   //{{{
   cAudFrameBox (cD2dWindow* window, float width, float height, cAudFrame*& audFrame, iAudio* audio)
       : cBox("audioBox", window, width, height), mAudFrame(audFrame), mAudio(audio) {
-    mPin = true;
-
     window->getDc()->CreateSolidColorBrush (ColorF (0.8f, 0.1f, 0.1f, 0.5f), &mBrush);
     }
   //}}}

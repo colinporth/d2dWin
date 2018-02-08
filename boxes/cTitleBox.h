@@ -8,9 +8,7 @@ class cTitleBox : public cD2dWindow::cBox {
 public:
   //{{{
   cTitleBox (cD2dWindow* window, float width, float height, const std::string& title)
-      : cBox("title", window, width, height), mTitle(title) {
-    mPin = true;
-    }
+      : cBox("title", window, width, height), mTitle(title) {}
   //}}}
   virtual ~cTitleBox() {}
 

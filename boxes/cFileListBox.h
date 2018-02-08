@@ -1,6 +1,7 @@
 // cFileListBox.h
 //{{{  includes
 #pragma once
+
 #include "../common/cD2dWindow.h"
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/cLog.h"
@@ -10,10 +11,7 @@ class cFileListBox : public cD2dWindow::cBox {
 public:
   //{{{
   cFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList) :
-      cBox ("fileList", window, width, height), mFileList(fileList) {
-
-    mPin = true;
-    }
+      cBox ("fileList", window, width, height), mFileList(fileList) {}
   //}}}
   virtual ~cFileListBox() {}
 
@@ -29,19 +27,44 @@ public:
     }
   //}}}
   //{{{
+  bool onProx (bool inClient, cPoint pos) {
+
+    if (mWindow->getTimedMenuOn()) {
+      pos += getTL();
+      unsigned row = 0;
+      for (auto& item : mRowVec) {
+        if (item.mRect.inside (pos)) {
+          mProxIndex = mFirstRowIndex + row;
+          mProxed = true;
+          return false;
+          }
+        row++;
+        }
+      mProxed = false;
+      }
+
+    return cBox::onProx (inClient, pos);
+    }
+  //}}}
+  //{{{
+  bool onProxExit() {
+    mProxed = false;
+    return false;
+    }
+  //}}}
+  //{{{
   bool onDown (bool right, cPoint pos)  {
 
     if (mWindow->getTimedMenuOn()) {
-
       mMoved = false;
       mMoveInc = 0;
       mScrollInc = 0.f;
 
-      int row = 0;
       pos += getTL();
+      unsigned row = 0;
       for (auto& item : mRowVec) {
         if (item.mRect.inside (pos)) {
-          mPressedIndex = mFirstRowIndex + row;
+          mProxIndex = mFirstRowIndex + row;
           mPressed = true;
           return false;
           }
@@ -74,7 +97,7 @@ public:
 
     if (mWindow->getTimedMenuOn()) {
       if (mPressed && !mMoved) {
-        mFileList->setIndex (mPressedIndex);
+        mFileList->setIndex (mProxIndex);
         onHit();
         }
 
@@ -91,17 +114,17 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     if (mWindow->getTimedMenuOn()) {
-      auto lineHeight = getLineHeight();
-      auto textHeight = lineHeight*5.f/6.f;
+      mLineHeight = getLineHeight();
+      auto textHeight = mLineHeight*5.f/6.f;
 
       if (!mPressed && mScrollInc)
         incScroll (mScrollInc * 0.9f);
 
-      mFirstRowIndex = int(mScroll / lineHeight);
+      mFirstRowIndex = int(mScroll / mLineHeight);
       //{{{  tricky sync of scroll to curIndex
       //if (!mMoved && (mFileList->getIndex() < mFirstRowIndex)) {
-      //  mScroll -= lineHeight;
-      //  mFirstRowIndex = int(mScroll / lineHeight);
+      //  mScroll -= mLineHeight;
+      //  mFirstRowIndex = int(mScroll / mLineHeight);
       //  }
       //}}}
 
@@ -110,7 +133,7 @@ public:
       // layout visible rows
       mRowVec.clear();
       auto index = mFirstRowIndex;
-      auto point = mRect.getTL() + cPoint (0.f, 1.f - (mScroll - (mFirstRowIndex * lineHeight)));
+      auto point = mRect.getTL() + cPoint (0.f, 1.f - (mScroll - (mFirstRowIndex * mLineHeight)));
       while ((index < mFileList->size()) && (point.y < mRect.bottom)) {
         // layout row
         cRow row;
@@ -119,18 +142,18 @@ public:
           auto str = fileItem.getFieldString (field);
           mWindow->getDwriteFactory()->CreateTextLayout (
             wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
-            mRect.getWidth(), lineHeight, &row.mTextLayout[field]);
+            mRect.getWidth(), mLineHeight, &row.mTextLayout[field]);
           row.mTextLayout[field]->SetFontSize (textHeight, {0, (uint32_t)str.size()});
           row.mTextLayout[field]->GetMetrics (&row.mTextMetrics[field]);
           maxColumnWidth[field] = max (row.mTextMetrics[field].width, maxColumnWidth[field]);
           }
-        row.mRect = cRect(point, point + cPoint(row.mTextMetrics[0].width, lineHeight));
-        row.mBrush = (mPressed && !mMoved && (index == mPressedIndex)) ?
+        row.mRect = cRect(point, point + cPoint(row.mTextMetrics[0].width, mLineHeight));
+        row.mBrush = (mProxed && !mMoved && (index == mProxIndex)) ?
           mWindow->getYellowBrush() :
             mFileList->isCurIndex (index) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
         mRowVec.push_back (row);
 
-        point.y += lineHeight;
+        point.y += mLineHeight;
         index++;
         }
 
@@ -144,7 +167,7 @@ public:
 
       // layout,draw bgnd
       mBgndRect = mRect;
-      mBgndRect.right = mRect.left + mColumnsWidth + lineHeight/2.f;
+      mBgndRect.right = mRect.left + mColumnsWidth + mLineHeight/2.f;
       mBgndRect.bottom = point.y;
       dc->FillRectangle (mBgndRect, mWindow->getTransparentBgndBrush());
 
@@ -166,29 +189,24 @@ protected:
   virtual void onHit() = 0;
 
 private:
-  //{{{
-  float getLineHeight() {
-    return min (max (getHeight() / mFileList->size(), kMinLineHeight), kMaxLineHeight);
-    }
-  //}}}
+  const float kMinLineHeight = 16.f;
+  const float kMaxLineHeight = 24.f;
+
+  float getLineHeight() { return min (max (getHeight() / mFileList->size(), kMinLineHeight), kMaxLineHeight); }
   //{{{
   void incScroll (float inc) {
 
-    auto lineHeight = getLineHeight();
     mScroll += inc;
     if (mScroll < 0.f)
       mScroll = 0.f;
-    else if ((mFileList->size() * lineHeight) < mRect.getHeight())
+    else if ((mFileList->size() * mLineHeight) < mRect.getHeight())
       mScroll = 0.f;
-    else if (mScroll > ((mFileList->size() * lineHeight) - mRect.getHeight()))
-      mScroll = float(((int)mFileList->size() * lineHeight) - mRect.getHeight());
+    else if (mScroll > ((mFileList->size() * mLineHeight) - mRect.getHeight()))
+      mScroll = float(((int)mFileList->size() * mLineHeight) - mRect.getHeight());
 
     mScrollInc = fabs(inc) < 0.2f ? 0 : inc;
     }
   //}}}
-
-  const float kMinLineHeight = 16.f;
-  const float kMaxLineHeight = 24.f;
 
   // vars
   cFileList* mFileList;
@@ -206,14 +224,16 @@ private:
 
   float mColumn[cFileItem::kFields] = { 0.f };
   float mColumnsWidth = 0.f;
+  float mLineHeight = 0.f;
   cRect mBgndRect;
 
-  unsigned mFirstRowIndex = 0;
-  unsigned mPressedIndex = 0;
+  bool mProxed = false;
   bool mPressed = false;
-
   bool mMoved = false;
   float mMoveInc = 0;
   float mScroll = 0.f;
   float mScrollInc = 0.f;
+
+  unsigned mFirstRowIndex = 0;
+  unsigned mProxIndex = 0;
   };

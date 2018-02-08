@@ -9,8 +9,6 @@ public:
   //{{{
   cBitmapBox (cD2dWindow* window, float width, float height, ID2D1Bitmap*& bitmap)
       : cBox("bitmap", window, width, height), mBitmap(bitmap) {
-
-    mPin = true;
     }
   //}}}
   virtual ~cBitmapBox() {}

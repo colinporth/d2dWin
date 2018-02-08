@@ -12,8 +12,6 @@ public:
       : cBox("bmp", window, width, height), mBmp(bmp),
         mMyValue(myValue), mValue(value), mValueChanged(valueChanged) {
 
-    mPin = true;
-
     mSizeX = *(bmp + 0x12);
     mSizeY = *(bmp + 0x16);
 

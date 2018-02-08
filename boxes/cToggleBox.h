@@ -9,7 +9,6 @@ public:
   //{{{
   cToggleBox (cD2dWindow* window, float width, float height, const string& title, bool& value, bool& changed)
       : cBox("offset", window, width, height), mTitle(title), mValue(value), mChanged(changed) {
-    mPin = true;
     mChanged = false;
     }
   //}}}

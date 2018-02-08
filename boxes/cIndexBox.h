@@ -9,14 +9,12 @@ public:
   //{{{
   cIndexBox (cD2dWindow* window, float width, float height, vector<string> strings, int& index, bool* changed)
       : cBox("offset", window, width, height), mStrings(strings), mIndex(index), mChanged(changed) {
-    mPin = true;
     mChanged = false;
     }
   //}}}
   //{{{
   cIndexBox (cD2dWindow* window, float width, float height, vector<string> strings, int& index, cSemaphore* sem)
       : cBox("offset", window, width, height), mStrings(strings), mIndex(index), mSem(sem) {
-    mPin = true;
     mChanged = false;
     }
   //}}}

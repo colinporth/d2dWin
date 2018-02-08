@@ -32,8 +32,6 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const strin
     cView("playerView", window, width, height),
     mFileName(fileName), mFirstVidPtsSem("firstVidPts") {
 
-  mPin = true;
-
   // create transportStreams
   mAnalTs = new cAnalTransportStream();
   mAudTs = new cAudTransportStream (kMaxAudFrames);

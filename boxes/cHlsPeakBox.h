@@ -13,7 +13,6 @@ public:
   //{{{
   cHlsPeakBox (cD2dWindow* window, float width, float height, cHls* hls) :
       cBox("hlsPeak", window, width, height), mHls(hls) {
-    mPin = true;
 
     mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
       DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 14.f, L"en-us",

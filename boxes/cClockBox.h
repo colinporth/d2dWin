@@ -12,10 +12,7 @@ public:
   cClockBox (cD2dWindow* window, float radius, chrono::system_clock::time_point& timePoint,
              bool applyDaylight = true, bool showSubSec = false)
       : cBox("clock", window, radius*2, radius*2), mTimePoint(timePoint),
-        mApplyDaylight(applyDaylight),  mShowSubSec(showSubSec) {
-
-    mPin = true;
-    }
+        mApplyDaylight(applyDaylight),  mShowSubSec(showSubSec) {}
   //}}}
 
   //{{{

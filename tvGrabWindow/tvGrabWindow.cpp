@@ -19,7 +19,7 @@ public:
 
     initialise (title, width, height, false);
     setChangeCountDown (4);
-    add (new cLogBox (this, 200.f,0, true), 0,200.f);
+    add (new cLogBox (this, 200.f,0, true), 0,200.f)->setPin (false);
 
     auto frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
@@ -38,7 +38,7 @@ public:
       thread ([=]() { fileThread (param, mDumpTs); }).detach();
       }
 
-    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     messagePump();
 
