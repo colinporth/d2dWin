@@ -168,7 +168,7 @@ public:
       for (auto& row : mRowVec) {
         auto p = mRect.getTL() + row.mRect.getTL();
         for (auto field = 0u; field < cFileItem::kFields; field++) {
-          p.x = field ? mColumn[field]-row.mTextMetrics[field].width : 2.f;
+          p.x = mRect.left + row.mRect.left + (field ? mColumn[field]-row.mTextMetrics[field].width : 2.f);
           dc->DrawTextLayout (p, row.mTextLayout[field], row.mBrush);
           row.mTextLayout[field]->Release();
           }
