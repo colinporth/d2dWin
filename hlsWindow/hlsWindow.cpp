@@ -41,7 +41,7 @@ public:
     add (new cHlsDotsBox (this, 18.f,60.f, this), -24.f, 0);
     add (new cHlsPeakBox (this, 0,0, this));
 
-    add (new cLogBox (this, 200.f,0, true), 0,200.f);
+    add (new cLogBox (this, 200.f,0, true), 0,200.f)->setPin (false);
 
     add (new cBmpBox (this, 60.f, 60.f, r1x80, 1, mChan, mChanChanged));
     add (new cBmpBox (this, 60.f, 60.f, r2x80, 2, mChan, mChanChanged), 61.f,0);
@@ -52,7 +52,6 @@ public:
     //add (new cClockBox (this, 40.f, mTimePoint), -82.f,-82.f);
 
     add (new cVolumeBox (this, 12.f,0), -12.f,0);
-    add (new cFloatBox (this, 50.f,20.f, mRenderTime), 0,-20.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     // launch loaderThread
@@ -61,16 +60,14 @@ public:
       cWinSockHttp http;
       loader (http);
       CoUninitialize();
-      }
-      ).detach();
+      }).detach();
 
     // launch playerThread, high priority
     auto playerThread = thread ([=]() {
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
       player (this, this);
       CoUninitialize();
-      }
-      );
+      });
     SetThreadPriority (playerThread.native_handle(), THREAD_PRIORITY_HIGHEST);
     playerThread.detach();
 

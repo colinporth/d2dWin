@@ -40,22 +40,21 @@ public:
   void run (const string& title, int width, int height, const string& fileName) {
 
     initialise (title, width, height, false);
+    add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f)->setPin (false);
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
-    add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f);
 
     mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-220.f, false, false, mFrameSet.mImage));
+    add (new cFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
+    add (new cFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
+    add (new cFrameSetTimeBox (this, 600.f,50.f, mFrameSet), -600.f,-50.f);
 
     mFileList = new cFileList (fileName, "*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
     add (new cAppFileListBox (this, 0.f,-220.f, mFileList));
 
-    add (new cFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
-    add (new cFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
-    add (new cFrameSetTimeBox (this, 600.f,50.f, mFrameSet), -600.f,-50.f);
-
     add (new cVolumeBox (this, 12.f,0.f), -12.f,0.f);
-    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (!mFileList->empty())
       thread ([=](){ analyseThread(); }).detach();
@@ -90,7 +89,7 @@ protected:
 
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
-      case 0x0d: selectFileItem(); changed(); break; // enter - play file
+      case 0x0d: mChanged = true; changed(); break; // enter - play file
 
       default  : cLog::log (LOGINFO, "key %x", key);
       }
@@ -589,12 +588,6 @@ private:
   //}}}
 
   bool getAbort() { return getExit() || mChanged; }
-  //{{{
-  void selectFileItem() {
-
-    mChanged = true;
-    }
-  //}}}
 
   //{{{
   void analyseThread() {
@@ -736,13 +729,15 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
+  string fileName = "C:/Users/colin/Music/Elton John";
   if (numArgs > 1) {
     wstring wstr (args[1]);
-    auto fileName = string (wstr.begin(), wstr.end());
-
-    cAppWindow appWindow;
-    appWindow.run ("mp3Window", 800, 500, fileName);
+    fileName = string (wstr.begin(), wstr.end());
     }
+
+  cAppWindow appWindow;
+  appWindow.run ("mp3Window", 800, 500, fileName);
+
   CoUninitialize();
   }
 //}}}
