@@ -69,3 +69,4 @@ UpgradeLog*.htm
 *.ldf
 *.o
 *.~cpp
+webWindow/apiKey.h
