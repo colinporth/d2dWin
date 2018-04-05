@@ -7,14 +7,14 @@
 class cIndexBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cIndexBox (cD2dWindow* window, float width, float height, vector<string> strings, int& index, bool* changed)
+  cIndexBox (cD2dWindow* window, float width, float height, vector<string> strings, int& index, bool& changed)
       : cBox("offset", window, width, height), mStrings(strings), mIndex(index), mChanged(changed) {
     mChanged = false;
     }
   //}}}
   //{{{
-  cIndexBox (cD2dWindow* window, float width, float height, vector<string> strings, int& index, cSemaphore* sem)
-      : cBox("offset", window, width, height), mStrings(strings), mIndex(index), mSem(sem) {
+  cIndexBox (cD2dWindow* window, float width, float height, vector<string> strings, int& index, bool& changed, cSemaphore* sem)
+      : cBox("offset", window, width, height), mStrings(strings), mIndex(index), mChanged(changed), mSem(sem) {
     mChanged = false;
     }
   //}}}
@@ -55,8 +55,7 @@ private:
     mIndex = index;
     mIndex = max (mIndex, 0);
     mIndex = min (mIndex, (int)mStrings.size()-1);
-    if (mChanged)
-      *mChanged = true;
+    mChanged = true;
     if (mSem)
       mSem->notify();
     }
@@ -64,6 +63,6 @@ private:
 
   vector<string> mStrings;
   int& mIndex;
-  bool* mChanged = nullptr;
+  bool& mChanged;
   cSemaphore* mSem;
   };

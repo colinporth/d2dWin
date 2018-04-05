@@ -46,8 +46,7 @@ void cSensor::run() {
     if (mId == kMt9d111) {
       mSensorTitle = "Mt9d111";
       cLog::log (LOGNOTICE, "MT9D111 - page:0xF0 read:0x00 sensorId " + hex(mId));
-      setPll (16, 1, 1); // 48Mhz
-      setPll(80, 11, 0); // 80 Mhz
+      setPll (18, 1, 2); // 36Mhz - fastest st32f746g disco will go
       setMode (ePreview);
       }
     else
@@ -124,6 +123,26 @@ uint8_t* cSensor::getRgbFrame (int bayer, bool info) {
         if (info) {
           mLumaHistogram.finishValues();
           mVector.finishValues();
+          }
+
+        ok = true;
+        }
+      break;
+      //}}}
+    case ePreviewRgb565:
+    case eCaptureRgb565:
+      //{{{  rgb565
+      if (frameLen == mWidth*mHeight*2) {
+        uint16_t* src = (uint16_t*)framePtr;
+        auto dst = rgbaBuffer;
+        for (auto y = 0; y < mHeight; y++) {
+          for (auto x = 0; x < mWidth; x++) {
+            uint16_t rgb = *src++;
+            *dst++ = (rgb & 0x001F) << 3;
+            *dst++ = (rgb & 0x07E0) >> 3;
+            *dst++ = (rgb & 0xF800) >> 8;
+            *dst++ = 255;
+            }
           }
 
         ok = true;
@@ -246,6 +265,7 @@ uint8_t* cSensor::getRgbFrame (int bayer, bool info) {
 ID2D1Bitmap* cSensor::getBitmapFrame (ID2D1DeviceContext* dc, int bayer, bool info) {
 
   auto rgbFrame = getRgbFrame (bayer, info);
+
   if (rgbFrame) {
     if (mBitmap) {
       auto pixelSize = mBitmap->GetPixelSize();
@@ -261,8 +281,7 @@ ID2D1Bitmap* cSensor::getBitmapFrame (ID2D1DeviceContext* dc, int bayer, bool in
                         &mBitmap);
 
     // fill bitmap
-    mBitmap->CopyFromMemory (
-      &RectU (0, 0, (int)getSize().x, (int)getSize().y), rgbFrame, (int)getSize().x*4);
+    mBitmap->CopyFromMemory (&RectU (0, 0, (int)getSize().x, (int)getSize().y), rgbFrame, (int)getSize().x*4);
 
     // free rgbFrame
     free (rgbFrame);
@@ -280,7 +299,7 @@ void cSensor::setMode (eMode mode) {
   mMode = mode;
   switch (mode) {
     case ePreview:
-      //{{{  preview
+      //{{{  previewYuv
       cLog::log (LOGINFO, "setMode preview");
       mWidth = 800;
       mHeight = 600;
@@ -288,6 +307,7 @@ void cSensor::setMode (eMode mode) {
       if (mId == kMt9d111) {
         writeReg (0xF0, 1);
         writeReg (0x09, 0x000A); // factory bypass 10 bit sensor
+        writeReg (0x97, 0x02); // output format configuration Yuv swap
         writeReg (0xC6, 0xA120); writeReg (0xC8, 0x00); // Sequencer.params.mode - none
         writeReg (0xC6, 0xA103); writeReg (0xC8, 0x01); // Sequencer goto preview A
         }
@@ -303,8 +323,24 @@ void cSensor::setMode (eMode mode) {
 
       break;
       //}}}
+    case ePreviewRgb565:
+      //{{{  previewRgb565
+      cLog::log (LOGINFO, "setMode previewRgb565");
+      mWidth = 800;
+      mHeight = 600;
+      if (mId == kMt9d111) {
+        writeReg (0xF0, 1);
+        writeReg (0x09, 0x000A); // factory bypass 10 bit sensor
+        writeReg (0x97, 0x0022); // output format configuration - RGB565, swap odd even
+        writeReg (0xC6, 0xA120); writeReg (0xC8, 0x00); // Sequencer.params.mode - none
+        writeReg (0xC6, 0xA103); writeReg (0xC8, 0x01); // Sequencer goto preview A
+        }
+
+      break;
+      //}}}
+
     case eCapture:
-      //{{{  capture
+      //{{{  captureYuv
       cLog::log (LOGINFO, "setMode capture");
       mWidth = 1600;
       mHeight = 1200;
@@ -312,6 +348,7 @@ void cSensor::setMode (eMode mode) {
       if (mId == kMt9d111) {
         writeReg (0xF0, 1);
         writeReg (0x09, 0x000A); // factory bypass 10 bit sensor
+        writeReg (0x97, 0x02); // output format configuration Yuv swap
         writeReg (0xC6, 0xA120); writeReg (0xC8, 0x02); // Sequencer.params.mode - capture video
         writeReg (0xC6, 0xA103); writeReg (0xC8, 0x02); // Sequencer goto capture B
         }
@@ -327,6 +364,22 @@ void cSensor::setMode (eMode mode) {
 
       break;
       //}}}
+    case eCaptureRgb565:
+      //{{{  captureRgb565
+      cLog::log (LOGINFO, "setMode captureRgb565");
+      mWidth = 1600;
+      mHeight = 1200;
+      if (mId == kMt9d111) {
+        writeReg (0xF0, 1);
+        writeReg (0x09, 0x000A); // factory bypass 10 bit sensor
+        writeReg (0x97, 0x0022); // output format configuration - RGB565, swap odd even
+        writeReg (0xC6, 0xA120); writeReg (0xC8, 0x02); // Sequencer.params.mode - capture video
+        writeReg (0xC6, 0xA103); writeReg (0xC8, 0x02); // Sequencer goto capture B
+        }
+
+      break;
+      //}}}
+
     case eBayer:
       //{{{  bayer
       cLog::log (LOGINFO, "setMode bayer");
@@ -499,10 +552,11 @@ void cSensor::setPll (int m, int n, int p) {
                         ((24000000 / (mPlln+1) * mPllm)/ (2*(mPllp+1))) );
 
     //  PLL (24mhz/(N+1))*M / 2*(P+1)
-    writeReg (0x66, (mPllm << 8) | mPlln);  // PLL Control 1    M:15:8,N:7:0 - M=16, N=1 (24mhz/(n1+1))*m16 / 2*(p1+1) = 48mhz
-    writeReg (0x67, 0x0500 | mPllp);  // PLL Control 2 0x05:15:8,P:7:0 - P=3
+    writeReg (0x66, (mPllm << 8) | mPlln);  // PLL Control1    M:N
+    writeReg (0x67, 0x0500 | mPllp)      ;  // PLL Control2 0x05:P
     writeReg (0x65, 0xA000);  // Clock CNTRL - PLL ON
     writeReg (0x65, 0x2000);  // Clock CNTRL - USE PLL
+    Sleep (100);
     }
   }
 //}}}
@@ -527,7 +581,7 @@ void cSensor::updateTitle() {
   mTitle = mSensorTitle +
            " " + dec(getSize().x) + "x" + dec(getSize().y) +
            " " + dec(mFrameLen) +
-           " "   + frac(1.f/getFrameTime(),0,3,' ') + " + " + frac(getRgbTime()*1000.f,0,2, ' ');
+           "b "   + frac(1.f/getFrameTime(),0,3,' ') + "ms + " + frac(getRgbTime()*1000.f,0,2, ' ') + "ms";
   }
 //}}}
 

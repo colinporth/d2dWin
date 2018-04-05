@@ -172,7 +172,7 @@ public:
   // gets
   int getId() { return mId; }
 
-  enum eMode { ePreview, eCapture, eBayer, eJpeg };
+  enum eMode { ePreview, ePreviewRgb565, eCapture, eCaptureRgb565, eBayer, eJpeg };
   eMode getMode() { return mMode; }
 
   int getWidth() { return mWidth; }

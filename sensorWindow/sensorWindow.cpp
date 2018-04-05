@@ -36,25 +36,16 @@ public:
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
-    mBayerValueBox = new cValueBox (this, 60.f,24.f, "bayer", 0,5.f, mBayer, mBayerChanged);
-    add (mBayerValueBox, -60.f,-24.f);
-
     if (mSensor->getId() == kMt9d112)
-      add (new cIndexBox (this, 50.f, 4*20.f,
-                                      {"pvw", "full", "bayer"}, (int&)mMode, &mModeChanged));
+      add (new cIndexBox (this, 50.f, 4*20.f, {"pvw", "full", "bayer"}, (int&)mMode, mModeChanged));
     else if (mSensor->getId() == kMt9d111) {
-      add (new cIndexBox (this, 50.f, 4*20.f,
-                                      {"pvw", "full", "bayer", "jpeg"}, (int&)mMode, &mModeChanged));
-      add (
-        new cValueBox (this, 100.f,20.f, "focus", 0,255.f, mFocus, mFocusChanged), -100.f,0);
+      add (new cIndexBox (this, 80.f, 6*20.f, {"pvwYuv", "pvwRgb", "fullYuv", "fullRgb", "bayer", "jpeg"}, (int&)mMode, mModeChanged));
+      add (new cValueBox (this, 100.f,20.f, "focus", 0,255.f, mFocus, mFocusChanged), -100.f,20.f);
+      mBayerValueBox = new cValueBox (this, 100.f,20.f, "bayer", 0,5.f, mBayer, mBayerChanged);
+      add (mBayerValueBox, -100.f,40.f);
       }
     add (new cFloatBox (this, 50.f,20.f, mRenderTime), -50.f,-20.f);
     add (new cClockBox (this, 40.f, mTimePoint, true, true), -82.f,-82.f);
-
-    if (mSensor->getId() == kMt9d111)
-      setMode (cSensor::ePreview);
-    else
-      setMode (cSensor::eCapture);
 
     thread ([=](){ changeThread(); }).detach();
 
@@ -93,6 +84,7 @@ protected:
                 mModeChanged = true;
                 break;
 
+      case 'E': mSensor->setPll (0x12, 1, 2); break;  // 36 Mhz
       case 'T': mSensor->setSlowPLL(); break;  // 48 Mhz
       case 'R': mSensor->set80PLL(); break; // 80 Mhz
       case 'A': mSensor->setPll (++mPllm, mPlln, mPllp); break;
