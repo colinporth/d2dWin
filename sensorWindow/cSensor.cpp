@@ -346,7 +346,7 @@ void cSensor::setMode (eMode mode) {
         writeReg (0xc6, 0x2779); writeReg (0xc8, mWidth);
         writeReg (0xc6, 0x277b); writeReg (0xc8, mHeight);
 
-        //writeReg (0x09, 0x000A); // factory bypass 10 bit sensor
+        writeReg (0x09, 0x000A); // factory bypass 10 bit sensor
         writeReg (0xC6, 0xA120); writeReg (0xC8, 0x02); // Sequencer.params.mode - capture video
         writeReg (0xC6, 0xA103); writeReg (0xC8, 0x02); // Sequencer goto capture B
 
@@ -360,9 +360,7 @@ void cSensor::setMode (eMode mode) {
         writeReg (0xc6, 0x277b); cLog::log (LOGINFO, "MODE_SPOOF_HEIGHT_B %d", readReg (0xc8));
         writeReg (0xc6, 0xa906); cLog::log (LOGINFO, "JPEG_FORMAT %d", readReg (0xc8));
         writeReg (0xc6, 0x2908); cLog::log (LOGINFO, "JPEG_RESTART_INT %d", readReg (0xc8));
-        writeReg (0xc6, 0xa90a);
-        mJpegQscale1 = readReg (0xc8);
-        cLog::log (LOGINFO, "JPEG_QSCALE_1 %d", mJpegQscale1);
+        writeReg (0xc6, 0xa90a); mJpegQscale1 = readReg (0xc8); cLog::log (LOGINFO, "JPEG_QSCALE_1 %d", mJpegQscale1);
         writeReg (0xc6, 0xa90b); cLog::log (LOGINFO, "JPEG_QSCALE_2 %d", readReg (0xc8));
         writeReg (0xc6, 0xa90c); cLog::log (LOGINFO, "JPEG_QSCALE_3 %d", readReg (0xc8));
         }
