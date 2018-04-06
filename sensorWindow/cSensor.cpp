@@ -47,8 +47,7 @@ void cSensor::run() {
     if (mId == kMt9d111) {
       mSensorTitle = "Mt9d111";
       cLog::log (LOGNOTICE, "MT9D111 - page:0xF0 read:0x00 sensorId " + hex(mId));
-      setPll (18, 1, 2); // 36Mhz - fastest st32f746g disco will go
-      setFastPll();
+      setSlowPll();
       setMode (ePreview);
       }
     else
@@ -94,28 +93,37 @@ ID2D1Bitmap* cSensor::getBitmapFrame (ID2D1DeviceContext* dc, int bayer, bool in
 //{{{
 void cSensor::setSlowPll() {
 
-  if (mId == kMt9d111)
-    setPll (16, 1, 1); // 48 Mhz
-  else {
-    writeReg (0x341E, 0x8F09); // PLL,clk_in control BYPASS PLL
-    writeReg (0x341C, 0x0150); // PLL 13:8:n=1, 7:0:m=85 clk = (10mhz/(n+1)) * (m/8) = 50mhz
-    Sleep (5);
-    writeReg (0x341E, 0x8F09); // PLL,clk_in control: PLL ON, bypass PLL
-    writeReg (0x341E, 0x8F08); // PLL,clk_in control: USE PLL
+  switch (mId) {
+    case kMt9d111:
+      //setPll (16, 1, 1); // 48Mhz
+      setPll (18, 1, 2); // 36Mhz
+      break;
+
+    case kMt9d112:
+      writeReg (0x341E, 0x8F09); // PLL,clk_in control BYPASS PLL
+      writeReg (0x341C, 0x0150); // PLL 13:8:n=1, 7:0:m=85 clk = (10mhz/(n+1)) * (m/8) = 50mhz
+      Sleep (5);
+      writeReg (0x341E, 0x8F09); // PLL,clk_in control: PLL ON, bypass PLL
+      writeReg (0x341E, 0x8F08); // PLL,clk_in control: USE PLL
+      break;
     }
   }
 //}}}
 //{{{
 void cSensor::setFastPll() {
 
-  if (mId == kMt9d111)
-    setPll (80, 11, 0);   // 80 Mhz
-  else {
-    writeReg (0x341E, 0x8F09); // PLL,clk_in control BYPASS PLL
-    writeReg (0x341C, 0x0180); // PLL 13:8:n=1, 7:0:m=128 clk = (10mhz/(n+1)) * (m/8) = 80mhz
-    Sleep (5);
-    writeReg (0x341E, 0x8F09); // PLL,clk_in control: PLL ON, bypass PLL
-    writeReg (0x341E, 0x8F08); // PLL,clk_in control: USE PLL
+  switch (mId) {
+    case kMt9d111:
+      setPll (80, 11, 0); // 80Mhz
+      break;
+
+    case kMt9d112:
+      writeReg (0x341E, 0x8F09); // PLL,clk_in control BYPASS PLL
+      writeReg (0x341C, 0x0180); // PLL 13:8:n=1, 7:0:m=128 clk = (10mhz/(n+1)) * (m/8) = 80mhz
+      Sleep (5);
+      writeReg (0x341E, 0x8F09); // PLL,clk_in control: PLL ON, bypass PLL
+      writeReg (0x341E, 0x8F08); // PLL,clk_in control: USE PLL
+      break;
     }
   }
 //}}}
@@ -131,7 +139,7 @@ void cSensor::setPll (int m, int n, int p) {
                         mPllm, mPlln, mPllp,
                         24000000 / (mPlln+1), (24000000 / (mPlln+1))*mPllm, ((24000000 / (mPlln+1) * mPllm)/ (2*(mPllp+1))));
 
-    //  PLL (24mhz/(N+1))*M / 2*(P+1)
+    //  PLL = (24mhz / (N+1)) * M / 2*(P+1)
     writeReg (0x66, (mPllm << 8) | mPlln);  // PLL Control1    M:N
     writeReg (0x67, 0x0500 | mPllp)      ;  // PLL Control2 0x05:P
     writeReg (0x65, 0xA000);  // Clock CNTRL - PLL ON
@@ -150,7 +158,7 @@ void cSensor::setMode (eMode mode) {
   switch (mode) {
     case ePreview:
       //{{{  previewYuv
-      cLog::log (LOGINFO, "setMode preview");
+      cLog::log (LOGINFO, "setMode previewYuv");
 
       mWidth = 800;
       mHeight = 600;
@@ -194,7 +202,7 @@ void cSensor::setMode (eMode mode) {
 
     case eCapture:
       //{{{  captureYuv
-      cLog::log (LOGINFO, "setMode capture");
+      cLog::log (LOGINFO, "setMode captureYuv");
 
       mWidth = 1600;
       mHeight = 1200;
@@ -389,6 +397,7 @@ uint8_t cSensor::limitByte (float v) {
     return 0;
   if (v >= 255.0)
     return 255;
+
   return (uint8_t)v;
   }
 //}}}

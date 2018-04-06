@@ -11,9 +11,7 @@
 
 #include "cSensor.h"
 //}}}
-//{{{  const
-const int kFullScreen = true;
-//}}}
+const int kFullScreen = false;
 
 class cAppWindow : public cD2dWindow {
 public:
@@ -44,8 +42,10 @@ public:
         mBayerValueBox = new cValueBox (this, 100.f,20.f, "bayer", 0,5.f, mBayer, mBayerChanged);
         add (mBayerValueBox, -100.f,40.f);
         break;
+
       case kMt9d112:
         add (new cIndexBox (this, 80.f, 20.f, {"preview", "capture", "bayer"}, (int&)mMode, mModeChanged));
+        break;
       }
 
     add (new cFloatBox (this, 50.f,20.f, mRenderTime), -50.f,-20.f);
