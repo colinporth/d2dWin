@@ -350,19 +350,21 @@ void cSensor::setMode (eMode mode) {
         writeReg (0xC6, 0xA120); writeReg (0xC8, 0x02); // Sequencer.params.mode - capture video
         writeReg (0xC6, 0xA103); writeReg (0xC8, 0x02); // Sequencer goto capture B
 
-        //writeReg (0xc6, 0xa907); printf ("JPEG_CONFIG %x\n",readReg (0xc8));
-        //writeReg (0xc6, 0x2772); printf ("MODE_FIFO_CONF0_B %x\n",readReg (0xc8));
-        //writeReg (0xc6, 0x2774); printf ("MODE_FIFO_CONF1_B %x\n",readReg (0xc8));
-        //writeReg (0xc6, 0x2776); printf ("MODE_FIFO_CONF2_B %x\n",readReg (0xc8));
-        //writeReg (0xc6, 0x2707); printf ("MODE_OUTPUT_WIDTH_B %d\n",readReg (0xc8));
-        //writeReg (0xc6, 0x2709); printf ("MODE_OUTPUT_HEIGHT_B %d\n",readReg (0xc8));
-        //writeReg (0xc6, 0x2779); printf ("MODE_SPOOF_WIDTH_B %d\n",readReg (0xc8));
-        //writeReg (0xc6, 0x277b); printf ("MODE_SPOOF_HEIGHT_B %d\n",readReg (0xc8));
-        //writeReg (0xc6, 0xa906); printf ("JPEG_FORMAT %d\n",readReg (0xc8));
-        //writeReg (0xc6, 0x2908); printf ("JPEG_RESTART_INT %d\n", readReg (0xc8));
-        //writeReg (0xc6, 0xa90a); printf ("JPEG_QSCALE_1 %d\n",readReg (0xc8));
-        //writeReg (0xc6, 0xa90b); printf ("JPEG_QSCALE_2 %d\n",readReg (0xc8));
-        //writeReg (0xc6, 0xa90c); printf ("JPEG_QSCALE_3 %d\n",readReg (0xc8));
+        writeReg (0xc6, 0xa907); cLog::log (LOGINFO, "JPEG_CONFIG %x", readReg (0xc8));
+        writeReg (0xc6, 0x2772); cLog::log (LOGINFO, "MODE_FIFO_CONF0_B %x", readReg (0xc8));
+        writeReg (0xc6, 0x2774); cLog::log (LOGINFO, "MODE_FIFO_CONF1_B %x", readReg (0xc8));
+        writeReg (0xc6, 0x2776); cLog::log (LOGINFO, "MODE_FIFO_CONF2_B %x", readReg (0xc8));
+        writeReg (0xc6, 0x2707); cLog::log (LOGINFO, "MODE_OUTPUT_WIDTH_B %d", readReg (0xc8));
+        writeReg (0xc6, 0x2709); cLog::log (LOGINFO, "MODE_OUTPUT_HEIGHT_B %d", readReg (0xc8));
+        writeReg (0xc6, 0x2779); cLog::log (LOGINFO, "MODE_SPOOF_WIDTH_B %d", readReg (0xc8));
+        writeReg (0xc6, 0x277b); cLog::log (LOGINFO, "MODE_SPOOF_HEIGHT_B %d", readReg (0xc8));
+        writeReg (0xc6, 0xa906); cLog::log (LOGINFO, "JPEG_FORMAT %d", readReg (0xc8));
+        writeReg (0xc6, 0x2908); cLog::log (LOGINFO, "JPEG_RESTART_INT %d", readReg (0xc8));
+        writeReg (0xc6, 0xa90a);
+        mJpegQscale1 = readReg (0xc8);
+        cLog::log (LOGINFO, "JPEG_QSCALE_1 %d", mJpegQscale1);
+        writeReg (0xc6, 0xa90b); cLog::log (LOGINFO, "JPEG_QSCALE_2 %d", readReg (0xc8));
+        writeReg (0xc6, 0xa90c); cLog::log (LOGINFO, "JPEG_QSCALE_3 %d", readReg (0xc8));
         }
       else
         cLog::log (LOGERROR, "setMode jpeg - unknown sensor");
@@ -529,30 +531,24 @@ uint8_t* cSensor::getRgbFrame (int bayer, bool info) {
         cLog::log (LOGERROR, "discarding nonJpeg frame %d %dx%d", frameLen, mWidth, mHeight);
 
       else {
-        cLog::log (LOGINFO, "jpeg frame %d %dx%d", frameLen, mWidth, mHeight);
-        auto jpegEndPtr = framePtr + frameLen - 4;
-        int jpegLen = *jpegEndPtr++;
-        jpegLen += (*jpegEndPtr++) << 8;
-        jpegLen += (*jpegEndPtr++) << 16;
+        // 3byte jpegLen, 1byte jpegStatus
+        int jpegLen = framePtr[frameLen-4] | (framePtr[frameLen-3] << 8) | (framePtr[frameLen-2] << 16);
+        auto jpegStatus = framePtr[frameLen-1];
 
-        auto status = *jpegEndPtr;
-        if ((*jpegEndPtr & 0x0f) != 0x01)
-          cLog::log (LOGERROR, "err status:%x expectedLen:%d jpegLen:%d %dx%d", *jpegEndPtr, frameLen, jpegLen, mWidth, mHeight);
+        if ((jpegLen <= frameLen) && (jpegStatus & 0x0f) != 0x01)
+          cLog::log (LOGERROR, "err status:%x len:%d:%d %dx%d", jpegStatus, frameLen, jpegLen, mWidth, mHeight);
         else {
           ok = true;
 
-          // form jpeg header, read JPEG_QSCALE_1 = 6?
-          writeReg (0xc6, 0xa90a);
-          int qscale1 = readReg (0xc8);
+          // make jpeg header
           uint8_t jpegHeader[1000];
-          int jpegHeaderLen = setJpegHeader (jpegHeader, mWidth, mHeight, 0, qscale1);
+          int jpegHeaderLen = setJpegHeader (jpegHeader, mWidth, mHeight, 0, mJpegQscale1);
 
           // append EOI marker
           framePtr[jpegLen] = 0xff;
           framePtr[jpegLen+1] = 0xd9;
 
-          cLog::log (LOGINFO, "jpegFrame:%d len:%d:%d %dx%d qscale1:%d", 
-                              mFrameCount, frameLen, jpegLen, mWidth, mHeight, qscale1);
+          cLog::log (LOGINFO, "jpegFrame:%d len:%d:%d %dx%d qscale1:%d", mFrameCount, frameLen, jpegLen, mWidth, mHeight, mJpegQscale1);
 
           // decompress framePtr to rgbaBuffer
           struct jpeg_error_mgr mJerr;

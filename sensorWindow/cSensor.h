@@ -224,6 +224,9 @@ private:
   int mPllp = 1;
   //}}}
 
+  int mFrameCount = 0;
+  int mJpegQscale1 = 6;
+
   uint8_t* mBuffer = nullptr;
   uint8_t* mBufferEnd = nullptr;
 
@@ -231,8 +234,6 @@ private:
   uint8_t* mLastFramePtr = nullptr;
   int mLastFrameLen = 0;
   ID2D1Bitmap* mBitmap = nullptr;
-
-  int mFrameCount = 0;
 
   float mFrameTime = 0;
   chrono::time_point<chrono::system_clock> mLastTime;
