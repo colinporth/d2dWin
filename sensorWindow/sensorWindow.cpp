@@ -33,20 +33,11 @@ public:
     add (mVectorBox, -276.f,-276.f);
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
-
-    switch (mSensor->getId()) {
-      case kMt9d111:
-        add (new cIndexBox (this, 90.f, 20.f,
-                            {"previewYuv", "previewRgb", "captureYuv", "captureRgb", "bayer", "jpeg"}, (int&)mMode, mModeChanged));
-        add (new cValueBox (this, 100.f,20.f, "focus", 0,255.f, mFocus, mFocusChanged), -100.f,20.f);
-        mBayerValueBox = new cValueBox (this, 100.f,20.f, "bayer", 0,5.f, mBayer, mBayerChanged);
-        add (mBayerValueBox, -100.f,40.f);
-        break;
-
-      case kMt9d112:
-        add (new cIndexBox (this, 80.f, 20.f, {"preview", "capture", "bayer"}, (int&)mMode, mModeChanged));
-        break;
-      }
+    add (new cIndexBox (this, 90.f, 20.f,
+                        {"previewYuv", "previewRgb", "captureYuv", "captureRgb", "bayer", "jpeg"}, (int&)mMode, mModeChanged));
+    add (new cValueBox (this, 100.f,20.f, "focus", 0,255.f, mFocus, mFocusChanged), -100.f,20.f);
+    mBayerValueBox = new cValueBox (this, 100.f,20.f, "bayer", 0,5.f, mBayer, mBayerChanged);
+    add (mBayerValueBox, -100.f,40.f);
 
     add (new cFloatBox (this, 50.f,20.f, mRenderTime), -50.f,-20.f);
     add (new cClockBox (this, 40.f, mTimePoint, true, true), -82.f,-82.f);
