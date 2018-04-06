@@ -36,14 +36,18 @@ public:
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
-    if (mSensor->getId() == kMt9d112)
-      add (new cIndexBox (this, 50.f, 4*20.f, {"pvw", "full", "bayer"}, (int&)mMode, mModeChanged));
-    else if (mSensor->getId() == kMt9d111) {
-      add (new cIndexBox (this, 80.f, 6*20.f, {"pvwYuv", "pvwRgb", "fullYuv", "fullRgb", "bayer", "jpeg"}, (int&)mMode, mModeChanged));
-      add (new cValueBox (this, 100.f,20.f, "focus", 0,255.f, mFocus, mFocusChanged), -100.f,20.f);
-      mBayerValueBox = new cValueBox (this, 100.f,20.f, "bayer", 0,5.f, mBayer, mBayerChanged);
-      add (mBayerValueBox, -100.f,40.f);
+    switch (mSensor->getId()) {
+      case kMt9d111:
+        add (new cIndexBox (this, 90.f, 20.f,
+                            {"previewYuv", "previewRgb", "captureYuv", "captureRgb", "bayer", "jpeg"}, (int&)mMode, mModeChanged));
+        add (new cValueBox (this, 100.f,20.f, "focus", 0,255.f, mFocus, mFocusChanged), -100.f,20.f);
+        mBayerValueBox = new cValueBox (this, 100.f,20.f, "bayer", 0,5.f, mBayer, mBayerChanged);
+        add (mBayerValueBox, -100.f,40.f);
+        break;
+      case kMt9d112:
+        add (new cIndexBox (this, 80.f, 20.f, {"preview", "capture", "bayer"}, (int&)mMode, mModeChanged));
       }
+
     add (new cFloatBox (this, 50.f,20.f, mRenderTime), -50.f,-20.f);
     add (new cClockBox (this, 40.f, mTimePoint, true, true), -82.f,-82.f);
 
@@ -84,9 +88,9 @@ protected:
                 mModeChanged = true;
                 break;
 
-      case 'E': mSensor->setPll (0x12, 1, 2); break;  // 36 Mhz
-      case 'T': mSensor->setSlowPLL(); break;  // 48 Mhz
-      case 'R': mSensor->set80PLL(); break; // 80 Mhz
+      case 'E': mSensor->setPll (18, 1, 2); break;  // 36 Mhz
+      case 'T': mSensor->setSlowPll(); break; // 48 Mhz
+      case 'R': mSensor->setFastPll(); break; // 80 Mhz
       case 'A': mSensor->setPll (++mPllm, mPlln, mPllp); break;
       case 'Z': mSensor->setPll (--mPllm, mPlln, mPllp); break;
       case 'S': mSensor->setPll (mPllm, ++mPlln, mPllp); break;

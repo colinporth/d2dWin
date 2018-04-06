@@ -179,7 +179,6 @@ public:
   int getHeight() { return mHeight; }
   cPoint getSize() { return cPoint (float(mWidth), float(mHeight)); }
 
-  uint8_t* getFramePtr (int& frameLen);
   ID2D1Bitmap* getBitmap() { return mBitmap; }
   float getFrameTime() { return mFrameTime; }
 
@@ -187,15 +186,14 @@ public:
   cHistogram& getLumaHistogram() { return mLumaHistogram; }
   cRgbHistogram& getRgbHistogram() { return mRgbHistogram; }
 
-  uint8_t* getRgbFrame (int bayer, bool info);
   ID2D1Bitmap* getBitmapFrame (ID2D1DeviceContext* dc, int bayer, bool info);
   float getRgbTime() { return mRgbTime; }
 
   // sets
   void setMode (eMode mode);
 
-  void set80PLL();
-  void setSlowPLL();
+  void setSlowPll();
+  void setFastPll();
   void setPll (int m, int n, int p);
 
   float getFocus();
@@ -204,8 +202,11 @@ public:
   string mTitle;
 
 private:
-  void updateTitle();
   uint8_t limitByte (float v);
+  uint8_t* getFramePtr (int& frameLen);
+  uint8_t* getRgbFrame (int bayer, bool info);
+
+  void updateTitle();
   void listenThread();
 
   //{{{  vars

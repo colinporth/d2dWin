@@ -8,7 +8,7 @@ class cIndexBox : public cD2dWindow::cBox {
 public:
   //{{{
   cIndexBox (cD2dWindow* window, float width, float height, vector<string> strings, int& index, bool& changed)
-      : cBox("offset", window, width, height), mStrings(strings), mIndex(index), mChanged(changed) {
+      : cBox("offset", window, width, height*strings.size()), mStrings(strings), mIndex(index), mChanged(changed) {
     mChanged = false;
     }
   //}}}
