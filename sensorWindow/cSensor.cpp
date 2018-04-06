@@ -530,60 +530,51 @@ uint8_t* cSensor::getRgbFrame (int bayer, bool info) {
 
       else {
         cLog::log (LOGINFO, "jpeg frame %d %dx%d", frameLen, mWidth, mHeight);
-        auto endPtr = framePtr + frameLen - 4;
-        int jpegLen = *endPtr++;
-        jpegLen += (*endPtr++) << 8;
-        jpegLen += (*endPtr++) << 16;
+        auto jpegEndPtr = framePtr + frameLen - 4;
+        int jpegLen = *jpegEndPtr++;
+        jpegLen += (*jpegEndPtr++) << 8;
+        jpegLen += (*jpegEndPtr++) << 16;
 
-        auto status = *endPtr;
+        auto status = *jpegEndPtr;
         if ((status & 0x0f) == 0x01) {
-          mCinfo.err = jpeg_std_error (&mJerr);
-          jpeg_create_decompress (&mCinfo);
-          mJpegHeaderLen = setJpegHeader (mJpegHeader, mWidth, mHeight, 0, 6);
+          ok = true;
 
-          jpeg_mem_src (&mCinfo, mJpegHeader, mJpegHeaderLen);
-          jpeg_read_header (&mCinfo, TRUE);
-          mCinfo.out_color_space = JCS_EXT_BGRA;
-
+          // append EOI marker
           framePtr[jpegLen] = 0xff;
           framePtr[jpegLen+1] = 0xd9;
+
+          // form jpeg header, read JPEG_QSCALE_1 = 6?
+          writeReg (0xc6, 0xa90a);
+          int qscale1 = readReg (0xc8);
+          cLog::log (LOGINFO, "jpegFrameNum:%d JPEG_QSCALE_1:%d", mFrameCount, qscale1);
+          uint8_t jpegHeader[1000];
+          int jpegHeaderLen = setJpegHeader (jpegHeader, mWidth, mHeight, 0, qscale1);
+
+          // decompress framePtr to rgbaBuffer
+          struct jpeg_error_mgr mJerr;
+          struct jpeg_decompress_struct mCinfo;
+          mCinfo.err = jpeg_std_error (&mJerr);
+          jpeg_create_decompress (&mCinfo);
+          jpeg_mem_src (&mCinfo, jpegHeader, jpegHeaderLen);
+          jpeg_read_header (&mCinfo, TRUE);
+          mCinfo.out_color_space = JCS_EXT_BGRA;
           jpeg_mem_src (&mCinfo, framePtr, jpegLen+2);
           jpeg_start_decompress (&mCinfo);
-
           while (mCinfo.output_scanline < mCinfo.output_height) {
             unsigned char* bufferArray[1];
             bufferArray[0] = rgbaBuffer + (mCinfo.output_scanline * mCinfo.output_width * mCinfo.output_components);
-            jpeg_read_scanlines(&mCinfo, bufferArray, 1);
+            jpeg_read_scanlines (&mCinfo, bufferArray, 1);
             }
-
           jpeg_finish_decompress (&mCinfo);
           jpeg_destroy_decompress (&mCinfo);
-          ok = true;
 
-          //{{{  write frame to file
-          ////writeReg (0xc6, 0xa90a); printf ("JPEG_QSCALE_1 %d\n",readReg (0xc8));
-          ////int qscale1 = readReg (0xc8);
-          //int qscale1 = 1;
-
-          //int mJpegHeaderLen  = setJpegHeader (jpegHeader, getWidth(), getHeight(), 0, qscale1);
-
-          //BYTE* endPtr = framePtr + frameLen - 4;
-          //int jpegLen = *endPtr++;
-          //jpegLen += (*endPtr++) << 8;
-          //jpegLen += (*endPtr++) << 16;
-          //int status = *endPtr;
-          //if ((status & 0x0f) == 0x01) {
-            //char filename[200];
-            //sprintf (filename, "C:/Users/colin/Desktop/cam.jpg");
-            //if (!mJpegFrameCount)
-              //mFile = fopen (filename, "wb");
-            //fwrite (mJpegHeader, 1, mJpegHeaderLen, mFile); // write JPEG header
-            //fwrite (framePtr, 1, jpegLen, mFile);      // write JPEG data
-            //fwrite ("\xff\xd9", 1, 2, mFile);               // write JPEG EOI marker
-            //mJpegFrameCount++;
-            //}
-          //}
-          //}}}
+          //  write framePtr to file, including appended EOI
+          char filename[200];
+          sprintf (filename, "C:/Users/colin/Desktop/piccies/cam%d.jpg", mFrameCount++);
+          auto mFile = fopen (filename, "wb");
+          fwrite (jpegHeader, 1, jpegHeaderLen, mFile); // write JPEG header
+          fwrite (framePtr, 1, jpegLen+2, mFile);        // write JPEG data, including appended EOI marker
+          fclose (mFile);
           }
         else
           cLog::log (LOGERROR, "err status %x %d %d", status, frameLen, jpegLen);

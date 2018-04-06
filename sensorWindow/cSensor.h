@@ -232,6 +232,8 @@ private:
   int mLastFrameLen = 0;
   ID2D1Bitmap* mBitmap = nullptr;
 
+  int mFrameCount = 0;
+
   float mFrameTime = 0;
   chrono::time_point<chrono::system_clock> mLastTime;
   float mRgbTime = 0;
@@ -239,12 +241,6 @@ private:
   cHistogram mLumaHistogram;
   cRgbHistogram mRgbHistogram;
   cVector mVector;
-
-  // jpeg
-  struct jpeg_decompress_struct mCinfo;
-  struct jpeg_error_mgr mJerr;
-  uint8_t mJpegHeader[1000];
-  int mJpegHeaderLen = 0;
 
   cSemaphore mSem;
   //}}}
