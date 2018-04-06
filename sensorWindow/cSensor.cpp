@@ -526,7 +526,7 @@ uint8_t* cSensor::getRgbFrame (int bayer, bool info) {
     case eJpeg:
       //{{{  jpeg
       if ((frameLen == 800*600*2) || (frameLen == 1600*800*2) || (frameLen == 1608*1208))
-        cLog::log (LOGINFO, "discarding nonJpeg frame %d %dx%d", frameLen, mWidth, mHeight);
+        cLog::log (LOGERROR, "discarding nonJpeg frame %d %dx%d", frameLen, mWidth, mHeight);
 
       else {
         cLog::log (LOGINFO, "jpeg frame %d %dx%d", frameLen, mWidth, mHeight);
@@ -536,19 +536,23 @@ uint8_t* cSensor::getRgbFrame (int bayer, bool info) {
         jpegLen += (*jpegEndPtr++) << 16;
 
         auto status = *jpegEndPtr;
-        if ((status & 0x0f) == 0x01) {
+        if ((*jpegEndPtr & 0x0f) != 0x01)
+          cLog::log (LOGERROR, "err status:%x expectedLen:%d jpegLen:%d %dx%d", *jpegEndPtr, frameLen, jpegLen, mWidth, mHeight);
+        else {
           ok = true;
+
+          // form jpeg header, read JPEG_QSCALE_1 = 6?
+          writeReg (0xc6, 0xa90a);
+          int qscale1 = readReg (0xc8);
+          uint8_t jpegHeader[1000];
+          int jpegHeaderLen = setJpegHeader (jpegHeader, mWidth, mHeight, 0, qscale1);
 
           // append EOI marker
           framePtr[jpegLen] = 0xff;
           framePtr[jpegLen+1] = 0xd9;
 
-          // form jpeg header, read JPEG_QSCALE_1 = 6?
-          writeReg (0xc6, 0xa90a);
-          int qscale1 = readReg (0xc8);
-          cLog::log (LOGINFO, "jpegFrameNum:%d JPEG_QSCALE_1:%d", mFrameCount, qscale1);
-          uint8_t jpegHeader[1000];
-          int jpegHeaderLen = setJpegHeader (jpegHeader, mWidth, mHeight, 0, qscale1);
+          cLog::log (LOGINFO, "jpegFrame:%d len:%d:%d %dx%d qscale1:%d", 
+                              mFrameCount, frameLen, jpegLen, mWidth, mHeight, qscale1);
 
           // decompress framePtr to rgbaBuffer
           struct jpeg_error_mgr mJerr;
@@ -571,15 +575,12 @@ uint8_t* cSensor::getRgbFrame (int bayer, bool info) {
           //  write framePtr to file, including appended EOI
           char filename[200];
           sprintf (filename, "C:/Users/colin/Desktop/piccies/cam%d.jpg", mFrameCount++);
-          auto mFile = fopen (filename, "wb");
-          fwrite (jpegHeader, 1, jpegHeaderLen, mFile); // write JPEG header
-          fwrite (framePtr, 1, jpegLen+2, mFile);        // write JPEG data, including appended EOI marker
-          fclose (mFile);
+          auto file = fopen (filename, "wb");
+          fwrite (jpegHeader, 1, jpegHeaderLen, file); // write JPEG header
+          fwrite (framePtr, 1, jpegLen+2, file);       // write JPEG data, including appended EOI marker
+          fclose (file);
           }
-        else
-          cLog::log (LOGERROR, "err status %x %d %d", status, frameLen, jpegLen);
         }
-
       break;
       //}}}
     }
