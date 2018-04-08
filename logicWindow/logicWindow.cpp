@@ -4,8 +4,8 @@
 
 #include "../common/usbUtils.h"
 
-#include "../common/cLogBox.h"
-#include "../common/cWindowBox.h"
+#include "../boxes/cLogBox.h"
+#include "../boxes/cWindowBox.h"
 //}}}
 //{{{  defines
 #define QUEUESIZE 64
@@ -19,9 +19,9 @@ public:
   void run (string title, int width, int height) {
 
     initialise (title, width, height, false);
-    addBox (new cBgndBox (this, 0, 0));
-    addBox (new cLogBox (this, 200.0f, 0), 0,0);
-    addBox (new cWindowBox (this, -60.0f, 24.0f), 0,0);
+    add (new cBgndBox (this, 0, 0));
+    add (new cLogBox (this, 200.0f, 0), 0,0);
+    add (new cWindowBox (this, -60.0f, 24.0f), 0,0);
 
     getDc()->CreateSolidColorBrush (ColorF(ColorF::CornflowerBlue), &mBrush);
 
