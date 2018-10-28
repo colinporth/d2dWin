@@ -1014,7 +1014,8 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
     add (new cFloatBox (this, 50.f, kLineHeight, mRenderTime), -50.f,-kLineHeight);
 
-    add (new cIndexBox (this, 100.f,3*20.f, {"os", "aerial"}, mMapIndex, &mMapIndexSem), 0.f, 80.f);
+     bool mChanged = false;  
+    add (new cIndexBox (this, 100.f,3*20.f, {"os", "aerial"}, mMapIndex, mChanged, &mMapIndexSem), 0.f, 80.f);
 
     // launch threads
     for (auto map : mMaps) {

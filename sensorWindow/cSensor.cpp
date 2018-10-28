@@ -47,7 +47,7 @@ void cSensor::run() {
     if (mId == kMt9d111) {
       mSensorTitle = "Mt9d111";
       cLog::log (LOGNOTICE, "MT9D111 - page:0xF0 read:0x00 sensorId " + hex(mId));
-      setSlowPll();
+      //setSlowPll();
       setMode (ePreview);
       }
     else
@@ -177,8 +177,6 @@ void cSensor::setMode (eMode mode) {
         writeReg (0x338C, 0xA120); writeReg (0x3390, 0x0000); // sequencer.params.mode - none
         writeReg (0x338C, 0xA103); writeReg (0x3390, 0x0001); // sequencer.cmd - goto preview mode A
         }
-      else
-        cLog::log (LOGERROR, "setMode preview - unknown sensor");
 
       break;
       //}}}
@@ -195,6 +193,11 @@ void cSensor::setMode (eMode mode) {
         writeReg (0x97, 0x0022); // output format configuration - RGB565, swap odd even
         writeReg (0xC6, 0xA120); writeReg (0xC8, 0x00); // Sequencer.params.mode - none
         writeReg (0xC6, 0xA103); writeReg (0xC8, 0x01); // Sequencer goto preview A
+        }
+      else if (mId == kMt9d112) {
+        writeReg (0x338c, 0x2795); writeReg (0x3390, 0x0022); // set A output format
+        writeReg (0x338C, 0xA120); writeReg (0x3390, 0x0000); // sequencer.params.mode - none
+        writeReg (0x338C, 0xA103); writeReg (0x3390, 0x0001); // sequencer.cmd - goto preview mode A
         }
 
       break;
@@ -221,8 +224,6 @@ void cSensor::setMode (eMode mode) {
         writeReg (0x338C, 0xA120); writeReg (0x3390, 0x0002); // sequencer.params.mode - capture video
         writeReg (0x338C, 0xA103); writeReg (0x3390, 0x0002); // sequencer.cmd - goto capture mode B
         }
-      else
-        cLog::log (LOGERROR, "setMode capture - unknown sensor");
 
       break;
       //}}}
@@ -239,6 +240,11 @@ void cSensor::setMode (eMode mode) {
         writeReg (0x97, 0x0022); // output format configuration - RGB565, swap odd even
         writeReg (0xC6, 0xA120); writeReg (0xC8, 0x02); // Sequencer.params.mode - capture video
         writeReg (0xC6, 0xA103); writeReg (0xC8, 0x02); // Sequencer goto capture B
+        }
+      else if (mId == kMt9d112) {
+        writeReg (0x338c, 0x2797); writeReg (0x3390, 0x0022); // set B output format
+        writeReg (0x338C, 0xA120); writeReg (0x3390, 0x0002); // sequencer.params.mode - capture video
+        writeReg (0x338C, 0xA103); writeReg (0x3390, 0x0002); // sequencer.cmd - goto capture mode B
         }
 
       break;
@@ -267,8 +273,6 @@ void cSensor::setMode (eMode mode) {
         writeReg (0x338C, 0xA120); writeReg (0x3390, 0x0002); // sequencer.params.mode - capture video
         writeReg (0x338C, 0xA103); writeReg (0x3390, 0x0002); // sequencer.cmd - goto capture mode B
         }
-      else
-        cLog::log (LOGERROR, "setMode bayer - unknown sensor");
 
       break;
       //}}}
