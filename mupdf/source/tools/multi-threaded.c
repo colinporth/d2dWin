@@ -32,10 +32,10 @@ depending on your environment.
 */
 
 //Include the MuPDF header file, and pthread's header file.
-#include <mupdf/fitz.h>
+#include "mupdf/fitz.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
+#include "mupdf/helpers/mu-threads.h"
 
 // A convenience function for dying abruptly on pthread errors.
 
