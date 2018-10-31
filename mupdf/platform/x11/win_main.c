@@ -398,7 +398,7 @@ void winalert (pdfapp_t* app, pdf_alert_event* alert) {
 //}}}
 //{{{
 void winprint (pdfapp_t* app) {
-  MessageBoxA (hwndframe, "The MuPDF library supports printing, but this application currently does not", 
+  MessageBoxA (hwndframe, "The MuPDF library supports printing, but this application currently does not",
                "Print document", MB_ICONWARNING);
 }
 //}}}
@@ -651,7 +651,7 @@ void winopen() {
 }
 //}}}
 //{{{
-void winclose (pdfapp_t *app) {
+void winclose (pdfapp_t* app) {
 
   if (pdfapp_preclose(app)) {
     do_close(app);
@@ -660,7 +660,7 @@ void winclose (pdfapp_t *app) {
   }
 //}}}
 //{{{
-void wincursor (pdfapp_t *app, int curs) {
+void wincursor (pdfapp_t* app, int curs) {
 
   if (curs == ARROW)
     SetCursor (arrowcurs);
@@ -673,7 +673,7 @@ void wincursor (pdfapp_t *app, int curs) {
   }
 //}}}
 //{{{
-void wintitle (pdfapp_t *app, char *title) {
+void wintitle (pdfapp_t* app, char *title) {
 
   wchar_t wide[256], *dp;
   char *sp;
@@ -691,7 +691,7 @@ void wintitle (pdfapp_t *app, char *title) {
   }
 //}}}
 //{{{
-void windrawrect (pdfapp_t *app, int x0, int y0, int x1, int y1) {
+void windrawrect (pdfapp_t* app, int x0, int y0, int x1, int y1) {
 
   RECT r;
   r.left = x0;
@@ -702,7 +702,7 @@ void windrawrect (pdfapp_t *app, int x0, int y0, int x1, int y1) {
   }
 //}}}
 //{{{
-void windrawstring (pdfapp_t *app, int x, int y, char *s) {
+void windrawstring (pdfapp_t* app, int x, int y, char *s) {
 
   HFONT font = (HFONT)GetStockObject (ANSI_FIXED_FONT);
   SelectObject (hdc, font);
@@ -723,10 +723,10 @@ void winblitsearch() {
 //{{{
 void winblit() {
 
-  int image_w = fz_pixmap_width(gapp.ctx, gapp.image);
-  int image_h = fz_pixmap_height(gapp.ctx, gapp.image);
-  int image_n = fz_pixmap_components(gapp.ctx, gapp.image);
-  unsigned char *samples = fz_pixmap_samples(gapp.ctx, gapp.image);
+  int image_w = fz_pixmap_width (gapp.ctx, gapp.image);
+  int image_h = fz_pixmap_height( gapp.ctx, gapp.image);
+  int image_n = fz_pixmap_components (gapp.ctx, gapp.image);
+  unsigned char *samples = fz_pixmap_samples (gapp.ctx, gapp.image);
   int x0 = gapp.panx;
   int y0 = gapp.pany;
   int x1 = gapp.panx + image_w;
@@ -735,11 +735,11 @@ void winblit() {
 
   if (gapp.image) {
     if (gapp.iscopying || justcopied) {
-      pdfapp_invert(&gapp, gapp.selr);
+      pdfapp_invert (&gapp, gapp.selr);
       justcopied = 1;
       }
 
-    pdfapp_inverthit(&gapp);
+    pdfapp_inverthit (&gapp);
 
     dibinf->bmiHeader.biWidth = image_w;
     dibinf->bmiHeader.biHeight = -image_h;
@@ -747,31 +747,27 @@ void winblit() {
 
     if (image_n == 2) {
       int i = image_w * image_h;
-      unsigned char *color = malloc(i*4);
-      unsigned char *s = samples;
-      unsigned char *d = color;
+      unsigned char* color = malloc(i*4);
+      unsigned char* s = samples;
+      unsigned char* d = color;
       for (; i > 0 ; i--) {
         d[2] = d[1] = d[0] = *s++;
         d[3] = *s++;
         d += 4;
         }
-      SetDIBitsToDevice(hdc,
-        gapp.panx, gapp.pany, image_w, image_h,
-        0, 0, 0, image_h, color,
-        dibinf, DIB_RGB_COLORS);
-      free(color);
-      }
-    if (image_n == 4) {
-      SetDIBitsToDevice(hdc,
-        gapp.panx, gapp.pany, image_w, image_h,
-        0, 0, 0, image_h, samples,
-        dibinf, DIB_RGB_COLORS);
+      SetDIBitsToDevice (hdc, gapp.panx, gapp.pany, image_w, image_h,
+                         0, 0, 0, image_h, color, dibinf, DIB_RGB_COLORS);
+      free (color);
       }
 
-    pdfapp_inverthit(&gapp);
+    if (image_n == 4) 
+      SetDIBitsToDevice (hdc, gapp.panx, gapp.pany, image_w, image_h,
+                         0, 0, 0, image_h, samples, dibinf, DIB_RGB_COLORS);
+
+    pdfapp_inverthit (&gapp);
 
     if (gapp.iscopying || justcopied) {
-      pdfapp_invert(&gapp, gapp.selr);
+      pdfapp_invert (&gapp, gapp.selr);
       justcopied = 1;
       }
     }
@@ -810,7 +806,7 @@ void winblit() {
   }
 //}}}
 //{{{
-void winresize (pdfapp_t *app, int w, int h) {
+void winresize (pdfapp_t* app, int w, int h) {
 
   ShowWindow (hwndframe, SW_SHOWDEFAULT);
   w += GetSystemMetrics (SM_CXFRAME) * 2;
@@ -820,13 +816,13 @@ void winresize (pdfapp_t *app, int w, int h) {
   }
 //}}}
 //{{{
-void winrepaint (pdfapp_t *app) {
+void winrepaint (pdfapp_t* app) {
 
   InvalidateRect(hwndview, NULL, 0);
   }
 //}}}
 //{{{
-void winrepaintsearch (pdfapp_t *app) {
+void winrepaintsearch (pdfapp_t* app) {
 
   // TODO: invalidate only search area and
   // call only search redraw routine.
@@ -834,47 +830,44 @@ void winrepaintsearch (pdfapp_t *app) {
   }
 //}}}
 //{{{
-void winfullscreen (pdfapp_t *app, int state) {
+void winfullscreen (pdfapp_t* app, int state) {
 
   static WINDOWPLACEMENT savedplace;
   static int isfullscreen = 0;
+
   if (state && !isfullscreen) {
-    GetWindowPlacement(hwndframe, &savedplace);
-    SetWindowLong(hwndframe, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-    SetWindowPos(hwndframe, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
-    ShowWindow(hwndframe, SW_SHOWMAXIMIZED);
+    GetWindowPlacement (hwndframe, &savedplace);
+    SetWindowLong (hwndframe, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+    SetWindowPos (hwndframe, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    ShowWindow (hwndframe, SW_SHOWMAXIMIZED);
     isfullscreen = 1;
     }
 
   if (!state && isfullscreen) {
-    SetWindowLong(hwndframe, GWL_STYLE, WS_OVERLAPPEDWINDOW);
-    SetWindowPos(hwndframe, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
-    SetWindowPlacement(hwndframe, &savedplace);
+    SetWindowLong (hwndframe, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+    SetWindowPos (hwndframe, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    SetWindowPlacement (hwndframe, &savedplace);
     isfullscreen = 0;
     }
   }
 //}}}
 //{{{
-void windocopy (pdfapp_t *app) {
+void windocopy (pdfapp_t* app) {
 
-  HGLOBAL handle;
-  unsigned short *ucsbuf;
-
-  if (!OpenClipboard(hwndframe))
+  if (!OpenClipboard (hwndframe))
     return;
   EmptyClipboard();
 
-  handle = GlobalAlloc(GMEM_MOVEABLE, 4096 * sizeof(unsigned short));
+  HGLOBAL handle = GlobalAlloc (GMEM_MOVEABLE, 4096 * sizeof(unsigned short));
   if (!handle) {
     CloseClipboard();
     return;
     }
+  unsigned short* ucsbuf = GlobalLock (handle);
+  pdfapp_oncopy (&gapp, ucsbuf, 4096);
+  GlobalUnlock (handle);
 
-  ucsbuf = GlobalLock(handle);
-  pdfapp_oncopy(&gapp, ucsbuf, 4096);
-  GlobalUnlock(handle);
-
-  SetClipboardData(CF_UNICODETEXT, handle);
+  SetClipboardData (CF_UNICODETEXT, handle);
   CloseClipboard();
 
   justcopied = 1; /* keep inversion around for a while... */
@@ -882,7 +875,6 @@ void windocopy (pdfapp_t *app) {
 //}}}
 //{{{
 void winreloadpage (pdfapp_t* app) {
-
   SendMessage (hwndview, WM_APP, 0, 0);
   }
 //}}}
@@ -929,10 +921,10 @@ char* winpassword (pdfapp_t* app, char* filename) {
 //{{{
 char* wintextinput (pdfapp_t* app, char* inittext, int retry) {
 
-  int code;
   td_retry = retry;
+
   fz_strlcpy(td_textinput, inittext ? inittext : "", sizeof td_textinput);
-  code = DialogBoxW(NULL, L"IDD_DLOGTEXT", hwndframe, dlogtextproc);
+  int code = DialogBoxW(NULL, L"IDD_DLOGTEXT", hwndframe, dlogtextproc);
   if (code <= 0)
     winerror(app, "cannot create text input dialog");
   if (pd_okay)
@@ -1061,7 +1053,7 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 
     case WM_SYSCOMMAND:
       if (wParam == ID_ABOUT) {
-        winhelp(&gapp);
+        winhelp (&gapp);
         return 0;
         }
       if (wParam == ID_DOCINFO) {
@@ -1143,9 +1135,10 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
 
     //{{{
     case WM_LBUTTONDOWN:
-      SetFocus(hwndview);
-      oldx = x; oldy = y;
-      handlemouse(x, y, 1, 1);
+      SetFocus (hwndview);
+      oldx = x; 
+      oldy = y;
+      handlemouse (x, y, 1, 1);
       return 0;
     //}}}
     //{{{
@@ -1212,8 +1205,8 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     case WM_TIMER:
       if (wParam == OUR_TIMER_ID && timer_pending && gapp.presentation_mode) {
         timer_pending = 0;
-        handlekey(VK_RIGHT + 256);
-        handlemouse(oldx, oldy, 0, 0); /* update cursor */
+        handlekey (VK_RIGHT + 256);
+        handlemouse (oldx, oldy, 0, 0); /* update cursor */
         return 0;
         }
       break;
@@ -1231,8 +1224,8 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
         case VK_DOWN:
         case VK_NEXT:
         case VK_ESCAPE:
-          handlekey(wParam + 256);
-          handlemouse(oldx, oldy, 0, 0);  /* update cursor */
+          handlekey (wParam + 256);
+          handlemouse (oldx, oldy, 0, 0);  /* update cursor */
           return 0;
         }
       return 1;
