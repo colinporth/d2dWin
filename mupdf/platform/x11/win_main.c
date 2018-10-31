@@ -38,7 +38,7 @@
 
 #define SET_KEY(parent, name, value) RegSetValueExA(parent, name, 0, REG_SZ, (const BYTE *)(value), (DWORD)strlen(value) + 1)
 //}}}
-//{{{
+//{{{  static vars
 static HWND hwndframe = NULL;
 static HWND hwndview = NULL;
 static HDC hdc;
@@ -46,8 +46,10 @@ static HBRUSH bgbrush;
 static HBRUSH shbrush;
 static BITMAPINFO *dibinf = NULL;
 static HCURSOR arrowcurs, handcurs, waitcurs, caretcurs;
+
 static LRESULT CALLBACK frameproc(HWND, UINT, WPARAM, LPARAM);
 static LRESULT CALLBACK viewproc(HWND, UINT, WPARAM, LPARAM);
+
 static int timer_pending = 0;
 static char *password = NULL;
 
@@ -57,12 +59,11 @@ static pdfapp_t gapp;
 
 static wchar_t wbuf[PATH_MAX];
 static char filename[PATH_MAX];
-//}}}
 
-//{{{  static vars
 static char pd_filename[256] = "The file is encrypted.";
 static char pd_password[256] = "";
 static wchar_t pd_passwordw[256] = {0};
+
 static char td_textinput[1024] = "";
 static int td_retry = 0;
 static int cd_nopts;
@@ -320,85 +321,85 @@ void install_app (char* argv0) {
   RegCloseKey (software);
   }
 //}}}
-
 //{{{
-/*
- * Dialog boxes
- */
+static void do_close (pdfapp_t *app) {
 
-void winwarn (pdfapp_t* app, char* msg)
-{
-  MessageBoxA(hwndframe, msg, "MuPDF: Warning", MB_ICONWARNING);
+  fz_context* ctx = app->ctx;
+  pdfapp_close (app);
+  free (dibinf);
+  fz_drop_context (ctx);
 }
 //}}}
+
 //{{{
-void winerror (pdfapp_t* app, char* msg)
-{
-  MessageBoxA(hwndframe, msg, "MuPDF: Error", MB_ICONERROR);
-  exit(1);
-}
+void winwarn (pdfapp_t* app, char* msg) {
+  MessageBoxA (hwndframe, msg, "MuPDF: Warning", MB_ICONWARNING);
+  }
 //}}}
 //{{{
-void winalert (pdfapp_t* app, pdf_alert_event* alert)
-{
+void winerror (pdfapp_t* app, char* msg) {
+  MessageBoxA (hwndframe, msg, "MuPDF: Error", MB_ICONERROR);
+  exit (1);
+  }
+//}}}
+//{{{
+void winalert (pdfapp_t* app, pdf_alert_event* alert) {
+
   int buttons = MB_OK;
   int icon = MB_ICONWARNING;
   int pressed = PDF_ALERT_BUTTON_NONE;
 
-  switch (alert->icon_type)
-  {
-  case PDF_ALERT_ICON_ERROR:
-    icon = MB_ICONERROR;
-    break;
-  case PDF_ALERT_ICON_WARNING:
-    icon = MB_ICONWARNING;
-    break;
-  case PDF_ALERT_ICON_QUESTION:
-    icon = MB_ICONQUESTION;
-    break;
-  case PDF_ALERT_ICON_STATUS:
-    icon = MB_ICONINFORMATION;
-    break;
-  }
+  switch (alert->icon_type) {
+    case PDF_ALERT_ICON_ERROR:
+      icon = MB_ICONERROR;
+      break;
+    case PDF_ALERT_ICON_WARNING:
+      icon = MB_ICONWARNING;
+      break;
+    case PDF_ALERT_ICON_QUESTION:
+      icon = MB_ICONQUESTION;
+      break;
+    case PDF_ALERT_ICON_STATUS:
+      icon = MB_ICONINFORMATION;
+      break;
+    }
 
-  switch (alert->button_group_type)
-  {
-  case PDF_ALERT_BUTTON_GROUP_OK:
-    buttons = MB_OK;
-    break;
-  case PDF_ALERT_BUTTON_GROUP_OK_CANCEL:
-    buttons = MB_OKCANCEL;
-    break;
-  case PDF_ALERT_BUTTON_GROUP_YES_NO:
-    buttons = MB_YESNO;
-    break;
-  case PDF_ALERT_BUTTON_GROUP_YES_NO_CANCEL:
-    buttons = MB_YESNOCANCEL;
-    break;
-  }
+  switch (alert->button_group_type) {
+    case PDF_ALERT_BUTTON_GROUP_OK:
+      buttons = MB_OK;
+      break;
+    case PDF_ALERT_BUTTON_GROUP_OK_CANCEL:
+      buttons = MB_OKCANCEL;
+      break;
+    case PDF_ALERT_BUTTON_GROUP_YES_NO:
+      buttons = MB_YESNO;
+      break;
+    case PDF_ALERT_BUTTON_GROUP_YES_NO_CANCEL:
+      buttons = MB_YESNOCANCEL;
+      break;
+    }
 
-  pressed = MessageBoxA(hwndframe, alert->message, alert->title, icon|buttons);
+  pressed = MessageBoxA (hwndframe, alert->message, alert->title, icon|buttons);
 
-  switch (pressed)
-  {
-  case IDOK:
-    alert->button_pressed = PDF_ALERT_BUTTON_OK;
-    break;
-  case IDCANCEL:
-    alert->button_pressed = PDF_ALERT_BUTTON_CANCEL;
-    break;
-  case IDNO:
-    alert->button_pressed = PDF_ALERT_BUTTON_NO;
-    break;
-  case IDYES:
-    alert->button_pressed = PDF_ALERT_BUTTON_YES;
+  switch (pressed) {
+    case IDOK:
+      alert->button_pressed = PDF_ALERT_BUTTON_OK;
+      break;
+    case IDCANCEL:
+      alert->button_pressed = PDF_ALERT_BUTTON_CANCEL;
+      break;
+    case IDNO:
+      alert->button_pressed = PDF_ALERT_BUTTON_NO;
+      break;
+    case IDYES:
+      alert->button_pressed = PDF_ALERT_BUTTON_YES;
+    }
   }
-}
 //}}}
 //{{{
-void winprint (pdfapp_t* app)
-{
-  MessageBoxA(hwndframe, "The MuPDF library supports printing, but this application currently does not", "Print document", MB_ICONWARNING);
+void winprint (pdfapp_t* app) {
+  MessageBoxA (hwndframe, "The MuPDF library supports printing, but this application currently does not", 
+               "Print document", MB_ICONWARNING);
 }
 //}}}
 //{{{
@@ -435,12 +436,13 @@ int winfilename (wchar_t* buf, int len) {
   ofn.lpstrTitle = L"MuPDF: Open PDF file";
   ofn.lpstrFilter = L"Documents (*.pdf;*.xps;*.cbz;*.epub;*.fb2;*.zip;*.png;*.jpeg;*.tiff)\0*.zip;*.cbz;*.xps;*.epub;*.fb2;*.pdf;*.jpe;*.jpg;*.jpeg;*.jfif;*.tif;*.tiff\0PDF Files (*.pdf)\0*.pdf\0XPS Files (*.xps)\0*.xps\0CBZ Files (*.cbz;*.zip)\0*.zip;*.cbz\0EPUB Files (*.epub)\0*.epub\0FictionBook 2 Files (*.fb2)\0*.fb2\0Image Files (*.png;*.jpeg;*.tiff)\0*.png;*.jpg;*.jpe;*.jpeg;*.jfif;*.tif;*.tiff\0All Files\0*\0\0";
   ofn.Flags = OFN_FILEMUSTEXIST|OFN_HIDEREADONLY;
-  return GetOpenFileNameW(&ofn);
+
+  return GetOpenFileNameW (&ofn);
   }
 //}}}
 //{{{
-int wingetcertpath (char* buf, int len)
-{
+int wingetcertpath (char* buf, int len) {
+
   wchar_t twbuf[PATH_MAX] = {0};
   OPENFILENAME ofn;
   buf[0] = 0;
@@ -453,22 +455,19 @@ int wingetcertpath (char* buf, int len)
   ofn.lpstrTitle = L"MuPDF: Select certificate file";
   ofn.lpstrFilter = L"Certificates (*.pfx)\0*.pfx\0All files\0*\0\0";
   ofn.Flags = OFN_FILEMUSTEXIST;
-  if (GetOpenFileNameW(&ofn))
-  {
+
+  if (GetOpenFileNameW(&ofn)) {
     int code = WideCharToMultiByte(CP_UTF8, 0, twbuf, -1, buf, MIN(PATH_MAX, len), NULL, NULL);
-    if (code == 0)
-    {
+    if (code == 0) {
       winerror(&gapp, "cannot convert filename to utf-8");
       return 0;
-    }
+      }
 
     return 1;
-  }
+    }
   else
-  {
     return 0;
   }
-}
 //}}}
 //{{{
 int wingetsavepath (pdfapp_t* app, char* buf, int len)
@@ -486,79 +485,71 @@ int wingetsavepath (pdfapp_t* app, char* buf, int len)
   ofn.lpstrTitle = L"MuPDF: Save PDF file";
   ofn.lpstrFilter = L"PDF Documents (*.pdf)\0*.pdf\0All Files\0*\0\0";
   ofn.Flags = OFN_HIDEREADONLY;
-  if (GetSaveFileName(&ofn))
-  {
+  if (GetSaveFileName(&ofn)) {
     int code = WideCharToMultiByte(CP_UTF8, 0, twbuf, -1, buf, MIN(PATH_MAX, len), NULL, NULL);
-    if (code == 0)
-    {
+    if (code == 0) {
       winerror(&gapp, "cannot convert filename to utf-8");
       return 0;
-    }
+      }
 
     wcscpy(wbuf, twbuf);
     strcpy(filename, buf);
     return 1;
-  }
+    }
   else
-  {
     return 0;
-  }
 }
 //}}}
 //{{{
-void winreplacefile (char* source, char* target)
-{
+void winreplacefile (char* source, char* target) {
+
   wchar_t wsource[PATH_MAX];
   wchar_t wtarget[PATH_MAX];
 
   int sz = MultiByteToWideChar(CP_UTF8, 0, source, -1, wsource, PATH_MAX);
-  if (sz == 0)
-  {
+  if (sz == 0) {
     winerror(&gapp, "cannot convert filename to Unicode");
     return;
-  }
+    }
 
   sz = MultiByteToWideChar(CP_UTF8, 0, target, -1, wtarget, PATH_MAX);
-  if (sz == 0)
-  {
+  if (sz == 0) {
     winerror(&gapp, "cannot convert filename to Unicode");
     return;
-  }
+    }
 
 #if (_WIN32_WINNT >= 0x0500)
-  ReplaceFile(wtarget, wsource, NULL, REPLACEFILE_IGNORE_MERGE_ERRORS, NULL, NULL);
+  ReplaceFile (wtarget, wsource, NULL, REPLACEFILE_IGNORE_MERGE_ERRORS, NULL, NULL);
 #else
-  DeleteFile(wtarget);
-  MoveFile(wsource, wtarget);
+  DeleteFile (wtarget);
+  MoveFile (wsource, wtarget);
 #endif
 }
 //}}}
 //{{{
-void wincopyfile (char* source, char* target)
-{
+void wincopyfile (char* source, char* target) {
+
   wchar_t wsource[PATH_MAX];
   wchar_t wtarget[PATH_MAX];
 
-  int sz = MultiByteToWideChar(CP_UTF8, 0, source, -1, wsource, PATH_MAX);
-  if (sz == 0)
-  {
-    winerror(&gapp, "cannot convert filename to Unicode");
+  int sz = MultiByteToWideChar (CP_UTF8, 0, source, -1, wsource, PATH_MAX);
+  if (sz == 0) {
+    winerror (&gapp, "cannot convert filename to Unicode");
     return;
-  }
+    }
 
-  sz = MultiByteToWideChar(CP_UTF8, 0, target, -1, wtarget, PATH_MAX);
-  if (sz == 0)
-  {
-    winerror(&gapp, "cannot convert filename to Unicode");
+  sz = MultiByteToWideChar (CP_UTF8, 0, target, -1, wtarget, PATH_MAX);
+  if (sz == 0) {
+    winerror (&gapp, "cannot convert filename to Unicode");
     return;
-  }
+    }
 
-  CopyFile(wsource, wtarget, FALSE);
-}
+  CopyFile (wsource, wtarget, FALSE);
+  }
 //}}}
 //{{{
-void winopen()
-{
+void winopen() {
+
   WNDCLASS wc;
   HMENU menu;
   RECT r;
@@ -658,85 +649,80 @@ void winopen()
 
   SetCursor(arrowcurs);
 }
+//}}}
+//{{{
+void winclose (pdfapp_t *app) {
 
-static void
-do_close(pdfapp_t *app)
-{
-  fz_context *ctx = app->ctx;
-  pdfapp_close(app);
-  free(dibinf);
-  fz_drop_context(ctx);
-}
-
-void winclose(pdfapp_t *app)
-{
-  if (pdfapp_preclose(app))
-  {
+  if (pdfapp_preclose(app)) {
     do_close(app);
     exit(0);
+    }
   }
-}
+//}}}
+//{{{
+void wincursor (pdfapp_t *app, int curs) {
 
-void wincursor(pdfapp_t *app, int curs)
-{
   if (curs == ARROW)
-    SetCursor(arrowcurs);
+    SetCursor (arrowcurs);
   if (curs == HAND)
-    SetCursor(handcurs);
+    SetCursor (handcurs);
   if (curs == WAIT)
-    SetCursor(waitcurs);
+    SetCursor (waitcurs);
   if (curs == CARET)
-    SetCursor(caretcurs);
-}
+    SetCursor (caretcurs);
+  }
+//}}}
+//{{{
+void wintitle (pdfapp_t *app, char *title) {
 
-void wintitle(pdfapp_t *app, char *title)
-{
   wchar_t wide[256], *dp;
   char *sp;
   int rune;
 
   dp = wide;
   sp = title;
-  while (*sp && dp < wide + 255)
-  {
-    sp += fz_chartorune(&rune, sp);
+  while (*sp && dp < wide + 255) {
+    sp += fz_chartorune (&rune, sp);
     *dp++ = rune;
-  }
+    }
   *dp = 0;
 
-  SetWindowTextW(hwndframe, wide);
-}
+  SetWindowTextW (hwndframe, wide);
+  }
+//}}}
+//{{{
+void windrawrect (pdfapp_t *app, int x0, int y0, int x1, int y1) {
 
-void windrawrect(pdfapp_t *app, int x0, int y0, int x1, int y1)
-{
   RECT r;
   r.left = x0;
   r.top = y0;
   r.right = x1;
   r.bottom = y1;
-  FillRect(hdc, &r, (HBRUSH)GetStockObject(WHITE_BRUSH));
-}
-
-void windrawstring(pdfapp_t *app, int x, int y, char *s)
-{
-  HFONT font = (HFONT)GetStockObject(ANSI_FIXED_FONT);
-  SelectObject(hdc, font);
-  TextOutA(hdc, x, y - 12, s, (int)strlen(s));
-}
-
-void winblitsearch()
-{
-  if (gapp.issearching)
-  {
-    char buf[sizeof(gapp.search) + 50];
-    sprintf(buf, "Search: %s", gapp.search);
-    windrawrect(&gapp, 0, 0, gapp.winw, 30);
-    windrawstring(&gapp, 10, 20, buf);
+  FillRect (hdc, &r, (HBRUSH)GetStockObject(WHITE_BRUSH));
   }
-}
+//}}}
+//{{{
+void windrawstring (pdfapp_t *app, int x, int y, char *s) {
 
-void winblit()
-{
+  HFONT font = (HFONT)GetStockObject (ANSI_FIXED_FONT);
+  SelectObject (hdc, font);
+  TextOutA (hdc, x, y - 12, s, (int)strlen(s));
+  }
+//}}}
+//{{{
+void winblitsearch() {
+
+  if (gapp.issearching) {
+    char buf[sizeof (gapp.search) + 50];
+    sprintf (buf, "Search: %s", gapp.search);
+    windrawrect (&gapp, 0, 0, gapp.winw, 30);
+    windrawstring (&gapp, 10, 20, buf);
+    }
+  }
+//}}}
+//{{{
+void winblit() {
+
   int image_w = fz_pixmap_width(gapp.ctx, gapp.image);
   int image_h = fz_pixmap_height(gapp.ctx, gapp.image);
   int image_n = fz_pixmap_components(gapp.ctx, gapp.image);
@@ -747,13 +733,11 @@ void winblit()
   int y1 = gapp.pany + image_h;
   RECT r;
 
-  if (gapp.image)
-  {
-    if (gapp.iscopying || justcopied)
-    {
+  if (gapp.image) {
+    if (gapp.iscopying || justcopied) {
       pdfapp_invert(&gapp, gapp.selr);
       justcopied = 1;
-    }
+      }
 
     pdfapp_inverthit(&gapp);
 
@@ -761,116 +745,118 @@ void winblit()
     dibinf->bmiHeader.biHeight = -image_h;
     dibinf->bmiHeader.biSizeImage = image_h * 4;
 
-    if (image_n == 2)
-    {
+    if (image_n == 2) {
       int i = image_w * image_h;
       unsigned char *color = malloc(i*4);
       unsigned char *s = samples;
       unsigned char *d = color;
-      for (; i > 0 ; i--)
-      {
+      for (; i > 0 ; i--) {
         d[2] = d[1] = d[0] = *s++;
         d[3] = *s++;
         d += 4;
-      }
+        }
       SetDIBitsToDevice(hdc,
         gapp.panx, gapp.pany, image_w, image_h,
         0, 0, 0, image_h, color,
         dibinf, DIB_RGB_COLORS);
       free(color);
-    }
-    if (image_n == 4)
-    {
+      }
+    if (image_n == 4) {
       SetDIBitsToDevice(hdc,
         gapp.panx, gapp.pany, image_w, image_h,
         0, 0, 0, image_h, samples,
         dibinf, DIB_RGB_COLORS);
-    }
+      }
 
     pdfapp_inverthit(&gapp);
 
-    if (gapp.iscopying || justcopied)
-    {
+    if (gapp.iscopying || justcopied) {
       pdfapp_invert(&gapp, gapp.selr);
       justcopied = 1;
+      }
     }
-  }
 
   /* Grey background */
-  r.top = 0; r.bottom = gapp.winh;
-  r.left = 0; r.right = x0;
-  FillRect(hdc, &r, bgbrush);
-  r.left = x1; r.right = gapp.winw;
-  FillRect(hdc, &r, bgbrush);
-  r.left = 0; r.right = gapp.winw;
-  r.top = 0; r.bottom = y0;
-  FillRect(hdc, &r, bgbrush);
-  r.top = y1; r.bottom = gapp.winh;
-  FillRect(hdc, &r, bgbrush);
+  r.top = 0;
+  r.bottom = gapp.winh;
+  r.left = 0;
+  r.right = x0;
+  FillRect (hdc, &r, bgbrush);
+  r.left = x1;
+  r.right = gapp.winw;
+  FillRect (hdc, &r, bgbrush);
+  r.left = 0;
+  r.right = gapp.winw;
+  r.top = 0;
+  r.bottom = y0;
+  FillRect (hdc, &r, bgbrush);
+  r.top = y1;
+  r.bottom = gapp.winh;
+  FillRect (hdc, &r, bgbrush);
 
   /* Drop shadow */
   r.left = x0 + 2;
   r.right = x1 + 2;
   r.top = y1;
   r.bottom = y1 + 2;
-  FillRect(hdc, &r, shbrush);
+  FillRect (hdc, &r, shbrush);
   r.left = x1;
   r.right = x1 + 2;
   r.top = y0 + 2;
   r.bottom = y1;
-  FillRect(hdc, &r, shbrush);
+  FillRect (hdc, &r, shbrush);
 
   winblitsearch();
-}
+  }
+//}}}
+//{{{
+void winresize (pdfapp_t *app, int w, int h) {
 
-void winresize(pdfapp_t *app, int w, int h)
-{
-  ShowWindow(hwndframe, SW_SHOWDEFAULT);
-  w += GetSystemMetrics(SM_CXFRAME) * 2;
-  h += GetSystemMetrics(SM_CYFRAME) * 2;
-  h += GetSystemMetrics(SM_CYCAPTION);
-  SetWindowPos(hwndframe, 0, 0, 0, w, h, SWP_NOZORDER | SWP_NOMOVE);
-}
+  ShowWindow (hwndframe, SW_SHOWDEFAULT);
+  w += GetSystemMetrics (SM_CXFRAME) * 2;
+  h += GetSystemMetrics (SM_CYFRAME) * 2;
+  h += GetSystemMetrics (SM_CYCAPTION);
+  SetWindowPos (hwndframe, 0, 0, 0, w, h, SWP_NOZORDER | SWP_NOMOVE);
+  }
+//}}}
+//{{{
+void winrepaint (pdfapp_t *app) {
 
-void winrepaint(pdfapp_t *app)
-{
   InvalidateRect(hwndview, NULL, 0);
-}
+  }
+//}}}
+//{{{
+void winrepaintsearch (pdfapp_t *app) {
 
-void winrepaintsearch(pdfapp_t *app)
-{
   // TODO: invalidate only search area and
   // call only search redraw routine.
   InvalidateRect(hwndview, NULL, 0);
-}
+  }
+//}}}
+//{{{
+void winfullscreen (pdfapp_t *app, int state) {
 
-void winfullscreen(pdfapp_t *app, int state)
-{
   static WINDOWPLACEMENT savedplace;
   static int isfullscreen = 0;
-  if (state && !isfullscreen)
-  {
+  if (state && !isfullscreen) {
     GetWindowPlacement(hwndframe, &savedplace);
     SetWindowLong(hwndframe, GWL_STYLE, WS_POPUP | WS_VISIBLE);
     SetWindowPos(hwndframe, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
     ShowWindow(hwndframe, SW_SHOWMAXIMIZED);
     isfullscreen = 1;
-  }
-  if (!state && isfullscreen)
-  {
+    }
+
+  if (!state && isfullscreen) {
     SetWindowLong(hwndframe, GWL_STYLE, WS_OVERLAPPEDWINDOW);
     SetWindowPos(hwndframe, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
     SetWindowPlacement(hwndframe, &savedplace);
     isfullscreen = 0;
+    }
   }
-}
+//}}}
+//{{{
+void windocopy (pdfapp_t *app) {
 
-/*
- * Event handling
- */
-
-void windocopy(pdfapp_t *app)
-{
   HGLOBAL handle;
   unsigned short *ucsbuf;
 
@@ -879,11 +865,10 @@ void windocopy(pdfapp_t *app)
   EmptyClipboard();
 
   handle = GlobalAlloc(GMEM_MOVEABLE, 4096 * sizeof(unsigned short));
-  if (!handle)
-  {
+  if (!handle) {
     CloseClipboard();
     return;
-  }
+    }
 
   ucsbuf = GlobalLock(handle);
   pdfapp_oncopy(&gapp, ucsbuf, 4096);
@@ -893,39 +878,37 @@ void windocopy(pdfapp_t *app)
   CloseClipboard();
 
   justcopied = 1; /* keep inversion around for a while... */
-}
+  }
 //}}}
 //{{{
-void winreloadpage (pdfapp_t* app)
-{
-  SendMessage(hwndview, WM_APP, 0, 0);
-}
+void winreloadpage (pdfapp_t* app) {
+
+  SendMessage (hwndview, WM_APP, 0, 0);
+  }
 //}}}
 //{{{
-void winopenuri (pdfapp_t* app, char* buf)
-{
-  ShellExecuteA(hwndframe, "open", buf, 0, 0, SW_SHOWNORMAL);
-}
+void winopenuri (pdfapp_t* app, char* buf) {
+  ShellExecuteA (hwndframe, "open", buf, 0, 0, SW_SHOWNORMAL);
+  }
 //}}}
 //{{{
-void winhelp (pdfapp_t* app)
-{
+void winhelp (pdfapp_t* app) {
+
   int code = DialogBoxW(NULL, L"IDD_DLOGABOUT", hwndframe, dlogaboutproc);
   if (code <= 0)
     winerror(&gapp, "cannot create help dialog");
-}
+  }
 //}}}
 //{{{
-char* winpassword (pdfapp_t* app, char* filename)
-{
+char* winpassword (pdfapp_t* app, char* filename) {
+
   char buf[1024], *s;
 
-  if (password)
-  {
+  if (password) {
     char *p = password;
     password = NULL;
     return p;
-  }
+    }
 
   strcpy(buf, filename);
   s = buf;
@@ -941,11 +924,11 @@ char* winpassword (pdfapp_t* app, char* filename)
   if (pd_okay)
     return pd_password;
   return NULL;
-}
+  }
 //}}}
 //{{{
-char* wintextinput (pdfapp_t* app, char* inittext, int retry)
-{
+char* wintextinput (pdfapp_t* app, char* inittext, int retry) {
+
   int code;
   td_retry = retry;
   fz_strlcpy(td_textinput, inittext ? inittext : "", sizeof td_textinput);
@@ -954,8 +937,9 @@ char* wintextinput (pdfapp_t* app, char* inittext, int retry)
     winerror(app, "cannot create text input dialog");
   if (pd_okay)
     return td_textinput;
+
   return NULL;
-}
+  }
 //}}}
 //{{{
 int winchoiceinput (pdfapp_t* app, int nopts, const char* opts[], int* nvals, const char* vals[]) {
@@ -1064,28 +1048,26 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 
   switch(message) {
     case WM_SETFOCUS:
-      PostMessage(hwnd, WM_APP+5, 0, 0);
+      PostMessage (hwnd, WM_APP+5, 0, 0);
       return 0;
 
     case WM_APP+5:
-      SetFocus(hwndview);
+      SetFocus (hwndview);
       return 0;
 
     case WM_DESTROY:
-      PostQuitMessage(0);
+      PostQuitMessage (0);
       return 0;
 
     case WM_SYSCOMMAND:
-      if (wParam == ID_ABOUT)
-      {
+      if (wParam == ID_ABOUT) {
         winhelp(&gapp);
         return 0;
-      }
-      if (wParam == ID_DOCINFO)
-      {
+        }
+      if (wParam == ID_DOCINFO) {
         info();
         return 0;
-      }
+        }
       break;
 
     case WM_SIZE:
@@ -1093,8 +1075,8 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
       // More generally, you should use GetEffectiveClientRect
       // if you have a toolbar etc.
       RECT rect;
-      GetClientRect(hwnd, &rect);
-      MoveWindow(hwndview, rect.left, rect.top,
+      GetClientRect (hwnd, &rect);
+      MoveWindow (hwndview, rect.left, rect.top,
       rect.right-rect.left, rect.bottom-rect.top, TRUE);
       if (wParam == SIZE_MAXIMIZED)
         gapp.shrinkwrap = 0;
@@ -1107,14 +1089,14 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 
     case WM_NOTIFY:
     case WM_COMMAND:
-      return SendMessage(hwndview, message, wParam, lParam);
+      return SendMessage (hwndview, message, wParam, lParam);
 
     case WM_CLOSE:
-      if (!pdfapp_preclose(&gapp))
+      if (!pdfapp_preclose (&gapp))
         return 0;
     }
 
-  return DefWindowProc(hwnd, message, wParam, lParam);
+  return DefWindowProc (hwnd, message, wParam, lParam);
   }
 //}}}
 //{{{
@@ -1133,10 +1115,10 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
         return 0;
       if (wParam == SIZE_MAXIMIZED)
         gapp.shrinkwrap = 0;
-      pdfapp_onresize(&gapp, LOWORD(lParam), HIWORD(lParam));
+
+      pdfapp_onresize (&gapp, LOWORD(lParam), HIWORD(lParam));
       break;
     //}}}
-
     //{{{
     /* Paint events are low priority and automagically catenated
      * so we don't need to do any fancy waiting to defer repainting.
@@ -1145,23 +1127,21 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     {
       //puts("WM_PAINT");
       PAINTSTRUCT ps;
-      hdc = BeginPaint(hwnd, &ps);
+      hdc = BeginPaint (hwnd, &ps);
       winblit();
       hdc = NULL;
       EndPaint(hwnd, &ps);
-      pdfapp_postblit(&gapp);
+
+      pdfapp_postblit (&gapp);
       return 0;
     }
     //}}}
-
     //{{{
     case WM_ERASEBKGND:
       return 1; // well, we don't need to erase to redraw cleanly
     //}}}
 
     //{{{
-    /* Mouse events */
-
     case WM_LBUTTONDOWN:
       SetFocus(hwndview);
       oldx = x; oldy = y;
@@ -1170,105 +1150,107 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //}}}
     //{{{
     case WM_MBUTTONDOWN:
-      SetFocus(hwndview);
-      oldx = x; oldy = y;
-      handlemouse(x, y, 2, 1);
+      SetFocus (hwndview);
+      oldx = x;
+      oldy = y;
+      handlemouse (x, y, 2, 1);
       return 0;
     //}}}
     //{{{
     case WM_RBUTTONDOWN:
-      SetFocus(hwndview);
-      oldx = x; oldy = y;
-      handlemouse(x, y, 3, 1);
+      SetFocus (hwndview);
+      oldx = x;
+      oldy = y;
+      handlemouse (x, y, 3, 1);
       return 0;
     //}}}
 
     //{{{
     case WM_LBUTTONUP:
-      oldx = x; oldy = y;
-      handlemouse(x, y, 1, -1);
+      oldx = x;
+      oldy = y;
+      handlemouse (x, y, 1, -1);
       return 0;
     //}}}
     //{{{
     case WM_MBUTTONUP:
-      oldx = x; oldy = y;
-      handlemouse(x, y, 2, -1);
+      oldx = x;
+      oldy = y;
+      handlemouse (x, y, 2, -1);
       return 0;
     //}}}
     //{{{
     case WM_RBUTTONUP:
-      oldx = x; oldy = y;
-      handlemouse(x, y, 3, -1);
+      oldx = x;
+      oldy = y;
+      handlemouse (x, y, 3, -1);
       return 0;
     //}}}
 
     //{{{
     case WM_MOUSEMOVE:
-      oldx = x; oldy = y;
-      handlemouse(x, y, 0, 0);
+      oldx = x;
+      oldy = y;
+      handlemouse (x, y, 0, 0);
       return 0;
     //}}}
     //{{{
     case WM_MOUSEWHEEL:
-      if ((signed short)HIWORD(wParam) <= 0)
-      {
-        handlemouse(oldx, oldy, 4, 1);
-        handlemouse(oldx, oldy, 4, -1);
-      }
-      else
-      {
-        handlemouse(oldx, oldy, 5, 1);
-        handlemouse(oldx, oldy, 5, -1);
-      }
+      if ((signed short)HIWORD(wParam) <= 0) {
+        handlemouse (oldx, oldy, 4, 1);
+        handlemouse (oldx, oldy, 4, -1);
+        }
+      else {
+        handlemouse (oldx, oldy, 5, 1);
+        handlemouse (oldx, oldy, 5, -1);
+        }
+
       return 0;
     //}}}
 
     //{{{
     case WM_TIMER:
-      if (wParam == OUR_TIMER_ID && timer_pending && gapp.presentation_mode)
-      {
+      if (wParam == OUR_TIMER_ID && timer_pending && gapp.presentation_mode) {
         timer_pending = 0;
         handlekey(VK_RIGHT + 256);
         handlemouse(oldx, oldy, 0, 0); /* update cursor */
         return 0;
-      }
+        }
       break;
     //}}}
 
     //{{{
     case WM_KEYDOWN:
       /* only handle special keys */
-      switch (wParam)
-      {
-      case VK_F1:
-      case VK_LEFT:
-      case VK_UP:
-      case VK_PRIOR:
-      case VK_RIGHT:
-      case VK_DOWN:
-      case VK_NEXT:
-      case VK_ESCAPE:
-        handlekey(wParam + 256);
-        handlemouse(oldx, oldy, 0, 0);  /* update cursor */
-        return 0;
-      }
+      switch (wParam) {
+        case VK_F1:
+        case VK_LEFT:
+        case VK_UP:
+        case VK_PRIOR:
+        case VK_RIGHT:
+        case VK_DOWN:
+        case VK_NEXT:
+        case VK_ESCAPE:
+          handlekey(wParam + 256);
+          handlemouse(oldx, oldy, 0, 0);  /* update cursor */
+          return 0;
+        }
       return 1;
     //}}}
     //{{{
     /* unicode encoded chars, including escape, backspace etc... */
     case WM_CHAR:
-      if (wParam < 256)
-      {
-        handlekey(wParam);
-        handlemouse(oldx, oldy, 0, 0);  /* update cursor */
-      }
+      if (wParam < 256) {
+        handlekey (wParam);
+        handlemouse (oldx, oldy, 0, 0);  /* update cursor */
+        }
       return 0;
     //}}}
 
     //{{{
     /* We use WM_APP to trigger a reload and repaint of a page */
     case WM_APP:
-      pdfapp_reloadpage(&gapp);
+      pdfapp_reloadpage (&gapp);
       break;
     //}}}
     }
@@ -1276,7 +1258,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
   fflush (stdout);
 
   /* Pass on unhandled events to Windows */
-  return DefWindowProc(hwnd, message, wParam, lParam);
+  return DefWindowProc (hwnd, message, wParam, lParam);
   }
 //}}}
 
