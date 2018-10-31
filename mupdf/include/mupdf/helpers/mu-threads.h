@@ -1,6 +1,9 @@
 #ifndef MUPDF_HELPERS_MU_THREADS_H
 #define MUPDF_HELPERS_MU_THREADS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*
 	Simple threading helper library.
 	Includes implementations for Windows, pthreads,
@@ -253,6 +256,10 @@ struct mu_mutex_s
 
 #else
 #error Unknown MU_THREAD_IMPL_TYPE setting
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* MUPDF_HELPERS_MU_THREADS_H */

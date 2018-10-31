@@ -12,7 +12,14 @@
 
 struct timeval;
 struct timezone;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 int gettimeofday(struct timeval *tv, struct timezone *tz);
+#ifdef __cplusplus
+}
+#endif
 //}}}
 
 #define DEBUG_THREADS(A) do { } while (0)
@@ -29,16 +36,14 @@ enum { CS_INVALID, CS_UNSET, CS_MONO, CS_GRAY, CS_GRAY_ALPHA, CS_RGB, CS_RGB_ALP
 enum { SPOTS_NONE, SPOTS_OVERPRINT_SIM, SPOTS_FULL };
 
 //{{{  struct suffix_t
-typedef struct
-{
-  char *suffix;
+typedef struct {
+  const char *suffix;
   int format;
   int spots;
-} suffix_t;
+  } suffix_t;
 //}}}
 //{{{
-static const suffix_t suffix_table[] =
-{
+static const suffix_t suffix_table[] = {
   { ".png", OUT_PNG, 0 },
   { ".pgm", OUT_PGM, 0 },
   { ".ppm", OUT_PPM, 0 },
@@ -61,18 +66,16 @@ static const suffix_t suffix_table[] =
   { ".stext", OUT_STEXT, 0 },
   { ".trace", OUT_TRACE, 0 },
   { ".gproof", OUT_GPROOF, 0 },
-};
+  };
 //}}}
 //{{{  struct cs_name
-typedef struct
-{
-  char *name;
+typedef struct {
+  const char *name;
   int colorspace;
-} cs_name_t;
+  } cs_name_t;
 //}}}
 //{{{
-static const cs_name_t cs_name_table[] =
-{
+static const cs_name_t cs_name_table[] = {
   { "m", CS_MONO },
   { "mono", CS_MONO },
   { "g", CS_GRAY },
@@ -87,19 +90,17 @@ static const cs_name_t cs_name_table[] =
   { "cmyk", CS_CMYK },
   { "cmyka", CS_CMYK_ALPHA },
   { "cmykalpha", CS_CMYK_ALPHA },
-};
+  };
 //}}}
 //{{{  struct format_cs_table_t
-typedef struct
-{
+typedef struct {
   int format;
   int default_cs;
   int permitted_cs[7];
-} format_cs_table_t;
+  } format_cs_table_t;
 //}}}
 //{{{
-static const format_cs_table_t format_cs_table[] =
-{
+static const format_cs_table_t format_cs_table[] = {
   { OUT_PNG, CS_RGB, { CS_GRAY, CS_GRAY_ALPHA, CS_RGB, CS_RGB_ALPHA, CS_ICC } },
   { OUT_PPM, CS_RGB, { CS_GRAY, CS_RGB } },
   { OUT_PNM, CS_GRAY, { CS_GRAY, CS_RGB } },
@@ -123,23 +124,23 @@ static const format_cs_table_t format_cs_table[] =
   { OUT_HTML, CS_RGB, { CS_RGB } },
   { OUT_XHTML, CS_RGB, { CS_RGB } },
   { OUT_STEXT, CS_RGB, { CS_RGB } },
-};
+  };
 //}}}
 
 static mu_mutex mutexes[FZ_LOCK_MAX];
 //{{{
-static void mudraw_lock (void* user, int lock) {
+void mudraw_lock (void* user, int lock) {
   mu_lock_mutex (&mutexes[lock]);
   }
 //}}}
 //{{{
-static void mudraw_unlock (void* user, int lock) {
+void mudraw_unlock (void* user, int lock) {
   mu_unlock_mutex (&mutexes[lock]);
   }
 //}}}
 static fz_locks_context mudraw_locks = { NULL, mudraw_lock, mudraw_unlock };
 //{{{
-static void fin_mudraw_locks() {
+void fin_mudraw_locks() {
 
   int i;
   for (i = 0; i < FZ_LOCK_MAX; i++)
@@ -147,7 +148,7 @@ static void fin_mudraw_locks() {
   }
 //}}}
 //{{{
-static fz_locks_context* init_mudraw_locks() {
+fz_locks_context* init_mudraw_locks() {
 
   int i;
   int failed = 0;
@@ -162,6 +163,7 @@ static fz_locks_context* init_mudraw_locks() {
   return &mudraw_locks;
   }
 //}}}
+
 //{{{  struct worker_t
 typedef struct worker_t {
   fz_context* ctx;
@@ -178,9 +180,8 @@ typedef struct worker_t {
   mu_thread thread;
   } worker_t;
 //}}}
-
 //{{{  static vars
-static char* output = NULL;
+static const char* output = NULL;
 static fz_output* out = NULL;
 
 static int output_pagenum = 0;
@@ -243,10 +244,13 @@ static const char* layer_config = NULL;
 static struct {
   int active;
   int started;
+
   fz_context* ctx;
+
   mu_thread thread;
   mu_semaphore start;
   mu_semaphore stop;
+
   int pagenum;
   char* filename;
   fz_display_list* list;
@@ -261,13 +265,14 @@ static struct {
   int min, max;
   int mininterp, maxinterp;
   int minpage, maxpage;
-  char* minfilename;
-  char* maxfilename;
+
+  const char* minfilename;
+  const char* maxfilename;
   } timing;
 //}}}
 
 //{{{
-static void usage() {
+void usage() {
   fprintf(stderr,
     "mudraw version " FZ_VERSION "\n"
     "Usage: mudraw [options] file [pages]\n"
@@ -325,22 +330,24 @@ static void usage() {
   }
 //}}}
 //{{{
-static int gettime() {
+int gettime() {
 
   static struct timeval first;
   static int once = 1;
-  struct timeval now;
+
   if (once) {
-    gettimeofday(&first, NULL);
+    gettimeofday (&first, NULL);
     once = 0;
     }
 
-  gettimeofday(&now, NULL);
+  struct timeval now;
+  gettimeofday (&now, NULL);
+
   return (now.tv_sec - first.tv_sec) * 1000 + (now.tv_usec - first.tv_usec) / 1000;
   }
 //}}}
 //{{{
-static int has_percent_d (char* s) {
+int has_percent_d (const char* s) {
 
   /* find '%[0-9]*d' */
   while (*s) {
@@ -357,7 +364,7 @@ static int has_percent_d (char* s) {
 //}}}
 //{{{
 /* Output file level (as opposed to page level) headers */
-static void file_level_headers (fz_context *ctx) {
+void file_level_headers (fz_context* ctx) {
 
   if (output_format == OUT_STEXT || output_format == OUT_TRACE)
     fz_write_printf(ctx, out, "<?xml version=\"1.0\"?>\n");
@@ -384,7 +391,7 @@ static void file_level_headers (fz_context *ctx) {
   }
 //}}}
 //{{{
-static void file_level_trailers (fz_context *ctx) {
+void file_level_trailers (fz_context* ctx) {
 
   if (output_format == OUT_STEXT || output_format == OUT_TRACE)
     fz_write_printf(ctx, out, "</document>\n");
@@ -403,7 +410,7 @@ static void file_level_trailers (fz_context *ctx) {
 //}}}
 
 //{{{
-static void drawband (fz_context *ctx, fz_page *page, fz_display_list *list, fz_matrix ctm, fz_rect tbounds, fz_cookie *cookie, int band_start, fz_pixmap *pix, fz_bitmap **bit)
+void drawband (fz_context* ctx, fz_page* page, fz_display_list* list, fz_matrix ctm, fz_rect tbounds, fz_cookie* cookie, int band_start, fz_pixmap* pix, fz_bitmap** bit)
 {
   fz_device* dev = NULL;
   fz_var(dev);
@@ -445,7 +452,7 @@ static void drawband (fz_context *ctx, fz_page *page, fz_display_list *list, fz_
   }
 //}}}
 //{{{
-static void dodrawpage( fz_context *ctx, fz_page *page, fz_display_list *list, int pagenum, fz_cookie *cookie, int start, int interptime, char *filename, int bg, fz_separations *seps)
+void dodrawpage( fz_context* ctx, fz_page* page, fz_display_list* list, int pagenum, fz_cookie* cookie, int start, int interptime, char* filename, int bg, fz_separations* seps)
 {
   fz_rect mediabox;
   fz_device *dev = NULL;
@@ -876,7 +883,7 @@ static void dodrawpage( fz_context *ctx, fz_page *page, fz_display_list *list, i
   }
 //}}}
 //{{{
-static void bgprint_flush()
+void bgprint_flush()
 {
   if (!bgprint.active || !bgprint.started)
     return;
@@ -886,7 +893,7 @@ static void bgprint_flush()
 //}}}
 
 //{{{
-static void drawpage (fz_context* ctx, fz_document* doc, int pagenum)
+void drawpage (fz_context* ctx, fz_document* doc, int pagenum)
 {
   fz_page* page;
   fz_display_list* list = NULL;
@@ -1017,7 +1024,7 @@ static void drawpage (fz_context* ctx, fz_document* doc, int pagenum)
   }
 //}}}
 //{{{
-static void drawrange (fz_context* ctx, fz_document* doc, const char* range) {
+void drawrange (fz_context* ctx, fz_document* doc, const char* range) {
 
   int page, spage, epage, pagecount;
 
@@ -1051,7 +1058,7 @@ static void drawrange (fz_context* ctx, fz_document* doc, const char* range) {
 //}}}
 
 //{{{
-static int parse_colorspace (const char* name) {
+int parse_colorspace (const char* name) {
 
   int i;
   for (i = 0; i < nelem(cs_name_table); i++)
@@ -1079,7 +1086,7 @@ typedef struct {
 //}}}
 
 //{{{
-static void* trace_malloc (void* arg, size_t size) {
+void* trace_malloc (void* arg, size_t size) {
 
   trace_info* info = (trace_info *) arg;
   trace_header* p;
@@ -1087,7 +1094,7 @@ static void* trace_malloc (void* arg, size_t size) {
   if (size == 0)
     return NULL;
 
-  p = malloc (size + sizeof(trace_header));
+  p = (trace_header*)malloc (size + sizeof(trace_header));
   if (p == NULL)
     return NULL;
 
@@ -1101,7 +1108,7 @@ static void* trace_malloc (void* arg, size_t size) {
   }
 //}}}
 //{{{
-static void trace_free (void* arg, void* p_) {
+void trace_free (void* arg, void* p_) {
 
   trace_info* info = (trace_info*) arg;
   trace_header* p = (trace_header*)p_;
@@ -1113,7 +1120,7 @@ static void trace_free (void* arg, void* p_) {
   }
 //}}}
 //{{{
-static void* trace_realloc (void* arg, void* p_, size_t size) {
+void* trace_realloc (void* arg, void* p_, size_t size) {
 
   trace_info* info = (trace_info*) arg;
   trace_header* p = (trace_header*)p_;
@@ -1128,7 +1135,7 @@ static void* trace_realloc (void* arg, void* p_, size_t size) {
     return trace_malloc (arg, size);
 
   oldsize = p[-1].size;
-  p = realloc(&p[-1], size + sizeof(trace_header));
+  p = (trace_header*)realloc(&p[-1], size + sizeof(trace_header));
   if (p == NULL)
     return NULL;
 
@@ -1146,7 +1153,7 @@ static void* trace_realloc (void* arg, void* p_, size_t size) {
 //}}}
 
 //{{{
-static void worker_thread (void* arg) {
+void worker_thread (void* arg) {
 
   worker_t* me = (worker_t*)arg;
 
@@ -1164,7 +1171,7 @@ static void worker_thread (void* arg) {
   }
 //}}}
 //{{{
-static void bgprint_worker (void* arg) {
+void bgprint_worker (void* arg) {
 
   fz_cookie cookie = { 0 };
   int pagenum;
@@ -1190,12 +1197,12 @@ static void bgprint_worker (void* arg) {
 //}}}
 
 //{{{
-static inline int iswhite (int ch) {
+inline int iswhite (int ch) {
   return ch == '\011' || ch == '\012' || ch == '\014' || ch == '\015' || ch == '\040';
   }
 //}}}
 //{{{
-static void apply_layer_config (fz_context* ctx, fz_document* doc, const char* lc) {
+void apply_layer_config (fz_context* ctx, fz_document* doc, const char* lc) {
 
   pdf_document *pdoc = pdf_specifics(ctx, doc);
   int config = -1;
@@ -1287,7 +1294,7 @@ static void apply_layer_config (fz_context* ctx, fz_document* doc, const char* l
 //{{{
 int main (int argc, char** argv) {
 
-  char* password = "";
+  const char* password = "";
   fz_document* doc = NULL;
   int c;
   fz_context* ctx;
@@ -1422,7 +1429,7 @@ int main (int argc, char** argv) {
   if (num_workers > 0) {
     int i;
     int fail = 0;
-    workers = fz_calloc (ctx, num_workers, sizeof(*workers));
+    workers = (worker_t*)fz_calloc (ctx, num_workers, sizeof(*workers));
     for (i = 0; i < num_workers; i++) {
       workers[i].ctx = fz_clone_context (ctx);
       workers[i].num = i;
@@ -1470,11 +1477,11 @@ int main (int argc, char** argv) {
     }
 
   else if (output) {
-    char *suffix = output;
+    const char *suffix = output;
     int i;
 
     for (i = 0; i < nelem (suffix_table); i++) {
-      char* s = strstr (suffix, suffix_table[i].suffix);
+      const char* s = strstr (suffix, suffix_table[i].suffix);
 
       if (s != NULL) {
         suffix = s+1;
