@@ -642,9 +642,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\x11\win_main.c" />
-  </ItemGroup>
-  <ItemGroup>
     <ResourceCompile Include="..\x11\win_res.rc" />
   </ItemGroup>
   <ItemGroup>
@@ -652,6 +649,9 @@
       <Project>{5f615f91-dff8-4f05-bf48-6222b7d86519}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\source\tools\winMain.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

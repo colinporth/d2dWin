@@ -1,4 +1,4 @@
-// win_main.c
+// winMain.cpp
 //{{{  includes
 #ifndef UNICODE
   #define UNICODE
@@ -63,7 +63,7 @@ enum panning { DONT_PAN = 0, PAN_TO_TOP, PAN_TO_BOTTOM };
 enum { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 //}}}
 //{{{
-struct app_s {
+struct app_t {
   /* current document params */
   fz_document* doc;
   char* docpath;
@@ -154,41 +154,40 @@ struct app_s {
   fz_context* ctx;
   };
 //}}}
-typedef struct app_s app_t;
-//{{{  static vars
-static HWND hwndframe = NULL;
-static HWND hwndview = NULL;
-static HDC hdc;
-static HBRUSH bgbrush;
-static HBRUSH shbrush;
-static BITMAPINFO* dibinf = NULL;
-static HCURSOR arrowcurs, handcurs, waitcurs, caretcurs;
+//{{{  global vars
+HWND hwndframe = NULL;
+HWND hwndview = NULL;
+HDC hdc;
+HBRUSH bgbrush;
+HBRUSH shbrush;
+BITMAPINFO* dibinf = NULL;
+HCURSOR arrowcurs, handcurs, waitcurs, caretcurs;
 
-static int timer_pending = 0;
-static int justcopied = 0;
+int timer_pending = 0;
+int justcopied = 0;
 
-static app_t gApp;
+app_t gApp;
 
-static wchar_t wbuf[PATH_MAX];
-static char filename[PATH_MAX];
+wchar_t wbuf[PATH_MAX];
+char filename[PATH_MAX];
 
-static char td_textinput[1024] = "";
-static int td_retry = 0;
-static int cd_nopts;
-static int* cd_nvals;
-static const char** cd_opts;
-static const char** cd_vals;
-static int pd_okay = 0;
+char td_textinput[1024] = "";
+int td_retry = 0;
+int cd_nopts;
+int* cd_nvals;
+const char** cd_opts;
+const char** cd_vals;
+int pd_okay = 0;
 //}}}
 
 //{{{
-char* appversion (app_t* app) {
+char* version (app_t* app) {
   return "MuPDF " FZ_VERSION "\n"
          "Copyright 2006-2017 Artifex Software, Inc.\n";
   }
 //}}}
 //{{{
-char* appusage (app_t* app) {
+char* usage (app_t* app) {
   return
     "L\t\t-- rotate left\n"
     "R\t\t-- rotate right\n"
@@ -231,8 +230,8 @@ INT_PTR CALLBACK dlogaboutproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM l
 
   switch(message) {
     case WM_INITDIALOG:
-      SetDlgItemTextA (hwnd, 2, appversion (&gApp));
-      SetDlgItemTextA (hwnd, 3, appusage (&gApp));
+      SetDlgItemTextA (hwnd, 2, version (&gApp));
+      SetDlgItemTextA (hwnd, 3, usage (&gApp));
       return TRUE;
 
     case WM_COMMAND:
@@ -271,7 +270,7 @@ INT_PTR CALLBACK dlogtextproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
       if ((HWND)lParam == GetDlgItem (hwnd, 4)) {
         SetTextColor ((HDC)wParam, RGB (255,0,0));
         SetBkMode ((HDC)wParam, TRANSPARENT);
-        return (INT)GetStockObject (NULL_BRUSH);
+        return (INT_PTR)GetStockObject (NULL_BRUSH);
         }
       break;
     }
@@ -408,7 +407,7 @@ void winError (app_t* app, char* msg) {
   }
 //}}}
 //{{{
-static void appError (app_t *app, char *msg) {
+void appError (app_t *app, char *msg) {
 
   winError(app, msg);
   }
@@ -419,7 +418,7 @@ void winWarn (app_t* app, char* msg) {
   }
 //}}}
 //{{{
-static void appWarn (app_t* app, const char* fmt, ...) {
+void appWarn (app_t* app, const char* fmt, ...) {
 
   char buf[1024];
   va_list ap;
@@ -608,7 +607,7 @@ int winchoiceinput (app_t* app, int nopts, const char* opts[], int* nvals, const
 
 static const int zoomList[] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
 //{{{
-static int zoomIn (int oldres) {
+int zoomIn (int oldres) {
 
   int i;
   for (i = 0; i < nelem (zoomList) - 1; ++i)
@@ -618,7 +617,7 @@ static int zoomIn (int oldres) {
   }
 //}}}
 //{{{
-static int zoomOut (int oldres) {
+int zoomOut (int oldres) {
 
   int i;
   for (i = 0; i < nelem (zoomList) - 1; ++i)
@@ -664,7 +663,7 @@ void appinvert (app_t* app, fz_rect rect) {
 //}}}
 
 //{{{
-static void event_cb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* data) {
+void event_cb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* data) {
 
   app_t* app = (app_t*)data;
 
@@ -695,7 +694,7 @@ static void event_cb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, 
 //}}}
 
 //{{{
-static void apppanview (app_t* app, int newx, int newy) {
+void apppanview (app_t* app, int newx, int newy) {
 
   int image_w = 0;
   int image_h = 0;
@@ -728,12 +727,12 @@ static void apppanview (app_t* app, int newx, int newy) {
   }
 //}}}
 //{{{
-static void appviewctm (fz_matrix* mat, app_t *app) {
+void appviewctm (fz_matrix* mat, app_t *app) {
   *mat = fz_transform_page (app->page_bbox, app->resolution, app->rotate);
   }
 //}}}
 //{{{
-static void apprunpage (app_t* app, fz_device* dev, const fz_matrix ctm, fz_rect scissor, fz_cookie* cookie) {
+void apprunpage (app_t* app, fz_device* dev, const fz_matrix ctm, fz_rect scissor, fz_cookie* cookie) {
 
   if (app->page_list)
     fz_run_display_list (app->ctx, app->page_list, dev, ctm, scissor, cookie);
@@ -743,7 +742,7 @@ static void apprunpage (app_t* app, fz_device* dev, const fz_matrix ctm, fz_rect
   }
 //}}}
 //{{{
-static void apploadpage (app_t* app, int no_cache) {
+void apploadpage (app_t* app, int no_cache) {
 
   int errored = 0;
   fz_cookie cookie = { 0 };
@@ -833,7 +832,7 @@ static void apploadpage (app_t* app, int no_cache) {
   }
 //}}}
 //{{{
-static void appshowpage (app_t* app, int loadpage, int drawpage, int repaint, int transition, int searching) {
+void appshowpage (app_t* app, int loadpage, int drawpage, int repaint, int transition, int searching) {
 
   char buf[MAX_TITLE];
   fz_device* idev = NULL;
@@ -985,7 +984,7 @@ static void appshowpage (app_t* app, int loadpage, int drawpage, int repaint, in
   }
 //}}}
 //{{{
-static void apprecreate_annotationslist (app_t* app) {
+void apprecreate_annotationslist (app_t* app) {
 
   int errored = 0;
   fz_cookie cookie = { 0 };
@@ -1027,7 +1026,7 @@ static void apprecreate_annotationslist (app_t* app) {
   }
 //}}}
 //{{{
-static void appupdatepage (app_t* app) {
+void appupdatepage (app_t* app) {
 
   if (pdf_update_page(app->ctx, (pdf_page*)app->page)) {
     apprecreate_annotationslist (app);
@@ -1039,7 +1038,7 @@ static void appupdatepage (app_t* app) {
 //}}}
 
 //{{{
-static int make_fake_doc (app_t* app) {
+int make_fake_doc (app_t* app) {
 
   fz_context* ctx = app->ctx;
 
@@ -1051,7 +1050,7 @@ static int make_fake_doc (app_t* app) {
 
   pdf_document* pdf = NULL;
   fz_try(ctx) {
-    fz_rect mediabox = { 0, 0, app->winw, app->winh };
+    fz_rect mediabox = { 0, 0, (float)app->winw, (float)app->winh };
     int i;
 
     pdf = pdf_create_document (ctx);
@@ -1394,7 +1393,7 @@ void apppostblit (app_t* app) {
 //}}}
 
 //{{{
-static void appsearch (app_t* app, enum panning* panto, int dir) {
+void appsearch (app_t* app, enum panning* panto, int dir) {
 
   /* abort if no search string */
   if (app->search[0] == 0) {
@@ -1556,7 +1555,7 @@ void winDoCopy (app_t* app) {
     return;
     }
 
-  unsigned short* ucsbuf = GlobalLock (handle);
+  unsigned short* ucsbuf = (unsigned short*)GlobalLock (handle);
   apponcopy (&gApp, ucsbuf, 4096);
   GlobalUnlock (handle);
 
@@ -1626,7 +1625,7 @@ void winblit() {
 
     if (image_n == 2) {
       int i = image_w * image_h;
-      unsigned char* color = malloc (i*4);
+      unsigned char* color = (unsigned char*)malloc (i*4);
       unsigned char* s = samples;
       unsigned char* d = color;
       for (; i > 0 ; i--) {
@@ -1747,13 +1746,14 @@ void onKey (app_t* app, int c, int modifiers) {
   switch (c) {
     case 'q':
     //{{{
-    case 0x1B:
+    case 0x1B: {
       fz_context* ctx = gApp.ctx;
       appclose (&gApp);
       free (dibinf);
       fz_drop_context (ctx);
       exit (0);
       break;
+      }
     //}}}
 
     //{{{
@@ -2134,7 +2134,7 @@ void handleKey (int c) {
 //}}}
 
 //{{{
-static void handleScroll (app_t* app, int modifiers, int dir) {
+void handleScroll (app_t* app, int modifiers, int dir) {
 
   app->ispanning = app->iscopying = 0;
   if (modifiers & (1<<2)) {
@@ -2192,7 +2192,7 @@ static void handleScroll (app_t* app, int modifiers, int dir) {
 void onMouse (app_t* app, int x, int y, int btn, int modifiers, int state) {
 
   fz_context* ctx = app->ctx;
-  fz_irect irect = { 0, 0, app->layout_w, app->layout_h };
+  fz_irect irect = { 0, 0, (int)app->layout_w, (int)app->layout_h };
   fz_link* link;
   fz_matrix ctm;
   fz_point p;
@@ -2257,11 +2257,11 @@ void onMouse (app_t* app, int x, int y, int btn, int modifiers, int state) {
 
             fz_try(ctx) {
               nopts = pdf_choice_widget_options(ctx, idoc, widget, 0, NULL);
-              opts = fz_malloc (ctx, nopts * sizeof(*opts));
+              opts = (const char**)fz_malloc (ctx, nopts * sizeof(*opts));
               (void)pdf_choice_widget_options (ctx, idoc, widget, 0, opts);
 
               nvals = pdf_choice_widget_value (ctx, idoc, widget, NULL);
-              vals = fz_malloc (ctx, MAX(nvals,nopts) * sizeof(*vals));
+              vals = (const char**)fz_malloc (ctx, MAX(nvals,nopts) * sizeof(*vals));
               (void)pdf_choice_widget_value (ctx, idoc, widget, vals);
 
               if (winchoiceinput (app, nopts, opts, &nvals, vals)) {
@@ -2737,7 +2737,7 @@ void winopen() {
   shbrush = CreateSolidBrush (RGB (0x40,0x40,0x40));
 
   /* Init DIB info for buffer */
-  dibinf = malloc (sizeof(BITMAPINFO) + 12);
+  dibinf = (BITMAPINFO*)malloc (sizeof(BITMAPINFO) + 12);
   dibinf->bmiHeader.biSize = sizeof(dibinf->bmiHeader);
   dibinf->bmiHeader.biPlanes = 1;
   dibinf->bmiHeader.biBitCount = 32;
@@ -2786,7 +2786,7 @@ void winopen() {
 
 typedef BOOL (SetProcessDPIAwareFn)(void);
 //{{{
-static int get_system_dpi() {
+int get_system_dpi() {
 
   HMODULE hUser32 = LoadLibrary (TEXT("user32.dll"));
   SetProcessDPIAwareFn* ptr = (SetProcessDPIAwareFn*)GetProcAddress (hUser32, "SetProcessDPIAware");

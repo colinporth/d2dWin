@@ -1,5 +1,8 @@
 #ifndef MUPDF_PKCS7_CHECK_H
 #define MUPDF_PKCS7_CHECK_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
 	pdf_check_signature: check a signature's certificate chain and digest
@@ -8,5 +11,8 @@
 	versions of mupdf
 */
 int pdf_check_signature(fz_context *ctx, pdf_document *doc, pdf_widget *widget, char *ebuf, int ebufsize);
+#ifdef __cplusplus
+}
+#endif
 
 #endif
