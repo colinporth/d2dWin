@@ -1,3 +1,4 @@
+// win_main.c
 //{{{  includes
 #ifndef UNICODE
   #define UNICODE
@@ -18,15 +19,16 @@
 #include <string.h>
 #include <limits.h>
 
-/* Include pdfapp.h *AFTER* the UNICODE defines */
+// Include pdfapp.h *AFTER* the UNICODE defines
 #include "mupdf/fitz.h"
 #include "mupdf/pdf.h"
 #include <time.h>
 
 #include "mupdf/helpers/pkcs7-check.h"
 #include "mupdf/helpers/pkcs7-openssl.h"
-
-/* 25% .. 1600% */
+//}}}
+//{{{  defines
+// 25% .. 1600%
 #define MINRES 18
 #define MAXRES 1152
 
@@ -43,10 +45,6 @@
 
 #define BEYOND_THRESHHOLD 40
 
-#ifndef PATH_MAX
-  #define PATH_MAX 4096
-#endif
-
 #define ID_ABOUT    0x1000
 #define ID_DOCINFO  0x1001
 
@@ -55,7 +53,6 @@
 
 #define SET_KEY(parent, name, value) RegSetValueExA (parent, name, 0, REG_SZ, (const BYTE*)(value), (DWORD)strlen(value) + 1)
 //}}}
-
 //{{{  enums
 enum { ARROW, HAND, WAIT, CARET };
 enum { DISCARD, SAVE, CANCEL };
@@ -68,16 +65,16 @@ enum { PDFAPP_OUTLINE_DEFERRED = 1, PDFAPP_OUTLINE_LOAD_NOW = 2 };
 //{{{
 struct pdfapp_s {
   /* current document params */
-  fz_document *doc;
-  char *docpath;
-  char *doctitle;
-  fz_outline *outline;
+  fz_document* doc;
+  char* docpath;
+  char* doctitle;
+  fz_outline* outline;
   int outline_deferred;
 
   float layout_w;
   float layout_h;
   float layout_em;
-  char *layout_css;
+  char* layout_css;
   int layout_use_doc_css;
 
   int pagecount;
@@ -85,17 +82,17 @@ struct pdfapp_s {
   /* current view params */
   int resolution;
   int rotate;
-  fz_pixmap *image;
+  fz_pixmap* image;
   int grayscale;
-  fz_colorspace *colorspace;
+  fz_colorspace* colorspace;
   int invert;
   int tint, tint_r, tint_g, tint_b;
 
   /* presentation mode */
   int presentation_mode;
   int transitions_enabled;
-  fz_pixmap *old_image;
-  fz_pixmap *new_image;
+  fz_pixmap* old_image;
+  fz_pixmap* new_image;
   clock_t start_time;
   int in_transit;
   float duration;
@@ -103,12 +100,12 @@ struct pdfapp_s {
 
   /* current page params */
   int pageno;
-  fz_page *page;
+  fz_page* page;
   fz_rect page_bbox;
-  fz_display_list *page_list;
-  fz_display_list *annotations_list;
-  fz_stext_page *page_text;
-  fz_link *page_links;
+  fz_display_list* page_list;
+  fz_display_list* annotations_list;
+  fz_stext_page* page_text;
+  fz_link* page_links;
   int errored;
   int incomplete;
 
@@ -152,9 +149,9 @@ struct pdfapp_s {
   int hit_count;
 
   /* client context storage */
-  void *userdata;
+  void* userdata;
 
-  fz_context *ctx;
+  fz_context* ctx;
   };
 //}}}
 typedef struct pdfapp_s pdfapp_t;
@@ -164,17 +161,13 @@ static HWND hwndview = NULL;
 static HDC hdc;
 static HBRUSH bgbrush;
 static HBRUSH shbrush;
-static BITMAPINFO *dibinf = NULL;
+static BITMAPINFO* dibinf = NULL;
 static HCURSOR arrowcurs, handcurs, waitcurs, caretcurs;
 
-static LRESULT CALLBACK frameproc(HWND, UINT, WPARAM, LPARAM);
-static LRESULT CALLBACK viewproc(HWND, UINT, WPARAM, LPARAM);
-
 static int timer_pending = 0;
-
 static int justcopied = 0;
 
-static pdfapp_t gapp;
+static pdfapp_t gApp;
 
 static wchar_t wbuf[PATH_MAX];
 static char filename[PATH_MAX];
@@ -238,8 +231,8 @@ INT_PTR CALLBACK dlogaboutproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM l
 
   switch(message) {
     case WM_INITDIALOG:
-      SetDlgItemTextA (hwnd, 2, pdfapp_version (&gapp));
-      SetDlgItemTextA (hwnd, 3, pdfapp_usage (&gapp));
+      SetDlgItemTextA (hwnd, 2, pdfapp_version (&gApp));
+      SetDlgItemTextA (hwnd, 3, pdfapp_usage (&gApp));
       return TRUE;
 
     case WM_COMMAND:
@@ -253,36 +246,33 @@ INT_PTR CALLBACK dlogaboutproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM l
 //{{{
 INT_PTR CALLBACK dlogtextproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
-  switch(message) {
+  switch (message) {
     case WM_INITDIALOG:
-      SetDlgItemTextA(hwnd, 3, td_textinput);
+      SetDlgItemTextA (hwnd, 3, td_textinput);
       if (!td_retry)
-        ShowWindow(GetDlgItem(hwnd, 4), SW_HIDE);
+        ShowWindow (GetDlgItem (hwnd, 4), SW_HIDE);
       return TRUE;
 
     case WM_COMMAND:
-      switch(wParam)
-      {
-      case 1:
-        pd_okay = 1;
-        GetDlgItemTextA(hwnd, 3, td_textinput, sizeof td_textinput);
-        EndDialog(hwnd, 1);
-        return TRUE;
-      case 2:
-        pd_okay = 0;
-        EndDialog(hwnd, 1);
-        return TRUE;
+      switch (wParam) {
+        case 1:
+          pd_okay = 1;
+          GetDlgItemTextA (hwnd, 3, td_textinput, sizeof td_textinput);
+          EndDialog (hwnd, 1);
+          return TRUE;
+        case 2:
+          pd_okay = 0;
+          EndDialog (hwnd, 1);
+          return TRUE;
       }
       break;
 
     case WM_CTLCOLORSTATIC:
-      if ((HWND)lParam == GetDlgItem(hwnd, 4))
-      {
-        SetTextColor((HDC)wParam, RGB(255,0,0));
-        SetBkMode((HDC)wParam, TRANSPARENT);
-
-        return (INT)GetStockObject(NULL_BRUSH);
-      }
+      if ((HWND)lParam == GetDlgItem (hwnd, 4)) {
+        SetTextColor ((HDC)wParam, RGB (255,0,0));
+        SetBkMode ((HDC)wParam, TRANSPARENT);
+        return (INT)GetStockObject (NULL_BRUSH);
+        }
       break;
     }
 
@@ -297,42 +287,40 @@ INT_PTR CALLBACK dlogchoiceproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM 
   int item;
   int sel;
 
-  switch(message) {
+  switch (message) {
     case WM_INITDIALOG:
-      listbox = GetDlgItem(hwnd, 3);
+      listbox = GetDlgItem (hwnd, 3);
       for (i = 0; i < cd_nopts; i++)
-        SendMessageA(listbox, LB_ADDSTRING, 0, (LPARAM)cd_opts[i]);
+        SendMessageA (listbox, LB_ADDSTRING, 0, (LPARAM)cd_opts[i]);
 
       /* FIXME: handle multiple select */
-      if (*cd_nvals > 0)
-      {
-        item = SendMessageA(listbox, LB_FINDSTRINGEXACT, (WPARAM)-1, (LPARAM)cd_vals[0]);
+      if (*cd_nvals > 0) {
+        item = SendMessageA (listbox, LB_FINDSTRINGEXACT, (WPARAM)-1, (LPARAM)cd_vals[0]);
         if (item != LB_ERR)
-          SendMessageA(listbox, LB_SETCURSEL, item, 0);
-      }
+          SendMessageA (listbox, LB_SETCURSEL, item, 0);
+        }
       return TRUE;
 
     case WM_COMMAND:
-      switch(wParam)
-      {
-      case 1:
-        listbox = GetDlgItem(hwnd, 3);
-        *cd_nvals = 0;
-        for (i = 0; i < cd_nopts; i++)
-        {
-          item = SendMessageA(listbox, LB_FINDSTRINGEXACT, (WPARAM)-1, (LPARAM)cd_opts[i]);
-          sel = SendMessageA(listbox, LB_GETSEL, item, 0);
-          if (sel && sel != LB_ERR)
-            cd_vals[(*cd_nvals)++] = cd_opts[i];
+      switch (wParam) {
+        case 1:
+          listbox = GetDlgItem (hwnd, 3);
+          *cd_nvals = 0;
+          for (i = 0; i < cd_nopts; i++) {
+            item = SendMessageA (listbox, LB_FINDSTRINGEXACT, (WPARAM)-1, (LPARAM)cd_opts[i]);
+            sel = SendMessageA (listbox, LB_GETSEL, item, 0);
+            if (sel && sel != LB_ERR)
+              cd_vals[(*cd_nvals)++] = cd_opts[i];
+            }
+          pd_okay = 1;
+          EndDialog (hwnd, 1);
+          return TRUE;
+
+        case 2:
+          pd_okay = 0;
+          EndDialog (hwnd, 1);
+          return TRUE;
         }
-        pd_okay = 1;
-        EndDialog(hwnd, 1);
-        return TRUE;
-      case 2:
-        pd_okay = 0;
-        EndDialog(hwnd, 1);
-        return TRUE;
-      }
       break;
     }
 
@@ -340,72 +328,68 @@ INT_PTR CALLBACK dlogchoiceproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM 
   }
 //}}}
 //{{{
-INT_PTR CALLBACK dloginfoproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
+INT_PTR CALLBACK dloginfoproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+
   char buf[256];
   wchar_t bufx[256];
-  fz_context *ctx = gapp.ctx;
-  fz_document *doc = gapp.doc;
+  fz_context* ctx = gApp.ctx;
+  fz_document* doc = gApp.doc;
 
-  switch(message)
-  {
-  case WM_INITDIALOG:
+  switch (message) {
+    case WM_INITDIALOG:
+      SetDlgItemTextW (hwnd, 0x10, wbuf);
+      if (fz_lookup_metadata (ctx, doc, FZ_META_FORMAT, buf, sizeof buf) >= 0)
+        SetDlgItemTextA (hwnd, 0x11, buf);
+      else {
+        SetDlgItemTextA (hwnd, 0x11, "Unknown");
+        SetDlgItemTextA (hwnd, 0x12, "None");
+        SetDlgItemTextA (hwnd, 0x13, "n/a");
+        return TRUE;
+        }
 
-    SetDlgItemTextW(hwnd, 0x10, wbuf);
+      if (fz_lookup_metadata (ctx, doc, FZ_META_ENCRYPTION, buf, sizeof buf) >= 0)
+        SetDlgItemTextA (hwnd, 0x12, buf);
+      else
+        SetDlgItemTextA (hwnd, 0x12, "None");
 
-    if (fz_lookup_metadata(ctx, doc, FZ_META_FORMAT, buf, sizeof buf) >= 0)
-      SetDlgItemTextA(hwnd, 0x11, buf);
-    else
-    {
-      SetDlgItemTextA(hwnd, 0x11, "Unknown");
-      SetDlgItemTextA(hwnd, 0x12, "None");
-      SetDlgItemTextA(hwnd, 0x13, "n/a");
+      buf[0] = 0;
+      if (fz_has_permission (ctx, doc, FZ_PERMISSION_PRINT))
+        strcat (buf, "print, ");
+      if (fz_has_permission (ctx, doc, FZ_PERMISSION_COPY))
+        strcat (buf, "copy, ");
+      if (fz_has_permission (ctx, doc, FZ_PERMISSION_EDIT))
+        strcat (buf, "edit, ");
+      if (fz_has_permission (ctx, doc, FZ_PERMISSION_ANNOTATE))
+        strcat (buf, "annotate, ");
+      if (strlen (buf) > 2)
+        buf[strlen (buf)-2] = 0;
+      else
+        strcpy (buf, "none");
+      SetDlgItemTextA (hwnd, 0x13, buf);
+
+      #define SETUTF8(ID, STRING) \
+        if (fz_lookup_metadata (ctx, doc, "info:" STRING, buf, sizeof buf) >= 0) {  \
+          MultiByteToWideChar (CP_UTF8, 0, buf, -1, bufx, nelem (bufx));            \
+          SetDlgItemTextW (hwnd, ID, bufx);                                         \
+          }
+
+      SETUTF8 (0x20, "Title");
+      SETUTF8 (0x21, "Author");
+      SETUTF8 (0x22, "Subject");
+      SETUTF8 (0x23, "Keywords");
+      SETUTF8 (0x24, "Creator");
+      SETUTF8 (0x25, "Producer");
+      SETUTF8 (0x26, "CreationDate");
+      SETUTF8 (0x27, "ModDate");
+      return TRUE;
+
+    case WM_COMMAND:
+      EndDialog (hwnd, 1);
       return TRUE;
     }
 
-    if (fz_lookup_metadata(ctx, doc, FZ_META_ENCRYPTION, buf, sizeof buf) >= 0)
-      SetDlgItemTextA(hwnd, 0x12, buf);
-    else
-      SetDlgItemTextA(hwnd, 0x12, "None");
-
-    buf[0] = 0;
-    if (fz_has_permission(ctx, doc, FZ_PERMISSION_PRINT))
-      strcat(buf, "print, ");
-    if (fz_has_permission(ctx, doc, FZ_PERMISSION_COPY))
-      strcat(buf, "copy, ");
-    if (fz_has_permission(ctx, doc, FZ_PERMISSION_EDIT))
-      strcat(buf, "edit, ");
-    if (fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
-      strcat(buf, "annotate, ");
-    if (strlen(buf) > 2)
-      buf[strlen(buf)-2] = 0;
-    else
-      strcpy(buf, "none");
-    SetDlgItemTextA(hwnd, 0x13, buf);
-
-#define SETUTF8(ID, STRING) \
-    if (fz_lookup_metadata(ctx, doc, "info:" STRING, buf, sizeof buf) >= 0) \
-    { \
-      MultiByteToWideChar(CP_UTF8, 0, buf, -1, bufx, nelem(bufx)); \
-      SetDlgItemTextW(hwnd, ID, bufx); \
-    }
-
-    SETUTF8(0x20, "Title");
-    SETUTF8(0x21, "Author");
-    SETUTF8(0x22, "Subject");
-    SETUTF8(0x23, "Keywords");
-    SETUTF8(0x24, "Creator");
-    SETUTF8(0x25, "Producer");
-    SETUTF8(0x26, "CreationDate");
-    SETUTF8(0x27, "ModDate");
-    return TRUE;
-
-  case WM_COMMAND:
-    EndDialog(hwnd, 1);
-    return TRUE;
-  }
   return FALSE;
-}
+  }
 //}}}
 
 #define OUR_TIMER_ID 1
@@ -418,24 +402,24 @@ void winadvancetimer (pdfapp_t* app, float delay) {
 //}}}
 
 //{{{
-void winerror (pdfapp_t* app, char* msg) {
+void winError (pdfapp_t* app, char* msg) {
   MessageBoxA (hwndframe, msg, "MuPDF: Error", MB_ICONERROR);
   exit (1);
   }
 //}}}
 //{{{
-static void pdfapp_error (pdfapp_t *app, char *msg)
-{
-  winerror(app, msg);
-}
+static void appError (pdfapp_t *app, char *msg) {
+
+  winError(app, msg);
+  }
 //}}}
 //{{{
-void winwarn (pdfapp_t* app, char* msg) {
+void winWarn (pdfapp_t* app, char* msg) {
   MessageBoxA (hwndframe, msg, "MuPDF: Warning", MB_ICONWARNING);
   }
 //}}}
 //{{{
-static void pdfapp_warn (pdfapp_t *app, const char *fmt, ...) {
+static void appWarn (pdfapp_t* app, const char* fmt, ...) {
 
   char buf[1024];
   va_list ap;
@@ -443,11 +427,12 @@ static void pdfapp_warn (pdfapp_t *app, const char *fmt, ...) {
   fz_vsnprintf (buf, sizeof(buf), fmt, ap);
   va_end (ap);
   buf[sizeof(buf)-1] = 0;
-  winwarn (app, buf);
+
+  winWarn (app, buf);
   }
 //}}}
 //{{{
-void winalert (pdfapp_t* app, pdf_alert_event* alert) {
+void winAlert (pdfapp_t* app, pdf_alert_event* alert) {
 
   int buttons = MB_OK;
   int icon = MB_ICONWARNING;
@@ -501,9 +486,15 @@ void winalert (pdfapp_t* app, pdf_alert_event* alert) {
   }
 //}}}
 //{{{
-void winhelp (pdfapp_t* app) {
+void winHelp (pdfapp_t* app) {
   if (DialogBoxW (NULL, L"IDD_DLOGABOUT", hwndframe, dlogaboutproc) <= 0)
-    winerror (&gapp, "cannot create help dialog");
+    winError (&gApp, "cannot create help dialog");
+  }
+//}}}
+//{{{
+void winInfo() {
+  if (DialogBoxW (NULL, L"IDD_DLOGINFO", hwndframe, dloginfoproc) <= 0)
+    winError (&gApp, "cannot create info dialog");
   }
 //}}}
 
@@ -521,40 +512,20 @@ void wincursor (pdfapp_t* app, int curs) {
   }
 //}}}
 //{{{
-void wintitle (pdfapp_t* app, char *title) {
+void winTitle (pdfapp_t* app, char *title) {
 
-  wchar_t wide[256], *dp;
-  char *sp;
-  int rune;
+  wchar_t wide[256];
+  wchar_t* dp = wide;
+  char* sp = title;
 
-  dp = wide;
-  sp = title;
   while (*sp && dp < wide + 255) {
+    int rune;
     sp += fz_chartorune (&rune, sp);
     *dp++ = rune;
     }
   *dp = 0;
 
   SetWindowTextW (hwndframe, wide);
-  }
-//}}}
-//{{{
-void windrawrect (pdfapp_t* app, int x0, int y0, int x1, int y1) {
-
-  RECT r;
-  r.left = x0;
-  r.top = y0;
-  r.right = x1;
-  r.bottom = y1;
-  FillRect (hdc, &r, (HBRUSH)GetStockObject(WHITE_BRUSH));
-  }
-//}}}
-//{{{
-void windrawstring (pdfapp_t* app, int x, int y, char *s) {
-
-  HFONT font = (HFONT)GetStockObject (ANSI_FIXED_FONT);
-  SelectObject (hdc, font);
-  TextOutA (hdc, x, y - 12, s, (int)strlen(s));
   }
 //}}}
 //{{{
@@ -610,10 +581,10 @@ char* wintextinput (pdfapp_t* app, char* inittext, int retry) {
 
   td_retry = retry;
 
-  fz_strlcpy(td_textinput, inittext ? inittext : "", sizeof td_textinput);
-  int code = DialogBoxW(NULL, L"IDD_DLOGTEXT", hwndframe, dlogtextproc);
-  if (code <= 0)
-    winerror(app, "cannot create text input dialog");
+  fz_strlcpy (td_textinput, inittext ? inittext : "", sizeof td_textinput);
+  if (DialogBoxW (NULL, L"IDD_DLOGTEXT", hwndframe, dlogtextproc) <= 0)
+    winError (app, "cannot create text input dialog");
+
   if (pd_okay)
     return td_textinput;
 
@@ -628,38 +599,37 @@ int winchoiceinput (pdfapp_t* app, int nopts, const char* opts[], int* nvals, co
   cd_opts = opts;
   cd_vals = vals;
 
-  int code = DialogBoxW(NULL, L"IDD_DLOGLIST", hwndframe, dlogchoiceproc);
-  if (code <= 0)
-    winerror(app, "cannot create text input dialog");
+  if (DialogBoxW (NULL, L"IDD_DLOGLIST", hwndframe, dlogchoiceproc) <= 0)
+    winError (app, "cannot create text input dialog");
 
   return pd_okay;
   }
 //}}}
 
-static const int zoomlist[] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
+static const int zoomList[] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
 //{{{
-static int zoom_in (int oldres)
-{
+static int zoomIn (int oldres) {
+
   int i;
-  for (i = 0; i < nelem(zoomlist) - 1; ++i)
-    if (zoomlist[i] <= oldres && zoomlist[i+1] > oldres)
-      return zoomlist[i+1];
-  return zoomlist[i];
-}
+  for (i = 0; i < nelem (zoomList) - 1; ++i)
+    if (zoomList[i] <= oldres && zoomList[i+1] > oldres)
+      return zoomList[i+1];
+  return zoomList[i];
+  }
 //}}}
 //{{{
-static int zoom_out (int oldres)
-{
+static int zoomOut (int oldres) {
+
   int i;
-  for (i = 0; i < nelem(zoomlist) - 1; ++i)
-    if (zoomlist[i] < oldres && zoomlist[i+1] >= oldres)
-      return zoomlist[i];
-  return zoomlist[0];
-}
+  for (i = 0; i < nelem (zoomList) - 1; ++i)
+    if (zoomList[i] < oldres && zoomList[i+1] >= oldres)
+      return zoomList[i];
+  return zoomList[0];
+  }
 //}}}
 
 //{{{
-void pdfapp_init (fz_context *ctx, pdfapp_t *app) {
+void pdfapp_init (fz_context* ctx, pdfapp_t* app) {
 
   memset(app, 0, sizeof(pdfapp_t));
   app->scrw = 640;
@@ -675,69 +645,65 @@ void pdfapp_init (fz_context *ctx, pdfapp_t *app) {
 
   app->transition.duration = 0.25f;
   app->transition.type = FZ_TRANSITION_FADE;
-#ifdef _WIN32
   app->colorspace = fz_device_bgr (ctx);
-#else
-  app->colorspace = fz_device_rgb (ctx);
-#endif
+
   app->tint_r = 255;
   app->tint_g = 250;
   app->tint_b = 240;
   }
 //}}}
 //{{{
-void pdfapp_setresolution (pdfapp_t *app, int res) {
+void pdfapp_setresolution (pdfapp_t* app, int res) {
   app->resolution = res;
   }
 //}}}
 //{{{
-void pdfapp_invert (pdfapp_t *app, fz_rect rect) {
+void pdfapp_invert (pdfapp_t* app, fz_rect rect) {
   fz_invert_pixmap_rect (app->ctx, app->image, fz_round_rect(rect));
   }
 //}}}
 
 //{{{
-static void event_cb (fz_context *ctx, pdf_document *doc, pdf_doc_event *event, void *data) {
+static void event_cb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* data) {
 
   pdfapp_t* app = (pdfapp_t*)data;
 
   switch (event->type) {
     case PDF_DOCUMENT_EVENT_ALERT:
-      winalert(app, pdf_access_alert_event(ctx, event));
+      winAlert (app, pdf_access_alert_event(ctx, event));
       break;
 
     case PDF_DOCUMENT_EVENT_PRINT:
     case PDF_DOCUMENT_EVENT_EXEC_MENU_ITEM:
-      pdfapp_warn (app, "The document attempted to execute menu item");
+      appWarn (app, "The document attempted to execute menu item");
       break;
 
     case PDF_DOCUMENT_EVENT_EXEC_DIALOG:
-      pdfapp_warn(app, "The document attempted to open a dialog box. (Not supported)");
+      appWarn (app, "The document attempted to open a dialog box. (Not supported)");
       break;
 
     case PDF_DOCUMENT_EVENT_LAUNCH_URL:
-      pdfapp_warn (app, "The document attempted to open url: %s. (Not supported by app)",
+      appWarn (app, "The document attempted to open url: %s. (Not supported by app)",
                    pdf_access_launch_url_event(ctx, event)->url);
       break;
 
     case PDF_DOCUMENT_EVENT_MAIL_DOC:
-      pdfapp_warn(app, "The document attempted to mail the document");
+      appWarn (app, "The document attempted to mail the document");
       break;
     }
   }
 //}}}
 
 //{{{
-static void pdfapp_panview (pdfapp_t *app, int newx, int newy)
-{
+static void pdfapp_panview (pdfapp_t* app, int newx, int newy) {
+
   int image_w = 0;
   int image_h = 0;
 
-  if (app->image)
-  {
-    image_w = fz_pixmap_width(app->ctx, app->image);
-    image_h = fz_pixmap_height(app->ctx, app->image);
-  }
+  if (app->image) {
+    image_w = fz_pixmap_width (app->ctx, app->image);
+    image_h = fz_pixmap_height (app->ctx, app->image);
+    }
 
   if (newx > 0)
     newx = 0;
@@ -755,19 +721,19 @@ static void pdfapp_panview (pdfapp_t *app, int newx, int newy)
     newy = (app->winh - image_h) / 2;
 
   if (newx != app->panx || newy != app->pany)
-    winrepaint(app);
+    winrepaint (app);
 
   app->panx = newx;
   app->pany = newy;
-}
+  }
 //}}}
 //{{{
-static void pdfapp_viewctm (fz_matrix *mat, pdfapp_t *app) {
+static void pdfapp_viewctm (fz_matrix* mat, pdfapp_t *app) {
   *mat = fz_transform_page (app->page_bbox, app->resolution, app->rotate);
   }
 //}}}
 //{{{
-static void pdfapp_runpage (pdfapp_t *app, fz_device *dev, const fz_matrix ctm, fz_rect scissor, fz_cookie *cookie) {
+static void pdfapp_runpage (pdfapp_t* app, fz_device* dev, const fz_matrix ctm, fz_rect scissor, fz_cookie* cookie) {
 
   if (app->page_list)
     fz_run_display_list (app->ctx, app->page_list, dev, ctm, scissor, cookie);
@@ -777,19 +743,19 @@ static void pdfapp_runpage (pdfapp_t *app, fz_device *dev, const fz_matrix ctm, 
   }
 //}}}
 //{{{
-static void pdfapp_loadpage (pdfapp_t *app, int no_cache) {
+static void pdfapp_loadpage (pdfapp_t* app, int no_cache) {
 
-  fz_device *mdev = NULL;
   int errored = 0;
   fz_cookie cookie = { 0 };
 
-  fz_var(mdev);
+  fz_device *mdev = NULL;
+  fz_var (mdev);
 
-  fz_drop_display_list(app->ctx, app->page_list);
-  fz_drop_display_list(app->ctx, app->annotations_list);
-  fz_drop_stext_page(app->ctx, app->page_text);
-  fz_drop_link(app->ctx, app->page_links);
-  fz_drop_page(app->ctx, app->page);
+  fz_drop_display_list (app->ctx, app->page_list);
+  fz_drop_display_list (app->ctx, app->annotations_list);
+  fz_drop_stext_page (app->ctx, app->page_text);
+  fz_drop_link (app->ctx, app->page_links);
+  fz_drop_page (app->ctx, app->page);
 
   app->page_list = NULL;
   app->annotations_list = NULL;
@@ -804,76 +770,75 @@ static void pdfapp_loadpage (pdfapp_t *app, int no_cache) {
   app->incomplete = 0;
 
   fz_try(app->ctx) {
-    app->page = fz_load_page(app->ctx, app->doc, app->pageno - 1);
-    app->page_bbox = fz_bound_page(app->ctx, app->page);
-  }
+    app->page = fz_load_page (app->ctx, app->doc, app->pageno - 1);
+    app->page_bbox = fz_bound_page (app->ctx, app->page);
+    }
   fz_catch(app->ctx) {
-    if (fz_caught(app->ctx) == FZ_ERROR_TRYLATER)
+    if (fz_caught (app->ctx) == FZ_ERROR_TRYLATER)
       app->incomplete = 1;
     else
-      pdfapp_warn(app, "Cannot load page");
+      appWarn (app, "Cannot load page");
     return;
-  }
+    }
 
   fz_try(app->ctx) {
-    fz_annot *annot;
     /* Create display lists */
-    app->page_list = fz_new_display_list(app->ctx, fz_infinite_rect);
-    mdev = fz_new_list_device(app->ctx, app->page_list);
+    app->page_list = fz_new_display_list (app->ctx, fz_infinite_rect);
+    mdev = fz_new_list_device (app->ctx, app->page_list);
     if (no_cache)
-      fz_enable_device_hints(app->ctx, mdev, FZ_NO_CACHE);
+      fz_enable_device_hints (app->ctx, mdev, FZ_NO_CACHE);
     cookie.incomplete_ok = 1;
-    fz_run_page_contents(app->ctx, app->page, mdev, fz_identity, &cookie);
-    fz_close_device(app->ctx, mdev);
-    fz_drop_device(app->ctx, mdev);
+    fz_run_page_contents (app->ctx, app->page, mdev, fz_identity, &cookie);
+    fz_close_device (app->ctx, mdev);
+    fz_drop_device (app->ctx, mdev);
+
     mdev = NULL;
-    app->annotations_list = fz_new_display_list(app->ctx, fz_infinite_rect);
-    mdev = fz_new_list_device(app->ctx, app->annotations_list);
-    for (annot = fz_first_annot(app->ctx, app->page); annot; annot = fz_next_annot(app->ctx, annot))
-      fz_run_annot(app->ctx, annot, mdev, fz_identity, &cookie);
-    if (cookie.incomplete) {
+    app->annotations_list = fz_new_display_list (app->ctx, fz_infinite_rect);
+    mdev = fz_new_list_device (app->ctx, app->annotations_list);
+
+    fz_annot* annot;
+    for (annot = fz_first_annot (app->ctx, app->page); annot; annot = fz_next_annot(app->ctx, annot))
+      fz_run_annot (app->ctx, annot, mdev, fz_identity, &cookie);
+    if (cookie.incomplete)
       app->incomplete = 1;
-      //pdfapp_warn(app, "Incomplete page rendering");
-      }
     else if (cookie.errors) {
-      pdfapp_warn(app, "Errors found on page");
+      appWarn (app, "Errors found on page");
       errored = 1;
       }
-    fz_close_device(app->ctx, mdev);
+    fz_close_device (app->ctx, mdev);
     }
-  fz_always(app->ctx) {
-    fz_drop_device(app->ctx, mdev);
+  fz_always (app->ctx) {
+    fz_drop_device (app->ctx, mdev);
     }
-  fz_catch(app->ctx) {
-    if (fz_caught(app->ctx) == FZ_ERROR_TRYLATER)
+  fz_catch (app->ctx) {
+    if (fz_caught (app->ctx) == FZ_ERROR_TRYLATER)
       app->incomplete = 1;
     else {
-      pdfapp_warn(app, "Cannot load page");
+      appWarn (app, "Cannot load page");
       errored = 1;
       }
     }
 
-  fz_try(app->ctx) {
-    app->page_links = fz_load_links(app->ctx, app->page);
+  fz_try (app->ctx) {
+    app->page_links = fz_load_links (app->ctx, app->page);
     }
-
-  fz_catch(app->ctx) {
-    if (fz_caught(app->ctx) == FZ_ERROR_TRYLATER)
+  fz_catch (app->ctx) {
+    if (fz_caught (app->ctx) == FZ_ERROR_TRYLATER)
       app->incomplete = 1;
     else if (!errored)
-      pdfapp_warn(app, "Cannot load page");
+      appWarn (app, "Cannot load page");
     }
 
   app->errored = errored;
   }
 //}}}
 //{{{
-static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repaint, int transition, int searching) {
+static void pdfapp_showpage (pdfapp_t* app, int loadpage, int drawpage, int repaint, int transition, int searching) {
 
   char buf[MAX_TITLE];
-  fz_device *idev = NULL;
-  fz_device *tdev;
-  fz_colorspace *colorspace;
+  fz_device* idev = NULL;
+  fz_device* tdev;
+  fz_colorspace* colorspace;
   fz_matrix ctm;
   fz_rect bounds;
   fz_irect ibounds;
@@ -892,25 +857,25 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
 
   if (loadpage) {
     fz_rect mediabox;
-    pdfapp_loadpage(app, searching);
+    pdfapp_loadpage (app, searching);
 
     /* Zero search hit position */
     app->hit_count = 0;
 
     /* Extract text */
-    mediabox = fz_bound_page(app->ctx, app->page);
-    app->page_text = fz_new_stext_page(app->ctx, mediabox);
+    mediabox = fz_bound_page (app->ctx, app->page);
+    app->page_text = fz_new_stext_page (app->ctx, mediabox);
 
     if (app->page_list || app->annotations_list) {
-      tdev = fz_new_stext_device(app->ctx, app->page_text, NULL);
+      tdev = fz_new_stext_device (app->ctx, app->page_text, NULL);
       fz_try(app->ctx) {
-        pdfapp_runpage(app, tdev, fz_identity, fz_infinite_rect, &cookie);
-        fz_close_device(app->ctx, tdev);
+        pdfapp_runpage (app, tdev, fz_identity, fz_infinite_rect, &cookie);
+        fz_close_device (app->ctx, tdev);
         }
-      fz_always(app->ctx)
-        fz_drop_device(app->ctx, tdev);
-      fz_catch(app->ctx)
-        fz_rethrow(app->ctx);
+      fz_always (app->ctx)
+        fz_drop_device (app->ctx, tdev);
+      fz_catch (app->ctx)
+        fz_rethrow (app->ctx);
       }
     }
 
@@ -918,50 +883,49 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
     char buf2[64];
     size_t len;
 
-    sprintf(buf2, " - %d/%d (%d dpi)",
-        app->pageno, app->pagecount, app->resolution);
-    len = MAX_TITLE-strlen(buf2);
-    if (strlen(app->doctitle) > len) {
-      fz_strlcpy(buf, app->doctitle, len-3);
-      fz_strlcat(buf, "...", MAX_TITLE);
-      fz_strlcat(buf, buf2, MAX_TITLE);
+    sprintf (buf2, " - %d/%d (%d dpi)", app->pageno, app->pagecount, app->resolution);
+    len = MAX_TITLE-strlen (buf2);
+    if (strlen (app->doctitle) > len) {
+      fz_strlcpy (buf, app->doctitle, len-3);
+      fz_strlcat (buf, "...", MAX_TITLE);
+      fz_strlcat (buf, buf2, MAX_TITLE);
       }
     else
-      sprintf(buf, "%s%s", app->doctitle, buf2);
-    wintitle(app, buf);
+      sprintf (buf, "%s%s", app->doctitle, buf2);
+    winTitle (app, buf);
 
-    pdfapp_viewctm(&ctm, app);
-    bounds = fz_transform_rect(app->page_bbox, ctm);
-    ibounds = fz_round_rect(bounds);
-    bounds = fz_rect_from_irect(ibounds);
+    pdfapp_viewctm (&ctm, app);
+    bounds = fz_transform_rect (app->page_bbox, ctm);
+    ibounds = fz_round_rect (bounds);
+    bounds = fz_rect_from_irect (ibounds);
 
-    /* Draw */
-    fz_drop_pixmap(app->ctx, app->image);
+    // Draw
+    fz_drop_pixmap (app->ctx, app->image);
     if (app->grayscale)
-      colorspace = fz_device_gray(app->ctx);
+      colorspace = fz_device_gray (app->ctx);
     else
       colorspace = app->colorspace;
 
     app->image = NULL;
-    fz_var(app->image);
-    fz_var(idev);
+    fz_var (app->image);
+    fz_var (idev);
 
-    fz_try(app->ctx) {
-      app->image = fz_new_pixmap_with_bbox(app->ctx, colorspace, ibounds, NULL, 1);
-      fz_clear_pixmap_with_value(app->ctx, app->image, 255);
+    fz_try (app->ctx) {
+      app->image = fz_new_pixmap_with_bbox (app->ctx, colorspace, ibounds, NULL, 1);
+      fz_clear_pixmap_with_value (app->ctx, app->image, 255);
       if (app->page_list || app->annotations_list) {
-        idev = fz_new_draw_device(app->ctx, fz_identity, app->image);
-        pdfapp_runpage(app, idev, ctm, bounds, &cookie);
-        fz_close_device(app->ctx, idev);
+        idev = fz_new_draw_device (app->ctx, fz_identity, app->image);
+        pdfapp_runpage (app, idev, ctm, bounds, &cookie);
+        fz_close_device (app->ctx, idev);
         }
       if (app->invert)
-        fz_invert_pixmap(app->ctx, app->image);
+        fz_invert_pixmap (app->ctx, app->image);
       if (app->tint)
-        fz_tint_pixmap(app->ctx, app->image, app->tint_r, app->tint_g, app->tint_b);
+        fz_tint_pixmap (app->ctx, app->image, app->tint_r, app->tint_g, app->tint_b);
       }
-    fz_always(app->ctx)
-      fz_drop_device(app->ctx, idev);
-    fz_catch(app->ctx)
+    fz_always (app->ctx)
+      fz_drop_device (app->ctx, idev);
+    fz_catch (app->ctx)
       cookie.errors++;
     }
 
@@ -969,32 +933,32 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
     app->new_image = app->image;
     app->image = NULL;
     if (app->grayscale)
-      colorspace = fz_device_gray(app->ctx);
+      colorspace = fz_device_gray (app->ctx);
     else
       colorspace = app->colorspace;
-    app->image = fz_new_pixmap_with_bbox(app->ctx, colorspace, ibounds, NULL, 1);
+    app->image = fz_new_pixmap_with_bbox (app->ctx, colorspace, ibounds, NULL, 1);
     app->duration = 0;
-    fz_page_presentation(app->ctx, app->page, &app->transition, &app->duration);
+    fz_page_presentation (app->ctx, app->page, &app->transition, &app->duration);
     if (app->duration == 0)
       app->duration = 5;
-    app->in_transit = fz_generate_transition(app->ctx, app->image, app->old_image, app->new_image, 0, &app->transition);
+    app->in_transit = fz_generate_transition (app->ctx, app->image, app->old_image, app->new_image, 0, &app->transition);
     if (!app->in_transit) {
       if (app->duration != 0)
-        winadvancetimer(app, app->duration);
+        winadvancetimer (app, app->duration);
       }
     app->start_time = clock();
     }
 
   if (repaint) {
-    pdfapp_panview(app, app->panx, app->pany);
+    pdfapp_panview (app, app->panx, app->pany);
 
     if (!app->image) {
       /* there is no image to blit, but there might be an error message */
       winresize(app, app->layout_w, app->layout_h);
       }
     else if (app->shrinkwrap) {
-      int w = fz_pixmap_width(app->ctx, app->image);
-      int h = fz_pixmap_height(app->ctx, app->image);
+      int w = fz_pixmap_width (app->ctx, app->image);
+      int h = fz_pixmap_height (app->ctx, app->image);
 
       if (app->winw == w)
         app->panx = 0;
@@ -1008,20 +972,20 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
         winresize(app, w, h);
       }
 
-    winrepaint(app);
-    wincursor(app, ARROW);
+    winrepaint (app);
+    wincursor (app, ARROW);
     }
 
   if (cookie.errors && app->errored == 0) {
     app->errored = 1;
-    pdfapp_warn(app, "Errors found on page. Page rendering may be incomplete.");
+    appWarn (app, "Errors found on page. Page rendering may be incomplete.");
     }
 
-  fz_flush_warnings(app->ctx);
+  fz_flush_warnings (app->ctx);
   }
 //}}}
 //{{{
-static void pdfapp_recreate_annotationslist (pdfapp_t *app) {
+static void pdfapp_recreate_annotationslist (pdfapp_t* app) {
 
   int errored = 0;
   fz_cookie cookie = { 0 };
@@ -1033,17 +997,19 @@ static void pdfapp_recreate_annotationslist (pdfapp_t *app) {
   app->annotations_list = NULL;
 
   fz_try (app->ctx) {
-    fz_annot* annot;
     /* Create display list */
     app->annotations_list = fz_new_display_list(app->ctx, fz_infinite_rect);
     mdev = fz_new_list_device (app->ctx, app->annotations_list);
+
+    fz_annot* annot;
     for (annot = fz_first_annot (app->ctx, app->page); annot; annot = fz_next_annot(app->ctx, annot))
       fz_run_annot (app->ctx, annot, mdev, fz_identity, &cookie);
+
     if (cookie.incomplete)
       app->incomplete = 1;
-      //pdfapp_warn(app, "Incomplete page rendering");
+      //appWarn(app, "Incomplete page rendering");
     else if (cookie.errors) {
-      pdfapp_warn (app, "Errors found on page");
+      appWarn (app, "Errors found on page");
       errored = 1;
       }
     fz_close_device (app->ctx, mdev);
@@ -1053,7 +1019,7 @@ static void pdfapp_recreate_annotationslist (pdfapp_t *app) {
     fz_drop_device (app->ctx, mdev);
     }
   fz_catch (app->ctx) {
-    pdfapp_warn (app, "Cannot load page");
+    appWarn (app, "Cannot load page");
     errored = 1;
     }
 
@@ -1061,22 +1027,21 @@ static void pdfapp_recreate_annotationslist (pdfapp_t *app) {
   }
 //}}}
 //{{{
-static void pdfapp_updatepage (pdfapp_t *app) {
+static void pdfapp_updatepage (pdfapp_t* app) {
 
   if (pdf_update_page(app->ctx, (pdf_page*)app->page)) {
     pdfapp_recreate_annotationslist (app);
-    pdfapp_showpage(app, 0, 1, 1, 0, 0);
+    pdfapp_showpage (app, 0, 1, 1, 0, 0);
     }
   else
-    pdfapp_showpage(app, 0, 0, 1, 0, 0);
+    pdfapp_showpage (app, 0, 0, 1, 0, 0);
   }
 //}}}
 
 //{{{
-static int make_fake_doc (pdfapp_t *app) {
+static int make_fake_doc (pdfapp_t* app) {
 
   fz_context* ctx = app->ctx;
-  pdf_document* pdf = NULL;
 
   fz_buffer* contents = NULL;
   fz_var (contents);
@@ -1084,32 +1049,33 @@ static int make_fake_doc (pdfapp_t *app) {
   pdf_obj* page_obj = NULL;
   fz_var (page_obj);
 
+  pdf_document* pdf = NULL;
   fz_try(ctx) {
     fz_rect mediabox = { 0, 0, app->winw, app->winh };
     int i;
 
-    pdf = pdf_create_document(ctx);
+    pdf = pdf_create_document (ctx);
 
-    contents = fz_new_buffer(ctx, 100);
-    fz_append_printf(ctx, contents, "1 0 0 RG %g w 0 0 m %g %g l 0 %g m %g 0 l s\n",
-      fz_min(mediabox.x1, mediabox.y1) / 20,
+    contents = fz_new_buffer (ctx, 100);
+    fz_append_printf (ctx, contents, "1 0 0 RG %g w 0 0 m %g %g l 0 %g m %g 0 l s\n",
+      fz_min (mediabox.x1, mediabox.y1) / 20,
       mediabox.x1, mediabox.y1,
       mediabox.y1, mediabox.x1);
 
     /* Create enough copies of our blank(ish) page so that the
      * page number is preserved if and when a subsequent load works. */
-    page_obj = pdf_add_page(ctx, pdf, mediabox, 0, NULL, contents);
+    page_obj = pdf_add_page (ctx, pdf, mediabox, 0, NULL, contents);
     for (i = 0; i < app->pagecount; i++)
-      pdf_insert_page(ctx, pdf, -1, page_obj);
+      pdf_insert_page (ctx, pdf, -1, page_obj);
     }
 
   fz_always(ctx) {
-    pdf_drop_obj(ctx, page_obj);
-    fz_drop_buffer(ctx, contents);
+    pdf_drop_obj (ctx, page_obj);
+    fz_drop_buffer (ctx, contents);
     }
 
   fz_catch(ctx) {
-    fz_drop_document(ctx, (fz_document *) pdf);
+    fz_drop_document (ctx, (fz_document*)pdf);
     return 1;
     }
 
@@ -1118,10 +1084,9 @@ static int make_fake_doc (pdfapp_t *app) {
   }
 //}}}
 //{{{
-void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps) {
+void pdfapp_open_progressive (pdfapp_t* app, char* filename, int reload, int bps) {
 
-  fz_context *ctx = app->ctx;
-  char *password = "";
+  fz_context* ctx = app->ctx;
   pdf_document *idoc;
 
   fz_try(ctx) {
@@ -1146,7 +1111,7 @@ void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps
           }
         fz_catch(ctx) {
           if (fz_caught(ctx) == FZ_ERROR_TRYLATER) {
-            pdfapp_warn(app, "not enough data to open yet");
+            appWarn(app, "not enough data to open yet");
             continue;
             }
           fz_rethrow(ctx);
@@ -1157,7 +1122,7 @@ void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps
     }
   fz_catch(ctx) {
     if (!reload || make_fake_doc(app))
-      pdfapp_error (app, "cannot open document");
+      appError (app, "cannot open document");
     }
 
   idoc = pdf_specifics (app->ctx, app->doc);
@@ -1167,13 +1132,13 @@ void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps
       pdf_set_doc_event_callback (ctx, idoc, event_cb, app);
       }
     fz_catch(ctx) {
-      pdfapp_error(app, "cannot load javascript embedded in document");
+      appError (app, "cannot load javascript embedded in document");
       }
     }
 
   fz_try(ctx) {
     if (fz_needs_password (app->ctx, app->doc))
-      pdfapp_warn(app, "needs password.");
+      appWarn(app, "needs password.");
 
     app->docpath = fz_strdup(ctx, filename);
     app->doctitle = filename;
@@ -1193,7 +1158,7 @@ void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps
         }
       fz_catch (ctx) {
         if (fz_caught (ctx) == FZ_ERROR_TRYLATER) {
-          pdfapp_warn (app, "not enough data to count pages yet");
+          appWarn (app, "not enough data to count pages yet");
           continue;
           }
         fz_rethrow (ctx);
@@ -1203,7 +1168,7 @@ void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps
 
     while (1) {
       fz_try (ctx) {
-        app->outline = fz_load_outline(app->ctx, app->doc);
+        app->outline = fz_load_outline (app->ctx, app->doc);
         }
 
       fz_catch(ctx) {
@@ -1211,13 +1176,13 @@ void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps
         if (fz_caught(ctx) == FZ_ERROR_TRYLATER)
           app->outline_deferred = PDFAPP_OUTLINE_DEFERRED;
         else
-          pdfapp_warn(app, "failed to load outline");
+          appWarn (app, "failed to load outline");
         }
       break;
       }
     }
   fz_catch(ctx) {
-    pdfapp_error(app, "cannot open document");
+    appError(app, "cannot open document");
     }
 
   if (app->pageno < 1)
@@ -1240,12 +1205,12 @@ void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps
   }
 //}}}
 //{{{
-void pdfapp_open (pdfapp_t *app, char *filename, int reload) {
+void pdfapp_open (pdfapp_t* app, char* filename, int reload) {
   pdfapp_open_progressive (app, filename, reload, 0);
   }
 //}}}
 //{{{
-void pdfapp_close (pdfapp_t *app) {
+void pdfapp_close (pdfapp_t* app) {
 
   fz_drop_display_list (app->ctx, app->page_list);
   app->page_list = NULL;
@@ -1287,7 +1252,7 @@ void pdfapp_close (pdfapp_t *app) {
   }
 //}}}
 //{{{
-void pdfapp_reloadfile (pdfapp_t *app) {
+void pdfapp_reloadfile (pdfapp_t* app) {
 
   char filename[PATH_MAX];
   fz_strlcpy (filename, app->docpath, PATH_MAX);
@@ -1297,21 +1262,21 @@ void pdfapp_reloadfile (pdfapp_t *app) {
 //}}}
 
 //{{{
-void pdfapp_reloadpage (pdfapp_t *app) {
+void pdfapp_reloadpage (pdfapp_t* app) {
 
   if (app->outline_deferred == PDFAPP_OUTLINE_LOAD_NOW) {
     fz_try(app->ctx)
-      app->outline = fz_load_outline(app->ctx, app->doc);
+      app->outline = fz_load_outline (app->ctx, app->doc);
     fz_catch(app->ctx)
       app->outline = NULL;
     app->outline_deferred = 0;
     }
 
-  pdfapp_showpage(app, 1, 1, 1, 0, 0);
+  pdfapp_showpage (app, 1, 1, 1, 0, 0);
   }
 //}}}
 //{{{
-void pdfapp_gotopage (pdfapp_t *app, int number) {
+void pdfapp_gotopage (pdfapp_t* app, int number) {
 
   app->issearching = 0;
   winrepaint(app);
@@ -1335,7 +1300,7 @@ void pdfapp_gotopage (pdfapp_t *app, int number) {
   }
 //}}}
 //{{{
-void pdfapp_inverthit (pdfapp_t *app) {
+void pdfapp_inverthit (pdfapp_t* app) {
 
   fz_rect bbox;
   fz_matrix ctm;
@@ -1352,100 +1317,100 @@ void pdfapp_inverthit (pdfapp_t *app) {
 //}}}
 
 //{{{
-void pdfapp_onresize (pdfapp_t *app, int w, int h) {
+void pdfapp_onresize (pdfapp_t* app, int w, int h) {
 
   if (app->winw != w || app->winh != h) {
     app->winw = w;
     app->winh = h;
-    pdfapp_panview(app, app->panx, app->pany);
-    winrepaint(app);
+    pdfapp_panview (app, app->panx, app->pany);
+    winrepaint (app);
     }
   }
 //}}}
 //{{{
-void pdfapp_autozoom_vertical (pdfapp_t *app) {
+void pdfapp_autozoom_vertical (pdfapp_t* app) {
 
   app->resolution *= (float) app->winh / fz_pixmap_height(app->ctx, app->image);
   if (app->resolution > MAXRES)
     app->resolution = MAXRES;
   else if (app->resolution < MINRES)
     app->resolution = MINRES;
-  pdfapp_showpage(app, 0, 1, 1, 0, 0);
+
+  pdfapp_showpage (app, 0, 1, 1, 0, 0);
   }
 //}}}
 //{{{
-void pdfapp_autozoom_horizontal (pdfapp_t *app) {
+void pdfapp_autozoom_horizontal (pdfapp_t* app) {
 
   app->resolution *= (float) app->winw / fz_pixmap_width(app->ctx, app->image);
   if (app->resolution > MAXRES)
     app->resolution = MAXRES;
   else if (app->resolution < MINRES)
     app->resolution = MINRES;
-  pdfapp_showpage(app, 0, 1, 1, 0, 0);
+
+  pdfapp_showpage (app, 0, 1, 1, 0, 0);
   }
 //}}}
 //{{{
-void pdfapp_autozoom (pdfapp_t *app) {
+void pdfapp_autozoom (pdfapp_t* app) {
 
-  float page_aspect = (float) fz_pixmap_width(app->ctx, app->image) / fz_pixmap_height(app->ctx, app->image);
+  float page_aspect = (float) fz_pixmap_width (app->ctx, app->image) / fz_pixmap_height (app->ctx, app->image);
   float win_aspect = (float) app->winw / app->winh;
   if (page_aspect > win_aspect)
-    pdfapp_autozoom_horizontal(app);
+    pdfapp_autozoom_horizontal (app);
   else
-    pdfapp_autozoom_vertical(app);
+    pdfapp_autozoom_vertical (app);
   }
 //}}}
 
 //{{{
-void pdfapp_postblit (pdfapp_t *app) {
-
-  clock_t time;
-  float seconds;
-  int llama;
+void pdfapp_postblit (pdfapp_t* app) {
 
   app->transitions_enabled = 1;
   if (!app->in_transit)
     return;
-  time = clock();
-  seconds = (float)(time - app->start_time) / CLOCKS_PER_SEC;
-  llama = seconds * 256 / app->transition.duration;
+
+  clock_t time = clock();
+  float seconds = (float)(time - app->start_time) / CLOCKS_PER_SEC;
+  int llama = seconds * 256 / app->transition.duration;
   if (llama >= 256) {
     /* Completed. */
-    fz_drop_pixmap(app->ctx, app->image);
+    fz_drop_pixmap (app->ctx, app->image);
     app->image = app->new_image;
     app->new_image = NULL;
-    fz_drop_pixmap(app->ctx, app->old_image);
+    fz_drop_pixmap (app->ctx, app->old_image);
     app->old_image = NULL;
     if (app->duration != 0)
       winadvancetimer (app, app->duration);
     }
   else
-    fz_generate_transition(app->ctx, app->image, app->old_image, app->new_image, llama, &app->transition);
-  winrepaint(app);
+    fz_generate_transition (app->ctx, app->image, app->old_image, app->new_image, llama, &app->transition);
+
+  winrepaint (app);
   if (llama >= 256)
     /* Completed. */
     app->in_transit = 0;
   }
 //}}}
-//{{{
-static void pdfapp_search_in_direction (pdfapp_t *app, enum panning *panto, int dir) {
 
-  int firstpage, page;
+//{{{
+static void pdfapp_search (pdfapp_t* app, enum panning* panto, int dir) {
 
   /* abort if no search string */
   if (app->search[0] == 0) {
-    winrepaint(app);
+    winrepaint (app);
     return;
     }
 
-  wincursor(app, WAIT);
+  wincursor (app, WAIT);
 
-  firstpage = app->pageno;
+  int firstpage = app->pageno;
+
+  int page;
   if (app->searchpage == app->pageno)
     page = app->pageno + dir;
   else
     page = app->pageno;
-
   if (page < 1)
     page = app->pagecount;
   if (page > app->pagecount)
@@ -1454,30 +1419,32 @@ static void pdfapp_search_in_direction (pdfapp_t *app, enum panning *panto, int 
   do {
     if (page != app->pageno) {
       app->pageno = page;
-      pdfapp_showpage(app, 1, 0, 0, 0, 1);
+      pdfapp_showpage (app, 1, 0, 0, 0, 1);
       }
 
-    app->hit_count = fz_search_stext_page(app->ctx, app->page_text, app->search, app->hit_bbox, nelem(app->hit_bbox));
+    app->hit_count = fz_search_stext_page (app->ctx, app->page_text, app->search, app->hit_bbox, nelem(app->hit_bbox));
     if (app->hit_count > 0) {
       *panto = dir == 1 ? PAN_TO_TOP : PAN_TO_BOTTOM;
       app->searchpage = app->pageno;
-      wincursor(app, HAND);
-      winrepaint(app);
+      wincursor (app, HAND);
+      winrepaint (app);
       return;
     }
 
     page += dir;
-    if (page < 1) page = app->pagecount;
-    if (page > app->pagecount) page = 1;
-  } while (page != firstpage);
+    if (page < 1)
+      page = app->pagecount;
+    if (page > app->pagecount)
+      page = 1;
+    } while (page != firstpage);
 
-  pdfapp_warn(app, "String '%s' not found.", app->search);
+  appWarn (app, "String '%s' not found.", app->search);
 
   app->pageno = firstpage;
-  pdfapp_showpage(app, 1, 0, 0, 0, 0);
-  wincursor(app, HAND);
-  winrepaint(app);
-}
+  pdfapp_showpage (app, 1, 0, 0, 0, 0);
+  wincursor (app, HAND);
+  winrepaint (app);
+  }
 //}}}
 
 //{{{
@@ -1525,110 +1492,9 @@ void installApp (char* argv0) {
   RegCloseKey (software);
   }
 //}}}
-//{{{
-void winopen() {
-
-  RECT r;
-
-  /* Create and register window frame class */
-  WNDCLASS wc;
-  memset(&wc, 0, sizeof(wc));
-  wc.style = 0;
-  wc.lpfnWndProc = frameproc;
-  wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
-  wc.hInstance = GetModuleHandle(NULL);
-  wc.hIcon = LoadIconA(wc.hInstance, "IDI_ICONAPP");
-  wc.hCursor = NULL; //LoadCursor(NULL, IDC_ARROW);
-  wc.hbrBackground = NULL;
-  wc.lpszMenuName = NULL;
-  wc.lpszClassName = L"FrameWindow";
-  ATOM a = RegisterClassW (&wc);
-  if (!a)
-    winerror(&gapp, "cannot register frame window class");
-
-  /* Create and register window view class */
-  memset(&wc, 0, sizeof(wc));
-  wc.style = CS_HREDRAW | CS_VREDRAW;
-  wc.lpfnWndProc = viewproc;
-  wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
-  wc.hInstance = GetModuleHandle (NULL);
-  wc.hIcon = NULL;
-  wc.hCursor = NULL;
-  wc.hbrBackground = NULL;
-  wc.lpszMenuName = NULL;
-  wc.lpszClassName = L"ViewWindow";
-  a = RegisterClassW (&wc);
-  if (!a)
-    winerror (&gapp, "cannot register view window class");
-
-  /* Get screen size */
-  SystemParametersInfo (SPI_GETWORKAREA, 0, &r, 0);
-  gapp.scrw = r.right - r.left;
-  gapp.scrh = r.bottom - r.top;
-
-  /* Create cursors */
-  arrowcurs = LoadCursor (NULL, IDC_ARROW);
-  handcurs = LoadCursor (NULL, IDC_HAND);
-  waitcurs = LoadCursor (NULL, IDC_WAIT);
-  caretcurs = LoadCursor (NULL, IDC_IBEAM);
-
-  /* And a background color */
-  bgbrush = CreateSolidBrush (RGB (0x70,0x70,0x70));
-  shbrush = CreateSolidBrush (RGB (0x40,0x40,0x40));
-
-  /* Init DIB info for buffer */
-  dibinf = malloc (sizeof(BITMAPINFO) + 12);
-  assert(dibinf);
-  dibinf->bmiHeader.biSize = sizeof(dibinf->bmiHeader);
-  dibinf->bmiHeader.biPlanes = 1;
-  dibinf->bmiHeader.biBitCount = 32;
-  dibinf->bmiHeader.biCompression = BI_RGB;
-  dibinf->bmiHeader.biXPelsPerMeter = 2834;
-  dibinf->bmiHeader.biYPelsPerMeter = 2834;
-  dibinf->bmiHeader.biClrUsed = 0;
-  dibinf->bmiHeader.biClrImportant = 0;
-  dibinf->bmiHeader.biClrUsed = 0;
-
-  /* Create window */
-  hwndframe = CreateWindowW (L"FrameWindow", // window class name
-                             NULL, // window caption
-                             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
-                             CW_USEDEFAULT, CW_USEDEFAULT, // initial position
-                             300, // initial x size
-                             300, // initial y size
-                             0, // parent window handle
-                             0, // window menu handle
-                             0, // program instance handle
-                             0); // creation parameters
-  if (!hwndframe)
-    winerror(&gapp, "cannot create frame");
-
-  hwndview = CreateWindowW (L"ViewWindow", // window class name
-                            NULL,
-                            WS_VISIBLE | WS_CHILD,
-                            CW_USEDEFAULT, CW_USEDEFAULT,
-                            CW_USEDEFAULT, CW_USEDEFAULT,
-                            hwndframe, 0, 0, 0);
-  if (!hwndview)
-    winerror (&gapp, "cannot create view");
-
-  hdc = NULL;
-
-  SetWindowTextW (hwndframe, L"MuPDF");
-
-  HMENU menu = GetSystemMenu (hwndframe, 0);
-  AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
-  AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF...");
-  AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties...");
-
-  SetCursor (arrowcurs);
-  }
-//}}}
 
 //{{{
-void pdfapp_oncopy (pdfapp_t *app, unsigned short *ucsbuf, int ucslen) {
+void pdfapp_oncopy (pdfapp_t* app, unsigned short *ucsbuf, int ucslen) {
 
   fz_matrix ctm;
   fz_stext_page *page = app->page_text;
@@ -1638,9 +1504,9 @@ void pdfapp_oncopy (pdfapp_t *app, unsigned short *ucsbuf, int ucslen) {
   fz_stext_char *ch;
   fz_rect sel;
 
-  pdfapp_viewctm(&ctm, app);
-  ctm = fz_invert_matrix(ctm);
-  sel = fz_transform_rect(app->selr, ctm);
+  pdfapp_viewctm (&ctm, app);
+  ctm = fz_invert_matrix (ctm);
+  sel = fz_transform_rect (app->selr, ctm);
 
   p = 0;
   need_newline = 0;
@@ -1658,28 +1524,26 @@ void pdfapp_oncopy (pdfapp_t *app, unsigned short *ucsbuf, int ucslen) {
         if (bbox.x1 >= sel.x0 && bbox.x0 <= sel.x1 && bbox.y1 >= sel.y0 && bbox.y0 <= sel.y1) {
           saw_text = 1;
           if (need_newline) {
-#ifdef _WIN32
             if (p < ucslen - 1)
               ucsbuf[p++] = '\r';
-#endif
             if (p < ucslen - 1)
               ucsbuf[p++] = '\n';
             need_newline = 0;
-          }
+            }
           if (p < ucslen - 1)
             ucsbuf[p++] = c;
+          }
         }
-      }
       if (saw_text)
         need_newline = 1;
+      }
     }
-  }
 
   ucsbuf[p] = 0;
-}
+  }
 //}}}
 //{{{
-void windocopy (pdfapp_t* app) {
+void winDoCopy (pdfapp_t* app) {
 
   if (!OpenClipboard (hwndframe))
     return;
@@ -1693,7 +1557,7 @@ void windocopy (pdfapp_t* app) {
     }
 
   unsigned short* ucsbuf = GlobalLock (handle);
-  pdfapp_oncopy (&gapp, ucsbuf, 4096);
+  pdfapp_oncopy (&gApp, ucsbuf, 4096);
   GlobalUnlock (handle);
 
   SetClipboardData (CF_UNICODETEXT, handle);
@@ -1702,37 +1566,58 @@ void windocopy (pdfapp_t* app) {
   justcopied = 1; /* keep inversion around for a while... */
   }
 //}}}
-//{{{
-void winblitsearch() {
 
-  if (gapp.issearching) {
-    char buf[sizeof (gapp.search) + 50];
-    sprintf (buf, "Search: %s", gapp.search);
-    windrawrect (&gapp, 0, 0, gapp.winw, 30);
-    windrawstring (&gapp, 10, 20, buf);
-    }
+//{{{
+void windrawrect (pdfapp_t* app, int x0, int y0, int x1, int y1) {
+
+  RECT r;
+  r.left = x0;
+  r.top = y0;
+  r.right = x1;
+  r.bottom = y1;
+  FillRect (hdc, &r, (HBRUSH)GetStockObject(WHITE_BRUSH));
   }
 //}}}
 //{{{
+void windrawstring (pdfapp_t* app, int x, int y, char *s) {
+
+  HFONT font = (HFONT)GetStockObject (ANSI_FIXED_FONT);
+  SelectObject (hdc, font);
+  TextOutA (hdc, x, y - 12, s, (int)strlen(s));
+  }
+//}}}
+//{{{
+void winblitsearch() {
+
+  if (gApp.issearching) {
+    char buf[sizeof (gApp.search) + 50];
+    sprintf (buf, "Search: %s", gApp.search);
+    windrawrect (&gApp, 0, 0, gApp.winw, 30);
+    windrawstring (&gApp, 10, 20, buf);
+    }
+  }
+//}}}
+
+//{{{
 void winblit() {
 
-  int image_w = fz_pixmap_width (gapp.ctx, gapp.image);
-  int image_h = fz_pixmap_height (gapp.ctx, gapp.image);
-  int image_n = fz_pixmap_components (gapp.ctx, gapp.image);
-  unsigned char* samples = fz_pixmap_samples (gapp.ctx, gapp.image);
-  int x0 = gapp.panx;
-  int y0 = gapp.pany;
-  int x1 = gapp.panx + image_w;
-  int y1 = gapp.pany + image_h;
-  RECT r;
+  int image_w = fz_pixmap_width (gApp.ctx, gApp.image);
+  int image_h = fz_pixmap_height (gApp.ctx, gApp.image);
+  int image_n = fz_pixmap_components (gApp.ctx, gApp.image);
+  unsigned char* samples = fz_pixmap_samples (gApp.ctx, gApp.image);
 
-  if (gapp.image) {
-    if (gapp.iscopying || justcopied) {
-      pdfapp_invert (&gapp, gapp.selr);
+  int x0 = gApp.panx;
+  int y0 = gApp.pany;
+  int x1 = gApp.panx + image_w;
+  int y1 = gApp.pany + image_h;
+
+  if (gApp.image) {
+    if (gApp.iscopying || justcopied) {
+      pdfapp_invert (&gApp, gApp.selr);
       justcopied = 1;
       }
 
-    pdfapp_inverthit (&gapp);
+    pdfapp_inverthit (&gApp);
 
     dibinf->bmiHeader.biWidth = image_w;
     dibinf->bmiHeader.biHeight = -image_h;
@@ -1748,38 +1633,42 @@ void winblit() {
         d[3] = *s++;
         d += 4;
         }
-      SetDIBitsToDevice (hdc, gapp.panx, gapp.pany, image_w, image_h,
+      SetDIBitsToDevice (hdc, gApp.panx, gApp.pany, image_w, image_h,
                          0, 0, 0, image_h, color, dibinf, DIB_RGB_COLORS);
       free (color);
       }
     else if (image_n == 4)
-      SetDIBitsToDevice (hdc, gapp.panx, gapp.pany, image_w, image_h,
+      SetDIBitsToDevice (hdc, gApp.panx, gApp.pany, image_w, image_h,
                          0, 0, 0, image_h, samples, dibinf, DIB_RGB_COLORS);
 
-    pdfapp_inverthit (&gapp);
+    pdfapp_inverthit (&gApp);
 
-    if (gapp.iscopying || justcopied) {
-      pdfapp_invert (&gapp, gapp.selr);
+    if (gApp.iscopying || justcopied) {
+      pdfapp_invert (&gApp, gApp.selr);
       justcopied = 1;
       }
     }
 
   /* Grey background */
+  RECT r;
   r.top = 0;
-  r.bottom = gapp.winh;
+  r.bottom = gApp.winh;
   r.left = 0;
   r.right = x0;
   FillRect (hdc, &r, bgbrush);
+
   r.left = x1;
-  r.right = gapp.winw;
+  r.right = gApp.winw;
   FillRect (hdc, &r, bgbrush);
+
   r.left = 0;
-  r.right = gapp.winw;
+  r.right = gApp.winw;
   r.top = 0;
   r.bottom = y0;
   FillRect (hdc, &r, bgbrush);
+
   r.top = y1;
-  r.bottom = gapp.winh;
+  r.bottom = gApp.winh;
   FillRect (hdc, &r, bgbrush);
 
   /* Drop shadow */
@@ -1788,6 +1677,7 @@ void winblit() {
   r.top = y1;
   r.bottom = y1 + 2;
   FillRect (hdc, &r, shbrush);
+
   r.left = x1;
   r.right = x1 + 2;
   r.top = y0 + 2;
@@ -1799,14 +1689,7 @@ void winblit() {
 //}}}
 
 //{{{
-void info() {
-  if (DialogBoxW (NULL, L"IDD_DLOGINFO", hwndframe, dloginfoproc) <= 0)
-    winerror (&gapp, "cannot create info dialog");
-  }
-//}}}
-
-//{{{
-void pdfapp_onkey (pdfapp_t *app, int c, int modifiers) {
+void onKey (pdfapp_t* app, int c, int modifiers) {
 
   int oldpage = app->pageno;
   enum panning panto = PAN_TO_TOP;
@@ -1833,7 +1716,7 @@ void pdfapp_onkey (pdfapp_t *app, int c, int modifiers) {
             pdfapp_showpage(app, 1, 1, 0, 0, 1);
             }
 
-          pdfapp_onkey(app, 'n', 0);
+          onKey (app, 'n', 0);
           }
         else
           winrepaint(app);
@@ -1864,8 +1747,8 @@ void pdfapp_onkey (pdfapp_t *app, int c, int modifiers) {
     case 'q':
     //{{{
     case 0x1B:
-      fz_context* ctx = gapp.ctx;
-      pdfapp_close (&gapp);
+      fz_context* ctx = gApp.ctx;
+      pdfapp_close (&gApp);
       free (dibinf);
       fz_drop_context (ctx);
       exit (0);
@@ -1899,14 +1782,14 @@ void pdfapp_onkey (pdfapp_t *app, int c, int modifiers) {
     case '+':
     //{{{
     case '=':
-      app->resolution = zoom_in(app->resolution);
-      pdfapp_showpage(app, 0, 1, 1, 0, 0);
+      app->resolution = zoomIn (app->resolution);
+      pdfapp_showpage (app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
     case '-':
-      app->resolution = zoom_out(app->resolution);
-      pdfapp_showpage(app, 0, 1, 1, 0, 0);
+      app->resolution = zoomOut (app->resolution);
+      pdfapp_showpage (app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
@@ -2167,18 +2050,18 @@ void pdfapp_onkey (pdfapp_t *app, int c, int modifiers) {
     //{{{
     case 'n':
       if (app->searchdir > 0)
-        pdfapp_search_in_direction(app, &panto, 1);
+        pdfapp_search (app, &panto, 1);
       else
-        pdfapp_search_in_direction(app, &panto, -1);
+        pdfapp_search (app, &panto, -1);
       loadpage = 0;
       break;
     //}}}
     //{{{
     case 'N':
       if (app->searchdir > 0)
-        pdfapp_search_in_direction(app, &panto, -1);
+        pdfapp_search (app, &panto, -1);
       else
-        pdfapp_search_in_direction(app, &panto, 1);
+        pdfapp_search (app, &panto, 1);
       loadpage = 0;
       break;
     //}}}
@@ -2214,7 +2097,7 @@ void pdfapp_onkey (pdfapp_t *app, int c, int modifiers) {
   }
 //}}}
 //{{{
-void handlekey (int c) {
+void handleKey (int c) {
 
   int modifier = (GetAsyncKeyState(VK_SHIFT) < 0);
   modifier |= ((GetAsyncKeyState(VK_CONTROL) < 0) << 2);
@@ -2227,7 +2110,7 @@ void handlekey (int c) {
 
   if (justcopied) {
     justcopied = 0;
-    winrepaint (&gapp);
+    winrepaint (&gApp);
     }
 
   /* translate VK into ASCII equivalents */
@@ -2244,21 +2127,21 @@ void handlekey (int c) {
       }
     }
 
-  pdfapp_onkey (&gapp, c, modifier);
-  winrepaint (&gapp);
+  onKey (&gApp, c, modifier);
+  winrepaint (&gApp);
   }
 //}}}
 
 //{{{
-static void handlescroll (pdfapp_t *app, int modifiers, int dir) {
+static void handleScroll (pdfapp_t* app, int modifiers, int dir) {
 
   app->ispanning = app->iscopying = 0;
   if (modifiers & (1<<2)) {
     /* zoom in/out if ctrl is pressed */
     if (dir < 0)
-      app->resolution = zoom_in(app->resolution);
+      app->resolution = zoomIn (app->resolution);
     else
-      app->resolution = zoom_out(app->resolution);
+      app->resolution = zoomOut (app->resolution);
     if (app->resolution > MAXRES)
       app->resolution = MAXRES;
     if (app->resolution < MINRES)
@@ -2305,11 +2188,11 @@ static void handlescroll (pdfapp_t *app, int modifiers, int dir) {
 }
 //}}}
 //{{{
-void pdfapp_onmouse (pdfapp_t *app, int x, int y, int btn, int modifiers, int state)
-{
-  fz_context *ctx = app->ctx;
+void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
+
+  fz_context* ctx = app->ctx;
   fz_irect irect = { 0, 0, app->layout_w, app->layout_h };
-  fz_link *link;
+  fz_link* link;
   fz_matrix ctm;
   fz_point p;
   int processed = 0;
@@ -2321,12 +2204,11 @@ void pdfapp_onmouse (pdfapp_t *app, int x, int y, int btn, int modifiers, int st
 
   pdfapp_viewctm(&ctm, app);
   ctm = fz_invert_matrix(ctm);
-
   p = fz_transform_point(p, ctm);
 
   if (btn == 1 && (state == 1 || state == -1)) {
     pdf_ui_event event;
-    pdf_document *idoc = pdf_specifics(app->ctx, app->doc);
+    pdf_document* idoc = pdf_specifics (app->ctx, app->doc);
 
     event.etype = PDF_EVENT_TYPE_POINTER;
     event.event.pointer.pt = p;
@@ -2335,36 +2217,33 @@ void pdfapp_onmouse (pdfapp_t *app, int x, int y, int btn, int modifiers, int st
     else /* state == -1 */
       event.event.pointer.ptype = PDF_POINTER_UP;
 
-    if (idoc && pdf_pass_event(ctx, idoc, (pdf_page *)app->page, &event)) {
-      pdf_widget *widget;
-
-      widget = pdf_focused_widget(ctx, idoc);
-
+    if (idoc && pdf_pass_event (ctx, idoc, (pdf_page *)app->page, &event)) {
+      pdf_widget* widget = pdf_focused_widget (ctx, idoc);
       app->nowaitcursor = 1;
-      pdfapp_updatepage(app);
-
+      pdfapp_updatepage (app);
       if (widget) {
-        switch (pdf_widget_type(ctx, widget)) {
-        case PDF_WIDGET_TYPE_TEXT:
-          {
+        switch (pdf_widget_type (ctx, widget)) {
+          //{{{
+          case PDF_WIDGET_TYPE_TEXT:
+            {
             char *text = pdf_text_widget_text(ctx, idoc, widget);
             char *current_text = text;
             int retry = 0;
 
-            do
-            {
+            do {
               current_text = wintextinput(app, current_text, retry);
               retry = 1;
-            }
-            while (current_text && !pdf_text_widget_set_text(ctx, idoc, widget, current_text));
+              } while (current_text && !pdf_text_widget_set_text(ctx, idoc, widget, current_text));
 
             fz_free(app->ctx, text);
             pdfapp_updatepage(app);
-          }
-          break;
-        case PDF_WIDGET_TYPE_LISTBOX:
-        case PDF_WIDGET_TYPE_COMBOBOX:
-          {
+            }
+            break;
+          //}}}
+          case PDF_WIDGET_TYPE_LISTBOX:
+          //{{{
+          case PDF_WIDGET_TYPE_COMBOBOX:
+            {
             int nopts;
             int nvals;
             const char **opts = NULL;
@@ -2375,8 +2254,7 @@ void pdfapp_onmouse (pdfapp_t *app, int x, int y, int btn, int modifiers, int st
             fz_var(nopts);
             fz_var(nvals);
 
-            fz_try(ctx)
-            {
+            fz_try(ctx) {
               nopts = pdf_choice_widget_options(ctx, idoc, widget, 0, NULL);
               opts = fz_malloc(ctx, nopts * sizeof(*opts));
               (void)pdf_choice_widget_options(ctx, idoc, widget, 0, opts);
@@ -2385,102 +2263,88 @@ void pdfapp_onmouse (pdfapp_t *app, int x, int y, int btn, int modifiers, int st
               vals = fz_malloc(ctx, MAX(nvals,nopts) * sizeof(*vals));
               (void)pdf_choice_widget_value(ctx, idoc, widget, vals);
 
-              if (winchoiceinput(app, nopts, opts, &nvals, vals))
-              {
+              if (winchoiceinput(app, nopts, opts, &nvals, vals)) {
                 pdf_choice_widget_set_value(ctx, idoc, widget, nvals, vals);
                 pdfapp_updatepage(app);
+                }
+              }
+            fz_always(ctx) {
+              fz_free (ctx, opts);
+              fz_free (ctx, vals);
+              }
+            fz_catch(ctx) {
+              appWarn (app, "setting of choice failed");
               }
             }
-            fz_always(ctx)
-            {
-              fz_free(ctx, opts);
-              fz_free(ctx, vals);
-            }
-            fz_catch(ctx)
-            {
-              pdfapp_warn(app, "setting of choice failed");
-            }
-          }
-          break;
+            break;
+          //}}}
+          //{{{
+          case PDF_WIDGET_TYPE_SIGNATURE:
+            if (state == -1) {
+              char ebuf[256];
 
-        case PDF_WIDGET_TYPE_SIGNATURE:
-          if (state == -1)
-          {
-            char ebuf[256];
-
-            if (pdf_dict_get(ctx, ((pdf_annot *)widget)->obj, PDF_NAME(V)))
-            {
-              /* Signature is signed. Check the signature */
-              ebuf[0] = 0;
-              if (pdf_check_signature(ctx, idoc, widget, ebuf, sizeof(ebuf)))
-              {
-                winwarn(app, "Signature is valid");
+              if (pdf_dict_get (ctx, ((pdf_annot *)widget)->obj, PDF_NAME(V))) {
+                /* Signature is signed. Check the signature */
+                ebuf[0] = 0;
+                if (pdf_check_signature (ctx, idoc, widget, ebuf, sizeof(ebuf)))
+                  winWarn (app, "Signature is valid");
+                else {
+                  if (ebuf[0] == 0)
+                    winWarn (app, "Signature check failed for unknown reason");
+                  else
+                    winWarn (app, ebuf);
+                  }
+                }
               }
-              else
-              {
-                if (ebuf[0] == 0)
-                  winwarn(app, "Signature check failed for unknown reason");
-                else
-                  winwarn(app, ebuf);
-              }
-            }
+            break;
+          //}}}
           }
-          break;
         }
-      }
-
       app->nowaitcursor = 0;
       processed = 1;
+      }
     }
-  }
 
   for (link = app->page_links; link; link = link->next)
-  {
     if (p.x >= link->rect.x0 && p.x <= link->rect.x1)
       if (p.y >= link->rect.y0 && p.y <= link->rect.y1)
         break;
-  }
 
-  if (link)
-  {
+  if (link) {
+    //{{{  linol
     wincursor(app, HAND);
-    if (btn == 1 && state == 1 && !processed)
-    {
+    if (btn == 1 && state == 1 && !processed) {
       if (fz_is_external_link (ctx, link->uri)) {
         //pdfapp_gotouri (app, link->uri);
         }
       else
         pdfapp_gotopage (app, fz_resolve_link(ctx, app->doc, link->uri, NULL, NULL) + 1);
       return;
+      }
     }
-  }
-  else
-  {
+    //}}}
+  else {
     fz_annot *annot;
-    for (annot = fz_first_annot(app->ctx, app->page); annot; annot = fz_next_annot(app->ctx, annot))
-    {
+    for (annot = fz_first_annot(app->ctx, app->page); annot; annot = fz_next_annot(app->ctx, annot)) {
       fz_rect rect = fz_bound_annot(app->ctx, annot);
       if (x >= rect.x0 && x < rect.x1)
         if (y >= rect.y0 && y < rect.y1)
           break;
-    }
+      }
     if (annot)
       wincursor(app, CARET);
     else
       wincursor(app, ARROW);
-  }
+    }
 
-  if (state == 1 && !processed)
-  {
-    if (btn == 1 && !app->iscopying)
-    {
+  if (state == 1 && !processed) {
+    if (btn == 1 && !app->iscopying) {
       app->ispanning = 1;
       app->selx = x;
       app->sely = y;
       app->beyondy = 0;
-    }
-    if (btn == 3 && !app->ispanning)
-    {
+      }
+    if (btn == 3 && !app->ispanning) {
       app->iscopying = 1;
       app->selx = x;
       app->sely = y;
@@ -2488,117 +2352,99 @@ void pdfapp_onmouse (pdfapp_t *app, int x, int y, int btn, int modifiers, int st
       app->selr.x1 = x;
       app->selr.y0 = y;
       app->selr.y1 = y;
-    }
+      }
     if (btn == 4 || btn == 5) /* scroll wheel */
-      handlescroll(app, modifiers, btn == 4 ? 1 : -1);
+      handleScroll(app, modifiers, btn == 4 ? 1 : -1);
     if (btn == 6 || btn == 7) /* scroll wheel (horizontal) */
       /* scroll left/right or up/down if shift is pressed */
-      handlescroll(app, modifiers ^ (1<<0), btn == 6 ? 1 : -1);
-    if (app->presentation_mode)
-    {
-      if (btn == 1 && app->pageno < app->pagecount)
-      {
+      handleScroll (app, modifiers ^ (1<<0), btn == 6 ? 1 : -1);
+    if (app->presentation_mode) {
+      if (btn == 1 && app->pageno < app->pagecount) {
         app->pageno++;
         pdfapp_showpage(app, 1, 1, 1, 0, 0);
-      }
-      if (btn == 3 && app->pageno > 1)
-      {
+        }
+      if (btn == 3 && app->pageno > 1) {
         app->pageno--;
         pdfapp_showpage(app, 1, 1, 1, 0, 0);
+        }
       }
     }
-  }
 
-  else if (state == -1)
-  {
-    if (app->iscopying)
-    {
+  else if (state == -1) {
+    if (app->iscopying) {
+      //{{{  copying
       app->iscopying = 0;
-      app->selr.x0 = fz_mini(app->selx, x) - app->panx + irect.x0;
-      app->selr.x1 = fz_maxi(app->selx, x) - app->panx + irect.x0;
-      app->selr.y0 = fz_mini(app->sely, y) - app->pany + irect.y0;
-      app->selr.y1 = fz_maxi(app->sely, y) - app->pany + irect.y0;
-      winrepaint(app);
+      app->selr.x0 = fz_mini (app->selx, x) - app->panx + irect.x0;
+      app->selr.x1 = fz_maxi (app->selx, x) - app->panx + irect.x0;
+      app->selr.y0 = fz_mini (app->sely, y) - app->pany + irect.y0;
+      app->selr.y1 = fz_maxi (app->sely, y) - app->pany + irect.y0;
+      winrepaint (app);
       if (app->selr.x0 < app->selr.x1 && app->selr.y0 < app->selr.y1)
-        windocopy(app);
-    }
+        winDoCopy (app);
+      }
+      //}}}
     app->ispanning = 0;
-  }
-
-  else if (app->ispanning)
-  {
+    }
+  else if (app->ispanning) {
+    //{{{  panning
     int newx = app->panx + x - app->selx;
     int newy = app->pany + y - app->sely;
     int imgh = app->winh;
     if (app->image)
-      imgh = fz_pixmap_height(app->ctx, app->image);
+      imgh = fz_pixmap_height (app->ctx, app->image);
 
     /* Scrolling beyond limits implies flipping pages */
     /* Are we requested to scroll beyond limits? */
-    if (newy + imgh < app->winh || newy > 0)
-    {
+    if (newy + imgh < app->winh || newy > 0) {
       /* Yes. We can assume that deltay != 0 */
       int deltay = y - app->sely;
-      /* Check whether the panning has occurred in the
-       * direction that we are already crossing the
-       * limit it. If not, we can conclude that we
-       * have switched ends of the page and will thus
-       * start over counting.
-       */
-      if( app->beyondy == 0 || (app->beyondy ^ deltay) >= 0 )
-      {
-        /* Updating how far we are beyond and
-         * flipping pages if beyond threshold
-         */
+      /* Check whether the panning has occurred in the direction that we are already crossing the
+       * limit it. If not, we can conclude that we have switched ends of the page and will thus start over counting */
+      if (app->beyondy == 0 || (app->beyondy ^ deltay) >= 0) {
+        /* Updating how far we are beyond and flipping pages if beyond threshold */
         app->beyondy += deltay;
-        if (app->beyondy > BEYOND_THRESHHOLD)
-        {
-          if( app->pageno > 1 )
-          {
+        if (app->beyondy > BEYOND_THRESHHOLD) {
+          if( app->pageno > 1) {
             app->pageno--;
-            pdfapp_showpage(app, 1, 1, 1, 0, 0);
+            pdfapp_showpage (app, 1, 1, 1, 0, 0);
             if (app->image)
-              newy = -fz_pixmap_height(app->ctx, app->image);
-          }
+              newy = -fz_pixmap_height (app->ctx, app->image);
+            }
           app->beyondy = 0;
-        }
-        else if (app->beyondy < -BEYOND_THRESHHOLD)
-        {
-          if( app->pageno < app->pagecount )
-          {
+          }
+        else if (app->beyondy < -BEYOND_THRESHHOLD) {
+          if( app->pageno < app->pagecount) {
             app->pageno++;
-            pdfapp_showpage(app, 1, 1, 1, 0, 0);
+            pdfapp_showpage (app, 1, 1, 1, 0, 0);
             newy = 0;
-          }
+            }
           app->beyondy = 0;
+          }
         }
-      }
       else
         app->beyondy = 0;
-    }
-    /* Although at this point we've already determined that
-     * or that no scrolling will be performed in
-     * y-direction, the x-direction has not yet been taken
-     * care off. Therefore
-     */
-    pdfapp_panview(app, newx, newy);
+      }
+    /* Although at this point we've already determined that or that no scrolling will be performed in
+     * y-direction, the x-direction has not yet been taken care off. Therefore */
+    pdfapp_panview (app, newx, newy);
 
     app->selx = x;
     app->sely = y;
+    }
+    //}}}
+  else if (app->iscopying) {
+    //{{{  copying
+    app->selr.x0 = fz_mini (app->selx, x) - app->panx + irect.x0;
+    app->selr.x1 = fz_maxi (app->selx, x) - app->panx + irect.x0;
+    app->selr.y0 = fz_mini (app->sely, y) - app->pany + irect.y0;
+    app->selr.y1 = fz_maxi (app->sely, y) - app->pany + irect.y0;
+    winrepaint (app);
+    }
+    //}}}
   }
-
-  else if (app->iscopying)
-  {
-    app->selr.x0 = fz_mini(app->selx, x) - app->panx + irect.x0;
-    app->selr.x1 = fz_maxi(app->selx, x) - app->panx + irect.x0;
-    app->selr.y0 = fz_mini(app->sely, y) - app->pany + irect.y0;
-    app->selr.y1 = fz_maxi(app->sely, y) - app->pany + irect.y0;
-    winrepaint(app);
-  }
-}
 //}}}
 //{{{
-void handlemouse (int x, int y, int btn, int state) {
+void handleMouse (int x, int y, int btn, int state) {
 
   int modifier = (GetAsyncKeyState(VK_SHIFT) < 0);
   modifier |= ((GetAsyncKeyState (VK_CONTROL) < 0) << 2);
@@ -2608,7 +2454,7 @@ void handlemouse (int x, int y, int btn, int state) {
 
   if (state != 0 && justcopied) {
     justcopied = 0;
-    winrepaint (&gapp);
+    winrepaint (&gApp);
     }
 
   if (state == 1)
@@ -2616,7 +2462,7 @@ void handlemouse (int x, int y, int btn, int state) {
   if (state == -1)
     ReleaseCapture();
 
-  pdfapp_onmouse (&gapp, x, y, btn, modifier, state);
+  onMouse (&gApp, x, y, btn, modifier, state);
   }
 //}}}
 
@@ -2638,11 +2484,11 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 
     case WM_SYSCOMMAND:
       if (wParam == ID_ABOUT) {
-        winhelp (&gapp);
+        winHelp (&gApp);
         return 0;
         }
       if (wParam == ID_DOCINFO) {
-        info();
+        winInfo();
         return 0;
         }
       break;
@@ -2655,12 +2501,12 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
       MoveWindow (hwndview, rect.left, rect.top,
       rect.right-rect.left, rect.bottom-rect.top, TRUE);
       if (wParam == SIZE_MAXIMIZED)
-        gapp.shrinkwrap = 0;
+        gApp.shrinkwrap = 0;
       return 0;
       }
 
     case WM_SIZING:
-      gapp.shrinkwrap = 0;
+      gApp.shrinkwrap = 0;
       break;
 
     case WM_NOTIFY:
@@ -2689,9 +2535,9 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       if (wParam == SIZE_MINIMIZED)
         return 0;
       if (wParam == SIZE_MAXIMIZED)
-        gapp.shrinkwrap = 0;
+        gApp.shrinkwrap = 0;
 
-      pdfapp_onresize (&gapp, LOWORD(lParam), HIWORD(lParam));
+      pdfapp_onresize (&gApp, LOWORD(lParam), HIWORD(lParam));
       break;
     //}}}
     //{{{
@@ -2699,17 +2545,17 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
      * so we don't need to do any fancy waiting to defer repainting.
      */
     case WM_PAINT:
-    {
+      {
       //puts("WM_PAINT");
       PAINTSTRUCT ps;
       hdc = BeginPaint (hwnd, &ps);
       winblit();
       hdc = NULL;
-      EndPaint(hwnd, &ps);
+      EndPaint (hwnd, &ps);
 
-      pdfapp_postblit (&gapp);
+      pdfapp_postblit (&gApp);
       return 0;
-    }
+      }
     //}}}
     //{{{
     case WM_ERASEBKGND:
@@ -2721,7 +2567,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       SetFocus (hwndview);
       oldx = x;
       oldy = y;
-      handlemouse (x, y, 1, 1);
+      handleMouse (x, y, 1, 1);
       return 0;
     //}}}
     //{{{
@@ -2729,7 +2575,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       SetFocus (hwndview);
       oldx = x;
       oldy = y;
-      handlemouse (x, y, 2, 1);
+      handleMouse (x, y, 2, 1);
       return 0;
     //}}}
     //{{{
@@ -2737,7 +2583,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       SetFocus (hwndview);
       oldx = x;
       oldy = y;
-      handlemouse (x, y, 3, 1);
+      handleMouse (x, y, 3, 1);
       return 0;
     //}}}
 
@@ -2745,21 +2591,21 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     case WM_LBUTTONUP:
       oldx = x;
       oldy = y;
-      handlemouse (x, y, 1, -1);
+      handleMouse (x, y, 1, -1);
       return 0;
     //}}}
     //{{{
     case WM_MBUTTONUP:
       oldx = x;
       oldy = y;
-      handlemouse (x, y, 2, -1);
+      handleMouse (x, y, 2, -1);
       return 0;
     //}}}
     //{{{
     case WM_RBUTTONUP:
       oldx = x;
       oldy = y;
-      handlemouse (x, y, 3, -1);
+      handleMouse(x, y, 3, -1);
       return 0;
     //}}}
 
@@ -2767,18 +2613,18 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     case WM_MOUSEMOVE:
       oldx = x;
       oldy = y;
-      handlemouse (x, y, 0, 0);
+      handleMouse(x, y, 0, 0);
       return 0;
     //}}}
     //{{{
     case WM_MOUSEWHEEL:
       if ((signed short)HIWORD(wParam) <= 0) {
-        handlemouse (oldx, oldy, 4, 1);
-        handlemouse (oldx, oldy, 4, -1);
+        handleMouse (oldx, oldy, 4, 1);
+        handleMouse(oldx, oldy, 4, -1);
         }
       else {
-        handlemouse (oldx, oldy, 5, 1);
-        handlemouse (oldx, oldy, 5, -1);
+        handleMouse(oldx, oldy, 5, 1);
+        handleMouse(oldx, oldy, 5, -1);
         }
 
       return 0;
@@ -2786,10 +2632,10 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
 
     //{{{
     case WM_TIMER:
-      if (wParam == OUR_TIMER_ID && timer_pending && gapp.presentation_mode) {
+      if (wParam == OUR_TIMER_ID && timer_pending && gApp.presentation_mode) {
         timer_pending = 0;
-        handlekey (VK_RIGHT + 256);
-        handlemouse (oldx, oldy, 0, 0); /* update cursor */
+        handleKey (VK_RIGHT + 256);
+        handleMouse (oldx, oldy, 0, 0); /* update cursor */
         return 0;
         }
       break;
@@ -2807,8 +2653,8 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
         case VK_DOWN:
         case VK_NEXT:
         case VK_ESCAPE:
-          handlekey (wParam + 256);
-          handlemouse (oldx, oldy, 0, 0);  /* update cursor */
+          handleKey (wParam + 256);
+          handleMouse (oldx, oldy, 0, 0);  /* update cursor */
           return 0;
         }
       return 1;
@@ -2817,8 +2663,8 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     /* unicode encoded chars, including escape, backspace etc... */
     case WM_CHAR:
       if (wParam < 256) {
-        handlekey (wParam);
-        handlemouse (oldx, oldy, 0, 0);  /* update cursor */
+        handleKey (wParam);
+        handleMouse (oldx, oldy, 0, 0);  /* update cursor */
         }
       return 0;
     //}}}
@@ -2826,7 +2672,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     /* We use WM_APP to trigger a reload and repaint of a page */
     case WM_APP:
-      pdfapp_reloadpage (&gapp);
+      pdfapp_reloadpage (&gApp);
       break;
     //}}}
     }
@@ -2835,6 +2681,105 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
 
   /* Pass on unhandled events to Windows */
   return DefWindowProc (hwnd, message, wParam, lParam);
+  }
+//}}}
+//{{{
+void winopen() {
+
+  /* Create and register window frame class */
+  WNDCLASS wc;
+  memset(&wc, 0, sizeof(wc));
+  wc.style = 0;
+  wc.lpfnWndProc = frameproc;
+  wc.cbClsExtra = 0;
+  wc.cbWndExtra = 0;
+  wc.hInstance = GetModuleHandle (NULL);
+  wc.hIcon = LoadIconA (wc.hInstance, "IDI_ICONAPP");
+  wc.hCursor = NULL; //LoadCursor(NULL, IDC_ARROW);
+  wc.hbrBackground = NULL;
+  wc.lpszMenuName = NULL;
+  wc.lpszClassName = L"FrameWindow";
+  ATOM a = RegisterClassW (&wc);
+  if (!a)
+    winError (&gApp, "cannot register frame window class");
+
+  /* Create and register window view class */
+  memset(&wc, 0, sizeof(wc));
+  wc.style = CS_HREDRAW | CS_VREDRAW;
+  wc.lpfnWndProc = viewproc;
+  wc.cbClsExtra = 0;
+  wc.cbWndExtra = 0;
+  wc.hInstance = GetModuleHandle (NULL);
+  wc.hIcon = NULL;
+  wc.hCursor = NULL;
+  wc.hbrBackground = NULL;
+  wc.lpszMenuName = NULL;
+  wc.lpszClassName = L"ViewWindow";
+  a = RegisterClassW (&wc);
+  if (!a)
+    winError (&gApp, "cannot register view window class");
+
+  /* Get screen size */
+  RECT r;
+  SystemParametersInfo (SPI_GETWORKAREA, 0, &r, 0);
+  gApp.scrw = r.right - r.left;
+  gApp.scrh = r.bottom - r.top;
+
+  /* Create cursors */
+  arrowcurs = LoadCursor (NULL, IDC_ARROW);
+  handcurs = LoadCursor (NULL, IDC_HAND);
+  waitcurs = LoadCursor (NULL, IDC_WAIT);
+  caretcurs = LoadCursor (NULL, IDC_IBEAM);
+
+  /* And a background color */
+  bgbrush = CreateSolidBrush (RGB (0x70,0x70,0x70));
+  shbrush = CreateSolidBrush (RGB (0x40,0x40,0x40));
+
+  /* Init DIB info for buffer */
+  dibinf = malloc (sizeof(BITMAPINFO) + 12);
+  dibinf->bmiHeader.biSize = sizeof(dibinf->bmiHeader);
+  dibinf->bmiHeader.biPlanes = 1;
+  dibinf->bmiHeader.biBitCount = 32;
+  dibinf->bmiHeader.biCompression = BI_RGB;
+  dibinf->bmiHeader.biXPelsPerMeter = 2834;
+  dibinf->bmiHeader.biYPelsPerMeter = 2834;
+  dibinf->bmiHeader.biClrUsed = 0;
+  dibinf->bmiHeader.biClrImportant = 0;
+  dibinf->bmiHeader.biClrUsed = 0;
+
+  /* Create window */
+  hwndframe = CreateWindowW (L"FrameWindow", // window class name
+                             NULL, // window caption
+                             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
+                             CW_USEDEFAULT, CW_USEDEFAULT, // initial position
+                             300, // initial x size
+                             300, // initial y size
+                             0, // parent window handle
+                             0, // window menu handle
+                             0, // program instance handle
+                             0); // creation parameters
+  if (!hwndframe)
+    winError (&gApp, "cannot create frame");
+
+  hwndview = CreateWindowW (L"ViewWindow", // window class name
+                            NULL,
+                            WS_VISIBLE | WS_CHILD,
+                            CW_USEDEFAULT, CW_USEDEFAULT,
+                            CW_USEDEFAULT, CW_USEDEFAULT,
+                            hwndframe, 0, 0, 0);
+  if (!hwndview)
+    winError (&gApp, "cannot create view");
+
+  hdc = NULL;
+
+  SetWindowTextW (hwndframe, L"MuPDF");
+
+  HMENU menu = GetSystemMenu (hwndframe, 0);
+  AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
+  AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF...");
+  AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties...");
+
+  SetCursor (arrowcurs);
   }
 //}}}
 
@@ -2856,22 +2801,6 @@ static int get_system_dpi() {
   return ((hdpi + vdpi) * 96 + 0.5f) / 200;
   }
 //}}}
-//{{{
-static void usage() {
-
-  fprintf (stderr, "usage: mupdf [options] file.pdf [page]\n");
-  fprintf (stderr, "\t-r -\tresolution\n");
-  fprintf (stderr, "\t-A -\tset anti-aliasing quality in bits (0=off, 8=best)\n");
-  fprintf (stderr, "\t-C -\tRRGGBB (tint color in hexadecimal syntax)\n");
-  fprintf (stderr, "\t-W -\tpage width for EPUB layout\n");
-  fprintf (stderr, "\t-H -\tpage height for EPUB layout\n");
-  fprintf (stderr, "\t-I -\tinvert colors\n");
-  fprintf (stderr, "\t-S -\tfont size for EPUB layout\n");
-  fprintf (stderr, "\t-U -\tuser style sheet for EPUB layout\n");
-  fprintf (stderr, "\t-X\tdisable document styles for EPUB layout\n");
-  exit (1);
-  }
-//}}}
 
 //{{{
 int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
@@ -2882,7 +2811,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     exit (1);
     }
 
-  pdfapp_init (ctx, &gapp);
+  pdfapp_init (ctx, &gApp);
 
   int argc;
   LPWSTR* wargv = CommandLineToArgvW (GetCommandLineW(), &argc);
@@ -2895,24 +2824,23 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     switch (c) {
       case 'C':
         c = strtol (fz_optarg, NULL, 16);
-        gapp.tint = 1;
-        gapp.tint_r = (c >> 16) & 255;
-        gapp.tint_g = (c >> 8) & 255;
-        gapp.tint_b = (c) & 255;
+        gApp.tint = 1;
+        gApp.tint_r = (c >> 16) & 255;
+        gApp.tint_g = (c >> 8) & 255;
+        gApp.tint_b = (c) & 255;
         break;
       case 'r': displayRes = fz_atoi(fz_optarg); break;
-      case 'I': gapp.invert = 1; break;
+      case 'I': gApp.invert = 1; break;
       case 'A': fz_set_aa_level(ctx, fz_atoi(fz_optarg)); break;
-      case 'W': gapp.layout_w = fz_atoi(fz_optarg); break;
-      case 'H': gapp.layout_h = fz_atoi(fz_optarg); break;
-      case 'S': gapp.layout_em = fz_atoi(fz_optarg); break;
-      case 'U': gapp.layout_css = fz_optarg; break;
-      case 'X': gapp.layout_use_doc_css = 0; break;
-      default: usage();
+      case 'W': gApp.layout_w = fz_atoi(fz_optarg); break;
+      case 'H': gApp.layout_h = fz_atoi(fz_optarg); break;
+      case 'S': gApp.layout_em = fz_atoi(fz_optarg); break;
+      case 'U': gApp.layout_css = fz_optarg; break;
+      case 'X': gApp.layout_use_doc_css = 0; break;
       }
     }
 
-  pdfapp_setresolution (&gapp, displayRes);
+  pdfapp_setresolution (&gApp, displayRes);
 
   char argv0[256];
   GetModuleFileNameA (NULL, argv0, sizeof argv0);
@@ -2923,8 +2851,8 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   if (fz_optind < argc) {
     strcpy (filename, argv[fz_optind++]);
     if (fz_optind < argc)
-      gapp.pageno = atoi (argv[fz_optind++]);
-    pdfapp_open (&gapp, filename, 0);
+      gApp.pageno = atoi (argv[fz_optind++]);
+    pdfapp_open (&gApp, filename, 0);
 
     MSG msg;
     while (GetMessage (&msg, NULL, 0, 0)) {
@@ -2935,8 +2863,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
   fz_free_argv (argc, argv);
 
-  //fz_context* ctx = gapp.ctx;
-  pdfapp_close (&gapp);
+  pdfapp_close (&gApp);
   free (dibinf);
   fz_drop_context (ctx);
 
