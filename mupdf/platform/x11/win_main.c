@@ -659,7 +659,7 @@ void pdfapp_setresolution (pdfapp_t* app, int res) {
 //}}}
 //{{{
 void pdfapp_invert (pdfapp_t* app, fz_rect rect) {
-  fz_invert_pixmap_rect (app->ctx, app->image, fz_round_rect(rect));
+  fz_invert_pixmap_rect (app->ctx, app->image, fz_round_rect (rect));
   }
 //}}}
 
@@ -1087,41 +1087,41 @@ static int make_fake_doc (pdfapp_t* app) {
 void pdfapp_open_progressive (pdfapp_t* app, char* filename, int reload, int bps) {
 
   fz_context* ctx = app->ctx;
-  pdf_document *idoc;
+  pdf_document* idoc;
 
   fz_try(ctx) {
-    fz_register_document_handlers(ctx);
+    fz_register_document_handlers (ctx);
 
     if (app->layout_css) {
-      fz_buffer *buf = fz_read_file(ctx, app->layout_css);
-      fz_set_user_css(ctx, fz_string_from_buffer(ctx, buf));
-      fz_drop_buffer(ctx, buf);
+      fz_buffer *buf = fz_read_file (ctx, app->layout_css);
+      fz_set_user_css (ctx, fz_string_from_buffer (ctx, buf));
+      fz_drop_buffer (ctx, buf);
       }
 
-    fz_set_use_document_css(ctx, app->layout_use_doc_css);
+    fz_set_use_document_css (ctx, app->layout_use_doc_css);
 
     if (bps == 0)
-      app->doc = fz_open_document(ctx, filename);
+      app->doc = fz_open_document (ctx, filename);
     else {
-      fz_stream *stream = fz_open_file_progressive(ctx, filename, bps);
+      fz_stream *stream = fz_open_file_progressive (ctx, filename, bps);
       while (1) {
-        fz_try(ctx) {
-          fz_seek(ctx, stream, 0, SEEK_SET);
-          app->doc = fz_open_document_with_stream(ctx, filename, stream);
+        fz_try (ctx) {
+          fz_seek (ctx, stream, 0, SEEK_SET);
+          app->doc = fz_open_document_with_stream (ctx, filename, stream);
           }
-        fz_catch(ctx) {
-          if (fz_caught(ctx) == FZ_ERROR_TRYLATER) {
-            appWarn(app, "not enough data to open yet");
+        fz_catch (ctx) {
+          if (fz_caught (ctx) == FZ_ERROR_TRYLATER) {
+            appWarn (app, "not enough data to open yet");
             continue;
             }
-          fz_rethrow(ctx);
+          fz_rethrow (ctx);
           }
         break;
         }
       }
     }
-  fz_catch(ctx) {
-    if (!reload || make_fake_doc(app))
+  fz_catch (ctx) {
+    if (!reload || make_fake_doc (app))
       appError (app, "cannot open document");
     }
 
@@ -1138,13 +1138,13 @@ void pdfapp_open_progressive (pdfapp_t* app, char* filename, int reload, int bps
 
   fz_try(ctx) {
     if (fz_needs_password (app->ctx, app->doc))
-      appWarn(app, "needs password.");
+      appWarn (app, "needs password.");
 
-    app->docpath = fz_strdup(ctx, filename);
+    app->docpath = fz_strdup (ctx, filename);
     app->doctitle = filename;
     if (strrchr(app->doctitle, '\\'))
-      app->doctitle = strrchr(app->doctitle, '\\') + 1;
-    if (strrchr(app->doctitle, '/'))
+      app->doctitle = strrchr (app->doctitle, '\\') + 1;
+    if (strrchr (app->doctitle, '/'))
       app->doctitle = strrchr (app->doctitle, '/') + 1;
     app->doctitle = fz_strdup (ctx, app->doctitle);
 
@@ -1173,7 +1173,7 @@ void pdfapp_open_progressive (pdfapp_t* app, char* filename, int reload, int bps
 
       fz_catch(ctx) {
         app->outline = NULL;
-        if (fz_caught(ctx) == FZ_ERROR_TRYLATER)
+        if (fz_caught (ctx) == FZ_ERROR_TRYLATER)
           app->outline_deferred = PDFAPP_OUTLINE_DEFERRED;
         else
           appWarn (app, "failed to load outline");
@@ -1182,7 +1182,7 @@ void pdfapp_open_progressive (pdfapp_t* app, char* filename, int reload, int bps
       }
     }
   fz_catch(ctx) {
-    appError(app, "cannot open document");
+    appError (app, "cannot open document");
     }
 
   if (app->pageno < 1)
@@ -1311,7 +1311,7 @@ void pdfapp_inverthit (pdfapp_t* app) {
   for (i = 0; i < app->hit_count; i++) {
     bbox = fz_rect_from_quad (app->hit_bbox[i]);
     bbox = fz_transform_rect (bbox, ctm);
-    pdfapp_invert (app, bbox);
+    fz_invert_pixmap_rect (app->ctx, app->image, fz_round_rect (bbox));
     }
   }
 //}}}
@@ -1614,6 +1614,7 @@ void winblit() {
   if (gApp.image) {
     if (gApp.iscopying || justcopied) {
       pdfapp_invert (&gApp, gApp.selr);
+      fz_invert_pixmap_rect (gApp.ctx, gApp.image, fz_round_rect (gApp.selr));
       justcopied = 1;
       }
 
@@ -1644,7 +1645,7 @@ void winblit() {
     pdfapp_inverthit (&gApp);
 
     if (gApp.iscopying || justcopied) {
-      pdfapp_invert (&gApp, gApp.selr);
+      fz_invert_pixmap_rect (gApp.ctx, gApp.image, fz_round_rect (gApp.selr));
       justcopied = 1;
       }
     }
