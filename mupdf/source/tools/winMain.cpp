@@ -2602,105 +2602,6 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
   return DefWindowProc (hwnd, message, wParam, lParam);
   }
 //}}}
-//{{{
-void winopen() {
-
-  /* Create and register window frame class */
-  WNDCLASS wc;
-  memset(&wc, 0, sizeof(wc));
-  wc.style = 0;
-  wc.lpfnWndProc = frameproc;
-  wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
-  wc.hInstance = GetModuleHandle (NULL);
-  wc.hIcon = LoadIconA (wc.hInstance, "IDI_ICONAPP");
-  wc.hCursor = NULL; //LoadCursor(NULL, IDC_ARROW);
-  wc.hbrBackground = NULL;
-  wc.lpszMenuName = NULL;
-  wc.lpszClassName = L"FrameWindow";
-  ATOM a = RegisterClassW (&wc);
-  if (!a)
-    winError (&gApp, "cannot register frame window class");
-
-  /* Create and register window view class */
-  memset(&wc, 0, sizeof(wc));
-  wc.style = CS_HREDRAW | CS_VREDRAW;
-  wc.lpfnWndProc = viewproc;
-  wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
-  wc.hInstance = GetModuleHandle (NULL);
-  wc.hIcon = NULL;
-  wc.hCursor = NULL;
-  wc.hbrBackground = NULL;
-  wc.lpszMenuName = NULL;
-  wc.lpszClassName = L"ViewWindow";
-  a = RegisterClassW (&wc);
-  if (!a)
-    winError (&gApp, "cannot register view window class");
-
-  /* Get screen size */
-  RECT r;
-  SystemParametersInfo (SPI_GETWORKAREA, 0, &r, 0);
-  gApp.scrw = r.right - r.left;
-  gApp.scrh = r.bottom - r.top;
-
-  /* Create cursors */
-  arrowcurs = LoadCursor (NULL, IDC_ARROW);
-  handcurs = LoadCursor (NULL, IDC_HAND);
-  waitcurs = LoadCursor (NULL, IDC_WAIT);
-  caretcurs = LoadCursor (NULL, IDC_IBEAM);
-
-  /* And a background color */
-  bgbrush = CreateSolidBrush (RGB (0x70,0x70,0x70));
-  shbrush = CreateSolidBrush (RGB (0x40,0x40,0x40));
-
-  /* Init DIB info for buffer */
-  dibinf = (BITMAPINFO*)malloc (sizeof(BITMAPINFO) + 12);
-  dibinf->bmiHeader.biSize = sizeof(dibinf->bmiHeader);
-  dibinf->bmiHeader.biPlanes = 1;
-  dibinf->bmiHeader.biBitCount = 32;
-  dibinf->bmiHeader.biCompression = BI_RGB;
-  dibinf->bmiHeader.biXPelsPerMeter = 2834;
-  dibinf->bmiHeader.biYPelsPerMeter = 2834;
-  dibinf->bmiHeader.biClrUsed = 0;
-  dibinf->bmiHeader.biClrImportant = 0;
-  dibinf->bmiHeader.biClrUsed = 0;
-
-  /* Create window */
-  hwndframe = CreateWindowW (L"FrameWindow", // window class name
-                             NULL, // window caption
-                             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
-                             CW_USEDEFAULT, CW_USEDEFAULT, // initial position
-                             300, // initial x size
-                             300, // initial y size
-                             0, // parent window handle
-                             0, // window menu handle
-                             0, // program instance handle
-                             0); // creation parameters
-  if (!hwndframe)
-    winError (&gApp, "cannot create frame");
-
-  hwndview = CreateWindowW (L"ViewWindow", // window class name
-                            NULL,
-                            WS_VISIBLE | WS_CHILD,
-                            CW_USEDEFAULT, CW_USEDEFAULT,
-                            CW_USEDEFAULT, CW_USEDEFAULT,
-                            hwndframe, 0, 0, 0);
-  if (!hwndview)
-    winError (&gApp, "cannot create view");
-
-  hdc = NULL;
-
-  SetWindowTextW (hwndframe, L"MuPDF");
-
-  HMENU menu = GetSystemMenu (hwndframe, 0);
-  AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
-  AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF...");
-  AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties...");
-
-  SetCursor (arrowcurs);
-  }
-//}}}
 
 typedef BOOL (SetProcessDPIAwareFn)(void);
 //{{{
@@ -2765,7 +2666,97 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   GetModuleFileNameA (NULL, argv0, sizeof argv0);
   installApp (argv0);
 
-  winopen();
+  //{{{  create and register window frame class
+  WNDCLASS wc;
+  memset(&wc, 0, sizeof(wc));
+  wc.style = 0;
+  wc.lpfnWndProc = frameproc;
+  wc.cbClsExtra = 0;
+  wc.cbWndExtra = 0;
+  wc.hInstance = GetModuleHandle (NULL);
+  wc.hIcon = LoadIconA (wc.hInstance, "IDI_ICONAPP");
+  wc.hCursor = NULL; //LoadCursor(NULL, IDC_ARROW);
+  wc.hbrBackground = NULL;
+  wc.lpszMenuName = NULL;
+  wc.lpszClassName = L"FrameWindow";
+  ATOM a = RegisterClassW (&wc);
+  if (!a)
+    winError (&gApp, "cannot register frame window class");
+  //}}}
+  //{{{  create and register window view class
+  memset(&wc, 0, sizeof(wc));
+  wc.style = CS_HREDRAW | CS_VREDRAW;
+  wc.lpfnWndProc = viewproc;
+  wc.cbClsExtra = 0;
+  wc.cbWndExtra = 0;
+  wc.hInstance = GetModuleHandle (NULL);
+  wc.hIcon = NULL;
+  wc.hCursor = NULL;
+  wc.hbrBackground = NULL;
+  wc.lpszMenuName = NULL;
+  wc.lpszClassName = L"ViewWindow";
+  a = RegisterClassW (&wc);
+  if (!a)
+    winError (&gApp, "cannot register view window class");
+  //}}}
+  //{{{  get screen size
+  RECT r;
+  SystemParametersInfo (SPI_GETWORKAREA, 0, &r, 0);
+  gApp.scrw = r.right - r.left;
+  gApp.scrh = r.bottom - r.top;
+  //}}}
+  //{{{  create cursors
+  arrowcurs = LoadCursor (NULL, IDC_ARROW);
+  handcurs = LoadCursor (NULL, IDC_HAND);
+  waitcurs = LoadCursor (NULL, IDC_WAIT);
+  caretcurs = LoadCursor (NULL, IDC_IBEAM);
+  //}}}
+  //{{{  background color
+  bgbrush = CreateSolidBrush (RGB (0x70,0x70,0x70));
+  shbrush = CreateSolidBrush (RGB (0x40,0x40,0x40));
+  //}}}
+  //{{{  init DIB info for buffer
+  dibinf = (BITMAPINFO*)malloc (sizeof(BITMAPINFO) + 12);
+  dibinf->bmiHeader.biSize = sizeof(dibinf->bmiHeader);
+  dibinf->bmiHeader.biPlanes = 1;
+  dibinf->bmiHeader.biBitCount = 32;
+  dibinf->bmiHeader.biCompression = BI_RGB;
+  dibinf->bmiHeader.biXPelsPerMeter = 2834;
+  dibinf->bmiHeader.biYPelsPerMeter = 2834;
+  dibinf->bmiHeader.biClrUsed = 0;
+  dibinf->bmiHeader.biClrImportant = 0;
+  dibinf->bmiHeader.biClrUsed = 0;
+  //}}}
+  //{{{  Create window 
+  hwndframe = CreateWindowW (L"FrameWindow", // window class name
+                             NULL, // window caption
+                             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
+                             CW_USEDEFAULT, CW_USEDEFAULT, // initial position
+                             300, // initial x size
+                             300, // initial y size
+                             0, // parent window handle
+                             0, // window menu handle
+                             0, // program instance handle
+                             0); // creation parameters
+  if (!hwndframe)
+    winError (&gApp, "cannot create frame");
+
+  hwndview = CreateWindowW (L"ViewWindow", // window class name
+                            NULL,
+                            WS_VISIBLE | WS_CHILD,
+                            CW_USEDEFAULT, CW_USEDEFAULT,
+                            CW_USEDEFAULT, CW_USEDEFAULT,
+                            hwndframe, 0, 0, 0);
+  if (!hwndview)
+    winError (&gApp, "cannot create view");
+  //}}}
+  hdc = NULL;
+  SetWindowTextW (hwndframe, L"MuPDF");
+  HMENU menu = GetSystemMenu (hwndframe, 0);
+  AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
+  AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF...");
+  AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties...");
+  SetCursor (arrowcurs);
 
   if (fz_optind < argc) {
     strcpy (filename, argv[fz_optind++]);
