@@ -60,10 +60,10 @@ enum { QUERY_NO, QUERY_YES };
 
 enum panning { DONT_PAN = 0, PAN_TO_TOP, PAN_TO_BOTTOM };
 
-enum { PDFAPP_OUTLINE_DEFERRED = 1, PDFAPP_OUTLINE_LOAD_NOW = 2 };
+enum { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 //}}}
 //{{{
-struct pdfapp_s {
+struct app_s {
   /* current document params */
   fz_document* doc;
   char* docpath;
@@ -133,7 +133,7 @@ struct pdfapp_s {
    * cursor position between two ticks/events, beyondy shall keep
    * track of the relative change in cursor position from the
    * point where the user hits a scrolling limit. This is ugly.
-   * Used in pdfapp.c:pdfapp_onmouse.
+   * Used in pdfapp.c:apponmouse.
    */
   int beyondy;
   fz_rect selr;
@@ -154,7 +154,7 @@ struct pdfapp_s {
   fz_context* ctx;
   };
 //}}}
-typedef struct pdfapp_s pdfapp_t;
+typedef struct app_s app_t;
 //{{{  static vars
 static HWND hwndframe = NULL;
 static HWND hwndview = NULL;
@@ -167,7 +167,7 @@ static HCURSOR arrowcurs, handcurs, waitcurs, caretcurs;
 static int timer_pending = 0;
 static int justcopied = 0;
 
-static pdfapp_t gApp;
+static app_t gApp;
 
 static wchar_t wbuf[PATH_MAX];
 static char filename[PATH_MAX];
@@ -182,13 +182,13 @@ static int pd_okay = 0;
 //}}}
 
 //{{{
-char* pdfapp_version (pdfapp_t* app) {
+char* appversion (app_t* app) {
   return "MuPDF " FZ_VERSION "\n"
          "Copyright 2006-2017 Artifex Software, Inc.\n";
   }
 //}}}
 //{{{
-char* pdfapp_usage (pdfapp_t* app) {
+char* appusage (app_t* app) {
   return
     "L\t\t-- rotate left\n"
     "R\t\t-- rotate right\n"
@@ -231,8 +231,8 @@ INT_PTR CALLBACK dlogaboutproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM l
 
   switch(message) {
     case WM_INITDIALOG:
-      SetDlgItemTextA (hwnd, 2, pdfapp_version (&gApp));
-      SetDlgItemTextA (hwnd, 3, pdfapp_usage (&gApp));
+      SetDlgItemTextA (hwnd, 2, appversion (&gApp));
+      SetDlgItemTextA (hwnd, 3, appusage (&gApp));
       return TRUE;
 
     case WM_COMMAND:
@@ -394,7 +394,7 @@ INT_PTR CALLBACK dloginfoproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
 
 #define OUR_TIMER_ID 1
 //{{{
-void winadvancetimer (pdfapp_t* app, float delay) {
+void winadvancetimer (app_t* app, float delay) {
 
   timer_pending = 1;
   SetTimer (hwndview, OUR_TIMER_ID, (unsigned int)(1000*delay), NULL);
@@ -402,24 +402,24 @@ void winadvancetimer (pdfapp_t* app, float delay) {
 //}}}
 
 //{{{
-void winError (pdfapp_t* app, char* msg) {
+void winError (app_t* app, char* msg) {
   MessageBoxA (hwndframe, msg, "MuPDF: Error", MB_ICONERROR);
   exit (1);
   }
 //}}}
 //{{{
-static void appError (pdfapp_t *app, char *msg) {
+static void appError (app_t *app, char *msg) {
 
   winError(app, msg);
   }
 //}}}
 //{{{
-void winWarn (pdfapp_t* app, char* msg) {
+void winWarn (app_t* app, char* msg) {
   MessageBoxA (hwndframe, msg, "MuPDF: Warning", MB_ICONWARNING);
   }
 //}}}
 //{{{
-static void appWarn (pdfapp_t* app, const char* fmt, ...) {
+static void appWarn (app_t* app, const char* fmt, ...) {
 
   char buf[1024];
   va_list ap;
@@ -432,7 +432,7 @@ static void appWarn (pdfapp_t* app, const char* fmt, ...) {
   }
 //}}}
 //{{{
-void winAlert (pdfapp_t* app, pdf_alert_event* alert) {
+void winAlert (app_t* app, pdf_alert_event* alert) {
 
   int buttons = MB_OK;
   int icon = MB_ICONWARNING;
@@ -486,7 +486,7 @@ void winAlert (pdfapp_t* app, pdf_alert_event* alert) {
   }
 //}}}
 //{{{
-void winHelp (pdfapp_t* app) {
+void winHelp (app_t* app) {
   if (DialogBoxW (NULL, L"IDD_DLOGABOUT", hwndframe, dlogaboutproc) <= 0)
     winError (&gApp, "cannot create help dialog");
   }
@@ -499,7 +499,7 @@ void winInfo() {
 //}}}
 
 //{{{
-void wincursor (pdfapp_t* app, int curs) {
+void wincursor (app_t* app, int curs) {
 
   if (curs == ARROW)
     SetCursor (arrowcurs);
@@ -512,7 +512,7 @@ void wincursor (pdfapp_t* app, int curs) {
   }
 //}}}
 //{{{
-void winTitle (pdfapp_t* app, char *title) {
+void winTitle (app_t* app, char *title) {
 
   wchar_t wide[256];
   wchar_t* dp = wide;
@@ -529,7 +529,7 @@ void winTitle (pdfapp_t* app, char *title) {
   }
 //}}}
 //{{{
-void winresize (pdfapp_t* app, int w, int h) {
+void winresize (app_t* app, int w, int h) {
 
   ShowWindow (hwndframe, SW_SHOWDEFAULT);
   w += GetSystemMetrics (SM_CXFRAME) * 2;
@@ -539,18 +539,18 @@ void winresize (pdfapp_t* app, int w, int h) {
   }
 //}}}
 //{{{
-void winrepaint (pdfapp_t* app) {
+void winrepaint (app_t* app) {
   InvalidateRect(hwndview, NULL, 0);
   }
 //}}}
 //{{{
-void winrepaintsearch (pdfapp_t* app) {
+void winrepaintsearch (app_t* app) {
   // TODO: invalidate only search area and call only search redraw routine.
   InvalidateRect (hwndview, NULL, 0);
   }
 //}}}
 //{{{
-void winfullscreen (pdfapp_t* app, int state) {
+void winfullscreen (app_t* app, int state) {
 
   static WINDOWPLACEMENT savedplace;
   static int isfullscreen = 0;
@@ -572,12 +572,12 @@ void winfullscreen (pdfapp_t* app, int state) {
   }
 //}}}
 //{{{
-void winreloadpage (pdfapp_t* app) {
+void winreloadpage (app_t* app) {
   SendMessage (hwndview, WM_APP, 0, 0);
   }
 //}}}
 //{{{
-char* wintextinput (pdfapp_t* app, char* inittext, int retry) {
+char* wintextinput (app_t* app, char* inittext, int retry) {
 
   td_retry = retry;
 
@@ -592,7 +592,7 @@ char* wintextinput (pdfapp_t* app, char* inittext, int retry) {
   }
 //}}}
 //{{{
-int winchoiceinput (pdfapp_t* app, int nopts, const char* opts[], int* nvals, const char* vals[]) {
+int winchoiceinput (app_t* app, int nopts, const char* opts[], int* nvals, const char* vals[]) {
 
   cd_nopts = nopts;
   cd_nvals = nvals;
@@ -629,9 +629,9 @@ static int zoomOut (int oldres) {
 //}}}
 
 //{{{
-void pdfapp_init (fz_context* ctx, pdfapp_t* app) {
+void appinit (fz_context* ctx, app_t* app) {
 
-  memset(app, 0, sizeof(pdfapp_t));
+  memset(app, 0, sizeof(app_t));
   app->scrw = 640;
   app->scrh = 480;
   app->resolution = 72;
@@ -653,12 +653,12 @@ void pdfapp_init (fz_context* ctx, pdfapp_t* app) {
   }
 //}}}
 //{{{
-void pdfapp_setresolution (pdfapp_t* app, int res) {
+void appsetresolution (app_t* app, int res) {
   app->resolution = res;
   }
 //}}}
 //{{{
-void pdfapp_invert (pdfapp_t* app, fz_rect rect) {
+void appinvert (app_t* app, fz_rect rect) {
   fz_invert_pixmap_rect (app->ctx, app->image, fz_round_rect (rect));
   }
 //}}}
@@ -666,7 +666,7 @@ void pdfapp_invert (pdfapp_t* app, fz_rect rect) {
 //{{{
 static void event_cb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* data) {
 
-  pdfapp_t* app = (pdfapp_t*)data;
+  app_t* app = (app_t*)data;
 
   switch (event->type) {
     case PDF_DOCUMENT_EVENT_ALERT:
@@ -695,7 +695,7 @@ static void event_cb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, 
 //}}}
 
 //{{{
-static void pdfapp_panview (pdfapp_t* app, int newx, int newy) {
+static void apppanview (app_t* app, int newx, int newy) {
 
   int image_w = 0;
   int image_h = 0;
@@ -728,12 +728,12 @@ static void pdfapp_panview (pdfapp_t* app, int newx, int newy) {
   }
 //}}}
 //{{{
-static void pdfapp_viewctm (fz_matrix* mat, pdfapp_t *app) {
+static void appviewctm (fz_matrix* mat, app_t *app) {
   *mat = fz_transform_page (app->page_bbox, app->resolution, app->rotate);
   }
 //}}}
 //{{{
-static void pdfapp_runpage (pdfapp_t* app, fz_device* dev, const fz_matrix ctm, fz_rect scissor, fz_cookie* cookie) {
+static void apprunpage (app_t* app, fz_device* dev, const fz_matrix ctm, fz_rect scissor, fz_cookie* cookie) {
 
   if (app->page_list)
     fz_run_display_list (app->ctx, app->page_list, dev, ctm, scissor, cookie);
@@ -743,7 +743,7 @@ static void pdfapp_runpage (pdfapp_t* app, fz_device* dev, const fz_matrix ctm, 
   }
 //}}}
 //{{{
-static void pdfapp_loadpage (pdfapp_t* app, int no_cache) {
+static void apploadpage (app_t* app, int no_cache) {
 
   int errored = 0;
   fz_cookie cookie = { 0 };
@@ -833,7 +833,7 @@ static void pdfapp_loadpage (pdfapp_t* app, int no_cache) {
   }
 //}}}
 //{{{
-static void pdfapp_showpage (pdfapp_t* app, int loadpage, int drawpage, int repaint, int transition, int searching) {
+static void appshowpage (app_t* app, int loadpage, int drawpage, int repaint, int transition, int searching) {
 
   char buf[MAX_TITLE];
   fz_device* idev = NULL;
@@ -857,7 +857,7 @@ static void pdfapp_showpage (pdfapp_t* app, int loadpage, int drawpage, int repa
 
   if (loadpage) {
     fz_rect mediabox;
-    pdfapp_loadpage (app, searching);
+    apploadpage (app, searching);
 
     /* Zero search hit position */
     app->hit_count = 0;
@@ -869,7 +869,7 @@ static void pdfapp_showpage (pdfapp_t* app, int loadpage, int drawpage, int repa
     if (app->page_list || app->annotations_list) {
       tdev = fz_new_stext_device (app->ctx, app->page_text, NULL);
       fz_try(app->ctx) {
-        pdfapp_runpage (app, tdev, fz_identity, fz_infinite_rect, &cookie);
+        apprunpage (app, tdev, fz_identity, fz_infinite_rect, &cookie);
         fz_close_device (app->ctx, tdev);
         }
       fz_always (app->ctx)
@@ -894,7 +894,7 @@ static void pdfapp_showpage (pdfapp_t* app, int loadpage, int drawpage, int repa
       sprintf (buf, "%s%s", app->doctitle, buf2);
     winTitle (app, buf);
 
-    pdfapp_viewctm (&ctm, app);
+    appviewctm (&ctm, app);
     bounds = fz_transform_rect (app->page_bbox, ctm);
     ibounds = fz_round_rect (bounds);
     bounds = fz_rect_from_irect (ibounds);
@@ -915,7 +915,7 @@ static void pdfapp_showpage (pdfapp_t* app, int loadpage, int drawpage, int repa
       fz_clear_pixmap_with_value (app->ctx, app->image, 255);
       if (app->page_list || app->annotations_list) {
         idev = fz_new_draw_device (app->ctx, fz_identity, app->image);
-        pdfapp_runpage (app, idev, ctm, bounds, &cookie);
+        apprunpage (app, idev, ctm, bounds, &cookie);
         fz_close_device (app->ctx, idev);
         }
       if (app->invert)
@@ -950,7 +950,7 @@ static void pdfapp_showpage (pdfapp_t* app, int loadpage, int drawpage, int repa
     }
 
   if (repaint) {
-    pdfapp_panview (app, app->panx, app->pany);
+    apppanview (app, app->panx, app->pany);
 
     if (!app->image) {
       /* there is no image to blit, but there might be an error message */
@@ -985,7 +985,7 @@ static void pdfapp_showpage (pdfapp_t* app, int loadpage, int drawpage, int repa
   }
 //}}}
 //{{{
-static void pdfapp_recreate_annotationslist (pdfapp_t* app) {
+static void apprecreate_annotationslist (app_t* app) {
 
   int errored = 0;
   fz_cookie cookie = { 0 };
@@ -1027,19 +1027,19 @@ static void pdfapp_recreate_annotationslist (pdfapp_t* app) {
   }
 //}}}
 //{{{
-static void pdfapp_updatepage (pdfapp_t* app) {
+static void appupdatepage (app_t* app) {
 
   if (pdf_update_page(app->ctx, (pdf_page*)app->page)) {
-    pdfapp_recreate_annotationslist (app);
-    pdfapp_showpage (app, 0, 1, 1, 0, 0);
+    apprecreate_annotationslist (app);
+    appshowpage (app, 0, 1, 1, 0, 0);
     }
   else
-    pdfapp_showpage (app, 0, 0, 1, 0, 0);
+    appshowpage (app, 0, 0, 1, 0, 0);
   }
 //}}}
 
 //{{{
-static int make_fake_doc (pdfapp_t* app) {
+static int make_fake_doc (app_t* app) {
 
   fz_context* ctx = app->ctx;
 
@@ -1084,7 +1084,7 @@ static int make_fake_doc (pdfapp_t* app) {
   }
 //}}}
 //{{{
-void pdfapp_open_progressive (pdfapp_t* app, char* filename, int reload, int bps) {
+void appopen_progressive (app_t* app, char* filename, int reload, int bps) {
 
   fz_context* ctx = app->ctx;
   pdf_document* idoc;
@@ -1174,7 +1174,7 @@ void pdfapp_open_progressive (pdfapp_t* app, char* filename, int reload, int bps
       fz_catch(ctx) {
         app->outline = NULL;
         if (fz_caught (ctx) == FZ_ERROR_TRYLATER)
-          app->outline_deferred = PDFAPP_OUTLINE_DEFERRED;
+          app->outline_deferred = appOUTLINE_DEFERRED;
         else
           appWarn (app, "failed to load outline");
         }
@@ -1201,16 +1201,16 @@ void pdfapp_open_progressive (pdfapp_t* app, char* filename, int reload, int bps
     app->pany = 0;
     }
 
-  pdfapp_showpage (app, 1, 1, 1, 0, 0);
+  appshowpage (app, 1, 1, 1, 0, 0);
   }
 //}}}
 //{{{
-void pdfapp_open (pdfapp_t* app, char* filename, int reload) {
-  pdfapp_open_progressive (app, filename, reload, 0);
+void appopen (app_t* app, char* filename, int reload) {
+  appopen_progressive (app, filename, reload, 0);
   }
 //}}}
 //{{{
-void pdfapp_close (pdfapp_t* app) {
+void appclose (app_t* app) {
 
   fz_drop_display_list (app->ctx, app->page_list);
   app->page_list = NULL;
@@ -1252,19 +1252,19 @@ void pdfapp_close (pdfapp_t* app) {
   }
 //}}}
 //{{{
-void pdfapp_reloadfile (pdfapp_t* app) {
+void appreloadfile (app_t* app) {
 
   char filename[PATH_MAX];
   fz_strlcpy (filename, app->docpath, PATH_MAX);
-  pdfapp_close (app);
-  pdfapp_open (app, filename, 1);
+  appclose (app);
+  appopen (app, filename, 1);
   }
 //}}}
 
 //{{{
-void pdfapp_reloadpage (pdfapp_t* app) {
+void appreloadpage (app_t* app) {
 
-  if (app->outline_deferred == PDFAPP_OUTLINE_LOAD_NOW) {
+  if (app->outline_deferred == appOUTLINE_LOAD_NOW) {
     fz_try(app->ctx)
       app->outline = fz_load_outline (app->ctx, app->doc);
     fz_catch(app->ctx)
@@ -1272,11 +1272,11 @@ void pdfapp_reloadpage (pdfapp_t* app) {
     app->outline_deferred = 0;
     }
 
-  pdfapp_showpage (app, 1, 1, 1, 0, 0);
+  appshowpage (app, 1, 1, 1, 0, 0);
   }
 //}}}
 //{{{
-void pdfapp_gotopage (pdfapp_t* app, int number) {
+void appgotopage (app_t* app, int number) {
 
   app->issearching = 0;
   winrepaint(app);
@@ -1296,16 +1296,16 @@ void pdfapp_gotopage (pdfapp_t* app, int number) {
 
   app->hist[app->histlen++] = app->pageno;
   app->pageno = number;
-  pdfapp_showpage(app, 1, 1, 1, 0, 0);
+  appshowpage(app, 1, 1, 1, 0, 0);
   }
 //}}}
 //{{{
-void pdfapp_inverthit (pdfapp_t* app) {
+void appinverthit (app_t* app) {
 
   fz_rect bbox;
   fz_matrix ctm;
 
-  pdfapp_viewctm (&ctm, app);
+  appviewctm (&ctm, app);
 
   int i;
   for (i = 0; i < app->hit_count; i++) {
@@ -1317,18 +1317,18 @@ void pdfapp_inverthit (pdfapp_t* app) {
 //}}}
 
 //{{{
-void pdfapp_onresize (pdfapp_t* app, int w, int h) {
+void apponresize (app_t* app, int w, int h) {
 
   if (app->winw != w || app->winh != h) {
     app->winw = w;
     app->winh = h;
-    pdfapp_panview (app, app->panx, app->pany);
+    apppanview (app, app->panx, app->pany);
     winrepaint (app);
     }
   }
 //}}}
 //{{{
-void pdfapp_autozoom_vertical (pdfapp_t* app) {
+void appautozoom_vertical (app_t* app) {
 
   app->resolution *= (float) app->winh / fz_pixmap_height(app->ctx, app->image);
   if (app->resolution > MAXRES)
@@ -1336,11 +1336,11 @@ void pdfapp_autozoom_vertical (pdfapp_t* app) {
   else if (app->resolution < MINRES)
     app->resolution = MINRES;
 
-  pdfapp_showpage (app, 0, 1, 1, 0, 0);
+  appshowpage (app, 0, 1, 1, 0, 0);
   }
 //}}}
 //{{{
-void pdfapp_autozoom_horizontal (pdfapp_t* app) {
+void appautozoom_horizontal (app_t* app) {
 
   app->resolution *= (float) app->winw / fz_pixmap_width(app->ctx, app->image);
   if (app->resolution > MAXRES)
@@ -1348,23 +1348,23 @@ void pdfapp_autozoom_horizontal (pdfapp_t* app) {
   else if (app->resolution < MINRES)
     app->resolution = MINRES;
 
-  pdfapp_showpage (app, 0, 1, 1, 0, 0);
+  appshowpage (app, 0, 1, 1, 0, 0);
   }
 //}}}
 //{{{
-void pdfapp_autozoom (pdfapp_t* app) {
+void appautozoom (app_t* app) {
 
   float page_aspect = (float) fz_pixmap_width (app->ctx, app->image) / fz_pixmap_height (app->ctx, app->image);
   float win_aspect = (float) app->winw / app->winh;
   if (page_aspect > win_aspect)
-    pdfapp_autozoom_horizontal (app);
+    appautozoom_horizontal (app);
   else
-    pdfapp_autozoom_vertical (app);
+    appautozoom_vertical (app);
   }
 //}}}
 
 //{{{
-void pdfapp_postblit (pdfapp_t* app) {
+void apppostblit (app_t* app) {
 
   app->transitions_enabled = 1;
   if (!app->in_transit)
@@ -1394,7 +1394,7 @@ void pdfapp_postblit (pdfapp_t* app) {
 //}}}
 
 //{{{
-static void pdfapp_search (pdfapp_t* app, enum panning* panto, int dir) {
+static void appsearch (app_t* app, enum panning* panto, int dir) {
 
   /* abort if no search string */
   if (app->search[0] == 0) {
@@ -1419,7 +1419,7 @@ static void pdfapp_search (pdfapp_t* app, enum panning* panto, int dir) {
   do {
     if (page != app->pageno) {
       app->pageno = page;
-      pdfapp_showpage (app, 1, 0, 0, 0, 1);
+      appshowpage (app, 1, 0, 0, 0, 1);
       }
 
     app->hit_count = fz_search_stext_page (app->ctx, app->page_text, app->search, app->hit_bbox, nelem(app->hit_bbox));
@@ -1441,7 +1441,7 @@ static void pdfapp_search (pdfapp_t* app, enum panning* panto, int dir) {
   appWarn (app, "String '%s' not found.", app->search);
 
   app->pageno = firstpage;
-  pdfapp_showpage (app, 1, 0, 0, 0, 0);
+  appshowpage (app, 1, 0, 0, 0, 0);
   wincursor (app, HAND);
   winrepaint (app);
   }
@@ -1494,7 +1494,7 @@ void installApp (char* argv0) {
 //}}}
 
 //{{{
-void pdfapp_oncopy (pdfapp_t* app, unsigned short *ucsbuf, int ucslen) {
+void apponcopy (app_t* app, unsigned short *ucsbuf, int ucslen) {
 
   fz_matrix ctm;
   fz_stext_page *page = app->page_text;
@@ -1504,7 +1504,7 @@ void pdfapp_oncopy (pdfapp_t* app, unsigned short *ucsbuf, int ucslen) {
   fz_stext_char *ch;
   fz_rect sel;
 
-  pdfapp_viewctm (&ctm, app);
+  appviewctm (&ctm, app);
   ctm = fz_invert_matrix (ctm);
   sel = fz_transform_rect (app->selr, ctm);
 
@@ -1543,7 +1543,7 @@ void pdfapp_oncopy (pdfapp_t* app, unsigned short *ucsbuf, int ucslen) {
   }
 //}}}
 //{{{
-void winDoCopy (pdfapp_t* app) {
+void winDoCopy (app_t* app) {
 
   if (!OpenClipboard (hwndframe))
     return;
@@ -1557,7 +1557,7 @@ void winDoCopy (pdfapp_t* app) {
     }
 
   unsigned short* ucsbuf = GlobalLock (handle);
-  pdfapp_oncopy (&gApp, ucsbuf, 4096);
+  apponcopy (&gApp, ucsbuf, 4096);
   GlobalUnlock (handle);
 
   SetClipboardData (CF_UNICODETEXT, handle);
@@ -1568,7 +1568,7 @@ void winDoCopy (pdfapp_t* app) {
 //}}}
 
 //{{{
-void windrawrect (pdfapp_t* app, int x0, int y0, int x1, int y1) {
+void windrawrect (app_t* app, int x0, int y0, int x1, int y1) {
 
   RECT r;
   r.left = x0;
@@ -1579,7 +1579,7 @@ void windrawrect (pdfapp_t* app, int x0, int y0, int x1, int y1) {
   }
 //}}}
 //{{{
-void windrawstring (pdfapp_t* app, int x, int y, char *s) {
+void windrawstring (app_t* app, int x, int y, char *s) {
 
   HFONT font = (HFONT)GetStockObject (ANSI_FIXED_FONT);
   SelectObject (hdc, font);
@@ -1613,12 +1613,12 @@ void winblit() {
 
   if (gApp.image) {
     if (gApp.iscopying || justcopied) {
-      pdfapp_invert (&gApp, gApp.selr);
+      appinvert (&gApp, gApp.selr);
       fz_invert_pixmap_rect (gApp.ctx, gApp.image, fz_round_rect (gApp.selr));
       justcopied = 1;
       }
 
-    pdfapp_inverthit (&gApp);
+    appinverthit (&gApp);
 
     dibinf->bmiHeader.biWidth = image_w;
     dibinf->bmiHeader.biHeight = -image_h;
@@ -1642,7 +1642,7 @@ void winblit() {
       SetDIBitsToDevice (hdc, gApp.panx, gApp.pany, image_w, image_h,
                          0, 0, 0, image_h, samples, dibinf, DIB_RGB_COLORS);
 
-    pdfapp_inverthit (&gApp);
+    appinverthit (&gApp);
 
     if (gApp.iscopying || justcopied) {
       fz_invert_pixmap_rect (gApp.ctx, gApp.image, fz_round_rect (gApp.selr));
@@ -1690,7 +1690,7 @@ void winblit() {
 //}}}
 
 //{{{
-void onKey (pdfapp_t* app, int c, int modifiers) {
+void onKey (app_t* app, int c, int modifiers) {
 
   int oldpage = app->pageno;
   enum panning panto = PAN_TO_TOP;
@@ -1714,7 +1714,7 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
               app->pageno = app->pagecount;
             else
               app->pageno--;
-            pdfapp_showpage(app, 1, 1, 0, 0, 1);
+            appshowpage(app, 1, 1, 0, 0, 1);
             }
 
           onKey (app, 'n', 0);
@@ -1749,7 +1749,7 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
     //{{{
     case 0x1B:
       fz_context* ctx = gApp.ctx;
-      pdfapp_close (&gApp);
+      appclose (&gApp);
       free (dibinf);
       fz_drop_context (ctx);
       exit (0);
@@ -1764,7 +1764,7 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
         fz_layout_document(app->ctx, app->doc, app->layout_w, app->layout_h, app->layout_em);
         app->pagecount = fz_count_pages(app->ctx, app->doc);
         app->pageno = app->pagecount * percent + 0.1f;
-        pdfapp_showpage(app, 1, 1, 1, 0, 0);
+        appshowpage(app, 1, 1, 1, 0, 0);
       }
       break;
     //}}}
@@ -1776,7 +1776,7 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
         fz_layout_document(app->ctx, app->doc, app->layout_w, app->layout_h, app->layout_em);
         app->pagecount = fz_count_pages(app->ctx, app->doc);
         app->pageno = app->pagecount * percent + 0.1f;
-        pdfapp_showpage(app, 1, 1, 1, 0, 0);
+        appshowpage(app, 1, 1, 1, 0, 0);
       }
       break;
     //}}}
@@ -1784,70 +1784,70 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
     //{{{
     case '=':
       app->resolution = zoomIn (app->resolution);
-      pdfapp_showpage (app, 0, 1, 1, 0, 0);
+      appshowpage (app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
     case '-':
       app->resolution = zoomOut (app->resolution);
-      pdfapp_showpage (app, 0, 1, 1, 0, 0);
+      appshowpage (app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
     case 'W':
-      pdfapp_autozoom_horizontal(app);
+      appautozoom_horizontal(app);
       break;
     //}}}
     //{{{
     case 'H':
-      pdfapp_autozoom_vertical(app);
+      appautozoom_vertical(app);
       break;
     //}}}
     //{{{
     case 'Z':
-      pdfapp_autozoom(app);
+      appautozoom(app);
       break;
     //}}}
     //{{{
     case 'L':
       app->rotate -= 90;
-      pdfapp_showpage(app, 0, 1, 1, 0, 0);
+      appshowpage(app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
     case 'R':
       app->rotate += 90;
-      pdfapp_showpage(app, 0, 1, 1, 0, 0);
+      appshowpage(app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
     case 'C':
       app->tint ^= 1;
-      pdfapp_showpage(app, 0, 1, 1, 0, 0);
+      appshowpage(app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
     case 'c':
       app->grayscale ^= 1;
-      pdfapp_showpage(app, 0, 1, 1, 0, 0);
+      appshowpage(app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
     case 'i':
       app->invert ^= 1;
-      pdfapp_showpage(app, 0, 1, 1, 0, 0);
+      appshowpage(app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
     case 'a':
       app->rotate -= 15;
-      pdfapp_showpage (app, 0, 1, 1, 0, 0);
+      appshowpage (app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
     case 's':
       app->rotate += 15;
-      pdfapp_showpage (app, 0, 1, 1, 0, 0);
+      appshowpage (app, 0, 1, 1, 0, 0);
       break;
     //}}}
     //{{{
@@ -1866,13 +1866,13 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
 
       app->shrinkwrap = 1;
       app->panx = app->pany = 0;
-      pdfapp_showpage(app, 0, 0, 1, 0, 0);
+      appshowpage(app, 0, 0, 1, 0, 0);
       break;
     //}}}
     //{{{
     case 'h':
       app->panx += fz_pixmap_width(app->ctx, app->image) / 10;
-      pdfapp_showpage(app, 0, 0, 1, 0, 0);
+      appshowpage(app, 0, 0, 1, 0, 0);
       break;
     //}}}
     //{{{
@@ -1885,7 +1885,7 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
         }
         else {
           app->pany -= h / 10;
-          pdfapp_showpage(app, 0, 0, 1, 0, 0);
+          appshowpage(app, 0, 0, 1, 0, 0);
         }
         break;
       }
@@ -1900,7 +1900,7 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
         }
         else {
           app->pany += h / 10;
-          pdfapp_showpage(app, 0, 0, 1, 0, 0);
+          appshowpage(app, 0, 0, 1, 0, 0);
         }
         break;
       }
@@ -1908,7 +1908,7 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
     //{{{
     case 'l':
       app->panx -= fz_pixmap_width(app->ctx, app->image) / 10;
-      pdfapp_showpage(app, 0, 0, 1, 0, 0);
+      appshowpage(app, 0, 0, 1, 0, 0);
       break;
     //}}}
 
@@ -1917,14 +1917,14 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
     //{{{
     case '\r':
       if (app->numberlen > 0)
-        pdfapp_gotopage(app, atoi(app->number));
+        appgotopage(app, atoi(app->number));
       else
-        pdfapp_gotopage(app, 1);
+        appgotopage(app, 1);
       break;
     //}}}
     //{{{
     case 'G':
-      pdfapp_gotopage(app, app->pagecount);
+      appgotopage(app, app->pagecount);
       break;
     //}}}
     //{{{
@@ -2025,7 +2025,7 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
     case 'r':
       panto = DONT_PAN;
       oldpage = -1;
-      pdfapp_reloadfile(app);
+      appreloadfile(app);
       break;
     //}}}
     //{{{
@@ -2051,18 +2051,18 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
     //{{{
     case 'n':
       if (app->searchdir > 0)
-        pdfapp_search (app, &panto, 1);
+        appsearch (app, &panto, 1);
       else
-        pdfapp_search (app, &panto, -1);
+        appsearch (app, &panto, -1);
       loadpage = 0;
       break;
     //}}}
     //{{{
     case 'N':
       if (app->searchdir > 0)
-        pdfapp_search (app, &panto, -1);
+        appsearch (app, &panto, -1);
       else
-        pdfapp_search (app, &panto, 1);
+        appsearch (app, &panto, 1);
       loadpage = 0;
       break;
     //}}}
@@ -2093,7 +2093,7 @@ void onKey (pdfapp_t* app, int c, int modifiers) {
         break;
       //}}}
       }
-    pdfapp_showpage(app, loadpage, 1, 1, 1, 0);
+    appshowpage(app, loadpage, 1, 1, 1, 0);
     }
   }
 //}}}
@@ -2134,7 +2134,7 @@ void handleKey (int c) {
 //}}}
 
 //{{{
-static void handleScroll (pdfapp_t* app, int modifiers, int dir) {
+static void handleScroll (app_t* app, int modifiers, int dir) {
 
   app->ispanning = app->iscopying = 0;
   if (modifiers & (1<<2)) {
@@ -2147,7 +2147,7 @@ static void handleScroll (pdfapp_t* app, int modifiers, int dir) {
       app->resolution = MAXRES;
     if (app->resolution < MINRES)
       app->resolution = MINRES;
-    pdfapp_showpage(app, 0, 1, 1, 0, 0);
+    appshowpage(app, 0, 1, 1, 0, 0);
   }
   else {
     /* scroll up/down, or left/right if
@@ -2174,22 +2174,22 @@ static void handleScroll (pdfapp_t* app, int modifiers, int dir) {
         ystep = 20 * dir;
     }
     if (pagestep == 0)
-      pdfapp_panview(app, app->panx + xstep, app->pany + ystep);
+      apppanview(app, app->panx + xstep, app->pany + ystep);
     else if (pagestep > 0 && app->pageno < app->pagecount) {
       app->pageno++;
       app->pany = 0;
-      pdfapp_showpage(app, 1, 1, 1, 0, 0);
+      appshowpage(app, 1, 1, 1, 0, 0);
     }
     else if (pagestep < 0 && app->pageno > 1) {
       app->pageno--;
       app->pany = INT_MIN;
-      pdfapp_showpage(app, 1, 1, 1, 0, 0);
+      appshowpage(app, 1, 1, 1, 0, 0);
     }
   }
 }
 //}}}
 //{{{
-void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
+void onMouse (app_t* app, int x, int y, int btn, int modifiers, int state) {
 
   fz_context* ctx = app->ctx;
   fz_irect irect = { 0, 0, app->layout_w, app->layout_h };
@@ -2203,7 +2203,7 @@ void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
   p.x = x - app->panx + irect.x0;
   p.y = y - app->pany + irect.y0;
 
-  pdfapp_viewctm(&ctm, app);
+  appviewctm(&ctm, app);
   ctm = fz_invert_matrix(ctm);
   p = fz_transform_point(p, ctm);
 
@@ -2218,26 +2218,26 @@ void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
     else /* state == -1 */
       event.event.pointer.ptype = PDF_POINTER_UP;
 
-    if (idoc && pdf_pass_event (ctx, idoc, (pdf_page *)app->page, &event)) {
+    if (idoc && pdf_pass_event (ctx, idoc, (pdf_page*)app->page, &event)) {
       pdf_widget* widget = pdf_focused_widget (ctx, idoc);
       app->nowaitcursor = 1;
-      pdfapp_updatepage (app);
+      appupdatepage (app);
       if (widget) {
         switch (pdf_widget_type (ctx, widget)) {
           //{{{
           case PDF_WIDGET_TYPE_TEXT:
             {
-            char *text = pdf_text_widget_text(ctx, idoc, widget);
-            char *current_text = text;
+            char* text = pdf_text_widget_text (ctx, idoc, widget);
+            char* current_text = text;
             int retry = 0;
 
             do {
-              current_text = wintextinput(app, current_text, retry);
+              current_text = wintextinput (app, current_text, retry);
               retry = 1;
-              } while (current_text && !pdf_text_widget_set_text(ctx, idoc, widget, current_text));
+              } while (current_text && !pdf_text_widget_set_text (ctx, idoc, widget, current_text));
 
             fz_free(app->ctx, text);
-            pdfapp_updatepage(app);
+            appupdatepage(app);
             }
             break;
           //}}}
@@ -2257,16 +2257,16 @@ void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
 
             fz_try(ctx) {
               nopts = pdf_choice_widget_options(ctx, idoc, widget, 0, NULL);
-              opts = fz_malloc(ctx, nopts * sizeof(*opts));
-              (void)pdf_choice_widget_options(ctx, idoc, widget, 0, opts);
+              opts = fz_malloc (ctx, nopts * sizeof(*opts));
+              (void)pdf_choice_widget_options (ctx, idoc, widget, 0, opts);
 
-              nvals = pdf_choice_widget_value(ctx, idoc, widget, NULL);
-              vals = fz_malloc(ctx, MAX(nvals,nopts) * sizeof(*vals));
-              (void)pdf_choice_widget_value(ctx, idoc, widget, vals);
+              nvals = pdf_choice_widget_value (ctx, idoc, widget, NULL);
+              vals = fz_malloc (ctx, MAX(nvals,nopts) * sizeof(*vals));
+              (void)pdf_choice_widget_value (ctx, idoc, widget, vals);
 
-              if (winchoiceinput(app, nopts, opts, &nvals, vals)) {
-                pdf_choice_widget_set_value(ctx, idoc, widget, nvals, vals);
-                pdfapp_updatepage(app);
+              if (winchoiceinput (app, nopts, opts, &nvals, vals)) {
+                pdf_choice_widget_set_value (ctx, idoc, widget, nvals, vals);
+                appupdatepage (app);
                 }
               }
             fz_always(ctx) {
@@ -2316,10 +2316,10 @@ void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
     wincursor(app, HAND);
     if (btn == 1 && state == 1 && !processed) {
       if (fz_is_external_link (ctx, link->uri)) {
-        //pdfapp_gotouri (app, link->uri);
+        //appgotouri (app, link->uri);
         }
       else
-        pdfapp_gotopage (app, fz_resolve_link(ctx, app->doc, link->uri, NULL, NULL) + 1);
+        appgotopage (app, fz_resolve_link(ctx, app->doc, link->uri, NULL, NULL) + 1);
       return;
       }
     }
@@ -2362,11 +2362,11 @@ void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
     if (app->presentation_mode) {
       if (btn == 1 && app->pageno < app->pagecount) {
         app->pageno++;
-        pdfapp_showpage(app, 1, 1, 1, 0, 0);
+        appshowpage(app, 1, 1, 1, 0, 0);
         }
       if (btn == 3 && app->pageno > 1) {
         app->pageno--;
-        pdfapp_showpage(app, 1, 1, 1, 0, 0);
+        appshowpage(app, 1, 1, 1, 0, 0);
         }
       }
     }
@@ -2407,7 +2407,7 @@ void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
         if (app->beyondy > BEYOND_THRESHHOLD) {
           if( app->pageno > 1) {
             app->pageno--;
-            pdfapp_showpage (app, 1, 1, 1, 0, 0);
+            appshowpage (app, 1, 1, 1, 0, 0);
             if (app->image)
               newy = -fz_pixmap_height (app->ctx, app->image);
             }
@@ -2416,7 +2416,7 @@ void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
         else if (app->beyondy < -BEYOND_THRESHHOLD) {
           if( app->pageno < app->pagecount) {
             app->pageno++;
-            pdfapp_showpage (app, 1, 1, 1, 0, 0);
+            appshowpage (app, 1, 1, 1, 0, 0);
             newy = 0;
             }
           app->beyondy = 0;
@@ -2427,7 +2427,7 @@ void onMouse (pdfapp_t* app, int x, int y, int btn, int modifiers, int state) {
       }
     /* Although at this point we've already determined that or that no scrolling will be performed in
      * y-direction, the x-direction has not yet been taken care off. Therefore */
-    pdfapp_panview (app, newx, newy);
+    apppanview (app, newx, newy);
 
     app->selx = x;
     app->sely = y;
@@ -2538,7 +2538,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       if (wParam == SIZE_MAXIMIZED)
         gApp.shrinkwrap = 0;
 
-      pdfapp_onresize (&gApp, LOWORD(lParam), HIWORD(lParam));
+      apponresize (&gApp, LOWORD(lParam), HIWORD(lParam));
       break;
     //}}}
     //{{{
@@ -2554,7 +2554,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       hdc = NULL;
       EndPaint (hwnd, &ps);
 
-      pdfapp_postblit (&gApp);
+      apppostblit (&gApp);
       return 0;
       }
     //}}}
@@ -2673,7 +2673,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     /* We use WM_APP to trigger a reload and repaint of a page */
     case WM_APP:
-      pdfapp_reloadpage (&gApp);
+      appreloadpage (&gApp);
       break;
     //}}}
     }
@@ -2812,7 +2812,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     exit (1);
     }
 
-  pdfapp_init (ctx, &gApp);
+  appinit (ctx, &gApp);
 
   int argc;
   LPWSTR* wargv = CommandLineToArgvW (GetCommandLineW(), &argc);
@@ -2841,7 +2841,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
       }
     }
 
-  pdfapp_setresolution (&gApp, displayRes);
+  appsetresolution (&gApp, displayRes);
 
   char argv0[256];
   GetModuleFileNameA (NULL, argv0, sizeof argv0);
@@ -2853,7 +2853,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     strcpy (filename, argv[fz_optind++]);
     if (fz_optind < argc)
       gApp.pageno = atoi (argv[fz_optind++]);
-    pdfapp_open (&gApp, filename, 0);
+    appopen (&gApp, filename, 0);
 
     MSG msg;
     while (GetMessage (&msg, NULL, 0, 0)) {
@@ -2864,7 +2864,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
   fz_free_argv (argc, argv);
 
-  pdfapp_close (&gApp);
+  appclose (&gApp);
   free (dibinf);
   fz_drop_context (ctx);
 
