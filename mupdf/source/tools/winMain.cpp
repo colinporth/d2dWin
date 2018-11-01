@@ -1,4 +1,4 @@
-// winMain.cpp
+ // winMain.cpp
 //{{{  includes
 #ifndef UNICODE
   #define UNICODE
@@ -62,14 +62,18 @@ enum panning { DONT_PAN = 0, PAN_TO_TOP, PAN_TO_BOTTOM };
 
 enum { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 //}}}
+
 //{{{
-struct app_t {
-  /* current document params */
+class app_t {
+public:
+  fz_context* ctx;
+
   fz_document* doc;
   char* docpath;
   char* doctitle;
   fz_outline* outline;
   int outline_deferred;
+  int pagecount;
 
   float layout_w;
   float layout_h;
@@ -77,7 +81,6 @@ struct app_t {
   char* layout_css;
   int layout_use_doc_css;
 
-  int pagecount;
 
   /* current view params */
   int resolution;
@@ -90,13 +93,9 @@ struct app_t {
 
   /* presentation mode */
   int presentation_mode;
-  int transitions_enabled;
   fz_pixmap* old_image;
   fz_pixmap* new_image;
   clock_t start_time;
-  int in_transit;
-  float duration;
-  fz_transition transition;
 
   /* current page params */
   int pageno;
@@ -147,11 +146,6 @@ struct app_t {
   int searchpage;
   fz_quad hit_bbox[512];
   int hit_count;
-
-  /* client context storage */
-  void* userdata;
-
-  fz_context* ctx;
   };
 //}}}
 //{{{  global vars
@@ -528,7 +522,7 @@ void winTitle (app_t* app, char *title) {
   }
 //}}}
 //{{{
-void winresize (app_t* app, int w, int h) {
+void winResize (app_t* app, int w, int h) {
 
   ShowWindow (hwndframe, SW_SHOWDEFAULT);
   w += GetSystemMetrics (SM_CXFRAME) * 2;
@@ -538,18 +532,7 @@ void winresize (app_t* app, int w, int h) {
   }
 //}}}
 //{{{
-void winrepaint (app_t* app) {
-  InvalidateRect(hwndview, NULL, 0);
-  }
-//}}}
-//{{{
-void winrepaintsearch (app_t* app) {
-  // TODO: invalidate only search area and call only search redraw routine.
-  InvalidateRect (hwndview, NULL, 0);
-  }
-//}}}
-//{{{
-void winfullscreen (app_t* app, int state) {
+void winFullScreen (app_t* app, int state) {
 
   static WINDOWPLACEMENT savedplace;
   static int isfullscreen = 0;
@@ -642,8 +625,6 @@ void appinit (fz_context* ctx, app_t* app) {
   app->layout_css = NULL;
   app->layout_use_doc_css = 1;
 
-  app->transition.duration = 0.25f;
-  app->transition.type = FZ_TRANSITION_FADE;
   app->colorspace = fz_device_bgr (ctx);
 
   app->tint_r = 255;
@@ -720,14 +701,14 @@ void apppanview (app_t* app, int newx, int newy) {
     newy = (app->winh - image_h) / 2;
 
   if (newx != app->panx || newy != app->pany)
-    winrepaint (app);
+    InvalidateRect (hwndview, NULL, 0);
 
   app->panx = newx;
   app->pany = newy;
   }
 //}}}
 //{{{
-void appviewctm (fz_matrix* mat, app_t *app) {
+void appviewctm (app_t* app, fz_matrix* mat) {
   *mat = fz_transform_page (app->page_bbox, app->resolution, app->rotate);
   }
 //}}}
@@ -832,7 +813,7 @@ void apploadpage (app_t* app, int no_cache) {
   }
 //}}}
 //{{{
-void appshowpage (app_t* app, int loadpage, int drawpage, int repaint, int transition, int searching) {
+void appShowPage (app_t* app, int loadpage, int drawpage, int repaint, int searching) {
 
   char buf[MAX_TITLE];
   fz_device* idev = NULL;
@@ -845,14 +826,6 @@ void appshowpage (app_t* app, int loadpage, int drawpage, int repaint, int trans
 
   if (!app->nowaitcursor)
     wincursor(app, WAIT);
-
-  if (!app->transitions_enabled || !app->presentation_mode)
-    transition = 0;
-
-  if (transition) {
-    app->old_image = app->image;
-    app->image = NULL;
-    }
 
   if (loadpage) {
     fz_rect mediabox;
@@ -893,7 +866,7 @@ void appshowpage (app_t* app, int loadpage, int drawpage, int repaint, int trans
       sprintf (buf, "%s%s", app->doctitle, buf2);
     winTitle (app, buf);
 
-    appviewctm (&ctm, app);
+    appviewctm (app, &ctm);
     bounds = fz_transform_rect (app->page_bbox, ctm);
     ibounds = fz_round_rect (bounds);
     bounds = fz_rect_from_irect (ibounds);
@@ -928,32 +901,12 @@ void appshowpage (app_t* app, int loadpage, int drawpage, int repaint, int trans
       cookie.errors++;
     }
 
-  if (transition) {
-    app->new_image = app->image;
-    app->image = NULL;
-    if (app->grayscale)
-      colorspace = fz_device_gray (app->ctx);
-    else
-      colorspace = app->colorspace;
-    app->image = fz_new_pixmap_with_bbox (app->ctx, colorspace, ibounds, NULL, 1);
-    app->duration = 0;
-    fz_page_presentation (app->ctx, app->page, &app->transition, &app->duration);
-    if (app->duration == 0)
-      app->duration = 5;
-    app->in_transit = fz_generate_transition (app->ctx, app->image, app->old_image, app->new_image, 0, &app->transition);
-    if (!app->in_transit) {
-      if (app->duration != 0)
-        winadvancetimer (app, app->duration);
-      }
-    app->start_time = clock();
-    }
-
   if (repaint) {
     apppanview (app, app->panx, app->pany);
 
     if (!app->image) {
       /* there is no image to blit, but there might be an error message */
-      winresize(app, app->layout_w, app->layout_h);
+      winResize(app, app->layout_w, app->layout_h);
       }
     else if (app->shrinkwrap) {
       int w = fz_pixmap_width (app->ctx, app->image);
@@ -968,10 +921,10 @@ void appshowpage (app_t* app, int loadpage, int drawpage, int repaint, int trans
       if (h > app->scrh * 90 / 100)
         h = app->scrh * 90 / 100;
       if (w != app->winw || h != app->winh)
-        winresize(app, w, h);
+        winResize(app, w, h);
       }
 
-    winrepaint (app);
+    InvalidateRect (hwndview, NULL, 0);
     wincursor (app, ARROW);
     }
 
@@ -1006,7 +959,6 @@ void apprecreate_annotationslist (app_t* app) {
 
     if (cookie.incomplete)
       app->incomplete = 1;
-      //appWarn(app, "Incomplete page rendering");
     else if (cookie.errors) {
       appWarn (app, "Errors found on page");
       errored = 1;
@@ -1030,15 +982,15 @@ void appupdatepage (app_t* app) {
 
   if (pdf_update_page(app->ctx, (pdf_page*)app->page)) {
     apprecreate_annotationslist (app);
-    appshowpage (app, 0, 1, 1, 0, 0);
+    appShowPage (app, 0, 1, 1, 0);
     }
   else
-    appshowpage (app, 0, 0, 1, 0, 0);
+    appShowPage (app, 0, 0, 1, 0);
   }
 //}}}
 
 //{{{
-int make_fake_doc (app_t* app) {
+int makeFakeDoc (app_t* app) {
 
   fz_context* ctx = app->ctx;
 
@@ -1120,7 +1072,7 @@ void appopen_progressive (app_t* app, char* filename, int reload, int bps) {
       }
     }
   fz_catch (ctx) {
-    if (!reload || make_fake_doc (app))
+    if (!reload || makeFakeDoc(app))
       appError (app, "cannot open document");
     }
 
@@ -1200,7 +1152,7 @@ void appopen_progressive (app_t* app, char* filename, int reload, int bps) {
     app->pany = 0;
     }
 
-  appshowpage (app, 1, 1, 1, 0, 0);
+  appShowPage (app, 1, 1, 1, 0);
   }
 //}}}
 //{{{
@@ -1271,14 +1223,14 @@ void appreloadpage (app_t* app) {
     app->outline_deferred = 0;
     }
 
-  appshowpage (app, 1, 1, 1, 0, 0);
+  appShowPage (app, 1, 1, 1, 0);
   }
 //}}}
 //{{{
 void appgotopage (app_t* app, int number) {
 
   app->issearching = 0;
-  winrepaint(app);
+  InvalidateRect (hwndview, NULL, 0);
 
   if (number < 1)
     number = 1;
@@ -1289,25 +1241,24 @@ void appgotopage (app_t* app, int number) {
     return;
 
   if (app->histlen + 1 == 256) {
-    memmove(app->hist, app->hist + 1, sizeof(int) * 255);
+    memmove (app->hist, app->hist + 1, sizeof(int) * 255);
     app->histlen --;
     }
 
   app->hist[app->histlen++] = app->pageno;
   app->pageno = number;
-  appshowpage(app, 1, 1, 1, 0, 0);
+  appShowPage (app, 1, 1, 1, 0);
   }
 //}}}
 //{{{
 void appinverthit (app_t* app) {
 
-  fz_rect bbox;
   fz_matrix ctm;
-
-  appviewctm (&ctm, app);
+  appviewctm (app, &ctm);
 
   int i;
   for (i = 0; i < app->hit_count; i++) {
+    fz_rect bbox;
     bbox = fz_rect_from_quad (app->hit_bbox[i]);
     bbox = fz_transform_rect (bbox, ctm);
     fz_invert_pixmap_rect (app->ctx, app->image, fz_round_rect (bbox));
@@ -1322,7 +1273,7 @@ void apponresize (app_t* app, int w, int h) {
     app->winw = w;
     app->winh = h;
     apppanview (app, app->panx, app->pany);
-    winrepaint (app);
+    InvalidateRect (hwndview, NULL, 0);
     }
   }
 //}}}
@@ -1335,7 +1286,7 @@ void appautozoom_vertical (app_t* app) {
   else if (app->resolution < MINRES)
     app->resolution = MINRES;
 
-  appshowpage (app, 0, 1, 1, 0, 0);
+  appShowPage (app, 0, 1, 1, 0);
   }
 //}}}
 //{{{
@@ -1347,7 +1298,7 @@ void appautozoom_horizontal (app_t* app) {
   else if (app->resolution < MINRES)
     app->resolution = MINRES;
 
-  appshowpage (app, 0, 1, 1, 0, 0);
+  appShowPage (app, 0, 1, 1, 0);
   }
 //}}}
 //{{{
@@ -1363,41 +1314,11 @@ void appautozoom (app_t* app) {
 //}}}
 
 //{{{
-void apppostblit (app_t* app) {
-
-  app->transitions_enabled = 1;
-  if (!app->in_transit)
-    return;
-
-  clock_t time = clock();
-  float seconds = (float)(time - app->start_time) / CLOCKS_PER_SEC;
-  int llama = seconds * 256 / app->transition.duration;
-  if (llama >= 256) {
-    /* Completed. */
-    fz_drop_pixmap (app->ctx, app->image);
-    app->image = app->new_image;
-    app->new_image = NULL;
-    fz_drop_pixmap (app->ctx, app->old_image);
-    app->old_image = NULL;
-    if (app->duration != 0)
-      winadvancetimer (app, app->duration);
-    }
-  else
-    fz_generate_transition (app->ctx, app->image, app->old_image, app->new_image, llama, &app->transition);
-
-  winrepaint (app);
-  if (llama >= 256)
-    /* Completed. */
-    app->in_transit = 0;
-  }
-//}}}
-
-//{{{
 void appsearch (app_t* app, enum panning* panto, int dir) {
 
   /* abort if no search string */
   if (app->search[0] == 0) {
-    winrepaint (app);
+    InvalidateRect (hwndview, NULL, 0);
     return;
     }
 
@@ -1418,7 +1339,7 @@ void appsearch (app_t* app, enum panning* panto, int dir) {
   do {
     if (page != app->pageno) {
       app->pageno = page;
-      appshowpage (app, 1, 0, 0, 0, 1);
+      appShowPage (app, 1, 0, 0, 1);
       }
 
     app->hit_count = fz_search_stext_page (app->ctx, app->page_text, app->search, app->hit_bbox, nelem(app->hit_bbox));
@@ -1426,9 +1347,9 @@ void appsearch (app_t* app, enum panning* panto, int dir) {
       *panto = dir == 1 ? PAN_TO_TOP : PAN_TO_BOTTOM;
       app->searchpage = app->pageno;
       wincursor (app, HAND);
-      winrepaint (app);
+      InvalidateRect (hwndview, NULL, 0);
       return;
-    }
+      }
 
     page += dir;
     if (page < 1)
@@ -1440,9 +1361,9 @@ void appsearch (app_t* app, enum panning* panto, int dir) {
   appWarn (app, "String '%s' not found.", app->search);
 
   app->pageno = firstpage;
-  appshowpage (app, 1, 0, 0, 0, 0);
+  appShowPage (app, 1, 0, 0, 0);
   wincursor (app, HAND);
-  winrepaint (app);
+  InvalidateRect (hwndview, NULL, 0);
   }
 //}}}
 
@@ -1503,7 +1424,7 @@ void apponcopy (app_t* app, unsigned short *ucsbuf, int ucslen) {
   fz_stext_char *ch;
   fz_rect sel;
 
-  appviewctm (&ctm, app);
+  appviewctm (app, &ctm);
   ctm = fz_invert_matrix (ctm);
   sel = fz_transform_rect (app->selr, ctm);
 
@@ -1567,7 +1488,7 @@ void winDoCopy (app_t* app) {
 //}}}
 
 //{{{
-void windrawrect (app_t* app, int x0, int y0, int x1, int y1) {
+void winDrawRect (app_t* app, int x0, int y0, int x1, int y1) {
 
   RECT r;
   r.left = x0;
@@ -1578,7 +1499,7 @@ void windrawrect (app_t* app, int x0, int y0, int x1, int y1) {
   }
 //}}}
 //{{{
-void windrawstring (app_t* app, int x, int y, char *s) {
+void winDrawString (app_t* app, int x, int y, char *s) {
 
   HFONT font = (HFONT)GetStockObject (ANSI_FIXED_FONT);
   SelectObject (hdc, font);
@@ -1586,19 +1507,19 @@ void windrawstring (app_t* app, int x, int y, char *s) {
   }
 //}}}
 //{{{
-void winblitsearch() {
+void winBlitSearch() {
 
   if (gApp.issearching) {
     char buf[sizeof (gApp.search) + 50];
     sprintf (buf, "Search: %s", gApp.search);
-    windrawrect (&gApp, 0, 0, gApp.winw, 30);
-    windrawstring (&gApp, 10, 20, buf);
+    winDrawRect (&gApp, 0, 0, gApp.winw, 30);
+    winDrawString (&gApp, 10, 20, buf);
     }
   }
 //}}}
 
 //{{{
-void winblit() {
+void winBlit() {
 
   int image_w = fz_pixmap_width (gApp.ctx, gApp.image);
   int image_h = fz_pixmap_height (gApp.ctx, gApp.image);
@@ -1684,7 +1605,7 @@ void winblit() {
   r.bottom = y1;
   FillRect (hdc, &r, shbrush);
 
-  winblitsearch();
+  winBlitSearch();
   }
 //}}}
 
@@ -1701,36 +1622,35 @@ void onKey (app_t* app, int c, int modifiers) {
     if (c < ' ') {
       if (c == '\b' && n > 0) {
         app->search[n - 1] = 0;
-        winrepaintsearch(app);
-       }
+        InvalidateRect (hwndview, NULL, 0);
+        }
       if (c == '\n' || c == '\r') {
         app->issearching = 0;
         if (n > 0) {
-          winrepaintsearch(app);
-
+          InvalidateRect (hwndview, NULL, 0);
           if (app->searchdir < 0) {
             if (app->pageno == 1)
               app->pageno = app->pagecount;
             else
               app->pageno--;
-            appshowpage(app, 1, 1, 0, 0, 1);
+            appShowPage(app, 1, 1, 0, 1);
             }
 
           onKey (app, 'n', 0);
           }
         else
-          winrepaint(app);
+          InvalidateRect (hwndview, NULL, 0);
         }
       if (c == '\033') {
         app->issearching = 0;
-        winrepaint(app);
+        InvalidateRect (hwndview, NULL, 0);
         }
-     }
-     else {
+      }
+    else {
       if (n + 2 < sizeof app->search) {
         app->search[n] = c;
         app->search[n + 1] = 0;
-        winrepaintsearch(app);
+        InvalidateRect(hwndview, NULL, 0);
         }
       }
     return;
@@ -1764,7 +1684,7 @@ void onKey (app_t* app, int c, int modifiers) {
         fz_layout_document(app->ctx, app->doc, app->layout_w, app->layout_h, app->layout_em);
         app->pagecount = fz_count_pages(app->ctx, app->doc);
         app->pageno = app->pagecount * percent + 0.1f;
-        appshowpage(app, 1, 1, 1, 0, 0);
+        appShowPage(app, 1, 1, 1, 0);
       }
       break;
     //}}}
@@ -1776,7 +1696,7 @@ void onKey (app_t* app, int c, int modifiers) {
         fz_layout_document(app->ctx, app->doc, app->layout_w, app->layout_h, app->layout_em);
         app->pagecount = fz_count_pages(app->ctx, app->doc);
         app->pageno = app->pagecount * percent + 0.1f;
-        appshowpage(app, 1, 1, 1, 0, 0);
+        appShowPage(app, 1, 1, 1, 0);
       }
       break;
     //}}}
@@ -1784,13 +1704,13 @@ void onKey (app_t* app, int c, int modifiers) {
     //{{{
     case '=':
       app->resolution = zoomIn (app->resolution);
-      appshowpage (app, 0, 1, 1, 0, 0);
+      appShowPage (app, 0, 1, 1, 0);
       break;
     //}}}
     //{{{
     case '-':
       app->resolution = zoomOut (app->resolution);
-      appshowpage (app, 0, 1, 1, 0, 0);
+      appShowPage (app, 0, 1, 1, 0);
       break;
     //}}}
     //{{{
@@ -1811,68 +1731,68 @@ void onKey (app_t* app, int c, int modifiers) {
     //{{{
     case 'L':
       app->rotate -= 90;
-      appshowpage(app, 0, 1, 1, 0, 0);
+      appShowPage(app, 0, 1, 1, 0);
       break;
     //}}}
     //{{{
     case 'R':
       app->rotate += 90;
-      appshowpage(app, 0, 1, 1, 0, 0);
+      appShowPage(app, 0, 1, 1, 0);
       break;
     //}}}
     //{{{
     case 'C':
       app->tint ^= 1;
-      appshowpage(app, 0, 1, 1, 0, 0);
+      appShowPage(app, 0, 1, 1, 0);
       break;
     //}}}
     //{{{
     case 'c':
       app->grayscale ^= 1;
-      appshowpage(app, 0, 1, 1, 0, 0);
+      appShowPage(app, 0, 1, 1, 0);
       break;
     //}}}
     //{{{
     case 'i':
       app->invert ^= 1;
-      appshowpage(app, 0, 1, 1, 0, 0);
+      appShowPage(app, 0, 1, 1, 0);
       break;
     //}}}
     //{{{
     case 'a':
       app->rotate -= 15;
-      appshowpage (app, 0, 1, 1, 0, 0);
+      appShowPage (app, 0, 1, 1, 0);
       break;
     //}}}
     //{{{
     case 's':
       app->rotate += 15;
-      appshowpage (app, 0, 1, 1, 0, 0);
+      appShowPage (app, 0, 1, 1, 0);
       break;
     //}}}
     //{{{
     case 'f':
       app->shrinkwrap = 0;
-      winfullscreen (app, !app->fullscreen);
+      winFullScreen (app, !app->fullscreen);
       app->fullscreen = !app->fullscreen;
       break;
     //}}}
     //{{{
     case 'w':
       if (app->fullscreen) {
-        winfullscreen(app, 0);
+        winFullScreen (app, 0);
         app->fullscreen = 0;
         }
 
       app->shrinkwrap = 1;
       app->panx = app->pany = 0;
-      appshowpage(app, 0, 0, 1, 0, 0);
+      appShowPage (app, 0, 0, 1, 0);
       break;
     //}}}
     //{{{
     case 'h':
-      app->panx += fz_pixmap_width(app->ctx, app->image) / 10;
-      appshowpage(app, 0, 0, 1, 0, 0);
+      app->panx += fz_pixmap_width (app->ctx, app->image) / 10;
+      appShowPage (app, 0, 0, 1, 0);
       break;
     //}}}
     //{{{
@@ -1885,7 +1805,7 @@ void onKey (app_t* app, int c, int modifiers) {
         }
         else {
           app->pany -= h / 10;
-          appshowpage(app, 0, 0, 1, 0, 0);
+          appShowPage(app, 0, 0, 1, 0);
         }
         break;
       }
@@ -1900,7 +1820,7 @@ void onKey (app_t* app, int c, int modifiers) {
         }
         else {
           app->pany += h / 10;
-          appshowpage(app, 0, 0, 1, 0, 0);
+          appShowPage(app, 0, 0, 1, 0);
         }
         break;
       }
@@ -1908,7 +1828,7 @@ void onKey (app_t* app, int c, int modifiers) {
     //{{{
     case 'l':
       app->panx -= fz_pixmap_width(app->ctx, app->image) / 10;
-      appshowpage(app, 0, 0, 1, 0, 0);
+      appShowPage(app, 0, 0, 1, 0);
       break;
     //}}}
 
@@ -2035,7 +1955,7 @@ void onKey (app_t* app, int c, int modifiers) {
       app->search[0] = 0;
       app->hit_count = 0;
       app->searchpage = -1;
-      winrepaintsearch(app);
+      InvalidateRect (hwndview, NULL, 0);
       break;
     //}}}
     //{{{
@@ -2045,7 +1965,7 @@ void onKey (app_t* app, int c, int modifiers) {
       app->search[0] = 0;
       app->hit_count = 0;
       app->searchpage = -1;
-      winrepaintsearch(app);
+      InvalidateRect (hwndview, NULL, 0);
       break;
     //}}}
     //{{{
@@ -2093,7 +2013,7 @@ void onKey (app_t* app, int c, int modifiers) {
         break;
       //}}}
       }
-    appshowpage(app, loadpage, 1, 1, 1, 0);
+    appShowPage(app, loadpage, 1, 1, 0);
     }
   }
 //}}}
@@ -2111,7 +2031,7 @@ void handleKey (int c) {
 
   if (justcopied) {
     justcopied = 0;
-    winrepaint (&gApp);
+    InvalidateRect (hwndview, NULL, 0);
     }
 
   /* translate VK into ASCII equivalents */
@@ -2129,7 +2049,7 @@ void handleKey (int c) {
     }
 
   onKey (&gApp, c, modifier);
-  winrepaint (&gApp);
+  InvalidateRect (hwndview, NULL, 0);
   }
 //}}}
 
@@ -2147,7 +2067,7 @@ void handleScroll (app_t* app, int modifiers, int dir) {
       app->resolution = MAXRES;
     if (app->resolution < MINRES)
       app->resolution = MINRES;
-    appshowpage(app, 0, 1, 1, 0, 0);
+    appShowPage(app, 0, 1, 1, 0);
   }
   else {
     /* scroll up/down, or left/right if
@@ -2178,12 +2098,12 @@ void handleScroll (app_t* app, int modifiers, int dir) {
     else if (pagestep > 0 && app->pageno < app->pagecount) {
       app->pageno++;
       app->pany = 0;
-      appshowpage(app, 1, 1, 1, 0, 0);
+      appShowPage(app, 1, 1, 1, 0);
     }
     else if (pagestep < 0 && app->pageno > 1) {
       app->pageno--;
       app->pany = INT_MIN;
-      appshowpage(app, 1, 1, 1, 0, 0);
+      appShowPage(app, 1, 1, 1, 0);
     }
   }
 }
@@ -2199,13 +2119,13 @@ void onMouse (app_t* app, int x, int y, int btn, int modifiers, int state) {
   int processed = 0;
 
   if (app->image)
-    irect = fz_pixmap_bbox(app->ctx, app->image);
+    irect = fz_pixmap_bbox (app->ctx, app->image);
   p.x = x - app->panx + irect.x0;
   p.y = y - app->pany + irect.y0;
 
-  appviewctm(&ctm, app);
-  ctm = fz_invert_matrix(ctm);
-  p = fz_transform_point(p, ctm);
+  appviewctm (app, &ctm);
+  ctm = fz_invert_matrix (ctm);
+  p = fz_transform_point (p, ctm);
 
   if (btn == 1 && (state == 1 || state == -1)) {
     pdf_ui_event event;
@@ -2362,11 +2282,11 @@ void onMouse (app_t* app, int x, int y, int btn, int modifiers, int state) {
     if (app->presentation_mode) {
       if (btn == 1 && app->pageno < app->pagecount) {
         app->pageno++;
-        appshowpage(app, 1, 1, 1, 0, 0);
+        appShowPage(app, 1, 1, 1, 0);
         }
       if (btn == 3 && app->pageno > 1) {
         app->pageno--;
-        appshowpage(app, 1, 1, 1, 0, 0);
+        appShowPage(app, 1, 1, 1, 0);
         }
       }
     }
@@ -2379,7 +2299,7 @@ void onMouse (app_t* app, int x, int y, int btn, int modifiers, int state) {
       app->selr.x1 = fz_maxi (app->selx, x) - app->panx + irect.x0;
       app->selr.y0 = fz_mini (app->sely, y) - app->pany + irect.y0;
       app->selr.y1 = fz_maxi (app->sely, y) - app->pany + irect.y0;
-      winrepaint (app);
+      InvalidateRect (hwndview, NULL, 0);
       if (app->selr.x0 < app->selr.x1 && app->selr.y0 < app->selr.y1)
         winDoCopy (app);
       }
@@ -2407,7 +2327,7 @@ void onMouse (app_t* app, int x, int y, int btn, int modifiers, int state) {
         if (app->beyondy > BEYOND_THRESHHOLD) {
           if( app->pageno > 1) {
             app->pageno--;
-            appshowpage (app, 1, 1, 1, 0, 0);
+            appShowPage (app, 1, 1, 1, 0);
             if (app->image)
               newy = -fz_pixmap_height (app->ctx, app->image);
             }
@@ -2416,7 +2336,7 @@ void onMouse (app_t* app, int x, int y, int btn, int modifiers, int state) {
         else if (app->beyondy < -BEYOND_THRESHHOLD) {
           if( app->pageno < app->pagecount) {
             app->pageno++;
-            appshowpage (app, 1, 1, 1, 0, 0);
+            appShowPage (app, 1, 1, 1, 0);
             newy = 0;
             }
           app->beyondy = 0;
@@ -2439,7 +2359,7 @@ void onMouse (app_t* app, int x, int y, int btn, int modifiers, int state) {
     app->selr.x1 = fz_maxi (app->selx, x) - app->panx + irect.x0;
     app->selr.y0 = fz_mini (app->sely, y) - app->pany + irect.y0;
     app->selr.y1 = fz_maxi (app->sely, y) - app->pany + irect.y0;
-    winrepaint (app);
+    InvalidateRect (hwndview, NULL, 0);
     }
     //}}}
   }
@@ -2455,7 +2375,7 @@ void handleMouse (int x, int y, int btn, int state) {
 
   if (state != 0 && justcopied) {
     justcopied = 0;
-    winrepaint (&gApp);
+    InvalidateRect (hwndview, NULL, 0);
     }
 
   if (state == 1)
@@ -2550,11 +2470,9 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       //puts("WM_PAINT");
       PAINTSTRUCT ps;
       hdc = BeginPaint (hwnd, &ps);
-      winblit();
+      winBlit();
       hdc = NULL;
       EndPaint (hwnd, &ps);
-
-      apppostblit (&gApp);
       return 0;
       }
     //}}}
