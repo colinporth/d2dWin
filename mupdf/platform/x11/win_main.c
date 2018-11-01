@@ -30,13 +30,13 @@
 
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 
-#define ID_ABOUT  0x1000
+#define ID_ABOUT    0x1000
 #define ID_DOCINFO  0x1001
 
 // Create registry keys to associate MuPDF with PDF and XPS files.
-#define OPEN_KEY(parent, name, ptr) RegCreateKeyExA(parent, name, 0, 0, 0, KEY_WRITE, 0, &ptr, 0)
+#define OPEN_KEY(parent, name, ptr) RegCreateKeyExA (parent, name, 0, 0, 0, KEY_WRITE, 0, &ptr, 0)
 
-#define SET_KEY(parent, name, value) RegSetValueExA(parent, name, 0, REG_SZ, (const BYTE *)(value), (DWORD)strlen(value) + 1)
+#define SET_KEY(parent, name, value) RegSetValueExA (parent, name, 0, REG_SZ, (const BYTE*)(value), (DWORD)strlen(value) + 1)
 //}}}
 //{{{  static vars
 static HWND hwndframe = NULL;
@@ -51,7 +51,6 @@ static LRESULT CALLBACK frameproc(HWND, UINT, WPARAM, LPARAM);
 static LRESULT CALLBACK viewproc(HWND, UINT, WPARAM, LPARAM);
 
 static int timer_pending = 0;
-static char *password = NULL;
 
 static int justcopied = 0;
 
@@ -59,10 +58,6 @@ static pdfapp_t gapp;
 
 static wchar_t wbuf[PATH_MAX];
 static char filename[PATH_MAX];
-
-static char pd_filename[256] = "The file is encrypted.";
-static char pd_password[256] = "";
-static wchar_t pd_passwordw[256] = {0};
 
 static char td_textinput[1024] = "";
 static int td_retry = 0;
@@ -85,34 +80,6 @@ INT_PTR CALLBACK dlogaboutproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM l
     case WM_COMMAND:
       EndDialog(hwnd, 1);
       return TRUE;
-    }
-
-  return FALSE;
-  }
-//}}}
-//{{{
-INT_PTR CALLBACK dlogpassproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-
-  switch(message) {
-    case WM_INITDIALOG:
-      SetDlgItemTextA(hwnd, 4, pd_filename);
-      return TRUE;
-
-    case WM_COMMAND:
-      switch(wParam)
-      {
-      case 1:
-        pd_okay = 1;
-        GetDlgItemTextW(hwnd, 3, pd_passwordw, nelem(pd_passwordw));
-        EndDialog(hwnd, 1);
-        WideCharToMultiByte(CP_UTF8, 0, pd_passwordw, -1, pd_password, sizeof pd_password, NULL, NULL);
-        return TRUE;
-      case 2:
-        pd_okay = 0;
-        EndDialog(hwnd, 1);
-        return TRUE;
-      }
-      break;
     }
 
   return FALSE;
@@ -277,7 +244,7 @@ INT_PTR CALLBACK dloginfoproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
 //}}}
 
 //{{{
-void install_app (char* argv0) {
+void installApp (char* argv0) {
 
   char buf[512];
   HKEY software, classes, mupdf, dotpdf, dotxps, dotepub, dotfb2;
@@ -322,13 +289,123 @@ void install_app (char* argv0) {
   }
 //}}}
 //{{{
-static void do_close (pdfapp_t *app) {
+static void doClose (pdfapp_t *app) {
 
   fz_context* ctx = app->ctx;
   pdfapp_close (app);
   free (dibinf);
   fz_drop_context (ctx);
 }
+//}}}
+//{{{
+void winopen() {
+
+  RECT r;
+
+  /* Create and register window frame class */
+  WNDCLASS wc;
+  memset(&wc, 0, sizeof(wc));
+  wc.style = 0;
+  wc.lpfnWndProc = frameproc;
+  wc.cbClsExtra = 0;
+  wc.cbWndExtra = 0;
+  wc.hInstance = GetModuleHandle(NULL);
+  wc.hIcon = LoadIconA(wc.hInstance, "IDI_ICONAPP");
+  wc.hCursor = NULL; //LoadCursor(NULL, IDC_ARROW);
+  wc.hbrBackground = NULL;
+  wc.lpszMenuName = NULL;
+  wc.lpszClassName = L"FrameWindow";
+  ATOM a = RegisterClassW (&wc);
+  if (!a)
+    winerror(&gapp, "cannot register frame window class");
+
+  /* Create and register window view class */
+  memset(&wc, 0, sizeof(wc));
+  wc.style = CS_HREDRAW | CS_VREDRAW;
+  wc.lpfnWndProc = viewproc;
+  wc.cbClsExtra = 0;
+  wc.cbWndExtra = 0;
+  wc.hInstance = GetModuleHandle (NULL);
+  wc.hIcon = NULL;
+  wc.hCursor = NULL;
+  wc.hbrBackground = NULL;
+  wc.lpszMenuName = NULL;
+  wc.lpszClassName = L"ViewWindow";
+  a = RegisterClassW (&wc);
+  if (!a)
+    winerror (&gapp, "cannot register view window class");
+
+  /* Get screen size */
+  SystemParametersInfo (SPI_GETWORKAREA, 0, &r, 0);
+  gapp.scrw = r.right - r.left;
+  gapp.scrh = r.bottom - r.top;
+
+  /* Create cursors */
+  arrowcurs = LoadCursor (NULL, IDC_ARROW);
+  handcurs = LoadCursor (NULL, IDC_HAND);
+  waitcurs = LoadCursor (NULL, IDC_WAIT);
+  caretcurs = LoadCursor (NULL, IDC_IBEAM);
+
+  /* And a background color */
+  bgbrush = CreateSolidBrush (RGB (0x70,0x70,0x70));
+  shbrush = CreateSolidBrush (RGB (0x40,0x40,0x40));
+
+  /* Init DIB info for buffer */
+  dibinf = malloc (sizeof(BITMAPINFO) + 12);
+  assert(dibinf);
+  dibinf->bmiHeader.biSize = sizeof(dibinf->bmiHeader);
+  dibinf->bmiHeader.biPlanes = 1;
+  dibinf->bmiHeader.biBitCount = 32;
+  dibinf->bmiHeader.biCompression = BI_RGB;
+  dibinf->bmiHeader.biXPelsPerMeter = 2834;
+  dibinf->bmiHeader.biYPelsPerMeter = 2834;
+  dibinf->bmiHeader.biClrUsed = 0;
+  dibinf->bmiHeader.biClrImportant = 0;
+  dibinf->bmiHeader.biClrUsed = 0;
+
+  /* Create window */
+  hwndframe = CreateWindowW (L"FrameWindow", // window class name
+                             NULL, // window caption
+                             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
+                             CW_USEDEFAULT, CW_USEDEFAULT, // initial position
+                             300, // initial x size
+                             300, // initial y size
+                             0, // parent window handle
+                             0, // window menu handle
+                             0, // program instance handle
+                             0); // creation parameters
+  if (!hwndframe)
+    winerror(&gapp, "cannot create frame");
+
+  hwndview = CreateWindowW (L"ViewWindow", // window class name
+                            NULL,
+                            WS_VISIBLE | WS_CHILD,
+                            CW_USEDEFAULT, CW_USEDEFAULT,
+                            CW_USEDEFAULT, CW_USEDEFAULT,
+                            hwndframe, 0, 0, 0);
+  if (!hwndview)
+    winerror (&gapp, "cannot create view");
+
+  hdc = NULL;
+
+  SetWindowTextW (hwndframe, L"MuPDF");
+
+  HMENU menu = GetSystemMenu (hwndframe, 0);
+  AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
+  AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF...");
+  AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties...");
+
+  SetCursor (arrowcurs);
+  }
+//}}}
+//{{{
+void winclose (pdfapp_t* app) {
+
+  if (pdfapp_preclose (app)) {
+    doClose (app);
+    exit (0);
+    }
+  }
 //}}}
 
 //{{{
@@ -547,118 +624,7 @@ void wincopyfile (char* source, char* target) {
   CopyFile (wsource, wtarget, FALSE);
   }
 //}}}
-//{{{
-void winopen() {
 
-  WNDCLASS wc;
-  HMENU menu;
-  RECT r;
-  ATOM a;
-
-  /* Create and register window frame class */
-  memset(&wc, 0, sizeof(wc));
-  wc.style = 0;
-  wc.lpfnWndProc = frameproc;
-  wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
-  wc.hInstance = GetModuleHandle(NULL);
-  wc.hIcon = LoadIconA(wc.hInstance, "IDI_ICONAPP");
-  wc.hCursor = NULL; //LoadCursor(NULL, IDC_ARROW);
-  wc.hbrBackground = NULL;
-  wc.lpszMenuName = NULL;
-  wc.lpszClassName = L"FrameWindow";
-  a = RegisterClassW(&wc);
-  if (!a)
-    winerror(&gapp, "cannot register frame window class");
-
-  /* Create and register window view class */
-  memset(&wc, 0, sizeof(wc));
-  wc.style = CS_HREDRAW | CS_VREDRAW;
-  wc.lpfnWndProc = viewproc;
-  wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
-  wc.hInstance = GetModuleHandle(NULL);
-  wc.hIcon = NULL;
-  wc.hCursor = NULL;
-  wc.hbrBackground = NULL;
-  wc.lpszMenuName = NULL;
-  wc.lpszClassName = L"ViewWindow";
-  a = RegisterClassW(&wc);
-  if (!a)
-    winerror(&gapp, "cannot register view window class");
-
-  /* Get screen size */
-  SystemParametersInfo(SPI_GETWORKAREA, 0, &r, 0);
-  gapp.scrw = r.right - r.left;
-  gapp.scrh = r.bottom - r.top;
-
-  /* Create cursors */
-  arrowcurs = LoadCursor(NULL, IDC_ARROW);
-  handcurs = LoadCursor(NULL, IDC_HAND);
-  waitcurs = LoadCursor(NULL, IDC_WAIT);
-  caretcurs = LoadCursor(NULL, IDC_IBEAM);
-
-  /* And a background color */
-  bgbrush = CreateSolidBrush(RGB(0x70,0x70,0x70));
-  shbrush = CreateSolidBrush(RGB(0x40,0x40,0x40));
-
-  /* Init DIB info for buffer */
-  dibinf = malloc(sizeof(BITMAPINFO) + 12);
-  assert(dibinf);
-  dibinf->bmiHeader.biSize = sizeof(dibinf->bmiHeader);
-  dibinf->bmiHeader.biPlanes = 1;
-  dibinf->bmiHeader.biBitCount = 32;
-  dibinf->bmiHeader.biCompression = BI_RGB;
-  dibinf->bmiHeader.biXPelsPerMeter = 2834;
-  dibinf->bmiHeader.biYPelsPerMeter = 2834;
-  dibinf->bmiHeader.biClrUsed = 0;
-  dibinf->bmiHeader.biClrImportant = 0;
-  dibinf->bmiHeader.biClrUsed = 0;
-
-  /* Create window */
-  hwndframe = CreateWindowW(L"FrameWindow", // window class name
-  NULL, // window caption
-  WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
-  CW_USEDEFAULT, CW_USEDEFAULT, // initial position
-  300, // initial x size
-  300, // initial y size
-  0, // parent window handle
-  0, // window menu handle
-  0, // program instance handle
-  0); // creation parameters
-  if (!hwndframe)
-    winerror(&gapp, "cannot create frame");
-
-  hwndview = CreateWindowW(L"ViewWindow", // window class name
-  NULL,
-  WS_VISIBLE | WS_CHILD,
-  CW_USEDEFAULT, CW_USEDEFAULT,
-  CW_USEDEFAULT, CW_USEDEFAULT,
-  hwndframe, 0, 0, 0);
-  if (!hwndview)
-    winerror(&gapp, "cannot create view");
-
-  hdc = NULL;
-
-  SetWindowTextW(hwndframe, L"MuPDF");
-
-  menu = GetSystemMenu(hwndframe, 0);
-  AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
-  AppendMenuW(menu, MF_STRING, ID_ABOUT, L"About MuPDF...");
-  AppendMenuW(menu, MF_STRING, ID_DOCINFO, L"Document Properties...");
-
-  SetCursor(arrowcurs);
-}
-//}}}
-//{{{
-void winclose (pdfapp_t* app) {
-
-  if (pdfapp_preclose(app)) {
-    do_close(app);
-    exit(0);
-    }
-  }
-//}}}
 //{{{
 void wincursor (pdfapp_t* app, int curs) {
 
@@ -724,9 +690,9 @@ void winblitsearch() {
 void winblit() {
 
   int image_w = fz_pixmap_width (gapp.ctx, gapp.image);
-  int image_h = fz_pixmap_height( gapp.ctx, gapp.image);
+  int image_h = fz_pixmap_height (gapp.ctx, gapp.image);
   int image_n = fz_pixmap_components (gapp.ctx, gapp.image);
-  unsigned char *samples = fz_pixmap_samples (gapp.ctx, gapp.image);
+  unsigned char* samples = fz_pixmap_samples (gapp.ctx, gapp.image);
   int x0 = gapp.panx;
   int y0 = gapp.pany;
   int x1 = gapp.panx + image_w;
@@ -747,7 +713,7 @@ void winblit() {
 
     if (image_n == 2) {
       int i = image_w * image_h;
-      unsigned char* color = malloc(i*4);
+      unsigned char* color = malloc (i*4);
       unsigned char* s = samples;
       unsigned char* d = color;
       for (; i > 0 ; i--) {
@@ -759,8 +725,7 @@ void winblit() {
                          0, 0, 0, image_h, color, dibinf, DIB_RGB_COLORS);
       free (color);
       }
-
-    if (image_n == 4) 
+    else if (image_n == 4)
       SetDIBitsToDevice (hdc, gapp.panx, gapp.pany, image_w, image_h,
                          0, 0, 0, image_h, samples, dibinf, DIB_RGB_COLORS);
 
@@ -817,16 +782,13 @@ void winresize (pdfapp_t* app, int w, int h) {
 //}}}
 //{{{
 void winrepaint (pdfapp_t* app) {
-
   InvalidateRect(hwndview, NULL, 0);
   }
 //}}}
 //{{{
 void winrepaintsearch (pdfapp_t* app) {
-
-  // TODO: invalidate only search area and
-  // call only search redraw routine.
-  InvalidateRect(hwndview, NULL, 0);
+  // TODO: invalidate only search area and call only search redraw routine.
+  InvalidateRect (hwndview, NULL, 0);
   }
 //}}}
 //{{{
@@ -856,6 +818,7 @@ void windocopy (pdfapp_t* app) {
 
   if (!OpenClipboard (hwndframe))
     return;
+
   EmptyClipboard();
 
   HGLOBAL handle = GlobalAlloc (GMEM_MOVEABLE, 4096 * sizeof(unsigned short));
@@ -863,6 +826,7 @@ void windocopy (pdfapp_t* app) {
     CloseClipboard();
     return;
     }
+
   unsigned short* ucsbuf = GlobalLock (handle);
   pdfapp_oncopy (&gapp, ucsbuf, 4096);
   GlobalUnlock (handle);
@@ -886,36 +850,9 @@ void winopenuri (pdfapp_t* app, char* buf) {
 //{{{
 void winhelp (pdfapp_t* app) {
 
-  int code = DialogBoxW(NULL, L"IDD_DLOGABOUT", hwndframe, dlogaboutproc);
+  int code = DialogBoxW (NULL, L"IDD_DLOGABOUT", hwndframe, dlogaboutproc);
   if (code <= 0)
     winerror(&gapp, "cannot create help dialog");
-  }
-//}}}
-//{{{
-char* winpassword (pdfapp_t* app, char* filename) {
-
-  char buf[1024], *s;
-
-  if (password) {
-    char *p = password;
-    password = NULL;
-    return p;
-    }
-
-  strcpy(buf, filename);
-  s = buf;
-  if (strrchr(s, '\\')) s = strrchr(s, '\\') + 1;
-  if (strrchr(s, '/')) s = strrchr(s, '/') + 1;
-  if (strlen(s) > 32)
-    strcpy(s + 30, "...");
-  sprintf(pd_filename, "The file \"%s\" is encrypted.", s);
-
-  int code = DialogBoxW(NULL, L"IDD_DLOGPASS", hwndframe, dlogpassproc);
-  if (code <= 0)
-    winerror(app, "cannot create password dialog");
-  if (pd_okay)
-    return pd_password;
-  return NULL;
   }
 //}}}
 //{{{
@@ -960,24 +897,23 @@ void info() {
 
 #define OUR_TIMER_ID 1
 //{{{
-void winadvancetimer (pdfapp_t* app, float delay)
-{
+void winadvancetimer (pdfapp_t* app, float delay) {
+
   timer_pending = 1;
-  SetTimer(hwndview, OUR_TIMER_ID, (unsigned int)(1000*delay), NULL);
-}
+  SetTimer (hwndview, OUR_TIMER_ID, (unsigned int)(1000*delay), NULL);
+  }
 //}}}
 //{{{
-static void killtimer (pdfapp_t* app)
-{
+static void killtimer (pdfapp_t* app) {
   timer_pending = 0;
-}
+  }
 //}}}
 
 //{{{
-void handlekey (int c)
-{
+void handlekey (int c) {
+
   int modifier = (GetAsyncKeyState(VK_SHIFT) < 0);
-  modifier |= ((GetAsyncKeyState(VK_CONTROL) < 0)<<2);
+  modifier |= ((GetAsyncKeyState(VK_CONTROL) < 0) << 2);
 
   if (timer_pending)
     killtimer(&gapp);
@@ -985,54 +921,50 @@ void handlekey (int c)
   if (GetCapture() == hwndview)
     return;
 
-  if (justcopied)
-  {
+  if (justcopied) {
     justcopied = 0;
-    winrepaint(&gapp);
-  }
+    winrepaint (&gapp);
+    }
 
   /* translate VK into ASCII equivalents */
-  if (c > 256)
-  {
-    switch (c - 256)
-    {
-    case VK_F1: c = '?'; break;
-    case VK_ESCAPE: c = '\033'; break;
-    case VK_DOWN: c = 'j'; break;
-    case VK_UP: c = 'k'; break;
-    case VK_LEFT: c = 'b'; break;
-    case VK_RIGHT: c = ' '; break;
-    case VK_PRIOR: c = ','; break;
-    case VK_NEXT: c = '.'; break;
+  if (c > 256) {
+    switch (c - 256) {
+      case VK_F1: c = '?'; break;
+      case VK_ESCAPE: c = '\033'; break;
+      case VK_DOWN: c = 'j'; break;
+      case VK_UP: c = 'k'; break;
+      case VK_LEFT: c = 'b'; break;
+      case VK_RIGHT: c = ' '; break;
+      case VK_PRIOR: c = ','; break;
+      case VK_NEXT: c = '.'; break;
+      }
     }
-  }
 
-  pdfapp_onkey(&gapp, c, modifier);
-  winrepaint(&gapp);
-}
+  pdfapp_onkey (&gapp, c, modifier);
+  winrepaint (&gapp);
+  }
 //}}}
 //{{{
-void handlemouse (int x, int y, int btn, int state)
-{
+void handlemouse (int x, int y, int btn, int state) {
+
   int modifier = (GetAsyncKeyState(VK_SHIFT) < 0);
-  modifier |= ((GetAsyncKeyState(VK_CONTROL) < 0)<<2);
+  modifier |= ((GetAsyncKeyState (VK_CONTROL) < 0) << 2);
 
   if (state != 0 && timer_pending)
-    killtimer(&gapp);
+    killtimer (&gapp);
 
-  if (state != 0 && justcopied)
-  {
+  if (state != 0 && justcopied) {
     justcopied = 0;
-    winrepaint(&gapp);
-  }
+    winrepaint (&gapp);
+    }
 
   if (state == 1)
-    SetCapture(hwndview);
+    SetCapture (hwndview);
   if (state == -1)
     ReleaseCapture();
 
-  pdfapp_onmouse(&gapp, x, y, btn, modifier, state);
-}
+  pdfapp_onmouse (&gapp, x, y, btn, modifier, state);
+  }
 //}}}
 
 //{{{
@@ -1062,8 +994,7 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         }
       break;
 
-    case WM_SIZE:
-    {
+    case WM_SIZE: {
       // More generally, you should use GetEffectiveClientRect
       // if you have a toolbar etc.
       RECT rect;
@@ -1073,7 +1004,7 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
       if (wParam == SIZE_MAXIMIZED)
         gapp.shrinkwrap = 0;
       return 0;
-    }
+      }
 
     case WM_SIZING:
       gapp.shrinkwrap = 0;
@@ -1136,7 +1067,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     case WM_LBUTTONDOWN:
       SetFocus (hwndview);
-      oldx = x; 
+      oldx = x;
       oldy = y;
       handlemouse (x, y, 1, 1);
       return 0;
@@ -1260,18 +1191,14 @@ typedef BOOL (SetProcessDPIAwareFn)(void);
 static int get_system_dpi() {
 
   HMODULE hUser32 = LoadLibrary (TEXT("user32.dll"));
-  SetProcessDPIAwareFn *ptr;
-  int hdpi, vdpi;
-  HDC desktopDC;
-
-  ptr = (SetProcessDPIAwareFn*)GetProcAddress (hUser32, "SetProcessDPIAware");
+  SetProcessDPIAwareFn* ptr = (SetProcessDPIAwareFn*)GetProcAddress (hUser32, "SetProcessDPIAware");
   if (ptr != NULL)
     ptr();
   FreeLibrary (hUser32);
 
-  desktopDC = GetDC(NULL);
-  hdpi = GetDeviceCaps (desktopDC, LOGPIXELSX);
-  vdpi = GetDeviceCaps (desktopDC, LOGPIXELSY);
+  HDC desktopDC = GetDC (NULL);
+  int hdpi = GetDeviceCaps (desktopDC, LOGPIXELSX);
+  int vdpi = GetDeviceCaps (desktopDC, LOGPIXELSY);
 
   /* hdpi,vdpi = 100 means 96dpi. */
   return ((hdpi + vdpi) * 96 + 0.5f) / 200;
@@ -1280,18 +1207,17 @@ static int get_system_dpi() {
 //{{{
 static void usage() {
 
-  fprintf(stderr, "usage: mupdf [options] file.pdf [page]\n");
-  fprintf(stderr, "\t-p -\tpassword\n");
-  fprintf(stderr, "\t-r -\tresolution\n");
-  fprintf(stderr, "\t-A -\tset anti-aliasing quality in bits (0=off, 8=best)\n");
-  fprintf(stderr, "\t-C -\tRRGGBB (tint color in hexadecimal syntax)\n");
-  fprintf(stderr, "\t-W -\tpage width for EPUB layout\n");
-  fprintf(stderr, "\t-H -\tpage height for EPUB layout\n");
-  fprintf(stderr, "\t-I -\tinvert colors\n");
-  fprintf(stderr, "\t-S -\tfont size for EPUB layout\n");
-  fprintf(stderr, "\t-U -\tuser style sheet for EPUB layout\n");
-  fprintf(stderr, "\t-X\tdisable document styles for EPUB layout\n");
-  exit(1);
+  fprintf (stderr, "usage: mupdf [options] file.pdf [page]\n");
+  fprintf (stderr, "\t-r -\tresolution\n");
+  fprintf (stderr, "\t-A -\tset anti-aliasing quality in bits (0=off, 8=best)\n");
+  fprintf (stderr, "\t-C -\tRRGGBB (tint color in hexadecimal syntax)\n");
+  fprintf (stderr, "\t-W -\tpage width for EPUB layout\n");
+  fprintf (stderr, "\t-H -\tpage height for EPUB layout\n");
+  fprintf (stderr, "\t-I -\tinvert colors\n");
+  fprintf (stderr, "\t-S -\tfont size for EPUB layout\n");
+  fprintf (stderr, "\t-U -\tuser style sheet for EPUB layout\n");
+  fprintf (stderr, "\t-X\tdisable document styles for EPUB layout\n");
+  exit (1);
   }
 //}}}
 
@@ -1310,7 +1236,6 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   LPWSTR* wargv = CommandLineToArgvW (GetCommandLineW(), &argc);
   char** argv = fz_argv_from_wargv (argc, wargv);
 
-  int bps = 0;
   int displayRes = get_system_dpi();
 
   int c;
@@ -1323,14 +1248,12 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
         gapp.tint_g = (c >> 8) & 255;
         gapp.tint_b = (c) & 255;
         break;
-      case 'p': password = fz_optarg; break;
       case 'r': displayRes = fz_atoi(fz_optarg); break;
       case 'I': gapp.invert = 1; break;
       case 'A': fz_set_aa_level(ctx, fz_atoi(fz_optarg)); break;
       case 'W': gapp.layout_w = fz_atoi(fz_optarg); break;
       case 'H': gapp.layout_h = fz_atoi(fz_optarg); break;
       case 'S': gapp.layout_em = fz_atoi(fz_optarg); break;
-      case 'b': bps = (fz_optarg && *fz_optarg) ? fz_atoi(fz_optarg) : 4096; break;
       case 'U': gapp.layout_css = fz_optarg; break;
       case 'X': gapp.layout_use_doc_css = 0; break;
       default: usage();
@@ -1341,7 +1264,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
   char argv0[256];
   GetModuleFileNameA (NULL, argv0, sizeof argv0);
-  install_app (argv0);
+  installApp (argv0);
 
   winopen();
 
@@ -1358,10 +1281,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   if (fz_optind < argc)
     gapp.pageno = atoi (argv[fz_optind++]);
 
-  if (bps)
-    pdfapp_open_progressive (&gapp, filename, 0, bps);
-  else
-    pdfapp_open (&gapp, filename, 0);
+  pdfapp_open (&gapp, filename, 0);
 
   MSG msg;
   while (GetMessage (&msg, NULL, 0, 0)) {
@@ -1371,7 +1291,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
   fz_free_argv (argc, argv);
 
-  do_close(&gapp);
+  doClose (&gapp);
 
   return 0;
   }

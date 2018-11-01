@@ -1,16 +1,8 @@
-#ifndef PDFAPP_H
-#define PDFAPP_H
+#pragma once
 
 #include "mupdf/fitz.h"
 #include "mupdf/pdf.h"
-
 #include <time.h>
-
-/*
- * Utility object for handling a pdf application / view
- * Takes care of PDF loading and displaying and navigation,
- * uses a number of callbacks to the GUI app.
- */
 
 /* 25% .. 1600% */
 #define MINRES 18
@@ -19,9 +11,7 @@
 typedef struct pdfapp_s pdfapp_t;
 
 enum { ARROW, HAND, WAIT, CARET };
-
 enum { DISCARD, SAVE, CANCEL };
-
 enum { QUERY_NO, QUERY_YES };
 
 extern void winwarn(pdfapp_t*, char *s);
@@ -52,8 +42,8 @@ extern void winreplacefile(char *source, char *target);
 extern void wincopyfile(char *source, char *target);
 extern void winreloadpage(pdfapp_t *);
 
-struct pdfapp_s
-{
+//{{{
+struct pdfapp_s {
 	/* current document params */
 	fz_document *doc;
 	char *docpath;
@@ -142,10 +132,8 @@ struct pdfapp_s
 	void *userdata;
 
 	fz_context *ctx;
-#ifdef HAVE_CURL
-	fz_stream *stream;
-#endif
-};
+	};
+//}}}
 
 void pdfapp_init(fz_context *ctx, pdfapp_t *app);
 void pdfapp_setresolution(pdfapp_t *app, int res);
@@ -155,8 +143,8 @@ void pdfapp_close(pdfapp_t *app);
 int pdfapp_preclose(pdfapp_t *app);
 void pdfapp_reloadfile(pdfapp_t *app);
 
-char *pdfapp_version(pdfapp_t *app);
-char *pdfapp_usage(pdfapp_t *app);
+char* pdfapp_version(pdfapp_t *app);
+char* pdfapp_usage(pdfapp_t *app);
 
 void pdfapp_onkey(pdfapp_t *app, int c, int modifiers);
 void pdfapp_onmouse(pdfapp_t *app, int x, int y, int btn, int modifiers, int state);
@@ -172,5 +160,3 @@ void pdfapp_invert(pdfapp_t *app, fz_rect rect);
 void pdfapp_inverthit(pdfapp_t *app);
 
 void pdfapp_postblit(pdfapp_t *app);
-
-#endif

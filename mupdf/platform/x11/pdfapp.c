@@ -60,16 +60,16 @@ static int zoom_out (int oldres)
 //}}}
 
 //{{{
-static void pdfapp_warn (pdfapp_t *app, const char *fmt, ...)
-{
+static void pdfapp_warn (pdfapp_t *app, const char *fmt, ...) {
+
   char buf[1024];
   va_list ap;
-  va_start(ap, fmt);
-  fz_vsnprintf(buf, sizeof(buf), fmt, ap);
-  va_end(ap);
+  va_start (ap, fmt);
+  fz_vsnprintf (buf, sizeof(buf), fmt, ap);
+  va_end (ap);
   buf[sizeof(buf)-1] = 0;
-  winwarn(app, buf);
-}
+  winwarn (app, buf);
+  }
 //}}}
 //{{{
 static void pdfapp_error (pdfapp_t *app, char *msg)
@@ -78,16 +78,13 @@ static void pdfapp_error (pdfapp_t *app, char *msg)
 }
 //}}}
 //{{{
-char* pdfapp_version (pdfapp_t *app)
-{
-  return
-    "MuPDF " FZ_VERSION "\n"
-    "Copyright 2006-2017 Artifex Software, Inc.\n";
-}
+char* pdfapp_version (pdfapp_t *app) {
+  return "MuPDF " FZ_VERSION "\n"
+         "Copyright 2006-2017 Artifex Software, Inc.\n";
+  }
 //}}}
 //{{{
-char* pdfapp_usage (pdfapp_t *app)
-{
+char* pdfapp_usage (pdfapp_t *app) {
   return
     "L\t\t-- rotate left\n"
     "R\t\t-- rotate right\n"
@@ -122,12 +119,12 @@ char* pdfapp_usage (pdfapp_t *app)
     "c\t\t-- toggle between color and grayscale\n"
     "i\t\t-- toggle inverted color mode\n"
     "q\t\t-- quit\n"
-  ;
-}
+    ;
+  }
 //}}}
 //{{{
-void pdfapp_init (fz_context *ctx, pdfapp_t *app)
-{
+void pdfapp_init (fz_context *ctx, pdfapp_t *app) {
+
   memset(app, 0, sizeof(pdfapp_t));
   app->scrw = 640;
   app->scrh = 480;
@@ -143,80 +140,74 @@ void pdfapp_init (fz_context *ctx, pdfapp_t *app)
   app->transition.duration = 0.25f;
   app->transition.type = FZ_TRANSITION_FADE;
 #ifdef _WIN32
-  app->colorspace = fz_device_bgr(ctx);
+  app->colorspace = fz_device_bgr (ctx);
 #else
-  app->colorspace = fz_device_rgb(ctx);
+  app->colorspace = fz_device_rgb (ctx);
 #endif
   app->tint_r = 255;
   app->tint_g = 250;
   app->tint_b = 240;
-}
+  }
 //}}}
 //{{{
-void pdfapp_setresolution (pdfapp_t *app, int res)
-{
+void pdfapp_setresolution (pdfapp_t *app, int res) {
   app->resolution = res;
-}
+  }
 //}}}
 //{{{
-void pdfapp_invert (pdfapp_t *app, fz_rect rect)
-{
-  fz_invert_pixmap_rect(app->ctx, app->image, fz_round_rect(rect));
-}
+void pdfapp_invert (pdfapp_t *app, fz_rect rect) {
+  fz_invert_pixmap_rect (app->ctx, app->image, fz_round_rect(rect));
+  }
 //}}}
 //{{{
-void pdfapp_reloadfile (pdfapp_t *app)
-{
+void pdfapp_reloadfile (pdfapp_t *app) {
   char filename[PATH_MAX];
-  fz_strlcpy(filename, app->docpath, PATH_MAX);
-  pdfapp_close(app);
-  pdfapp_open(app, filename, 1);
-}
+  fz_strlcpy (filename, app->docpath, PATH_MAX);
+  pdfapp_close (app);
+  pdfapp_open (app, filename, 1);
+  }
 //}}}
 
 //{{{
-static void event_cb (fz_context *ctx, pdf_document *doc, pdf_doc_event *event, void *data)
-{
-  pdfapp_t *app = (pdfapp_t *)data;
+static void event_cb (fz_context *ctx, pdf_document *doc, pdf_doc_event *event, void *data) {
 
-  switch (event->type)
-  {
-  case PDF_DOCUMENT_EVENT_ALERT:
-    {
+  pdfapp_t* app = (pdfapp_t*)data;
+
+  switch (event->type) {
+    case PDF_DOCUMENT_EVENT_ALERT:
+      {
       pdf_alert_event *alert = pdf_access_alert_event(ctx, event);
       winalert(app, alert);
-    }
-    break;
+      }
+      break;
 
-  case PDF_DOCUMENT_EVENT_PRINT:
-    winprint(app);
-    break;
+    case PDF_DOCUMENT_EVENT_PRINT:
+      winprint(app);
+      break;
 
-  case PDF_DOCUMENT_EVENT_EXEC_MENU_ITEM:
-    {
+    case PDF_DOCUMENT_EVENT_EXEC_MENU_ITEM:
+      {
       const char *item = pdf_access_exec_menu_item_event(ctx, event);
-
-      if (!strcmp(item, "Print"))
+      if (strcmp(item, "Print"))
         winprint(app);
       else
         pdfapp_warn(app, "The document attempted to execute menu item: %s. (Not supported)", item);
-    }
-    break;
+      }
+      break;
 
-  case PDF_DOCUMENT_EVENT_EXEC_DIALOG:
-    pdfapp_warn(app, "The document attempted to open a dialog box. (Not supported)");
-    break;
+    case PDF_DOCUMENT_EVENT_EXEC_DIALOG:
+      pdfapp_warn(app, "The document attempted to open a dialog box. (Not supported)");
+      break;
 
-  case PDF_DOCUMENT_EVENT_LAUNCH_URL:
-    {
+    case PDF_DOCUMENT_EVENT_LAUNCH_URL:
+      {
       pdf_launch_url_event *launch_url = pdf_access_launch_url_event(ctx, event);
-
       pdfapp_warn(app, "The document attempted to open url: %s. (Not supported by app)", launch_url->url);
-    }
-    break;
+      }
+      break;
 
-  case PDF_DOCUMENT_EVENT_MAIL_DOC:
-    {
+    case PDF_DOCUMENT_EVENT_MAIL_DOC:
+      {
       pdf_mail_doc_event *mail_doc = pdf_access_mail_doc_event(ctx, event);
 
       pdfapp_warn(app, "The document attempted to mail the document%s%s%s%s%s%s%s%s (Not supported)",
@@ -224,53 +215,28 @@ static void event_cb (fz_context *ctx, pdf_document *doc, pdf_doc_event *event, 
         mail_doc->cc[0]?", Cc: ":"", mail_doc->cc,
         mail_doc->bcc[0]?", Bcc: ":"", mail_doc->bcc,
         mail_doc->subject[0]?", Subject: ":"", mail_doc->subject);
+      }
+      break;
     }
-    break;
   }
-}
 //}}}
 //{{{
-void pdfapp_open (pdfapp_t *app, char *filename, int reload)
-{
-  pdfapp_open_progressive(app, filename, reload, 0);
-}
-//}}}
+static int make_fake_doc (pdfapp_t *app) {
 
-#ifdef HAVE_CURL
-//{{{
-static void pdfapp_more_data (void *app_, int complete)
-{
-  pdfapp_t *app = (pdfapp_t *)app_;
+  fz_context* ctx = app->ctx;
+  pdf_document* pdf = NULL;
 
-  if (complete && app->outline_deferred == PDFAPP_OUTLINE_DEFERRED)
-  {
-    app->outline_deferred = PDFAPP_OUTLINE_LOAD_NOW;
-    winreloadpage(app);
-  }
-  else if (app->incomplete)
-    winreloadpage(app);
-}
-//}}}
-#endif
+  fz_buffer* contents = NULL;
+  fz_var (contents);
 
-//{{{
-static int make_fake_doc (pdfapp_t *app)
-{
-  fz_context *ctx = app->ctx;
-  pdf_document *pdf = NULL;
-  fz_buffer *contents = NULL;
-  pdf_obj *page_obj = NULL;
+  pdf_obj* page_obj = NULL;
+  fz_var (page_obj);
 
-  fz_var(contents);
-  fz_var(page_obj);
-
-  fz_try(ctx)
-  {
+  fz_try(ctx) {
     fz_rect mediabox = { 0, 0, app->winw, app->winh };
     int i;
 
     pdf = pdf_create_document(ctx);
-
 
     contents = fz_new_buffer(ctx, 100);
     fz_append_printf(ctx, contents, "1 0 0 RG %g w 0 0 m %g %g l 0 %g m %g 0 l s\n",
@@ -279,135 +245,84 @@ static int make_fake_doc (pdfapp_t *app)
       mediabox.y1, mediabox.x1);
 
     /* Create enough copies of our blank(ish) page so that the
-     * page number is preserved if and when a subsequent load
-     * works. */
+     * page number is preserved if and when a subsequent load works. */
     page_obj = pdf_add_page(ctx, pdf, mediabox, 0, NULL, contents);
     for (i = 0; i < app->pagecount; i++)
       pdf_insert_page(ctx, pdf, -1, page_obj);
-  }
-  fz_always(ctx)
-  {
+    }
+
+  fz_always(ctx) {
     pdf_drop_obj(ctx, page_obj);
     fz_drop_buffer(ctx, contents);
-  }
-  fz_catch(ctx)
-  {
+    }
+
+  fz_catch(ctx) {
     fz_drop_document(ctx, (fz_document *) pdf);
     return 1;
-  }
+    }
 
   app->doc = (fz_document*)pdf;
   return 0;
-}
+  }
 //}}}
+
 //{{{
-void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps)
-{
+void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps) {
+
   fz_context *ctx = app->ctx;
   char *password = "";
   pdf_document *idoc;
 
-  fz_try(ctx)
-  {
+  fz_try(ctx) {
     fz_register_document_handlers(ctx);
 
-    if (app->layout_css)
-    {
+    if (app->layout_css) {
       fz_buffer *buf = fz_read_file(ctx, app->layout_css);
       fz_set_user_css(ctx, fz_string_from_buffer(ctx, buf));
       fz_drop_buffer(ctx, buf);
-    }
+      }
 
     fz_set_use_document_css(ctx, app->layout_use_doc_css);
 
-#ifdef HAVE_CURL
-    if (!strncmp(filename, "http://", 7) || !strncmp(filename, "https://", 8))
-    {
-      app->stream = fz_stream_from_curl(ctx, filename, pdfapp_more_data, app);
-      while (1)
-      {
-        fz_try(ctx)
-        {
-          fz_seek(ctx, app->stream, 0, SEEK_SET);
-          app->doc = fz_open_document_with_stream(ctx, filename, app->stream);
-        }
-        fz_catch(ctx)
-        {
-          if (fz_caught(ctx) == FZ_ERROR_TRYLATER)
-          {
-            pdfapp_warn(app, "not enough data to open yet");
-            continue;
-          }
-          fz_rethrow(ctx);
-        }
-        break;
-      }
-    }
-    else
-#endif
     if (bps == 0)
-    {
       app->doc = fz_open_document(ctx, filename);
-    }
-    else
-    {
+    else {
       fz_stream *stream = fz_open_file_progressive(ctx, filename, bps);
-      while (1)
-      {
-        fz_try(ctx)
-        {
+      while (1) {
+        fz_try(ctx) {
           fz_seek(ctx, stream, 0, SEEK_SET);
           app->doc = fz_open_document_with_stream(ctx, filename, stream);
-        }
-        fz_catch(ctx)
-        {
-          if (fz_caught(ctx) == FZ_ERROR_TRYLATER)
-          {
+          }
+        fz_catch(ctx) {
+          if (fz_caught(ctx) == FZ_ERROR_TRYLATER) {
             pdfapp_warn(app, "not enough data to open yet");
             continue;
-          }
+            }
           fz_rethrow(ctx);
-        }
+          }
         break;
+        }
       }
     }
-  }
-  fz_catch(ctx)
-  {
+  fz_catch(ctx) {
     if (!reload || make_fake_doc(app))
       pdfapp_error(app, "cannot open document");
-  }
+    }
 
   idoc = pdf_specifics(app->ctx, app->doc);
-  if (idoc)
-  {
-    fz_try(ctx)
-    {
+  if (idoc) {
+    fz_try(ctx) {
       pdf_enable_js(ctx, idoc);
       pdf_set_doc_event_callback(ctx, idoc, event_cb, app);
-    }
-    fz_catch(ctx)
-    {
+      }
+    fz_catch(ctx) {
       pdfapp_error(app, "cannot load javascript embedded in document");
-    }
-  }
-
-  fz_try(ctx)
-  {
-
-    if (fz_needs_password(app->ctx, app->doc))
-    {
-      int okay = fz_authenticate_password(app->ctx, app->doc, password);
-      while (!okay)
-      {
-        password = winpassword(app, filename);
-        if (!password)
-          fz_throw(ctx, FZ_ERROR_GENERIC, "Needs a password");
-        okay = fz_authenticate_password(app->ctx, app->doc, password);
-        if (!okay)
-          pdfapp_warn(app, "Invalid password.");
       }
     }
+
+  fz_try(ctx) {
+    if (fz_needs_password(app->ctx, app->doc))
+      pdfapp_warn(app, "needs password.");
 
     app->docpath = fz_strdup(ctx, filename);
     app->doctitle = filename;
@@ -419,46 +334,40 @@ void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps
 
     fz_layout_document(app->ctx, app->doc, app->layout_w, app->layout_h, app->layout_em);
 
-    while (1)
-    {
-      fz_try(ctx)
-      {
+    while (1) {
+      fz_try(ctx) {
         app->pagecount = fz_count_pages(app->ctx, app->doc);
         if (app->pagecount <= 0)
           fz_throw(ctx, FZ_ERROR_GENERIC, "No pages in document");
-      }
-      fz_catch(ctx)
-      {
-        if (fz_caught(ctx) == FZ_ERROR_TRYLATER)
-        {
+        }
+      fz_catch(ctx) {
+        if (fz_caught(ctx) == FZ_ERROR_TRYLATER) {
           pdfapp_warn(app, "not enough data to count pages yet");
           continue;
-        }
+          }
         fz_rethrow(ctx);
-      }
+        }
       break;
-    }
-    while (1)
-    {
-      fz_try(ctx)
-      {
-        app->outline = fz_load_outline(app->ctx, app->doc);
       }
-      fz_catch(ctx)
-      {
+
+    while (1) {
+      fz_try(ctx) {
+        app->outline = fz_load_outline(app->ctx, app->doc);
+        }
+
+      fz_catch(ctx) {
         app->outline = NULL;
         if (fz_caught(ctx) == FZ_ERROR_TRYLATER)
           app->outline_deferred = PDFAPP_OUTLINE_DEFERRED;
         else
           pdfapp_warn(app, "failed to load outline");
-      }
+        }
       break;
+      }
     }
-  }
-  fz_catch(ctx)
-  {
+  fz_catch(ctx) {
     pdfapp_error(app, "cannot open document");
-  }
+    }
 
   if (app->pageno < 1)
     app->pageno = 1;
@@ -469,64 +378,64 @@ void pdfapp_open_progressive (pdfapp_t *app, char *filename, int reload, int bps
   if (app->resolution > MAXRES)
     app->resolution = MAXRES;
 
-  if (!reload)
-  {
+  if (!reload) {
     app->shrinkwrap = 1;
     app->rotate = 0;
     app->panx = 0;
     app->pany = 0;
-  }
+    }
 
-  pdfapp_showpage(app, 1, 1, 1, 0, 0);
-}
+  pdfapp_showpage (app, 1, 1, 1, 0, 0);
+  }
 //}}}
 //{{{
-void pdfapp_close (pdfapp_t *app)
-{
-  fz_drop_display_list(app->ctx, app->page_list);
+void pdfapp_open (pdfapp_t *app, char *filename, int reload) {
+  pdfapp_open_progressive (app, filename, reload, 0);
+  }
+//}}}
+//{{{
+void pdfapp_close (pdfapp_t *app) {
+
+  fz_drop_display_list (app->ctx, app->page_list);
   app->page_list = NULL;
 
-  fz_drop_display_list(app->ctx, app->annotations_list);
+  fz_drop_display_list (app->ctx, app->annotations_list);
   app->annotations_list = NULL;
 
-  fz_drop_stext_page(app->ctx, app->page_text);
+  fz_drop_stext_page (app->ctx, app->page_text);
   app->page_text = NULL;
 
-  fz_drop_link(app->ctx, app->page_links);
+  fz_drop_link (app->ctx, app->page_links);
   app->page_links = NULL;
 
-  fz_free(app->ctx, app->doctitle);
+  fz_free (app->ctx, app->doctitle);
   app->doctitle = NULL;
 
-  fz_free(app->ctx, app->docpath);
+  fz_free (app->ctx, app->docpath);
   app->docpath = NULL;
 
-  fz_drop_pixmap(app->ctx, app->image);
+  fz_drop_pixmap (app->ctx, app->image);
   app->image = NULL;
 
-  fz_drop_pixmap(app->ctx, app->new_image);
+  fz_drop_pixmap (app->ctx, app->new_image);
   app->new_image = NULL;
 
-  fz_drop_pixmap(app->ctx, app->old_image);
+  fz_drop_pixmap (app->ctx, app->old_image);
   app->old_image = NULL;
 
-  fz_drop_outline(app->ctx, app->outline);
+  fz_drop_outline (app->ctx, app->outline);
   app->outline = NULL;
 
-  fz_drop_page(app->ctx, app->page);
+  fz_drop_page (app->ctx, app->page);
   app->page = NULL;
 
-  fz_drop_document(app->ctx, app->doc);
+  fz_drop_document (app->ctx, app->doc);
   app->doc = NULL;
 
-#ifdef HAVE_CURL
-  fz_drop_stream(app->ctx, app->stream);
-#endif
-
-  fz_flush_warnings(app->ctx);
-}
-
+  fz_flush_warnings (app->ctx);
+  }
 //}}}
+
 //{{{
 static int gen_tmp_file (char *buf, int len)
 {
@@ -608,29 +517,29 @@ static int pdfapp_save (pdfapp_t *app)
   return 0;
 }
 //}}}
+
 //{{{
-int pdfapp_preclose (pdfapp_t *app)
-{
-  pdf_document *idoc = pdf_specifics(app->ctx, app->doc);
+int pdfapp_preclose (pdfapp_t *app) {
 
-  if (idoc && pdf_has_unsaved_changes(app->ctx, idoc))
-  {
-    switch (winsavequery(app))
-    {
-    case DISCARD:
-      return 1;
+  pdf_document* idoc = pdf_specifics(app->ctx, app->doc);
 
-    case CANCEL:
-      return 0;
+  if (idoc && pdf_has_unsaved_changes(app->ctx, idoc)) {
+    switch (winsavequery(app)) {
+      case DISCARD:
+        return 1;
 
-    case SAVE:
-      return pdfapp_save(app);
+      case CANCEL:
+        return 0;
+
+      case SAVE:
+        return pdfapp_save(app);
+      }
     }
-  }
 
   return 1;
-}
+  }
 //}}}
+
 //{{{
 static void pdfapp_viewctm (fz_matrix *mat, pdfapp_t *app)
 {
@@ -817,13 +726,14 @@ static void pdfapp_recreate_annotationslist (pdfapp_t *app)
 }
 //}}}
 //{{{
-static void pdfapp_runpage (pdfapp_t *app, fz_device *dev, const fz_matrix ctm, fz_rect scissor, fz_cookie *cookie)
-{
+static void pdfapp_runpage (pdfapp_t *app, fz_device *dev, const fz_matrix ctm, fz_rect scissor, fz_cookie *cookie) {
+
   if (app->page_list)
-    fz_run_display_list(app->ctx, app->page_list, dev, ctm, scissor, cookie);
+    fz_run_display_list (app->ctx, app->page_list, dev, ctm, scissor, cookie);
+
   if (app->annotations_list)
-    fz_run_display_list(app->ctx, app->annotations_list, dev, ctm, scissor, cookie);
-}
+    fz_run_display_list (app->ctx, app->annotations_list, dev, ctm, scissor, cookie);
+  }
 //}}}
 
 #define MAX_TITLE 256
@@ -848,6 +758,7 @@ void pdfapp_reloadpage (pdfapp_t *app) {
       app->outline = NULL;
     app->outline_deferred = 0;
     }
+
   pdfapp_showpage(app, 1, 1, 1, 0, 0);
   }
 //}}}
@@ -872,7 +783,7 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
   if (transition) {
     app->old_image = app->image;
     app->image = NULL;
-  }
+    }
 
   if (loadpage) {
     fz_rect mediabox;
@@ -890,13 +801,13 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
       fz_try(app->ctx) {
         pdfapp_runpage(app, tdev, fz_identity, fz_infinite_rect, &cookie);
         fz_close_device(app->ctx, tdev);
-      }
+        }
       fz_always(app->ctx)
         fz_drop_device(app->ctx, tdev);
       fz_catch(app->ctx)
         fz_rethrow(app->ctx);
+      }
     }
-  }
 
   if (drawpage) {
     char buf2[64];
@@ -909,7 +820,7 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
       fz_strlcpy(buf, app->doctitle, len-3);
       fz_strlcat(buf, "...", MAX_TITLE);
       fz_strlcat(buf, buf2, MAX_TITLE);
-    }
+      }
     else
       sprintf(buf, "%s%s", app->doctitle, buf2);
     wintitle(app, buf);
@@ -937,7 +848,7 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
         idev = fz_new_draw_device(app->ctx, fz_identity, app->image);
         pdfapp_runpage(app, idev, ctm, bounds, &cookie);
         fz_close_device(app->ctx, idev);
-      }
+        }
       if (app->invert)
         fz_invert_pixmap(app->ctx, app->image);
       if (app->tint)
@@ -965,9 +876,9 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
     if (!app->in_transit) {
       if (app->duration != 0)
         winadvancetimer(app, app->duration);
-    }
+      }
     app->start_time = clock();
-  }
+    }
 
   if (repaint) {
     pdfapp_panview(app, app->panx, app->pany);
@@ -975,7 +886,7 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
     if (!app->image) {
       /* there is no image to blit, but there might be an error message */
       winresize(app, app->layout_w, app->layout_h);
-    }
+      }
     else if (app->shrinkwrap) {
       int w = fz_pixmap_width(app->ctx, app->image);
       int h = fz_pixmap_height(app->ctx, app->image);
@@ -990,19 +901,19 @@ static void pdfapp_showpage (pdfapp_t *app, int loadpage, int drawpage, int repa
         h = app->scrh * 90 / 100;
       if (w != app->winw || h != app->winh)
         winresize(app, w, h);
-    }
+      }
 
     winrepaint(app);
     wincursor(app, ARROW);
-  }
+    }
 
   if (cookie.errors && app->errored == 0) {
     app->errored = 1;
     pdfapp_warn(app, "Errors found on page. Page rendering may be incomplete.");
-  }
+    }
 
   fz_flush_warnings(app->ctx);
-}
+  }
 //}}}
 //{{{
 static void pdfapp_gotouri (pdfapp_t *app, char *uri) {
