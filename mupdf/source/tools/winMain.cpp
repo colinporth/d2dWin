@@ -1973,10 +1973,11 @@ cApp* gApp;
 //{{{
 INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
-  char buf[256];
-  wchar_t bufx[256];
   fz_context* context = gApp->mContext;
   fz_document* document = gApp->mDocument;
+
+  char buf[256];
+  wchar_t bufx[256];
 
   switch (message) {
     case WM_INITDIALOG:
