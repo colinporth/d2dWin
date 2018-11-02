@@ -50,7 +50,6 @@
 
 // Create registry keys to associate MuPDF with PDF and XPS files.
 #define OPEN_KEY(parent, name, ptr) RegCreateKeyExA (parent, name, 0, 0, 0, KEY_WRITE, 0, &ptr, 0)
-
 #define SET_KEY(parent, name, value) RegSetValueExA (parent, name, 0, REG_SZ, (const BYTE*)(value), (DWORD)strlen(value) + 1)
 //}}}
 //{{{  enums
@@ -129,7 +128,7 @@ char* usage() {
   }
 //}}}
 //{{{
-INT_PTR CALLBACK dlogaboutproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+INT_PTR CALLBACK dlogAboutProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
   switch(message) {
     case WM_INITDIALOG:
@@ -146,7 +145,7 @@ INT_PTR CALLBACK dlogaboutproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM l
   }
 //}}}
 //{{{
-INT_PTR CALLBACK dlogtextproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+INT_PTR CALLBACK dlogTextProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
   switch (message) {
     case WM_INITDIALOG:
@@ -182,7 +181,7 @@ INT_PTR CALLBACK dlogtextproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
   }
 //}}}
 //{{{
-INT_PTR CALLBACK dlogchoiceproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+INT_PTR CALLBACK dlogChoiceProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
   HWND listbox;
   int i;
@@ -310,7 +309,7 @@ void winAlert (pdf_alert_event* alert) {
 //}}}
 //{{{
 void winHelp (cApp* app) {
-  if (DialogBoxW (NULL, L"IDD_DLOGABOUT", hwndframe, dlogaboutproc) <= 0)
+  if (DialogBoxW (NULL, L"IDD_DLOGABOUT", hwndframe, dlogAboutProc) <= 0)
     winError ("cannot create help dialog");
   }
 //}}}
@@ -381,7 +380,7 @@ char* winTextInput (char* inittext, int retry) {
   td_retry = retry;
 
   fz_strlcpy (td_textinput, inittext ? inittext : "", sizeof td_textinput);
-  if (DialogBoxW (NULL, L"IDD_DLOGTEXT", hwndframe, dlogtextproc) <= 0)
+  if (DialogBoxW (NULL, L"IDD_DLOGTEXT", hwndframe, dlogTextProc) <= 0)
     winError ("cannot create text input dialog");
 
   if (pd_okay)
@@ -398,7 +397,7 @@ int winChoiceInput (int nopts, const char* opts[], int* nvals, const char* vals[
   cd_opts = opts;
   cd_vals = vals;
 
-  if (DialogBoxW (NULL, L"IDD_DLOGLIST", hwndframe, dlogchoiceproc) <= 0)
+  if (DialogBoxW (NULL, L"IDD_DLOGLIST", hwndframe, dlogChoiceProc) <= 0)
     winError ("cannot create text input dialog");
 
   return pd_okay;
@@ -469,9 +468,8 @@ void winInstallApp (char* argv0) {
   }
 //}}}
 
-static const int zoomList[] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
 //{{{
-void event_cb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* data) {
+void eventCb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* data) {
 
   switch (event->type) {
     case PDF_DOCUMENT_EVENT_ALERT:
@@ -480,20 +478,19 @@ void event_cb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* d
 
     case PDF_DOCUMENT_EVENT_PRINT:
     case PDF_DOCUMENT_EVENT_EXEC_MENU_ITEM:
-      winWarn ("The document attempted to execute menu item");
+      winWarn ("document attempted to execute menu item");
       break;
 
     case PDF_DOCUMENT_EVENT_EXEC_DIALOG:
-      winWarn ("The document attempted to open a dialog box. (Not supported)");
+      winWarn ("document attempted to open a dialog box");
       break;
 
     case PDF_DOCUMENT_EVENT_LAUNCH_URL:
-      winWarn ("The document attempted to open url: %s. (Not supported by app)",
-               pdf_access_launch_url_event(ctx, event)->url);
+      winWarn ("document attempted to open url: %s", pdf_access_launch_url_event(ctx, event)->url);
       break;
 
     case PDF_DOCUMENT_EVENT_MAIL_DOC:
-      winWarn ("The document attempted to mail the document");
+      winWarn ("document attempted to mail the document");
       break;
     }
   }
@@ -556,13 +553,11 @@ public:
 
     fz_try (ctx) {
       fz_register_document_handlers (ctx);
-
       if (layout_css) {
-        fz_buffer *buf = fz_read_file (ctx, layout_css);
+        fz_buffer* buf = fz_read_file (ctx, layout_css);
         fz_set_user_css (ctx, fz_string_from_buffer (ctx, buf));
         fz_drop_buffer (ctx, buf);
         }
-
       fz_set_use_document_css (ctx, layout_use_doc_css);
 
       if (bps == 0)
@@ -594,16 +589,16 @@ public:
     if (idoc) {
       fz_try (ctx) {
         pdf_enable_js (ctx, idoc);
-        pdf_set_doc_event_callback (ctx, idoc, event_cb, this);
+        pdf_set_doc_event_callback (ctx, idoc, eventCb, this);
         }
       fz_catch (ctx) {
         winError ("cannot load javascript embedded in document");
         }
       }
 
-    fz_try(ctx) {
+    fz_try (ctx) {
       if (fz_needs_password (ctx, doc))
-        winWarn ("needs password.");
+        winWarn ("document needs password");
 
       docpath = fz_strdup (ctx, filename);
       doctitle = filename;
@@ -619,7 +614,7 @@ public:
         fz_try(ctx) {
           pagecount = fz_count_pages (ctx, doc);
           if (pagecount <= 0)
-            fz_throw(ctx, FZ_ERROR_GENERIC, "No pages in document");
+            fz_throw (ctx, FZ_ERROR_GENERIC, "No pages in document");
           }
         fz_catch (ctx) {
           if (fz_caught (ctx) == FZ_ERROR_TRYLATER) {
@@ -718,7 +713,6 @@ public:
 
     int image_w = 0;
     int image_h = 0;
-
     if (image) {
       image_w = fz_pixmap_width (ctx, image);
       image_h = fz_pixmap_height (ctx, image);
@@ -1973,11 +1967,13 @@ private:
     }
   }
   //}}}
+
+  const int zoomList[11] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
   };
 //}}}
 
 //{{{
-INT_PTR CALLBACK dloginfoproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
   char buf[256];
   wchar_t bufx[256];
@@ -2042,7 +2038,7 @@ INT_PTR CALLBACK dloginfoproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
 //}}}
 //{{{
 void winInfo() {
-  if (DialogBoxW (NULL, L"IDD_DLOGINFO", hwndframe, dloginfoproc) <= 0)
+  if (DialogBoxW (NULL, L"IDD_DLOGINFO", hwndframe, dlogInfoProc) <= 0)
     winError ("cannot create info dialog");
   }
 //}}}
@@ -2082,8 +2078,7 @@ void handleKey (int c) {
 //{{{
 void handleMouse (int x, int y, int btn, int state) {
 
-  int modifier = GetAsyncKeyState(VK_SHIFT) < 0;
-  modifier |= (GetAsyncKeyState (VK_CONTROL) < 0) << 2;
+  int modifier = (GetAsyncKeyState(VK_SHIFT) < 0) | ((GetAsyncKeyState (VK_CONTROL) < 0) << 2);
 
   if (state != 0 && justcopied) {
     justcopied = 0;
