@@ -558,13 +558,13 @@ public:
       fz_set_use_document_css (mContext, layout_use_doc_css);
 
       if (bps == 0)
-        doc = fz_open_document (mContext, filename);
+        mDocument = fz_open_document (mContext, filename);
       else {
         fz_stream* stream = fz_open_file_progressive (mContext, filename, bps);
         while (1) {
           fz_try (mContext) {
             fz_seek (mContext, stream, 0, SEEK_SET);
-            doc = fz_open_document_with_stream (mContext, filename, stream);
+            mDocument = fz_open_document_with_stream (mContext, filename, stream);
             }
           fz_catch (mContext) {
             if (fz_caught (mContext) == FZ_ERROR_TRYLATER) {
@@ -582,7 +582,7 @@ public:
         winError ("cannot open document");
       }
 
-    pdf_document* idoc = pdf_specifics (mContext, doc);
+    pdf_document* idoc = pdf_specifics (mContext, mDocument);
     if (idoc) {
       fz_try (mContext) {
         pdf_enable_js (mContext, idoc);
@@ -594,7 +594,7 @@ public:
       }
 
     fz_try (mContext) {
-      if (fz_needs_password (mContext, doc))
+      if (fz_needs_password (mContext, mDocument))
         winWarn ("document needs password");
 
       mDocPath = fz_strdup (mContext, filename);
@@ -605,11 +605,11 @@ public:
         mDocTitle = strrchr (mDocTitle, '/') + 1;
       mDocTitle = fz_strdup (mContext, mDocTitle);
 
-      fz_layout_document (mContext, doc, layout_w, layout_h, layout_em);
+      fz_layout_document (mContext, mDocument, layout_w, layout_h, layout_em);
 
       while (1) {
         fz_try(mContext) {
-          mPageCount = fz_count_pages (mContext, doc);
+          mPageCount = fz_count_pages (mContext, mDocument);
           if (mPageCount <= 0)
             fz_throw (mContext, FZ_ERROR_GENERIC, "No pages in document");
           }
@@ -625,7 +625,7 @@ public:
 
       while (1) {
         fz_try (mContext) {
-          outline = fz_load_outline (mContext, doc);
+          outline = fz_load_outline (mContext, mDocument);
           }
         fz_catch (mContext) {
           outline = NULL;
@@ -689,8 +689,8 @@ public:
     fz_drop_page (mContext, page);
     page = NULL;
 
-    fz_drop_document (mContext, doc);
-    doc = NULL;
+    fz_drop_document (mContext, mDocument);
+    mDocument = NULL;
 
     fz_flush_warnings (mContext);
     }
@@ -775,7 +775,7 @@ public:
     incomplete = 0;
 
     fz_try(mContext) {
-      page = fz_load_page (mContext, doc, pageno - 1);
+      page = fz_load_page (mContext, mDocument, pageno - 1);
       page_bbox = fz_bound_page (mContext, page);
       }
     fz_catch(mContext) {
@@ -1001,7 +1001,7 @@ public:
 
     if (outline_deferred == appOUTLINE_LOAD_NOW) {
       fz_try (mContext)
-        outline = fz_load_outline (mContext, doc);
+        outline = fz_load_outline (mContext, mDocument);
       fz_catch (mContext)
         outline = NULL;
       outline_deferred = 0;
@@ -1544,7 +1544,7 @@ public:
     int processed = 0;
     if (btn == 1 && (state == 1 || state == -1)) {
       pdf_ui_event event;
-      pdf_document* idoc = pdf_specifics (mContext, doc);
+      pdf_document* idoc = pdf_specifics (mContext, mDocument);
 
       event.etype = PDF_EVENT_TYPE_POINTER;
       event.event.pointer.pt = p;
@@ -1654,7 +1654,7 @@ public:
           //appgotouri (app, link->uri);
           }
         else
-          gotoPage(fz_resolve_link(mContext, doc, link->uri, NULL, NULL) + 1);
+          gotoPage(fz_resolve_link(mContext, mDocument, link->uri, NULL, NULL) + 1);
         return;
         }
       }
@@ -1783,7 +1783,7 @@ public:
 
   //  vars
   fz_context* mContext;
-  fz_document* doc;
+  fz_document* mDocument;
   char* mDocPath;
   char* mDocTitle;
   fz_outline* outline;
@@ -1884,7 +1884,7 @@ private:
       return 1;
       }
 
-    doc = (fz_document*)pdf;
+    mDocument = (fz_document*)pdf;
     return 0;
     }
   //}}}
@@ -1975,13 +1975,13 @@ INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
 
   char buf[256];
   wchar_t bufx[256];
-  fz_context* ctx = gApp->mContext;
-  fz_document* doc = gApp->doc;
+  fz_context* context = gApp->mContext;
+  fz_document* document = gApp->mDocument;
 
   switch (message) {
     case WM_INITDIALOG:
       SetDlgItemTextW (hwnd, 0x10, wbuf);
-      if (fz_lookup_metadata (ctx, doc, FZ_META_FORMAT, buf, sizeof buf) >= 0)
+      if (fz_lookup_metadata (context, document, FZ_META_FORMAT, buf, sizeof buf) >= 0)
         SetDlgItemTextA (hwnd, 0x11, buf);
       else {
         SetDlgItemTextA (hwnd, 0x11, "Unknown");
@@ -1990,19 +1990,19 @@ INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
         return TRUE;
         }
 
-      if (fz_lookup_metadata (ctx, doc, FZ_META_ENCRYPTION, buf, sizeof buf) >= 0)
+      if (fz_lookup_metadata (context, document, FZ_META_ENCRYPTION, buf, sizeof buf) >= 0)
         SetDlgItemTextA (hwnd, 0x12, buf);
       else
         SetDlgItemTextA (hwnd, 0x12, "None");
 
       buf[0] = 0;
-      if (fz_has_permission (ctx, doc, FZ_PERMISSION_PRINT))
+      if (fz_has_permission (context, document, FZ_PERMISSION_PRINT))
         strcat (buf, "print, ");
-      if (fz_has_permission (ctx, doc, FZ_PERMISSION_COPY))
+      if (fz_has_permission (context, document, FZ_PERMISSION_COPY))
         strcat (buf, "copy, ");
-      if (fz_has_permission (ctx, doc, FZ_PERMISSION_EDIT))
+      if (fz_has_permission (context, document, FZ_PERMISSION_EDIT))
         strcat (buf, "edit, ");
-      if (fz_has_permission (ctx, doc, FZ_PERMISSION_ANNOTATE))
+      if (fz_has_permission (context, document, FZ_PERMISSION_ANNOTATE))
         strcat (buf, "annotate, ");
       if (strlen (buf) > 2)
         buf[strlen (buf)-2] = 0;
@@ -2011,7 +2011,7 @@ INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
       SetDlgItemTextA (hwnd, 0x13, buf);
 
       #define SETUTF8(ID, STRING) \
-        if (fz_lookup_metadata (ctx, doc, "info:" STRING, buf, sizeof buf) >= 0) {  \
+        if (fz_lookup_metadata (context, document, "info:" STRING, buf, sizeof buf) >= 0) {  \
           MultiByteToWideChar (CP_UTF8, 0, buf, -1, bufx, nelem (bufx));            \
           SetDlgItemTextW (hwnd, ID, bufx);                                         \
           }
