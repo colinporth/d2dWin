@@ -69,7 +69,7 @@ HDC hdc;
 HBRUSH bgbrush;
 HBRUSH shbrush;
 BITMAPINFO* dibinf = NULL;
-HCURSOR arrowcurs, handcurs, waitcurs, caretcurs;
+HCURSOR arrowCursor, handCursor, waitCursor, caretCursor;
 
 int justcopied = 0;
 
@@ -225,6 +225,7 @@ INT_PTR CALLBACK dlogChoiceProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM 
   return FALSE;
   }
 //}}}
+
 //{{{
 void winError (char* msg) {
 
@@ -314,13 +315,13 @@ void winHelp() {
 void winCursor (int curs) {
 
   if (curs == ARROW)
-    SetCursor (arrowcurs);
+    SetCursor (arrowCursor);
   if (curs == HAND)
-    SetCursor (handcurs);
+    SetCursor (handCursor);
   if (curs == WAIT)
-    SetCursor (waitcurs);
+    SetCursor (waitCursor);
   if (curs == CARET)
-    SetCursor (caretcurs);
+    SetCursor (caretCursor);
   }
 //}}}
 //{{{
@@ -422,7 +423,6 @@ void winDrawString (int x, int y, char *s) {
 //{{{
 void winInstallApp (char* argv0) {
 
-  char buf[512];
   HKEY software, classes, mupdf, dotpdf, dotxps, dotepub, dotfb2;
   HKEY shell, open, command, supported_types;
   HKEY pdf_progids, xps_progids, epub_progids, fb2_progids;
@@ -443,6 +443,7 @@ void winInstallApp (char* argv0) {
   OPEN_KEY (shell, "open", open);
   OPEN_KEY (open, "command", command);
 
+  char buf[512];
   sprintf (buf, "\"%s\" \"%%1\"", argv0);
 
   SET_KEY (open, "FriendlyAppName", "MuPDF");
@@ -466,11 +467,11 @@ void winInstallApp (char* argv0) {
 //}}}
 
 //{{{
-void eventCb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* data) {
+void eventCallback (fz_context* context, pdf_document* document, pdf_doc_event* event, void* data) {
 
   switch (event->type) {
     case PDF_DOCUMENT_EVENT_ALERT:
-      winAlert (pdf_access_alert_event (ctx, event));
+      winAlert (pdf_access_alert_event (context, event));
       break;
 
     case PDF_DOCUMENT_EVENT_PRINT:
@@ -483,7 +484,7 @@ void eventCb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* da
       break;
 
     case PDF_DOCUMENT_EVENT_LAUNCH_URL:
-      winWarn ("document attempted to open url: %s", pdf_access_launch_url_event(ctx, event)->url);
+      winWarn ("document attempted to open url: %s", pdf_access_launch_url_event (context, event)->url);
       break;
 
     case PDF_DOCUMENT_EVENT_MAIL_DOC:
@@ -586,7 +587,7 @@ public:
     if (idoc) {
       fz_try (mContext) {
         pdf_enable_js (mContext, idoc);
-        pdf_set_doc_event_callback (mContext, idoc, eventCb, this);
+        pdf_set_doc_event_callback (mContext, idoc, eventCallback, this);
         }
       fz_catch (mContext) {
         winError ("cannot load javascript embedded in document");
@@ -706,55 +707,10 @@ public:
   //}}}
 
   //{{{
-  void panView (int newx, int newy) {
-
-    int image_w = 0;
-    int image_h = 0;
-    if (image) {
-      image_w = fz_pixmap_width (mContext, image);
-      image_h = fz_pixmap_height (mContext, image);
-      }
-
-    if (newx > 0)
-      newx = 0;
-    if (newy > 0)
-      newy = 0;
-
-    if (newx + image_w < winw)
-      newx = winw - image_w;
-    if (newy + image_h < winh)
-      newy = winh - image_h;
-
-    if (winw >= image_w)
-      newx = (winw - image_w) / 2;
-    if (winh >= image_h)
-      newy = (winh - image_h) / 2;
-
-    if (newx != panx || newy != pany)
-      InvalidateRect (hwndview, NULL, 0);
-
-    panx = newx;
-    pany = newy;
-    }
-  //}}}
-  //{{{
-  void runPage (fz_device* dev, const fz_matrix ctm, fz_rect scissor, fz_cookie* cookie) {
-
-    if (page_list)
-      fz_run_display_list (mContext, page_list, dev, ctm, scissor, cookie);
-
-    if (annotations_list)
-      fz_run_display_list (mContext, annotations_list, dev, ctm, scissor, cookie);
-    }
-  //}}}
-  //{{{
   void loadPage (int no_cache) {
 
     errored = 0;
-    fz_cookie cookie = { 0 };
-
-    fz_device* mdev = NULL;
-    fz_var (mdev);
+    incomplete = 0;
 
     fz_drop_display_list (mContext, page_list);
     fz_drop_display_list (mContext, annotations_list);
@@ -772,13 +728,11 @@ public:
     page_bbox.x1 = 100;
     page_bbox.y1 = 100;
 
-    incomplete = 0;
-
-    fz_try(mContext) {
+    fz_try (mContext) {
       page = fz_load_page (mContext, mDocument, pageno - 1);
       page_bbox = fz_bound_page (mContext, page);
       }
-    fz_catch(mContext) {
+    fz_catch (mContext) {
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
         incomplete = 1;
       else
@@ -786,6 +740,10 @@ public:
       return;
       }
 
+    fz_cookie cookie = { 0 };
+
+    fz_device* mdev = NULL;
+    fz_var (mdev);
     fz_try (mContext) {
       /* Create display lists */
       page_list = fz_new_display_list (mContext, fz_infinite_rect);
@@ -800,9 +758,7 @@ public:
       mdev = NULL;
       annotations_list = fz_new_display_list (mContext, fz_infinite_rect);
       mdev = fz_new_list_device (mContext, annotations_list);
-
-      fz_annot* annot;
-      for (annot = fz_first_annot (mContext, page); annot; annot = fz_next_annot(mContext, annot))
+      for (fz_annot* annot = fz_first_annot (mContext, page); annot; annot = fz_next_annot(mContext, annot))
         fz_run_annot (mContext, annot, mdev, fz_identity, &cookie);
       if (cookie.incomplete)
         incomplete = 1;
@@ -838,53 +794,54 @@ public:
     }
   //}}}
   //{{{
-  void recreateAnnotations() {
+  void updatePage() {
 
-    int errored = 0;
-    fz_cookie cookie = { 0 };
-
-    fz_device* mdev = NULL;
-    fz_var (mdev);
-
-    fz_drop_display_list (mContext, annotations_list);
-    annotations_list = NULL;
-
-    fz_try (mContext) {
-      /* Create display list */
-      annotations_list = fz_new_display_list(mContext, fz_infinite_rect);
-      mdev = fz_new_list_device (mContext, annotations_list);
-
-      fz_annot* annot;
-      for (annot = fz_first_annot (mContext, page); annot; annot = fz_next_annot(mContext, annot))
-        fz_run_annot (mContext, annot, mdev, fz_identity, &cookie);
-
-      if (cookie.incomplete)
-        incomplete = 1;
-      else if (cookie.errors) {
-        winWarn ("Errors found on page");
-        errored = 1;
-        }
-      fz_close_device (mContext, mdev);
+    if (pdf_update_page (mContext, (pdf_page*)page)) {
+      recreateAnnotations();
+      showPage (0, 1, 1, 0);
       }
-    fz_always (mContext) {
-      fz_drop_device (mContext, mdev);
-      }
-    fz_catch (mContext) {
-      winWarn ("Cannot load page");
-      errored = 1;
+    else
+      showPage (0, 0, 1, 0);
+    }
+  //}}}
+  //{{{
+  void reloadPage() {
+
+    if (outline_deferred == appOUTLINE_LOAD_NOW) {
+      fz_try (mContext)
+        outline = fz_load_outline (mContext, mDocument);
+      fz_catch (mContext)
+        outline = NULL;
+      outline_deferred = 0;
       }
 
-    errored = errored;
+    showPage (1, 1, 1, 0);
+    }
+  //}}}
+  //{{{
+  void gotoPage (int pageNumber) {
+
+    issearching = 0;
+
+    if (pageNumber < 1)
+      pageNumber = 1;
+    if (pageNumber > mPageCount)
+      pageNumber = mPageCount;
+    if (pageNumber == pageno)
+      return;
+
+    pageno = pageNumber;
+    InvalidateRect (hwndview, NULL, 0);
+    showPage (1, 1, 1, 0);
     }
   //}}}
   //{{{
   void showPage (int load, int draw, int repaint, int searching) {
 
-    fz_cookie cookie = { 0 };
-
     if (!nowaitcursor)
       winCursor (WAIT);
 
+    fz_cookie cookie = { 0 };
     if (load) {
       //{{{  load
       loadPage (searching);
@@ -899,7 +856,10 @@ public:
       if (page_list || annotations_list) {
         fz_device* tdev = fz_new_stext_device (mContext, page_text, NULL);
         fz_try (mContext) {
-          runPage (tdev, fz_identity, fz_infinite_rect, &cookie);
+          if (page_list)
+            fz_run_display_list (mContext, page_list, tdev, fz_identity, fz_infinite_rect, &cookie);
+          if (annotations_list)
+            fz_run_display_list (mContext, annotations_list, tdev, fz_identity, fz_infinite_rect, &cookie);
           fz_close_device (mContext, tdev);
           }
         fz_always (mContext)
@@ -950,7 +910,10 @@ public:
         fz_clear_pixmap_with_value (mContext, image, 255);
         if (page_list || annotations_list) {
           idev = fz_new_draw_device (mContext, fz_identity, image);
-          runPage (idev, ctm, bounds, &cookie);
+          if (page_list)
+            fz_run_display_list (mContext, page_list, idev, ctm, bounds, &cookie);
+          if (annotations_list)
+            fz_run_display_list (mContext, annotations_list, idev, ctm, bounds, &cookie);
           fz_close_device (mContext, idev);
           }
         if (invert)
@@ -978,53 +941,10 @@ public:
 
     if (cookie.errors && errored == 0) {
       errored = 1;
-      winWarn ("Errors found on page. Page rendering may be incomplete.");
+      winWarn ("Errors found on page, page rendering may be incomplete");
       }
 
     fz_flush_warnings (mContext);
-    }
-  //}}}
-
-  //{{{
-  void updatePage() {
-
-    if (pdf_update_page (mContext, (pdf_page*)page)) {
-      recreateAnnotations();
-      showPage (0, 1, 1, 0);
-      }
-    else
-      showPage (0, 0, 1, 0);
-    }
-  //}}}
-  //{{{
-  void reloadPage() {
-
-    if (outline_deferred == appOUTLINE_LOAD_NOW) {
-      fz_try (mContext)
-        outline = fz_load_outline (mContext, mDocument);
-      fz_catch (mContext)
-        outline = NULL;
-      outline_deferred = 0;
-      }
-
-    showPage (1, 1, 1, 0);
-    }
-  //}}}
-  //{{{
-  void gotoPage (int pageNumber) {
-
-    issearching = 0;
-
-    if (pageNumber < 1)
-      pageNumber = 1;
-    if (pageNumber > mPageCount)
-      pageNumber = mPageCount;
-    if (pageNumber == pageno)
-      return;
-
-    pageno = pageNumber;
-    InvalidateRect (hwndview, NULL, 0);
-    showPage (1, 1, 1, 0);
     }
   //}}}
 
@@ -1820,6 +1740,7 @@ public:
   int winw, winh;
   int scrw, scrh;
   int fullscreen;
+  bool mExit = false;
   //}}}
   //{{{  event handling state
   char number[256];
@@ -1888,7 +1809,79 @@ private:
     return 0;
     }
   //}}}
+  //{{{
+  void recreateAnnotations() {
 
+    int errored = 0;
+    fz_cookie cookie = { 0 };
+
+    fz_device* mdev = NULL;
+    fz_var (mdev);
+
+    fz_drop_display_list (mContext, annotations_list);
+    annotations_list = NULL;
+
+    fz_try (mContext) {
+      /* Create display list */
+      annotations_list = fz_new_display_list(mContext, fz_infinite_rect);
+      mdev = fz_new_list_device (mContext, annotations_list);
+
+      fz_annot* annot;
+      for (annot = fz_first_annot (mContext, page); annot; annot = fz_next_annot(mContext, annot))
+        fz_run_annot (mContext, annot, mdev, fz_identity, &cookie);
+
+      if (cookie.incomplete)
+        incomplete = 1;
+      else if (cookie.errors) {
+        winWarn ("Errors found on page");
+        errored = 1;
+        }
+      fz_close_device (mContext, mdev);
+      }
+    fz_always (mContext) {
+      fz_drop_device (mContext, mdev);
+      }
+    fz_catch (mContext) {
+      winWarn ("Cannot load page");
+      errored = 1;
+      }
+
+    errored = errored;
+    }
+  //}}}
+
+  //{{{
+  void panView (int newx, int newy) {
+
+    int image_w = 0;
+    int image_h = 0;
+    if (image) {
+      image_w = fz_pixmap_width (mContext, image);
+      image_h = fz_pixmap_height (mContext, image);
+      }
+
+    if (newx > 0)
+      newx = 0;
+    if (newy > 0)
+      newy = 0;
+
+    if (newx + image_w < winw)
+      newx = winw - image_w;
+    if (newy + image_h < winh)
+      newy = winh - image_h;
+
+    if (winw >= image_w)
+      newx = (winw - image_w) / 2;
+    if (winh >= image_h)
+      newy = (winh - image_h) / 2;
+
+    if (newx != panx || newy != pany)
+      InvalidateRect (hwndview, NULL, 0);
+
+    panx = newx;
+    pany = newy;
+    }
+  //}}}
   //{{{
   int zoomIn (int oldres) {
 
@@ -2045,8 +2038,7 @@ void winInfo() {
 //{{{
 void handleKey (int c) {
 
-  int modifier = (GetAsyncKeyState(VK_SHIFT) < 0);
-  modifier |= ((GetAsyncKeyState(VK_CONTROL) < 0) << 2);
+  int modifier = (GetAsyncKeyState(VK_SHIFT) < 0) | ((GetAsyncKeyState(VK_CONTROL) < 0) << 2);
 
   if (GetCapture() == hwndview)
     return;
@@ -2056,7 +2048,7 @@ void handleKey (int c) {
     InvalidateRect (hwndview, NULL, 0);
     }
 
-  /* translate VK into ASCII equivalents */
+  // translate VK into ASCII equivalents
   if (c > 256) {
     switch (c - 256) {
       case VK_F1: c = '?'; break;
@@ -2106,6 +2098,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     case WM_SIZE:
       if (wParam == SIZE_MINIMIZED)
         return 0;
+
       gApp->onResize (LOWORD(lParam), HIWORD(lParam));
       break;
     //}}}
@@ -2234,7 +2227,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
 //{{{
 LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
-  switch(message) {
+  switch (message) {
     case WM_SETFOCUS:
       PostMessage (hwnd, WM_APP+5, 0, 0);
       return 0;
@@ -2244,6 +2237,7 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
       return 0;
 
     case WM_DESTROY:
+      gApp->mExit = true;
       PostQuitMessage (0);
       return 0;
 
@@ -2267,15 +2261,15 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
       return 0;
       }
 
-    case WM_SIZING:
-      break;
-
     case WM_NOTIFY:
     case WM_COMMAND:
       return SendMessage (hwndview, message, wParam, lParam);
 
     case WM_CLOSE:
       return 0;
+
+    case WM_SIZING:
+      break;
     }
 
   return DefWindowProc (hwnd, message, wParam, lParam);
@@ -2355,10 +2349,10 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   gApp->scrh = r.bottom - r.top;
   //}}}
   //{{{  create cursors
-  arrowcurs = LoadCursor (NULL, IDC_ARROW);
-  handcurs = LoadCursor (NULL, IDC_HAND);
-  waitcurs = LoadCursor (NULL, IDC_WAIT);
-  caretcurs = LoadCursor (NULL, IDC_IBEAM);
+  arrowCursor = LoadCursor (NULL, IDC_ARROW);
+  handCursor = LoadCursor (NULL, IDC_HAND);
+  waitCursor = LoadCursor (NULL, IDC_WAIT);
+  caretCursor = LoadCursor (NULL, IDC_IBEAM);
   //}}}
   //{{{  background color
   bgbrush = CreateSolidBrush (RGB (0x70,0x70,0x70));
@@ -2405,7 +2399,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
   AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF...");
   AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties...");
-  SetCursor (arrowcurs);
+  SetCursor (arrowCursor);
 
   if (fz_optind < argc) {
     strcpy (filename, argv[fz_optind++]);
@@ -2414,7 +2408,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     gApp->open (filename, 0, 0);
 
     MSG msg;
-    while (GetMessage (&msg, NULL, 0, 0)) {
+    while (GetMessage (&msg, NULL, 0, 0) && !gApp->mExit) {
       TranslateMessage (&msg);
       DispatchMessage (&msg);
       }
