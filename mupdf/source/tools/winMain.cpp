@@ -18,14 +18,14 @@
 #include <assert.h>
 #include <string.h>
 #include <limits.h>
+#include <time.h>
 
 // Include pdfapp.h *AFTER* the UNICODE defines
 #include "mupdf/fitz.h"
 #include "mupdf/pdf.h"
-#include <time.h>
 
 #include "mupdf/helpers/pkcs7-check.h"
-#include "mupdf/helpers/pkcs7-openssl.h"
+//#include "mupdf/helpers/pkcs7-openssl.h"
 //}}}
 //{{{  defines
 // 25% .. 1600%
@@ -89,7 +89,6 @@ const char** cd_vals;
 int pd_okay = 0;
 //}}}
 
-//{{{  windows
 //{{{
 char* version() {
   return "MuPDF " FZ_VERSION "\n" "Copyright 2006-2017 Artifex Software, Inc.\n";
@@ -151,7 +150,6 @@ INT_PTR CALLBACK dlogaboutproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM l
   return FALSE;
   }
 //}}}
-
 //{{{
 INT_PTR CALLBACK dlogtextproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
@@ -236,7 +234,6 @@ INT_PTR CALLBACK dlogchoiceproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM 
   return FALSE;
   }
 //}}}
-
 //{{{
 void winError (char* msg) {
 
@@ -247,6 +244,19 @@ void winError (char* msg) {
 //{{{
 void winWarn (char* msg) {
   MessageBoxA (hwndframe, msg, "MuPDF: Warning", MB_ICONWARNING);
+  }
+//}}}
+//{{{
+void winWarn (const char* fmt, ...) {
+
+  char buf[1024];
+  va_list ap;
+  va_start (ap, fmt);
+  fz_vsnprintf (buf, sizeof(buf), fmt, ap);
+  va_end (ap);
+  buf[sizeof(buf)-1] = 0;
+
+  winWarn (buf);
   }
 //}}}
 //{{{
@@ -310,20 +320,6 @@ void winHelp (cApp* app) {
   }
 //}}}
 //{{{
-void winWarn (const char* fmt, ...) {
-
-  char buf[1024];
-  va_list ap;
-  va_start (ap, fmt);
-  fz_vsnprintf (buf, sizeof(buf), fmt, ap);
-  va_end (ap);
-  buf[sizeof(buf)-1] = 0;
-
-  winWarn (buf);
-  }
-//}}}
-
-//{{{
 void winCursor (int curs) {
 
   if (curs == ARROW)
@@ -337,7 +333,7 @@ void winCursor (int curs) {
   }
 //}}}
 //{{{
-void winTitle (char *title) {
+void winTitle (char* title) {
 
   wchar_t wide[256];
   wchar_t* dp = wide;
@@ -353,7 +349,6 @@ void winTitle (char *title) {
   SetWindowTextW (hwndframe, wide);
   }
 //}}}
-
 //{{{
 void winResize (int w, int h) {
 
@@ -386,7 +381,6 @@ void winFullScreen (int state) {
     }
   }
 //}}}
-
 //{{{
 char* winTextInput (char* inittext, int retry) {
 
@@ -416,7 +410,6 @@ int winChoiceInput (int nopts, const char* opts[], int* nvals, const char* vals[
   return pd_okay;
   }
 //}}}
-
 //{{{
 void winDrawRect (int x0, int y0, int x1, int y1) {
 
@@ -436,9 +429,8 @@ void winDrawString (int x, int y, char *s) {
   TextOutA (hdc, x, y - 12, s, (int)strlen(s));
   }
 //}}}
-
 //{{{
-void installApp (char* argv0) {
+void winInstallApp (char* argv0) {
 
   char buf[512];
   HKEY software, classes, mupdf, dotpdf, dotxps, dotepub, dotfb2;
@@ -482,7 +474,6 @@ void installApp (char* argv0) {
   RegCloseKey (software);
   }
 //}}}
-//}}}
 
 static const int zoomList[] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
 //{{{
@@ -513,6 +504,7 @@ void event_cb (fz_context* ctx, pdf_document* doc, pdf_doc_event* event, void* d
     }
   }
 //}}}
+
 //{{{
 class cApp {
 public:
@@ -545,61 +537,6 @@ public:
     }
   //}}}
 
-  //{{{
-  void onScroll (int modifiers, int dir) {
-
-    ispanning = iscopying = 0;
-    if (modifiers & (1<<2)) {
-      /* zoom in/out if ctrl is pressed */
-      if (dir < 0)
-        resolution = zoomIn (resolution);
-      else
-        resolution = zoomOut (resolution);
-      if (resolution > MAXRES)
-        resolution = MAXRES;
-      if (resolution < MINRES)
-        resolution = MINRES;
-      showPage (0, 1, 1, 0);
-    }
-    else {
-      /* scroll up/down, or left/right if
-      shift is pressed */
-      int w = fz_pixmap_width(ctx, image);
-      int h = fz_pixmap_height(ctx, image);
-      int xstep = 0;
-      int ystep = 0;
-      int pagestep = 0;
-      if (modifiers & (1<<0)) {
-        if (dir > 0 && panx >= 0)
-          pagestep = -1;
-        else if (dir < 0 && panx <= winw - w)
-          pagestep = 1;
-        else
-          xstep = 20 * dir;
-      }
-      else {
-        if (dir > 0 && pany >= 0)
-          pagestep = -1;
-        else if (dir < 0 && pany <= winh - h)
-          pagestep = 1;
-        else
-          ystep = 20 * dir;
-      }
-      if (pagestep == 0)
-        panView (panx + xstep, pany + ystep);
-      else if (pagestep > 0 && pageno < pagecount) {
-        pageno++;
-        pany = 0;
-        showPage (1, 1, 1, 0);
-      }
-      else if (pagestep < 0 && pageno > 1) {
-        pageno--;
-        pany = INT_MIN;
-        showPage (1, 1, 1, 0);
-      }
-    }
-  }
-  //}}}
   //{{{
   void onKey (int c, int modifiers) {
 
@@ -1335,55 +1272,12 @@ public:
     r.bottom = y1;
     FillRect (hdc, &r, shbrush);
 
-   blitSearch();
+    blitSearch();
     }
   //}}}
 
   //{{{
-  int makeFakeDoc() {
-
-    fz_buffer* contents = NULL;
-    fz_var (contents);
-
-    pdf_obj* page_obj = NULL;
-    fz_var (page_obj);
-
-    pdf_document* pdf = NULL;
-    fz_try(ctx) {
-      fz_rect mediabox = { 0, 0, (float)winw, (float)winh };
-      int i;
-
-      pdf = pdf_create_document (ctx);
-
-      contents = fz_new_buffer (ctx, 100);
-      fz_append_printf (ctx, contents, "1 0 0 RG %g w 0 0 m %g %g l 0 %g m %g 0 l s\n",
-        fz_min (mediabox.x1, mediabox.y1) / 20,
-        mediabox.x1, mediabox.y1,
-        mediabox.y1, mediabox.x1);
-
-      /* Create enough copies of our blank(ish) page so that the
-       * page number is preserved if and when a subsequent load works. */
-      page_obj = pdf_add_page (ctx, pdf, mediabox, 0, NULL, contents);
-      for (i = 0; i < pagecount; i++)
-        pdf_insert_page (ctx, pdf, -1, page_obj);
-      }
-
-    fz_always(ctx) {
-      pdf_drop_obj (ctx, page_obj);
-      fz_drop_buffer (ctx, contents);
-      }
-
-    fz_catch(ctx) {
-      fz_drop_document (ctx, (fz_document*)pdf);
-      return 1;
-      }
-
-    doc = (fz_document*)pdf;
-    return 0;
-    }
-  //}}}
-  //{{{
-  void open_progressive (char* filename, int reload, int bps) {
+  void open (char* filename, int reload, int bps) {
 
     pdf_document* idoc;
 
@@ -1503,11 +1397,6 @@ public:
     }
   //}}}
   //{{{
-  void open (char* filename, int reload) {
-    open_progressive (filename, reload, 0);
-    }
-  //}}}
-  //{{{
   void close() {
 
     fz_drop_display_list (ctx, page_list);
@@ -1549,7 +1438,7 @@ public:
     char filename[PATH_MAX];
     fz_strlcpy (filename, docpath, PATH_MAX);
     close();
-    open (filename, 1);
+    open (filename, 1, 0);
     }
   //}}}
 
@@ -2137,6 +2026,50 @@ public:
 
 private:
   //{{{
+  int makeFakeDoc() {
+
+    fz_buffer* contents = NULL;
+    fz_var (contents);
+
+    pdf_obj* page_obj = NULL;
+    fz_var (page_obj);
+
+    pdf_document* pdf = NULL;
+    fz_try(ctx) {
+      fz_rect mediabox = { 0, 0, (float)winw, (float)winh };
+      int i;
+
+      pdf = pdf_create_document (ctx);
+
+      contents = fz_new_buffer (ctx, 100);
+      fz_append_printf (ctx, contents, "1 0 0 RG %g w 0 0 m %g %g l 0 %g m %g 0 l s\n",
+        fz_min (mediabox.x1, mediabox.y1) / 20,
+        mediabox.x1, mediabox.y1,
+        mediabox.y1, mediabox.x1);
+
+      /* Create enough copies of our blank(ish) page so that the
+       * page number is preserved if and when a subsequent load works. */
+      page_obj = pdf_add_page (ctx, pdf, mediabox, 0, NULL, contents);
+      for (i = 0; i < pagecount; i++)
+        pdf_insert_page (ctx, pdf, -1, page_obj);
+      }
+
+    fz_always(ctx) {
+      pdf_drop_obj (ctx, page_obj);
+      fz_drop_buffer (ctx, contents);
+      }
+
+    fz_catch(ctx) {
+      fz_drop_document (ctx, (fz_document*)pdf);
+      return 1;
+      }
+
+    doc = (fz_document*)pdf;
+    return 0;
+    }
+  //}}}
+
+  //{{{
   int zoomIn (int oldres) {
 
     int i;
@@ -2155,6 +2088,61 @@ private:
         return zoomList[i];
     return zoomList[0];
     }
+  //}}}
+  //{{{
+  void onScroll (int modifiers, int dir) {
+
+    ispanning = iscopying = 0;
+    if (modifiers & (1<<2)) {
+      /* zoom in/out if ctrl is pressed */
+      if (dir < 0)
+        resolution = zoomIn (resolution);
+      else
+        resolution = zoomOut (resolution);
+      if (resolution > MAXRES)
+        resolution = MAXRES;
+      if (resolution < MINRES)
+        resolution = MINRES;
+      showPage (0, 1, 1, 0);
+    }
+    else {
+      /* scroll up/down, or left/right if
+      shift is pressed */
+      int w = fz_pixmap_width(ctx, image);
+      int h = fz_pixmap_height(ctx, image);
+      int xstep = 0;
+      int ystep = 0;
+      int pagestep = 0;
+      if (modifiers & (1<<0)) {
+        if (dir > 0 && panx >= 0)
+          pagestep = -1;
+        else if (dir < 0 && panx <= winw - w)
+          pagestep = 1;
+        else
+          xstep = 20 * dir;
+      }
+      else {
+        if (dir > 0 && pany >= 0)
+          pagestep = -1;
+        else if (dir < 0 && pany <= winh - h)
+          pagestep = 1;
+        else
+          ystep = 20 * dir;
+      }
+      if (pagestep == 0)
+        panView (panx + xstep, pany + ystep);
+      else if (pagestep > 0 && pageno < pagecount) {
+        pageno++;
+        pany = 0;
+        showPage (1, 1, 1, 0);
+      }
+      else if (pagestep < 0 && pageno > 1) {
+        pageno--;
+        pany = INT_MIN;
+        showPage (1, 1, 1, 0);
+      }
+    }
+  }
   //}}}
   };
 //}}}
@@ -2513,7 +2501,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
   char argv0[256];
   GetModuleFileNameA (NULL, argv0, sizeof argv0);
-  installApp (argv0);
+  winInstallApp (argv0);
 
   //{{{  create register window frame class
   WNDCLASS wc;
@@ -2611,7 +2599,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     strcpy (filename, argv[fz_optind++]);
     if (fz_optind < argc)
       gApp->pageno = atoi (argv[fz_optind++]);
-    gApp->open (filename, 0);
+    gApp->open (filename, 0, 0);
 
     MSG msg;
     while (GetMessage (&msg, NULL, 0, 0)) {
