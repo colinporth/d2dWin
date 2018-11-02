@@ -1190,6 +1190,138 @@ public:
     }
   //}}}
 
+  //{{{
+  void reloadPage() {
+
+    if (outline_deferred == appOUTLINE_LOAD_NOW) {
+      fz_try (ctx)
+        outline = fz_load_outline (ctx, doc);
+      fz_catch (ctx)
+        outline = NULL;
+      outline_deferred = 0;
+      }
+
+    showPage (1, 1, 1, 0);
+    }
+  //}}}
+  //{{{
+  void gotoPage (int number) {
+
+    issearching = 0;
+    InvalidateRect (hwndview, NULL, 0);
+
+    if (number < 1)
+      number = 1;
+    if (number > pagecount)
+      number = pagecount;
+
+    if (number == pageno)
+      return;
+
+    pageno = number;
+    showPage (1, 1, 1, 0);
+    }
+  //}}}
+  //{{{
+  void onResize (int w, int h) {
+
+    if (winw != w || winh != h) {
+      winw = w;
+      winh = h;
+      panView (panx, pany);
+      InvalidateRect (hwndview, NULL, 0);
+      }
+    }
+  //}}}
+  //{{{
+  void autoZoomVertical() {
+
+    resolution *= (float) winh / fz_pixmap_height(ctx, image);
+    if (resolution > MAXRES)
+      resolution = MAXRES;
+    else if (resolution < MINRES)
+      resolution = MINRES;
+
+    showPage (0, 1, 1, 0);
+    }
+  //}}}
+  //{{{
+  void autoZoomHorizontal() {
+
+    resolution *= (float) winw / fz_pixmap_width(ctx, image);
+    if (resolution > MAXRES)
+      resolution = MAXRES;
+    else if (resolution < MINRES)
+      resolution = MINRES;
+
+    showPage (0, 1, 1, 0);
+    }
+  //}}}
+  //{{{
+  void autoZoom() {
+
+    float page_aspect = (float) fz_pixmap_width (ctx, image) / fz_pixmap_height (ctx, image);
+    float win_aspect = (float) winw / winh;
+    if (page_aspect > win_aspect)
+      autoZoomHorizontal();
+    else
+      autoZoomVertical();
+    }
+  //}}}
+  //{{{
+  void doSearch (enum panning* panto, int dir) {
+
+    /* abort if no search string */
+    if (search[0] == 0) {
+      InvalidateRect (hwndview, NULL, 0);
+      return;
+      }
+
+    winCursor (WAIT);
+
+    int firstpage = pageno;
+
+    int page;
+    if (searchpage == pageno)
+      page = pageno + dir;
+    else
+      page = pageno;
+    if (page < 1)
+      page = pagecount;
+    if (page > pagecount)
+      page = 1;
+
+    do {
+      if (page != pageno) {
+        pageno = page;
+        showPage (1, 0, 0, 1);
+        }
+
+      hit_count = fz_search_stext_page (ctx, page_text, search, hit_bbox, nelem(hit_bbox));
+      if (hit_count > 0) {
+        *panto = dir == 1 ? PAN_TO_TOP : PAN_TO_BOTTOM;
+        searchpage = pageno;
+        winCursor (HAND);
+        InvalidateRect (hwndview, NULL, 0);
+        return;
+        }
+
+      page += dir;
+      if (page < 1)
+        page = pagecount;
+      if (page > pagecount)
+        page = 1;
+      } while (page != firstpage);
+
+      winWarn ("String '%s' not found.", search);
+
+    pageno = firstpage;
+    showPage (1, 0, 0, 0);
+    winCursor (HAND);
+    InvalidateRect (hwndview, NULL, 0);
+    }
+  //}}}
+
   fz_context* ctx;
 
   fz_document* doc;
@@ -1213,8 +1345,6 @@ public:
   fz_colorspace* colorspace;
   int invert;
   int tint, tint_r, tint_g, tint_b;
-
-  clock_t start_time;
 
   /* current page params */
   int pageno;
@@ -1334,160 +1464,6 @@ void winInfo() {
   }
 //}}}
 
-static const int zoomList[] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
-//{{{
-int zoomIn (int oldres) {
-
-  int i;
-  for (i = 0; i < nelem (zoomList) - 1; ++i)
-    if (zoomList[i] <= oldres && zoomList[i+1] > oldres)
-      return zoomList[i+1];
-  return zoomList[i];
-  }
-//}}}
-//{{{
-int zoomOut (int oldres) {
-
-  int i;
-  for (i = 0; i < nelem (zoomList) - 1; ++i)
-    if (zoomList[i] < oldres && zoomList[i+1] >= oldres)
-      return zoomList[i];
-  return zoomList[0];
-  }
-//}}}
-
-//{{{
-void appreloadpage (cApp* app) {
-
-  if (app->outline_deferred == appOUTLINE_LOAD_NOW) {
-    fz_try(app->ctx)
-      app->outline = fz_load_outline (app->ctx, app->doc);
-    fz_catch(app->ctx)
-      app->outline = NULL;
-    app->outline_deferred = 0;
-    }
-
-  app->showPage (1, 1, 1, 0);
-  }
-//}}}
-//{{{
-void appgotopage (cApp* app, int number) {
-
-  app->issearching = 0;
-  InvalidateRect (hwndview, NULL, 0);
-
-  if (number < 1)
-    number = 1;
-  if (number > app->pagecount)
-    number = app->pagecount;
-
-  if (number == app->pageno)
-    return;
-
-  app->pageno = number;
-  app->showPage (1, 1, 1, 0);
-  }
-//}}}
-//{{{
-void apponresize (cApp* app, int w, int h) {
-
-  if (app->winw != w || app->winh != h) {
-    app->winw = w;
-    app->winh = h;
-    app->panView (app->panx, app->pany);
-    InvalidateRect (hwndview, NULL, 0);
-    }
-  }
-//}}}
-//{{{
-void appautozoom_vertical (cApp* app) {
-
-  app->resolution *= (float) app->winh / fz_pixmap_height(app->ctx, app->image);
-  if (app->resolution > MAXRES)
-    app->resolution = MAXRES;
-  else if (app->resolution < MINRES)
-    app->resolution = MINRES;
-
-  app->showPage (0, 1, 1, 0);
-  }
-//}}}
-//{{{
-void appautozoom_horizontal (cApp* app) {
-
-  app->resolution *= (float) app->winw / fz_pixmap_width(app->ctx, app->image);
-  if (app->resolution > MAXRES)
-    app->resolution = MAXRES;
-  else if (app->resolution < MINRES)
-    app->resolution = MINRES;
-
-  app->showPage (0, 1, 1, 0);
-  }
-//}}}
-//{{{
-void appautozoom (cApp* app) {
-
-  float page_aspect = (float) fz_pixmap_width (app->ctx, app->image) / fz_pixmap_height (app->ctx, app->image);
-  float win_aspect = (float) app->winw / app->winh;
-  if (page_aspect > win_aspect)
-    appautozoom_horizontal (app);
-  else
-    appautozoom_vertical (app);
-  }
-//}}}
-//{{{
-void appsearch (cApp* app, enum panning* panto, int dir) {
-
-  /* abort if no search string */
-  if (app->search[0] == 0) {
-    InvalidateRect (hwndview, NULL, 0);
-    return;
-    }
-
-  winCursor (WAIT);
-
-  int firstpage = app->pageno;
-
-  int page;
-  if (app->searchpage == app->pageno)
-    page = app->pageno + dir;
-  else
-    page = app->pageno;
-  if (page < 1)
-    page = app->pagecount;
-  if (page > app->pagecount)
-    page = 1;
-
-  do {
-    if (page != app->pageno) {
-      app->pageno = page;
-      app->showPage (1, 0, 0, 1);
-      }
-
-    app->hit_count = fz_search_stext_page (app->ctx, app->page_text, app->search, app->hit_bbox, nelem(app->hit_bbox));
-    if (app->hit_count > 0) {
-      *panto = dir == 1 ? PAN_TO_TOP : PAN_TO_BOTTOM;
-      app->searchpage = app->pageno;
-      winCursor (HAND);
-      InvalidateRect (hwndview, NULL, 0);
-      return;
-      }
-
-    page += dir;
-    if (page < 1)
-      page = app->pagecount;
-    if (page > app->pagecount)
-      page = 1;
-    } while (page != firstpage);
-
-    winWarn ("String '%s' not found.", app->search);
-
-  app->pageno = firstpage;
-  app->showPage (1, 0, 0, 0);
-  winCursor (HAND);
-  InvalidateRect (hwndview, NULL, 0);
-  }
-//}}}
-
 //{{{
 void apponcopy (cApp* app, unsigned short *ucsbuf, int ucslen) {
 
@@ -1563,6 +1539,27 @@ void winDoCopy (cApp* app) {
   }
 //}}}
 
+static const int zoomList[] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
+//{{{
+int zoomIn (int oldres) {
+
+  int i;
+  for (i = 0; i < nelem (zoomList) - 1; ++i)
+    if (zoomList[i] <= oldres && zoomList[i+1] > oldres)
+      return zoomList[i+1];
+  return zoomList[i];
+  }
+//}}}
+//{{{
+int zoomOut (int oldres) {
+
+  int i;
+  for (i = 0; i < nelem (zoomList) - 1; ++i)
+    if (zoomList[i] < oldres && zoomList[i+1] >= oldres)
+      return zoomList[i];
+  return zoomList[0];
+  }
+//}}}
 //{{{
 void onKey (cApp* app, int c, int modifiers) {
 
@@ -1669,17 +1666,17 @@ void onKey (cApp* app, int c, int modifiers) {
     //}}}
     //{{{
     case 'W':
-      appautozoom_horizontal(app);
+      app->autoZoomHorizontal();
       break;
     //}}}
     //{{{
     case 'H':
-      appautozoom_vertical(app);
+      app->autoZoomVertical();
       break;
     //}}}
     //{{{
     case 'Z':
-      appautozoom(app);
+      app->autoZoom();
       break;
     //}}}
     //{{{
@@ -1791,14 +1788,14 @@ void onKey (cApp* app, int c, int modifiers) {
     //{{{
     case '\r':
       if (app->numberlen > 0)
-        appgotopage(app, atoi(app->number));
+        app->gotoPage (atoi(app->number));
       else
-        appgotopage(app, 1);
+        app->gotoPage (1);
       break;
     //}}}
     //{{{
     case 'G':
-      appgotopage(app, app->pagecount);
+      app->gotoPage (app->pagecount);
       break;
     //}}}
     //{{{
@@ -1890,18 +1887,18 @@ void onKey (cApp* app, int c, int modifiers) {
     //{{{
     case 'n':
       if (app->searchdir > 0)
-        appsearch (app, &panto, 1);
+        app->doSearch (&panto, 1);
       else
-        appsearch (app, &panto, -1);
+        app->doSearch (&panto, -1);
       loadpage = 0;
       break;
     //}}}
     //{{{
     case 'N':
       if (app->searchdir > 0)
-        appsearch (app, &panto, -1);
+        app->doSearch(&panto, -1);
       else
-        appsearch (app, &panto, 1);
+        app->doSearch(&panto, 1);
       loadpage = 0;
       break;
     //}}}
@@ -2156,7 +2153,7 @@ void onMouse (cApp* app, int x, int y, int btn, int modifiers, int state) {
         //appgotouri (app, link->uri);
         }
       else
-        appgotopage (app, fz_resolve_link(ctx, app->doc, link->uri, NULL, NULL) + 1);
+        app->gotoPage(fz_resolve_link(ctx, app->doc, link->uri, NULL, NULL) + 1);
       return;
       }
     }
@@ -2362,7 +2359,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       if (wParam == SIZE_MAXIMIZED)
         gApp->shrinkwrap = 0;
 
-      apponresize (gApp, LOWORD(lParam), HIWORD(lParam));
+      gApp->onResize (LOWORD(lParam), HIWORD(lParam));
       break;
     //}}}
     //{{{
@@ -2484,7 +2481,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     /* We use WM_APP to trigger a reload and repaint of a page */
     case WM_APP:
-      appreloadpage (gApp);
+      gApp->reloadPage();
       break;
     //}}}
     }
