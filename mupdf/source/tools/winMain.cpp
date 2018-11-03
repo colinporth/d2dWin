@@ -55,10 +55,7 @@
 //{{{  enums
 enum { ARROW, HAND, WAIT, CARET };
 enum { DISCARD, SAVE, CANCEL };
-enum { QUERY_NO, QUERY_YES };
-
-enum panning { DONT_PAN = 0, PAN_TO_TOP, PAN_TO_BOTTOM };
-
+enum ePanning { DONT_PAN = 0, PAN_TO_TOP, PAN_TO_BOTTOM };
 enum { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 //}}}
 
@@ -402,25 +399,6 @@ int winChoiceInput (int nopts, const char* opts[], int* nvals, const char* vals[
   }
 //}}}
 //{{{
-void winDrawRect (int x0, int y0, int x1, int y1) {
-
-  RECT r;
-  r.left = x0;
-  r.top = y0;
-  r.right = x1;
-  r.bottom = y1;
-  FillRect (hdc, &r, (HBRUSH)GetStockObject(WHITE_BRUSH));
-  }
-//}}}
-//{{{
-void winDrawString (int x, int y, char *s) {
-
-  HFONT font = (HFONT)GetStockObject (ANSI_FIXED_FONT);
-  SelectObject (hdc, font);
-  TextOutA (hdc, x, y - 12, s, (int)strlen(s));
-  }
-//}}}
-//{{{
 void winInstallApp (char* argv0) {
 
   HKEY software, classes, mupdf, dotpdf, dotxps, dotepub, dotfb2;
@@ -516,18 +494,6 @@ public:
     tint_r = 255;
     tint_g = 250;
     tint_b = 240;
-    }
-  //}}}
-
-  //{{{
-  void blitSearch() {
-
-    if (isSearching) {
-      char buf[sizeof (search) + 50];
-      sprintf (buf, "Search: %s", search);
-      winDrawRect (0, 0, winw, 30);
-      winDrawString (10, 20, buf);
-      }
     }
   //}}}
 
@@ -968,7 +934,7 @@ public:
   //}}}
 
   //{{{
-  void doSearch (enum panning* panTo, int dir) {
+  void doSearch (enum ePanning* panTo, int dir) {
 
     /* abort if no search string */
     if (search[0] == 0) {
@@ -1097,7 +1063,7 @@ public:
   void onKey (int c, int modifiers) {
 
     int oldpage = mPageNumber;
-    enum panning panTo = PAN_TO_TOP;
+    enum ePanning panTo = PAN_TO_TOP;
     int loadpage = 1;
 
     if (isSearching) {
@@ -1575,12 +1541,12 @@ public:
 
     if (state == 1 && !processed) {
       if (btn == 1 && !iscopying) {
-        ispanning = 1;
+        isPanning = 1;
         selx = x;
         sely = y;
         beyondy = 0;
         }
-      if (btn == 3 && !ispanning) {
+      if (btn == 3 && !isPanning) {
         iscopying = 1;
         selx = x;
         sely = y;
@@ -1609,9 +1575,9 @@ public:
           doCopy();
         }
         //}}}
-      ispanning = 0;
+      isPanning = 0;
       }
-    else if (ispanning) {
+    else if (isPanning) {
       //{{{  panning
       int newx = panx + x - selx;
       int newy = pany + y - sely;
@@ -1733,7 +1699,7 @@ public:
   char number[256];
   int numberlen;
 
-  int ispanning;
+  int isPanning;
   int panx, pany;
 
   int iscopying;
@@ -1904,7 +1870,7 @@ private:
   //{{{
   void onScroll (int modifiers, int dir) {
 
-    ispanning = iscopying = 0;
+    isPanning = iscopying = 0;
     if (modifiers & (1<<2)) {
       /* zoom in/out if ctrl is pressed */
       if (dir < 0)
