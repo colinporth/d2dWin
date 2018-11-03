@@ -62,11 +62,12 @@ enum eOutline { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 HWND gHwndFrame = NULL;
 HWND gHwndView = NULL;
 
-BITMAPINFO* gDibinf = NULL;
 HCURSOR gArrowCursor;
 HCURSOR gHandCursor;
 HCURSOR gWaitCursor;
 HCURSOR gCaretCursor;
+
+BITMAPINFO* gBitMapInfo = NULL;
 
 int td_retry = 0;
 char td_textinput[1024] = "";
@@ -993,7 +994,7 @@ public:
 
     fz_stext_page* page = page_text;
     for (fz_stext_block* block = page->first_block; block; block = block->next) {
-      if (block->type != FZ_STEXT_BLOCK_TEXT) 
+      if (block->type != FZ_STEXT_BLOCK_TEXT)
         continue;
 
       for (fz_stext_line* line = block->u.t.first_line; line; line = line->next) {
@@ -2311,16 +2312,16 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   gCaretCursor = LoadCursor (NULL, IDC_IBEAM);
   //}}}
   //{{{  init DIB info for buffer
-  gDibinf = (BITMAPINFO*)malloc (sizeof(BITMAPINFO) + 12);
-  gDibinf->bmiHeader.biSize = sizeof (gDibinf->bmiHeader);
-  gDibinf->bmiHeader.biPlanes = 1;
-  gDibinf->bmiHeader.biBitCount = 32;
-  gDibinf->bmiHeader.biCompression = BI_RGB;
-  gDibinf->bmiHeader.biXPelsPerMeter = 2834;
-  gDibinf->bmiHeader.biYPelsPerMeter = 2834;
-  gDibinf->bmiHeader.biClrUsed = 0;
-  gDibinf->bmiHeader.biClrImportant = 0;
-  gDibinf->bmiHeader.biClrUsed = 0;
+  gBitMapInfo = (BITMAPINFO*)malloc (sizeof(BITMAPINFO) + 12);
+  gBitMapInfo->bmiHeader.biSize = sizeof (gBitMapInfo->bmiHeader);
+  gBitMapInfo->bmiHeader.biPlanes = 1;
+  gBitMapInfo->bmiHeader.biBitCount = 32;
+  gBitMapInfo->bmiHeader.biCompression = BI_RGB;
+  gBitMapInfo->bmiHeader.biXPelsPerMeter = 2834;
+  gBitMapInfo->bmiHeader.biYPelsPerMeter = 2834;
+  gBitMapInfo->bmiHeader.biClrUsed = 0;
+  gBitMapInfo->bmiHeader.biClrImportant = 0;
+  gBitMapInfo->bmiHeader.biClrUsed = 0;
   //}}}
   //{{{  create window
   gHwndFrame = CreateWindowW (L"FrameWindow", // window class name
@@ -2373,7 +2374,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     gPdf->closeFile();
     }
 
-  free (gDibinf);
+  free (gBitMapInfo);
   fz_drop_context (gPdf->mContext);
   fz_free_argv (argc, argv);
 
