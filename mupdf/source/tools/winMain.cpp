@@ -613,17 +613,17 @@ public:
   //{{{
   void closeFile() {
 
-    fz_drop_display_list (mContext, page_list);
-    page_list = NULL;
+    fz_drop_display_list (mContext, mPageList);
+    mPageList = NULL;
 
-    fz_drop_display_list (mContext, annotations_list);
-    annotations_list = NULL;
+    fz_drop_display_list (mContext, mAnnotationsList);
+    mAnnotationsList = NULL;
 
-    fz_drop_stext_page (mContext, page_text);
-    page_text = NULL;
+    fz_drop_stext_page (mContext, mPageText);
+    mPageText = NULL;
 
-    fz_drop_link (mContext, page_links);
-    page_links = NULL;
+    fz_drop_link (mContext, mPageLinks);
+    mPageLinks = NULL;
 
     fz_free (mContext, mDocTitle);
     mDocTitle = NULL;
@@ -637,8 +637,8 @@ public:
     fz_drop_outline (mContext, outline);
     outline = NULL;
 
-    fz_drop_page (mContext, page);
-    page = NULL;
+    fz_drop_page (mContext, mPage);
+    mPage = NULL;
 
     fz_drop_document (mContext, mDocument);
     mDocument = NULL;
@@ -662,25 +662,25 @@ public:
     mErrored = 0;
     incomplete = 0;
 
-    fz_drop_display_list (mContext, page_list);
-    fz_drop_display_list (mContext, annotations_list);
-    fz_drop_stext_page (mContext, page_text);
-    fz_drop_link (mContext, page_links);
-    fz_drop_page (mContext, page);
+    fz_drop_display_list (mContext, mPageList);
+    fz_drop_display_list (mContext, mAnnotationsList);
+    fz_drop_stext_page (mContext, mPageText);
+    fz_drop_link (mContext, mPageLinks);
+    fz_drop_page (mContext, mPage);
 
-    page_list = NULL;
-    annotations_list = NULL;
-    page_text = NULL;
-    page_links = NULL;
-    page = NULL;
-    page_bbox.x0 = 0;
-    page_bbox.y0 = 0;
-    page_bbox.x1 = 100;
-    page_bbox.y1 = 100;
+    mPageList = NULL;
+    mAnnotationsList = NULL;
+    mPageText = NULL;
+    mPageLinks = NULL;
+    mPage = NULL;
+    mPageBoundingBox.x0 = 0;
+    mPageBoundingBox.y0 = 0;
+    mPageBoundingBox.x1 = 100;
+    mPageBoundingBox.y1 = 100;
 
     fz_try (mContext) {
-      page = fz_load_page (mContext, mDocument, mPageNumber - 1);
-      page_bbox = fz_bound_page (mContext, page);
+      mPage = fz_load_page (mContext, mDocument, mPageNumber - 1);
+      mPageBoundingBox = fz_bound_page (mContext, mPage);
       }
     fz_catch (mContext) {
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
@@ -696,19 +696,19 @@ public:
     fz_var (mdev);
     fz_try (mContext) {
       /* Create display lists */
-      page_list = fz_new_display_list (mContext, fz_infinite_rect);
-      mdev = fz_new_list_device (mContext, page_list);
+      mPageList = fz_new_display_list (mContext, fz_infinite_rect);
+      mdev = fz_new_list_device (mContext, mPageList);
       if (no_cache)
         fz_enable_device_hints (mContext, mdev, FZ_NO_CACHE);
       cookie.incomplete_ok = 1;
-      fz_run_page_contents (mContext, page, mdev, fz_identity, &cookie);
+      fz_run_page_contents (mContext, mPage, mdev, fz_identity, &cookie);
       fz_close_device (mContext, mdev);
       fz_drop_device (mContext, mdev);
 
       mdev = NULL;
-      annotations_list = fz_new_display_list (mContext, fz_infinite_rect);
-      mdev = fz_new_list_device (mContext, annotations_list);
-      for (fz_annot* annot = fz_first_annot (mContext, page); annot; annot = fz_next_annot(mContext, annot))
+      mAnnotationsList = fz_new_display_list (mContext, fz_infinite_rect);
+      mdev = fz_new_list_device (mContext, mAnnotationsList);
+      for (fz_annot* annot = fz_first_annot (mContext, mPage); annot; annot = fz_next_annot(mContext, annot))
         fz_run_annot (mContext, annot, mdev, fz_identity, &cookie);
       if (cookie.incomplete)
         incomplete = 1;
@@ -731,7 +731,7 @@ public:
       }
 
     fz_try (mContext) {
-      page_links = fz_load_links (mContext, page);
+      mPageLinks = fz_load_links (mContext, mPage);
       }
     fz_catch (mContext) {
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
@@ -744,7 +744,7 @@ public:
   //{{{
   void updatePage() {
 
-    if (pdf_update_page (mContext, (pdf_page*)page)) {
+    if (pdf_update_page (mContext, (pdf_page*)mPage)) {
       recreateAnnotations();
       showPage (0, 1, 1, 0);
       }
@@ -798,16 +798,16 @@ public:
       hit_count = 0;
 
       /* Extract text */
-      fz_rect mediabox = fz_bound_page (mContext, page);
-      page_text = fz_new_stext_page (mContext, mediabox);
+      fz_rect mediabox = fz_bound_page (mContext, mPage);
+      mPageText = fz_new_stext_page (mContext, mediabox);
 
-      if (page_list || annotations_list) {
-        fz_device* tdev = fz_new_stext_device (mContext, page_text, NULL);
+      if (mPageList || mAnnotationsList) {
+        fz_device* tdev = fz_new_stext_device (mContext, mPageText, NULL);
         fz_try (mContext) {
-          if (page_list)
-            fz_run_display_list (mContext, page_list, tdev, fz_identity, fz_infinite_rect, &cookie);
-          if (annotations_list)
-            fz_run_display_list (mContext, annotations_list, tdev, fz_identity, fz_infinite_rect, &cookie);
+          if (mPageList)
+            fz_run_display_list (mContext, mPageList, tdev, fz_identity, fz_infinite_rect, &cookie);
+          if (mAnnotationsList)
+            fz_run_display_list (mContext, mAnnotationsList, tdev, fz_identity, fz_infinite_rect, &cookie);
           fz_close_device (mContext, tdev);
           }
         fz_always (mContext)
@@ -833,8 +833,8 @@ public:
         sprintf (buf, "%s%s", mDocTitle, buf2);
       winTitle (buf);
 
-      fz_matrix ctm = fz_transform_page (page_bbox, resolution, rotate);
-      fz_rect bounds = fz_transform_rect (page_bbox, ctm);
+      fz_matrix ctm = fz_transform_page (mPageBoundingBox, resolution, rotate);
+      fz_rect bounds = fz_transform_rect (mPageBoundingBox, ctm);
       fz_irect ibounds = fz_round_rect (bounds);
       bounds = fz_rect_from_irect (ibounds);
 
@@ -856,12 +856,12 @@ public:
       fz_try (mContext) {
         image = fz_new_pixmap_with_bbox (mContext, colorspace, ibounds, NULL, 1);
         fz_clear_pixmap_with_value (mContext, image, 255);
-        if (page_list || annotations_list) {
+        if (mPageList || mAnnotationsList) {
           idev = fz_new_draw_device (mContext, fz_identity, image);
-          if (page_list)
-            fz_run_display_list (mContext, page_list, idev, ctm, bounds, &cookie);
-          if (annotations_list)
-            fz_run_display_list (mContext, annotations_list, idev, ctm, bounds, &cookie);
+          if (mPageList)
+            fz_run_display_list (mContext, mPageList, idev, ctm, bounds, &cookie);
+          if (mAnnotationsList)
+            fz_run_display_list (mContext, mAnnotationsList, idev, ctm, bounds, &cookie);
           fz_close_device (mContext, idev);
           }
         if (invert)
@@ -956,7 +956,7 @@ public:
         showPage (1, 0, 0, 1);
         }
 
-      hit_count = fz_search_stext_page (mContext, page_text, search, hit_bbox, nelem (hit_bbox));
+      hit_count = fz_search_stext_page (mContext, mPageText, search, hit_bbox, nelem (hit_bbox));
       if (hit_count > 0) {
         *panTo = dir == 1 ? PAN_TO_TOP : PAN_TO_BOTTOM;
         searchpage = mPageNumber;
@@ -984,7 +984,7 @@ public:
   //{{{
   void onCopy (unsigned short *ucsbuf, int ucslen) {
 
-    fz_matrix ctm = fz_transform_page (page_bbox, resolution, rotate);
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, resolution, rotate);
     ctm = fz_invert_matrix (ctm);
 
     fz_rect sel = fz_transform_rect (selr, ctm);
@@ -992,7 +992,7 @@ public:
     int p = 0;
     int need_newline = 0;
 
-    fz_stext_page* page = page_text;
+    fz_stext_page* page = mPageText;
     for (fz_stext_block* block = page->first_block; block; block = block->next) {
       if (block->type != FZ_STEXT_BLOCK_TEXT)
         continue;
@@ -1392,7 +1392,7 @@ public:
     p.x = x - panx + irect.x0;
     p.y = y - pany + irect.y0;
 
-    fz_matrix ctm = fz_transform_page (page_bbox, resolution, rotate);
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, resolution, rotate);
     ctm = fz_invert_matrix (ctm);
 
     p = fz_transform_point (p, ctm);
@@ -1410,7 +1410,7 @@ public:
       else /* state == -1 */
         event.event.pointer.ptype = PDF_POINTER_UP;
 
-      if (idoc && pdf_pass_event (mContext, idoc, (pdf_page*)page, &event)) {
+      if (idoc && pdf_pass_event (mContext, idoc, (pdf_page*)mPage, &event)) {
         pdf_widget* widget = pdf_focused_widget (mContext, idoc);
         nowaitcursor = 1;
         updatePage();
@@ -1498,7 +1498,7 @@ public:
         }
       }
 
-    for (link = page_links; link; link = link->next)
+    for (link = mPageLinks; link; link = link->next)
       if (p.x >= link->rect.x0 && p.x <= link->rect.x1)
         if (p.y >= link->rect.y0 && p.y <= link->rect.y1)
           break;
@@ -1517,8 +1517,8 @@ public:
       }
       //}}}
     else {
-      fz_annot *annot;
-      for (annot = fz_first_annot (mContext, page); annot; annot = fz_next_annot (mContext, annot)) {
+      fz_annot* annot;
+      for (annot = fz_first_annot (mContext, mPage); annot; annot = fz_next_annot (mContext, annot)) {
         fz_rect rect = fz_bound_annot(mContext, annot);
         if (x >= rect.x0 && x < rect.x1)
           if (y >= rect.y0 && y < rect.y1)
@@ -1649,14 +1649,13 @@ public:
   int mPageCount;
   int mPageNumber;
 
-  fz_page* page;
-  fz_rect page_bbox;
+  fz_page* mPage;
+  fz_rect mPageBoundingBox;
 
-  fz_display_list* page_list;
-  fz_display_list* annotations_list;
-
-  fz_stext_page* page_text;
-  fz_link* page_links;
+  fz_display_list* mPageList;
+  fz_display_list* mAnnotationsList;
+  fz_stext_page* mPageText;
+  fz_link* mPageLinks;
 
   int mErrored;
   int incomplete;
@@ -1763,16 +1762,16 @@ private:
     fz_device* mdev = NULL;
     fz_var (mdev);
 
-    fz_drop_display_list (mContext, annotations_list);
-    annotations_list = NULL;
+    fz_drop_display_list (mContext, mAnnotationsList);
+    mAnnotationsList = NULL;
 
     fz_try (mContext) {
       /* Create display list */
-      annotations_list = fz_new_display_list(mContext, fz_infinite_rect);
-      mdev = fz_new_list_device (mContext, annotations_list);
+      mAnnotationsList = fz_new_display_list(mContext, fz_infinite_rect);
+      mdev = fz_new_list_device (mContext, mAnnotationsList);
 
       fz_annot* annot;
-      for (annot = fz_first_annot (mContext, page); annot; annot = fz_next_annot(mContext, annot))
+      for (annot = fz_first_annot (mContext, mPage); annot; annot = fz_next_annot(mContext, annot))
         fz_run_annot (mContext, annot, mdev, fz_identity, &cookie);
 
       if (cookie.incomplete)
@@ -1795,7 +1794,7 @@ private:
   //{{{
   void invertHit() {
 
-    fz_matrix ctm = fz_transform_page (page_bbox, resolution, rotate);
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, resolution, rotate);
 
     for (int i = 0; i < hit_count; i++) {
       fz_rect bbox;
