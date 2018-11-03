@@ -511,7 +511,7 @@ public:
         mDocument = fz_open_document (mContext, filename);
       else {
         fz_stream* stream = fz_open_file_progressive (mContext, filename, bps);
-        while (1) {
+        while (true) {
           fz_try (mContext) {
             fz_seek (mContext, stream, 0, SEEK_SET);
             mDocument = fz_open_document_with_stream (mContext, filename, stream);
@@ -557,7 +557,7 @@ public:
 
       fz_layout_document (mContext, mDocument, layout_w, layout_h, layout_em);
 
-      while (1) {
+      while (true) {
         fz_try(mContext) {
           mPageCount = fz_count_pages (mContext, mDocument);
           if (mPageCount <= 0)
@@ -573,7 +573,7 @@ public:
         break;
         }
 
-      while (1) {
+      while (true) {
         fz_try (mContext) {
           outline = fz_load_outline (mContext, mDocument);
           }
@@ -983,11 +983,6 @@ public:
   //{{{
   void onCopy (unsigned short *ucsbuf, int ucslen) {
 
-    fz_stext_page* page = page_text;
-    fz_stext_block *block;
-    fz_stext_line* line;
-    fz_stext_char* ch;
-
     fz_matrix ctm = fz_transform_page (page_bbox, resolution, rotate);
     ctm = fz_invert_matrix (ctm);
 
@@ -996,12 +991,14 @@ public:
     int p = 0;
     int need_newline = 0;
 
-    for (block = page->first_block; block; block = block->next) {
-      if (block->type != FZ_STEXT_BLOCK_TEXT) continue;
+    fz_stext_page* page = page_text;
+    for (fz_stext_block* block = page->first_block; block; block = block->next) {
+      if (block->type != FZ_STEXT_BLOCK_TEXT) 
+        continue;
 
-      for (line = block->u.t.first_line; line; line = line->next) {
+      for (fz_stext_line* line = block->u.t.first_line; line; line = line->next) {
         int saw_text = 0;
-        for (ch = line->first_char; ch; ch = ch->next) {
+        for (fz_stext_char* ch = line->first_char; ch; ch = ch->next) {
           fz_rect bbox = fz_rect_from_quad(ch->quad);
           int c = ch->c;
           if (c < 32)
@@ -2065,6 +2062,7 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       PAINTSTRUCT ps;
       BeginPaint (hwnd, &ps);
       EndPaint (hwnd, &ps);
+
       return 0;
       }
     //}}}
@@ -2079,30 +2077,25 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       oldx = x;
       oldy = y;
       handleMouse (x, y, 1, 1);
+
       return 0;
     //}}}
+    //{{{
+    case WM_LBUTTONUP:
+      oldx = x;
+      oldy = y;
+      handleMouse (x, y, 1, -1);
+
+      return 0;
+    //}}}
+
     //{{{
     case WM_MBUTTONDOWN:
       SetFocus (gHwndView);
       oldx = x;
       oldy = y;
       handleMouse (x, y, 2, 1);
-      return 0;
-    //}}}
-    //{{{
-    case WM_RBUTTONDOWN:
-      SetFocus (gHwndView);
-      oldx = x;
-      oldy = y;
-      handleMouse (x, y, 3, 1);
-      return 0;
-    //}}}
 
-    //{{{
-    case WM_LBUTTONUP:
-      oldx = x;
-      oldy = y;
-      handleMouse (x, y, 1, -1);
       return 0;
     //}}}
     //{{{
@@ -2110,6 +2103,17 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       oldx = x;
       oldy = y;
       handleMouse (x, y, 2, -1);
+
+      return 0;
+    //}}}
+
+    //{{{
+    case WM_RBUTTONDOWN:
+      SetFocus (gHwndView);
+      oldx = x;
+      oldy = y;
+      handleMouse (x, y, 3, 1);
+
       return 0;
     //}}}
     //{{{
@@ -2117,6 +2121,7 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       oldx = x;
       oldy = y;
       handleMouse(x, y, 3, -1);
+
       return 0;
     //}}}
 
@@ -2157,6 +2162,7 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
           handleMouse (oldx, oldy, 0, 0);  /* update cursor */
           return 0;
         }
+
       return 1;
     //}}}
     //{{{
@@ -2166,6 +2172,7 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
         handleKey (wParam);
         handleMouse (oldx, oldy, 0, 0);  /* update cursor */
         }
+
       return 0;
     //}}}
 
