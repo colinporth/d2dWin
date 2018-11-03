@@ -66,32 +66,34 @@ enum { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 HWND hwndframe = NULL;
 HWND hwndview = NULL;
 HDC hdc;
-HBRUSH bgbrush;
-HBRUSH shbrush;
 BITMAPINFO* dibinf = NULL;
-HCURSOR arrowCursor, handCursor, waitCursor, caretCursor;
-
-int justcopied = 0;
+HCURSOR arrowCursor;
+HCURSOR handCursor;
+HCURSOR waitCursor ;
+HCURSOR caretCursor;
 
 wchar_t wbuf[PATH_MAX];
 char filename[PATH_MAX];
 
 char td_textinput[1024] = "";
 int td_retry = 0;
+
 int cd_nopts;
 int* cd_nvals;
 const char** cd_opts;
 const char** cd_vals;
 int pd_okay = 0;
+
+bool gJustCopied = false;
 //}}}
 
 //{{{
-char* version() {
+char* versionStr() {
   return "MuPDF " FZ_VERSION "\n" "Copyright 2006-2017 Artifex Software, Inc.\n";
   }
 //}}}
 //{{{
-char* usage() {
+char* usageStr() {
   return
     "L\t\t-- rotate left\n"
     "R\t\t-- rotate right\n"
@@ -129,8 +131,8 @@ INT_PTR CALLBACK dlogAboutProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM l
 
   switch(message) {
     case WM_INITDIALOG:
-      SetDlgItemTextA (hwnd, 2, version());
-      SetDlgItemTextA (hwnd, 3, usage());
+      SetDlgItemTextA (hwnd, 2, versionStr());
+      SetDlgItemTextA (hwnd, 3, usageStr());
       return TRUE;
 
     case WM_COMMAND:
@@ -505,8 +507,6 @@ public:
     mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
     colorspace = fz_device_bgr (mContext);
 
-    scrw = 640;
-    scrh = 480;
     resolution = 96;
 
     layout_w = 450;
@@ -1106,7 +1106,7 @@ public:
     SetClipboardData (CF_UNICODETEXT, handle);
     CloseClipboard();
 
-    justcopied = 1; /* keep inversion around for a while... */
+    gJustCopied = true;
     }
   //}}}
 
@@ -2038,13 +2038,13 @@ void winInfo() {
 //{{{
 void handleKey (int c) {
 
-  int modifier = (GetAsyncKeyState(VK_SHIFT) < 0) | ((GetAsyncKeyState(VK_CONTROL) < 0) << 2);
+  int modifier = (GetAsyncKeyState (VK_SHIFT) < 0) | ((GetAsyncKeyState (VK_CONTROL) < 0) << 2);
 
   if (GetCapture() == hwndview)
     return;
 
-  if (justcopied) {
-    justcopied = 0;
+  if (gJustCopied) {
+    gJustCopied = false;
     InvalidateRect (hwndview, NULL, 0);
     }
 
@@ -2069,10 +2069,10 @@ void handleKey (int c) {
 //{{{
 void handleMouse (int x, int y, int btn, int state) {
 
-  int modifier = (GetAsyncKeyState(VK_SHIFT) < 0) | ((GetAsyncKeyState (VK_CONTROL) < 0) << 2);
+  int modifier = (GetAsyncKeyState (VK_SHIFT) < 0) | ((GetAsyncKeyState (VK_CONTROL) < 0) << 2);
 
-  if (state != 0 && justcopied) {
-    justcopied = 0;
+  if ((state != 0) && gJustCopied) {
+    gJustCopied = false;
     InvalidateRect (hwndview, NULL, 0);
     }
 
@@ -2090,8 +2090,8 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
   static int oldx = 0;
   static int oldy = 0;
 
-  int x = (signed short) LOWORD(lParam);
-  int y = (signed short) HIWORD(lParam);
+  int x = (signed short)LOWORD(lParam);
+  int y = (signed short)HIWORD(lParam);
 
   switch (message) {
     //{{{
@@ -2281,30 +2281,22 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
   gApp = new cApp();
 
+  // get command line
   int argc;
   LPWSTR* wargv = CommandLineToArgvW (GetCommandLineW(), &argc);
   char** argv = fz_argv_from_wargv (argc, wargv);
-
+  //{{{  get options
   int c;
-  while ((c = fz_getopt(argc, argv, "Ip:r:A:C:W:H:S:U:Xb:")) != -1) {
+  while ((c = fz_getopt (argc, argv, "A:B:C:")) != -1) {
     switch (c) {
-      case 'C':
-        c = strtol (fz_optarg, NULL, 16);
-        gApp->tint = 1;
-        gApp->tint_r = (c >> 16) & 255;
-        gApp->tint_g = (c >> 8) & 255;
-        gApp->tint_b = (c) & 255;
-        break;
-      case 'I': gApp->invert = 1; break;
-      case 'A': fz_set_aa_level (gApp->mContext, fz_atoi(fz_optarg)); break;
-      case 'W': gApp->layout_w = fz_atoi (fz_optarg); break;
-      case 'H': gApp->layout_h = fz_atoi (fz_optarg); break;
-      case 'S': gApp->layout_em = fz_atoi (fz_optarg); break;
-      case 'U': gApp->layout_css = fz_optarg; break;
-      case 'X': gApp->layout_use_doc_css = 0; break;
+      case 'A': break;
+      case 'B': break;
+      case 'C': break;
       }
     }
+  //}}}
 
+  // get app name
   char argv0[256];
   GetModuleFileNameA (NULL, argv0, sizeof argv0);
   winInstallApp (argv0);
@@ -2354,10 +2346,6 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   waitCursor = LoadCursor (NULL, IDC_WAIT);
   caretCursor = LoadCursor (NULL, IDC_IBEAM);
   //}}}
-  //{{{  background color
-  bgbrush = CreateSolidBrush (RGB (0x70,0x70,0x70));
-  shbrush = CreateSolidBrush (RGB (0x40,0x40,0x40));
-  //}}}
   //{{{  init DIB info for buffer
   dibinf = (BITMAPINFO*)malloc (sizeof(BITMAPINFO) + 12);
   dibinf->bmiHeader.biSize = sizeof(dibinf->bmiHeader);
@@ -2402,9 +2390,13 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   SetCursor (arrowCursor);
 
   if (fz_optind < argc) {
+    // has filename
     strcpy (filename, argv[fz_optind++]);
+
+    // has page number
     if (fz_optind < argc)
       gApp->pageno = atoi (argv[fz_optind++]);
+
     gApp->open (filename, 0, 0);
 
     MSG msg;
@@ -2412,13 +2404,13 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
       TranslateMessage (&msg);
       DispatchMessage (&msg);
       }
+
+    gApp->close();
     }
 
-  fz_free_argv (argc, argv);
-
-  gApp->close();
   free (dibinf);
   fz_drop_context (gApp->mContext);
+  fz_free_argv (argc, argv);
 
   return 0;
   }
