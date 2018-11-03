@@ -61,7 +61,6 @@ enum eOutline { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 //{{{  global vars
 HWND gHwndFrame = NULL;
 HWND gHwndView = NULL;
-HDC gHdc;
 
 BITMAPINFO* gDibinf = NULL;
 HCURSOR gArrowCursor;
@@ -79,6 +78,9 @@ const char** cd_vals;
 
 int gPdOk = 0;
 bool gJustCopied = false;
+
+WINDOWPLACEMENT gSavedPlacement;
+bool gIsFullScreen = false;
 //}}}
 
 //{{{
@@ -349,22 +351,19 @@ void winResize (int w, int h) {
 //{{{
 void winFullScreen (int state) {
 
-  static WINDOWPLACEMENT savedPlacement;
-  static int isFullScreen = 0;
-
-  if (state && !isFullScreen) {
-    GetWindowPlacement (gHwndFrame, &savedPlacement);
+  if (state && !gIsFullScreen) {
+    GetWindowPlacement (gHwndFrame, &gSavedPlacement);
     SetWindowLong (gHwndFrame, GWL_STYLE, WS_POPUP | WS_VISIBLE);
     SetWindowPos (gHwndFrame, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
     ShowWindow (gHwndFrame, SW_SHOWMAXIMIZED);
-    isFullScreen = 1;
+    gIsFullScreen = true;
     }
 
-  if (!state && isFullScreen) {
+  if (!state && gIsFullScreen) {
     SetWindowLong (gHwndFrame, GWL_STYLE, WS_OVERLAPPEDWINDOW);
     SetWindowPos (gHwndFrame, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
-    SetWindowPlacement (gHwndFrame, &savedPlacement);
-    isFullScreen = 0;
+    SetWindowPlacement (gHwndFrame, &gSavedPlacement);
+    gIsFullScreen = false;
     }
   }
 //}}}
@@ -2044,7 +2043,7 @@ void handleMouse (int x, int y, int btn, int state) {
   }
 //}}}
 //{{{
-LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
   static int oldx = 0;
   static int oldy = 0;
@@ -2064,8 +2063,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     case WM_PAINT: {
       PAINTSTRUCT ps;
-      gHdc = BeginPaint (hwnd, &ps);
-      gHdc = NULL;
+      BeginPaint (hwnd, &ps);
       EndPaint (hwnd, &ps);
       return 0;
       }
@@ -2184,7 +2182,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
   }
 //}}}
 //{{{
-LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK frameProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
   switch (message) {
     case WM_SETFOCUS:
@@ -2264,7 +2262,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   WNDCLASS wc;
   memset(&wc, 0, sizeof(wc));
   wc.style = 0;
-  wc.lpfnWndProc = frameproc;
+  wc.lpfnWndProc = frameProc;
   wc.cbClsExtra = 0;
   wc.cbWndExtra = 0;
   wc.hInstance = GetModuleHandle (NULL);
@@ -2280,7 +2278,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   //{{{  createregister window view class
   memset(&wc, 0, sizeof(wc));
   wc.style = CS_HREDRAW | CS_VREDRAW;
-  wc.lpfnWndProc = viewproc;
+  wc.lpfnWndProc = viewProc;
   wc.cbClsExtra = 0;
   wc.cbWndExtra = 0;
   wc.hInstance = GetModuleHandle (NULL);
@@ -2341,7 +2339,6 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     winError ("cannot create view");
   //}}}
 
-  gHdc = NULL;
   SetWindowTextW (gHwndFrame, L"MuPDF");
   HMENU menu = GetSystemMenu (gHwndFrame, 0);
   AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
