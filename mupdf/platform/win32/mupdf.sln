@@ -21,8 +21,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libpkcs7", "libpkcs7.vcxpro
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bin2coff", "bin2coff.vcxproj", "{BFE316B3-BD90-433A-A20D-C73975F1CAA7}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "..\test\test.vcxproj", "{15678B44-FBC7-4013-BF98-180A4481860C}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -469,58 +467,6 @@ Global
 		{BFE316B3-BD90-433A-A20D-C73975F1CAA7}.ReleaseOpenssl|Win32.ActiveCfg = Release|Win32
 		{BFE316B3-BD90-433A-A20D-C73975F1CAA7}.ReleaseOpenssl|Win32.Build.0 = Release|Win32
 		{BFE316B3-BD90-433A-A20D-C73975F1CAA7}.ReleaseOpenssl|x64.ActiveCfg = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Debug|Win32.ActiveCfg = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Debug|Win32.Build.0 = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Debug|x64.ActiveCfg = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Debug|x64.Build.0 = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugCommercial|Win32.ActiveCfg = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugCommercial|Win32.Build.0 = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugCommercial|x64.ActiveCfg = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugCommercial|x64.Build.0 = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugGSView|Win32.ActiveCfg = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugGSView|Win32.Build.0 = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugGSView|x64.ActiveCfg = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugGSView|x64.Build.0 = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugJava|Win32.ActiveCfg = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugJava|Win32.Build.0 = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugJava|x64.ActiveCfg = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugJava|x64.Build.0 = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugOpenssl|Win32.ActiveCfg = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugOpenssl|Win32.Build.0 = Debug|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugOpenssl|x64.ActiveCfg = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.DebugOpenssl|x64.Build.0 = Debug|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Memento|Win32.ActiveCfg = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Memento|Win32.Build.0 = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Memento|x64.ActiveCfg = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Memento|x64.Build.0 = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.MementoCommercial|Win32.ActiveCfg = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.MementoCommercial|Win32.Build.0 = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.MementoCommercial|x64.ActiveCfg = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.MementoCommercial|x64.Build.0 = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.MementoOpenSSL|Win32.ActiveCfg = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.MementoOpenSSL|Win32.Build.0 = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.MementoOpenSSL|x64.ActiveCfg = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.MementoOpenSSL|x64.Build.0 = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Release|Win32.ActiveCfg = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Release|Win32.Build.0 = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Release|x64.ActiveCfg = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.Release|x64.Build.0 = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseCommercial|Win32.ActiveCfg = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseCommercial|Win32.Build.0 = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseCommercial|x64.ActiveCfg = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseCommercial|x64.Build.0 = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseGSView|Win32.ActiveCfg = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseGSView|Win32.Build.0 = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseGSView|x64.ActiveCfg = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseGSView|x64.Build.0 = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseJava|Win32.ActiveCfg = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseJava|Win32.Build.0 = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseJava|x64.ActiveCfg = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseJava|x64.Build.0 = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseOpenssl|Win32.ActiveCfg = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseOpenssl|Win32.Build.0 = Release|Win32
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseOpenssl|x64.ActiveCfg = Release|x64
-		{15678B44-FBC7-4013-BF98-180A4481860C}.ReleaseOpenssl|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

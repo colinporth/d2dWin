@@ -27,7 +27,7 @@ int gettimeofday(struct timeval *tv, struct timezone *tz);
 #endif
 //}}}
 #define DEBUG_THREADS(A) do { } while (0)
-//{{{  enukms
+//{{{  enums
 enum {
   OUT_NONE,
   OUT_PNG, OUT_TGA, OUT_PNM, OUT_PGM, OUT_PPM, OUT_PAM,
@@ -318,7 +318,7 @@ static struct {
 } timing;
 //}}}
 //{{{
-static void usage(void)
+static void usage()
 {
   fprintf(stderr,
     "mudraw version " FZ_VERSION "\n"
@@ -393,7 +393,7 @@ static void usage(void)
 }
 //}}}
 //{{{
-static int gettime(void)
+static int gettime()
 {
   static struct timeval first;
   static int once = 1;
@@ -408,7 +408,7 @@ static int gettime(void)
 }
 //}}}
 //{{{
-static int has_percent_d(char *s)
+static int has_percent_d (char *s)
 {
   /* find '%[0-9]*d' */
   while (*s)
@@ -426,7 +426,7 @@ static int has_percent_d(char *s)
 //}}}
 //{{{
 /* Output file level (as opposed to page level) headers */
-static void file_level_headers(fz_context *ctx)
+static void file_level_headers (fz_context *ctx)
 {
   if (output_format == OUT_STEXT || output_format == OUT_TRACE)
     fz_write_printf(ctx, out, "<?xml version=\"1.0\"?>\n");
@@ -455,7 +455,7 @@ static void file_level_headers(fz_context *ctx)
 }
 //}}}
 //{{{
-static void file_level_trailers(fz_context *ctx)
+static void file_level_trailers (fz_context *ctx)
 {
   if (output_format == OUT_STEXT || output_format == OUT_TRACE)
     fz_write_printf(ctx, out, "</document>\n");
@@ -475,7 +475,7 @@ static void file_level_trailers(fz_context *ctx)
 //}}}
 
 //{{{
-static void drawband(fz_context *ctx, fz_page *page, fz_display_list *list, fz_matrix ctm, fz_rect tbounds, fz_cookie *cookie, int band_start, fz_pixmap *pix, fz_bitmap **bit)
+static void drawband (fz_context *ctx, fz_page *page, fz_display_list *list, fz_matrix ctm, fz_rect tbounds, fz_cookie *cookie, int band_start, fz_pixmap *pix, fz_bitmap **bit)
 {
   fz_device *dev = NULL;
 
@@ -519,7 +519,7 @@ static void drawband(fz_context *ctx, fz_page *page, fz_display_list *list, fz_m
 }
 //}}}
 //{{{
-static void dodrawpage(fz_context *ctx, fz_page *page, fz_display_list *list, int pagenum, fz_cookie *cookie, int start, int interptime, char *filename, int bg, fz_separations *seps)
+static void dodrawpage (fz_context *ctx, fz_page *page, fz_display_list *list, int pagenum, fz_cookie *cookie, int start, int interptime, char *filename, int bg, fz_separations *seps)
 {
   fz_rect mediabox;
   fz_device *dev = NULL;
@@ -1026,7 +1026,7 @@ static void dodrawpage(fz_context *ctx, fz_page *page, fz_display_list *list, in
 }
 //}}}
 //{{{
-static void bgprint_flush(void)
+static void bgprint_flush()
 {
   if (!bgprint.active || !bgprint.started)
     return;
@@ -1039,7 +1039,7 @@ static void bgprint_flush(void)
 
 //}}}
 //{{{
-static void drawpage(fz_context *ctx, fz_document *doc, int pagenum)
+static void drawpage (fz_context *ctx, fz_document *doc, int pagenum)
 {
   fz_page *page;
   fz_display_list *list = NULL;
@@ -1197,7 +1197,7 @@ static void drawpage(fz_context *ctx, fz_document *doc, int pagenum)
 }
 //}}}
 //{{{
-static void drawrange(fz_context *ctx, fz_document *doc, const char *range)
+static void drawrange (fz_context *ctx, fz_document *doc, const char *range)
 {
   int page, spage, epage, pagecount;
 
@@ -1236,7 +1236,7 @@ static void drawrange(fz_context *ctx, fz_document *doc, const char *range)
 //}}}
 
 //{{{
-static int parse_colorspace(const char *name)
+static int parse_colorspace (const char *name)
 {
   int i;
 
@@ -1271,7 +1271,7 @@ typedef struct
 
 //}}}
 //{{{
-static void * trace_malloc(void *arg, size_t size)
+static void * trace_malloc (void *arg, size_t size)
 {
   trace_info *info = (trace_info *) arg;
   trace_header *p;
@@ -1289,7 +1289,7 @@ static void * trace_malloc(void *arg, size_t size)
 }
 //}}}
 //{{{
-static void trace_free(void *arg, void *p_)
+static void trace_free (void *arg, void *p_)
 {
   trace_info *info = (trace_info *) arg;
   trace_header *p = (trace_header *)p_;
@@ -1301,7 +1301,7 @@ static void trace_free(void *arg, void *p_)
 }
 //}}}
 //{{{
-static void * trace_realloc(void *arg, void *p_, size_t size)
+static void * trace_realloc (void *arg, void *p_, size_t size)
 {
   trace_info *info = (trace_info *) arg;
   trace_header *p = (trace_header *)p_;
@@ -1330,7 +1330,7 @@ static void * trace_realloc(void *arg, void *p_, size_t size)
 
 #ifndef DISABLE_MUTHREADS
 //{{{
-static void worker_thread(void *arg)
+static void worker_thread (void *arg)
 {
   worker_t *me = (worker_t *)arg;
 
@@ -1348,7 +1348,7 @@ static void worker_thread(void *arg)
 }
 //}}}
 //{{{
-static void bgprint_worker(void *arg)
+static void bgprint_worker (void *arg)
 {
   fz_cookie cookie = { 0 };
   int pagenum;
@@ -1376,7 +1376,7 @@ static void bgprint_worker(void *arg)
 #endif
 
 //{{{
-static inline int iswhite(int ch)
+static inline int iswhite (int ch)
 {
   return
     ch == '\011' || ch == '\012' ||
@@ -1384,7 +1384,7 @@ static inline int iswhite(int ch)
 }
 //}}}
 //{{{
-static void apply_layer_config(fz_context *ctx, fz_document *doc, const char *lc)
+static void apply_layer_config (fz_context *ctx, fz_document *doc, const char *lc)
 {
 #if FZ_ENABLE_PDF
   pdf_document *pdoc = pdf_specifics(ctx, doc);
@@ -1486,7 +1486,7 @@ static void apply_layer_config(fz_context *ctx, fz_document *doc, const char *lc
 //}}}
 
 //{{{
-int main(int argc, char **argv)
+int main (int argc, char **argv)
 {
   char *password = "";
   fz_document *doc = NULL;

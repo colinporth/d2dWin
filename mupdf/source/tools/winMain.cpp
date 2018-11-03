@@ -59,9 +59,9 @@ enum eOutline { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 //}}}
 
 //{{{  global vars
-HWND hwndframe = NULL;
-HWND hwndview = NULL;
-HDC hdc;
+HWND gHwndFrame = NULL;
+HWND gHwndView = NULL;
+HDC gHdc;
 
 BITMAPINFO* gDibinf = NULL;
 HCURSOR gArrowCursor;
@@ -225,13 +225,13 @@ INT_PTR CALLBACK dlogChoiceProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 //{{{
 void winError (char* msg) {
 
-  MessageBoxA (hwndframe, msg, "MuPDF: Error", MB_ICONERROR);
+  MessageBoxA (gHwndFrame, msg, "MuPDF: Error", MB_ICONERROR);
   exit (1);
   }
 //}}}
 //{{{
 void winWarn (char* msg) {
-  MessageBoxA (hwndframe, msg, "MuPDF: Warning", MB_ICONWARNING);
+  MessageBoxA (gHwndFrame, msg, "MuPDF: Warning", MB_ICONWARNING);
   }
 //}}}
 //{{{
@@ -284,7 +284,7 @@ void winAlert (pdf_alert_event* alert) {
       break;
     }
 
-  pressed = MessageBoxA (hwndframe, alert->message, alert->title, icon|buttons);
+  pressed = MessageBoxA (gHwndFrame, alert->message, alert->title, icon|buttons);
 
   switch (pressed) {
     case IDOK:
@@ -303,7 +303,7 @@ void winAlert (pdf_alert_event* alert) {
 //}}}
 //{{{
 void winHelp() {
-  if (DialogBoxW (NULL, L"IDD_DLOGABOUT", hwndframe, dlogAboutProc) <= 0)
+  if (DialogBoxW (NULL, L"IDD_DLOGABOUT", gHwndFrame, dlogAboutProc) <= 0)
     winError ("cannot create help dialog");
   }
 //}}}
@@ -333,17 +333,17 @@ void winTitle (char* title) {
     }
   *dp = 0;
 
-  SetWindowTextW (hwndframe, wide);
+  SetWindowTextW (gHwndFrame, wide);
   }
 //}}}
 //{{{
 void winResize (int w, int h) {
 
-  ShowWindow (hwndframe, SW_SHOWDEFAULT);
+  ShowWindow (gHwndFrame, SW_SHOWDEFAULT);
   w += GetSystemMetrics (SM_CXFRAME) * 2;
   h += GetSystemMetrics (SM_CYFRAME) * 2;
   h += GetSystemMetrics (SM_CYCAPTION);
-  SetWindowPos (hwndframe, 0, 0, 0, w, h, SWP_NOZORDER | SWP_NOMOVE);
+  SetWindowPos (gHwndFrame, 0, 0, 0, w, h, SWP_NOZORDER | SWP_NOMOVE);
   }
 //}}}
 //{{{
@@ -353,17 +353,17 @@ void winFullScreen (int state) {
   static int isFullScreen = 0;
 
   if (state && !isFullScreen) {
-    GetWindowPlacement (hwndframe, &savedPlacement);
-    SetWindowLong (hwndframe, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-    SetWindowPos (hwndframe, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
-    ShowWindow (hwndframe, SW_SHOWMAXIMIZED);
+    GetWindowPlacement (gHwndFrame, &savedPlacement);
+    SetWindowLong (gHwndFrame, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+    SetWindowPos (gHwndFrame, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    ShowWindow (gHwndFrame, SW_SHOWMAXIMIZED);
     isFullScreen = 1;
     }
 
   if (!state && isFullScreen) {
-    SetWindowLong (hwndframe, GWL_STYLE, WS_OVERLAPPEDWINDOW);
-    SetWindowPos (hwndframe, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
-    SetWindowPlacement (hwndframe, &savedPlacement);
+    SetWindowLong (gHwndFrame, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+    SetWindowPos (gHwndFrame, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    SetWindowPlacement (gHwndFrame, &savedPlacement);
     isFullScreen = 0;
     }
   }
@@ -374,7 +374,7 @@ char* winTextInput (char* inittext, int retry) {
   td_retry = retry;
 
   fz_strlcpy (td_textinput, inittext ? inittext : "", sizeof td_textinput);
-  if (DialogBoxW (NULL, L"IDD_DLOGTEXT", hwndframe, dlogTextProc) <= 0)
+  if (DialogBoxW (NULL, L"IDD_DLOGTEXT", gHwndFrame, dlogTextProc) <= 0)
     winError ("cannot create text input dialog");
 
   if (gPdOk)
@@ -391,7 +391,7 @@ int winChoiceInput (int nopts, const char* opts[], int* nvals, const char* vals[
   cd_opts = opts;
   cd_vals = vals;
 
-  if (DialogBoxW (NULL, L"IDD_DLOGLIST", hwndframe, dlogChoiceProc) <= 0)
+  if (DialogBoxW (NULL, L"IDD_DLOGLIST", gHwndFrame, dlogChoiceProc) <= 0)
     winError ("cannot create text input dialog");
 
   return gPdOk;
@@ -779,7 +779,7 @@ public:
       return;
 
     mPageNumber = number;
-    InvalidateRect (hwndview, NULL, 0);
+    InvalidateRect (gHwndView, NULL, 0);
     showPage (1, 1, 1, 0);
     }
   //}}}
@@ -882,7 +882,7 @@ public:
       if (!image)
         winResize (layout_w, layout_h);
 
-      InvalidateRect (hwndview, NULL, 0);
+      InvalidateRect (gHwndView, NULL, 0);
       winCursor (eARROW);
       }
       //}}}
@@ -935,21 +935,16 @@ public:
   //{{{
   void doSearch (enum ePanning* panTo, int dir) {
 
-    /* abort if no search string */
     if (search[0] == 0) {
-      InvalidateRect (hwndview, NULL, 0);
+      // abort if no search string
+      InvalidateRect (gHwndView, NULL, 0);
       return;
       }
 
     winCursor (eWAIT);
 
     int firstpage = mPageNumber;
-
-    int page;
-    if (searchpage == mPageNumber)
-      page = mPageNumber + dir;
-    else
-      page = mPageNumber;
+    int page = (searchpage == mPageNumber) ? mPageNumber + dir : mPageNumber;
     if (page < 1)
       page = mPageCount;
     if (page > mPageCount)
@@ -961,12 +956,12 @@ public:
         showPage (1, 0, 0, 1);
         }
 
-      hit_count = fz_search_stext_page (mContext, page_text, search, hit_bbox, nelem(hit_bbox));
+      hit_count = fz_search_stext_page (mContext, page_text, search, hit_bbox, nelem (hit_bbox));
       if (hit_count > 0) {
         *panTo = dir == 1 ? PAN_TO_TOP : PAN_TO_BOTTOM;
         searchpage = mPageNumber;
         winCursor (eHAND);
-        InvalidateRect (hwndview, NULL, 0);
+        InvalidateRect (gHwndView, NULL, 0);
         return;
         }
 
@@ -982,7 +977,7 @@ public:
     mPageNumber = firstpage;
     showPage (1, 0, 0, 0);
     winCursor (eHAND);
-    InvalidateRect (hwndview, NULL, 0);
+    InvalidateRect (gHwndView, NULL, 0);
     }
   //}}}
 
@@ -1036,7 +1031,7 @@ public:
   //{{{
   void doCopy() {
 
-    if (!OpenClipboard (hwndframe))
+    if (!OpenClipboard (gHwndFrame))
       return;
 
     EmptyClipboard();
@@ -1071,12 +1066,12 @@ public:
       if (c < ' ') {
         if (c == '\b' && n > 0) {
           search[n - 1] = 0;
-          InvalidateRect (hwndview, NULL, 0);
+          InvalidateRect (gHwndView, NULL, 0);
           }
         if (c == '\n' || c == '\r') {
           isSearching = 0;
           if (n > 0) {
-            InvalidateRect (hwndview, NULL, 0);
+            InvalidateRect (gHwndView, NULL, 0);
             if (searchdir < 0) {
               if (mPageNumber == 1)
                 mPageNumber = mPageCount;
@@ -1088,18 +1083,18 @@ public:
             onKey ('n', 0);
             }
           else
-            InvalidateRect (hwndview, NULL, 0);
+            InvalidateRect (gHwndView, NULL, 0);
           }
         if (c == '\033') {
           isSearching = 0;
-          InvalidateRect (hwndview, NULL, 0);
+          InvalidateRect (gHwndView, NULL, 0);
           }
         }
       else {
         if (n + 2 < sizeof search) {
           search[n] = c;
           search[n + 1] = 0;
-          InvalidateRect(hwndview, NULL, 0);
+          InvalidateRect(gHwndView, NULL, 0);
           }
         }
       return;
@@ -1328,7 +1323,7 @@ public:
         search[0] = 0;
         hit_count = 0;
         searchpage = -1;
-        InvalidateRect (hwndview, NULL, 0);
+        InvalidateRect (gHwndView, NULL, 0);
         break;
       //}}}
       //{{{
@@ -1338,7 +1333,7 @@ public:
         search[0] = 0;
         hit_count = 0;
         searchpage = -1;
-        InvalidateRect (hwndview, NULL, 0);
+        InvalidateRect (gHwndView, NULL, 0);
         break;
       //}}}
       //{{{
@@ -1569,7 +1564,7 @@ public:
         selr.x1 = fz_maxi (selx, x) - panx + irect.x0;
         selr.y0 = fz_mini (sely, y) - pany + irect.y0;
         selr.y1 = fz_maxi (sely, y) - pany + irect.y0;
-        InvalidateRect (hwndview, NULL, 0);
+        InvalidateRect (gHwndView, NULL, 0);
         if (selr.x0 < selr.x1 && selr.y0 < selr.y1)
           doCopy();
         }
@@ -1629,7 +1624,7 @@ public:
       selr.x1 = fz_maxi (selx, x) - panx + irect.x0;
       selr.y0 = fz_mini (sely, y) - pany + irect.y0;
       selr.y1 = fz_maxi (sely, y) - pany + irect.y0;
-      InvalidateRect (hwndview, NULL, 0);
+      InvalidateRect (gHwndView, NULL, 0);
       }
       //}}}
     }
@@ -1641,7 +1636,7 @@ public:
       winw = w;
       winh = h;
       panView (panx, pany);
-      InvalidateRect (hwndview, NULL, 0);
+      InvalidateRect (gHwndView, NULL, 0);
       }
     }
   //}}}
@@ -1653,7 +1648,7 @@ public:
   char* mDocTitle;
   fz_outline* outline;
   int outline_deferred;
-  //{{{  page params
+  //{{{  page
   int mPageCount;
   int mPageNumber;
 
@@ -1676,7 +1671,7 @@ public:
   char* layout_css;
   int layout_use_doc_css;
   //}}}
-  //{{{  current view params
+  //{{{  current view
   int resolution;
   int rotate;
 
@@ -1840,7 +1835,7 @@ private:
       newy = (winh - image_h) / 2;
 
     if (newx != panx || newy != pany)
-      InvalidateRect (hwndview, NULL, 0);
+      InvalidateRect (gHwndView, NULL, 0);
 
     panx = newx;
     pany = newy;
@@ -1930,16 +1925,14 @@ cPdf* gPdf;
 //{{{
 INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
-  fz_context* context = gPdf->mContext;
-  fz_document* document = gPdf->mDocument;
-
-  char buf[256];
-  wchar_t bufx[256];
-
   switch (message) {
-    case WM_INITDIALOG:
-     wchar_t wbuf[PATH_MAX];
+    case WM_INITDIALOG: {
+      wchar_t wbuf[PATH_MAX];
       SetDlgItemTextW (hwnd, 0x10, wbuf);
+
+      fz_context* context = gPdf->mContext;
+      fz_document* document = gPdf->mDocument;
+      char buf[256];
       if (fz_lookup_metadata (context, document, FZ_META_FORMAT, buf, sizeof buf) >= 0)
         SetDlgItemTextA (hwnd, 0x11, buf);
       else {
@@ -1969,6 +1962,7 @@ INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
         strcpy (buf, "none");
       SetDlgItemTextA (hwnd, 0x13, buf);
 
+      wchar_t bufx[256];
       #define SETUTF8(ID, STRING) \
         if (fz_lookup_metadata (context, document, "info:" STRING, buf, sizeof buf) >= 0) {  \
           MultiByteToWideChar (CP_UTF8, 0, buf, -1, bufx, nelem (bufx));            \
@@ -1984,7 +1978,7 @@ INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
       SETUTF8 (0x26, "CreationDate");
       SETUTF8 (0x27, "ModDate");
       return TRUE;
-
+      }
     case WM_COMMAND:
       EndDialog (hwnd, 1);
       return TRUE;
@@ -1995,7 +1989,7 @@ INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
 //}}}
 //{{{
 void winInfo() {
-  if (DialogBoxW (NULL, L"IDD_DLOGINFO", hwndframe, dlogInfoProc) <= 0)
+  if (DialogBoxW (NULL, L"IDD_DLOGINFO", gHwndFrame, dlogInfoProc) <= 0)
     winError ("cannot create info dialog");
   }
 //}}}
@@ -2005,12 +1999,12 @@ void handleKey (int c) {
 
   int modifier = (GetAsyncKeyState (VK_SHIFT) < 0) | ((GetAsyncKeyState (VK_CONTROL) < 0) << 2);
 
-  if (GetCapture() == hwndview)
+  if (GetCapture() == gHwndView)
     return;
 
   if (gJustCopied) {
     gJustCopied = false;
-    InvalidateRect (hwndview, NULL, 0);
+    InvalidateRect (gHwndView, NULL, 0);
     }
 
   // translate VK into ASCII equivalents
@@ -2028,7 +2022,7 @@ void handleKey (int c) {
     }
 
   gPdf->onKey (c, modifier);
-  InvalidateRect (hwndview, NULL, 0);
+  InvalidateRect (gHwndView, NULL, 0);
   }
 //}}}
 //{{{
@@ -2038,11 +2032,11 @@ void handleMouse (int x, int y, int btn, int state) {
 
   if ((state != 0) && gJustCopied) {
     gJustCopied = false;
-    InvalidateRect (hwndview, NULL, 0);
+    InvalidateRect (gHwndView, NULL, 0);
     }
 
   if (state == 1)
-    SetCapture (hwndview);
+    SetCapture (gHwndView);
   if (state == -1)
     ReleaseCapture();
 
@@ -2070,8 +2064,8 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     case WM_PAINT: {
       PAINTSTRUCT ps;
-      hdc = BeginPaint (hwnd, &ps);
-      hdc = NULL;
+      gHdc = BeginPaint (hwnd, &ps);
+      gHdc = NULL;
       EndPaint (hwnd, &ps);
       return 0;
       }
@@ -2083,7 +2077,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
 
     //{{{
     case WM_LBUTTONDOWN:
-      SetFocus (hwndview);
+      SetFocus (gHwndView);
       oldx = x;
       oldy = y;
       handleMouse (x, y, 1, 1);
@@ -2091,7 +2085,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //}}}
     //{{{
     case WM_MBUTTONDOWN:
-      SetFocus (hwndview);
+      SetFocus (gHwndView);
       oldx = x;
       oldy = y;
       handleMouse (x, y, 2, 1);
@@ -2099,7 +2093,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //}}}
     //{{{
     case WM_RBUTTONDOWN:
-      SetFocus (hwndview);
+      SetFocus (gHwndView);
       oldx = x;
       oldy = y;
       handleMouse (x, y, 3, 1);
@@ -2198,7 +2192,7 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
       return 0;
 
     case WM_APP+5:
-      SetFocus (hwndview);
+      SetFocus (gHwndView);
       return 0;
 
     case WM_DESTROY:
@@ -2221,14 +2215,14 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
       // More generally, you should use GetEffectiveClientRect if you have a toolbar etc.
       RECT rect;
       GetClientRect (hwnd, &rect);
-      MoveWindow (hwndview, rect.left, rect.top,
+      MoveWindow (gHwndView, rect.left, rect.top,
       rect.right-rect.left, rect.bottom-rect.top, TRUE);
       return 0;
       }
 
     case WM_NOTIFY:
     case WM_COMMAND:
-      return SendMessage (hwndview, message, wParam, lParam);
+      return SendMessage (gHwndView, message, wParam, lParam);
 
     case WM_CLOSE:
       return 0;
@@ -2324,7 +2318,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   gDibinf->bmiHeader.biClrUsed = 0;
   //}}}
   //{{{  create window
-  hwndframe = CreateWindowW (L"FrameWindow", // window class name
+  gHwndFrame = CreateWindowW (L"FrameWindow", // window class name
                              NULL, // window caption
                              WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                              CW_USEDEFAULT, CW_USEDEFAULT, // initial position
@@ -2334,22 +2328,22 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
                              0, // window menu handle
                              0, // program instance handle
                              0); // creation parameters
-  if (!hwndframe)
+  if (!gHwndFrame)
     winError ("cannot create frame");
 
-  hwndview = CreateWindowW (L"ViewWindow", // window class name
+  gHwndView = CreateWindowW (L"ViewWindow", // window class name
                             NULL,
                             WS_VISIBLE | WS_CHILD,
                             CW_USEDEFAULT, CW_USEDEFAULT,
                             CW_USEDEFAULT, CW_USEDEFAULT,
-                            hwndframe, 0, 0, 0);
-  if (!hwndview)
+                            gHwndFrame, 0, 0, 0);
+  if (!gHwndView)
     winError ("cannot create view");
   //}}}
 
-  hdc = NULL;
-  SetWindowTextW (hwndframe, L"MuPDF");
-  HMENU menu = GetSystemMenu (hwndframe, 0);
+  gHdc = NULL;
+  SetWindowTextW (gHwndFrame, L"MuPDF");
+  HMENU menu = GetSystemMenu (gHwndFrame, 0);
   AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
   AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF");
   AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties");
