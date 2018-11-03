@@ -66,6 +66,7 @@ enum { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 HWND hwndframe = NULL;
 HWND hwndview = NULL;
 HDC hdc;
+
 BITMAPINFO* gDibinf = NULL;
 HCURSOR gArrowCursor;
 HCURSOR gHandCursor;
@@ -79,8 +80,8 @@ int cd_nopts;
 int* cd_nvals;
 const char** cd_opts;
 const char** cd_vals;
-int pd_okay = 0;
 
+int gPdOk = 0;
 bool gJustCopied = false;
 //}}}
 
@@ -153,12 +154,12 @@ INT_PTR CALLBACK dlogTextProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
     case WM_COMMAND:
       switch (wParam) {
         case 1:
-          pd_okay = 1;
+          gPdOk = 1;
           GetDlgItemTextA (hwnd, 3, td_textinput, sizeof td_textinput);
           EndDialog (hwnd, 1);
           return TRUE;
         case 2:
-          pd_okay = 0;
+          gPdOk = 0;
           EndDialog (hwnd, 1);
           return TRUE;
       }
@@ -209,12 +210,12 @@ INT_PTR CALLBACK dlogChoiceProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM 
             if (sel && sel != LB_ERR)
               cd_vals[(*cd_nvals)++] = cd_opts[i];
             }
-          pd_okay = 1;
+          gPdOk = 1;
           EndDialog (hwnd, 1);
           return TRUE;
 
         case 2:
-          pd_okay = 0;
+          gPdOk = 0;
           EndDialog (hwnd, 1);
           return TRUE;
         }
@@ -380,7 +381,7 @@ char* winTextInput (char* inittext, int retry) {
   if (DialogBoxW (NULL, L"IDD_DLOGTEXT", hwndframe, dlogTextProc) <= 0)
     winError ("cannot create text input dialog");
 
-  if (pd_okay)
+  if (gPdOk)
     return td_textinput;
 
   return NULL;
@@ -397,7 +398,7 @@ int winChoiceInput (int nopts, const char* opts[], int* nvals, const char* vals[
   if (DialogBoxW (NULL, L"IDD_DLOGLIST", hwndframe, dlogChoiceProc) <= 0)
     winError ("cannot create text input dialog");
 
-  return pd_okay;
+  return gPdOk;
   }
 //}}}
 //{{{
@@ -494,12 +495,12 @@ void eventCallback (fz_context* context, pdf_document* document, pdf_doc_event* 
 //}}}
 
 //{{{
-class cApp {
+class cPdf {
 public:
   //{{{
-  cApp() {
+  cPdf() {
 
-    memset (this, 0, sizeof(cApp));
+    memset (this, 0, sizeof(cPdf));
 
     mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
     colorspace = fz_device_bgr (mContext);
@@ -521,7 +522,7 @@ public:
   //{{{
   void blitSearch() {
 
-    if (issearching) {
+    if (isSearching) {
       char buf[sizeof (search) + 50];
       sprintf (buf, "Search: %s", search);
       winDrawRect (0, 0, winw, 30);
@@ -531,7 +532,7 @@ public:
   //}}}
 
   //{{{
-  void open (char* filename, int reload, int bps) {
+  void openFile (char* filename, int reload, int bps) {
 
     fz_try (mContext) {
       fz_register_document_handlers (mContext);
@@ -626,10 +627,10 @@ public:
       winError ("cannot open document");
       }
 
-    if (pageno < 1)
-      pageno = 1;
-    if (pageno > mPageCount)
-      pageno = mPageCount;
+    if (mPageNumber < 1)
+      mPageNumber = 1;
+    if (mPageNumber > mPageCount)
+      mPageNumber = mPageCount;
     if (resolution < MINRES)
       resolution = MINRES;
     if (resolution > MAXRES)
@@ -645,7 +646,7 @@ public:
     }
   //}}}
   //{{{
-  void close() {
+  void closeFile() {
 
     fz_drop_display_list (mContext, page_list);
     page_list = NULL;
@@ -685,15 +686,15 @@ public:
 
     char filename[PATH_MAX];
     fz_strlcpy (filename, mDocPath, PATH_MAX);
-    close();
-    open (filename, 1, 0);
+    closeFile();
+    openFile (filename, 1, 0);
     }
   //}}}
 
   //{{{
   void loadPage (int no_cache) {
 
-    errored = 0;
+    mErrored = 0;
     incomplete = 0;
 
     fz_drop_display_list (mContext, page_list);
@@ -713,7 +714,7 @@ public:
     page_bbox.y1 = 100;
 
     fz_try (mContext) {
-      page = fz_load_page (mContext, mDocument, pageno - 1);
+      page = fz_load_page (mContext, mDocument, mPageNumber - 1);
       page_bbox = fz_bound_page (mContext, page);
       }
     fz_catch (mContext) {
@@ -748,7 +749,7 @@ public:
         incomplete = 1;
       else if (cookie.errors) {
         winWarn ("Errors found on page");
-        errored = 1;
+        mErrored = 1;
         }
       fz_close_device (mContext, mdev);
       }
@@ -760,7 +761,7 @@ public:
         incomplete = 1;
       else {
         winWarn ("Cannot load page");
-        errored = 1;
+        mErrored = 1;
         }
       }
 
@@ -770,11 +771,9 @@ public:
     fz_catch (mContext) {
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
         incomplete = 1;
-      else if (!errored)
+      else if (!mErrored)
         winWarn ("Cannot load page");
       }
-
-    errored = errored;
     }
   //}}}
   //{{{
@@ -803,18 +802,18 @@ public:
     }
   //}}}
   //{{{
-  void gotoPage (int pageNumber) {
+  void gotoPage (int number) {
 
-    issearching = 0;
+    isSearching = 0;
 
-    if (pageNumber < 1)
-      pageNumber = 1;
-    if (pageNumber > mPageCount)
-      pageNumber = mPageCount;
-    if (pageNumber == pageno)
+    if (number < 1)
+      number = 1;
+    if (number > mPageCount)
+      number = mPageCount;
+    if (number == mPageNumber)
       return;
 
-    pageno = pageNumber;
+    mPageNumber = number;
     InvalidateRect (hwndview, NULL, 0);
     showPage (1, 1, 1, 0);
     }
@@ -856,7 +855,7 @@ public:
     if (draw) {
       //{{{  draw
       char buf2[64];
-      sprintf (buf2, " - %d/%d (%d dpi)", pageno, mPageCount, resolution);
+      sprintf (buf2, " - %d/%d (%d dpi)", mPageNumber, mPageCount, resolution);
 
       char buf[MAX_TITLE];
       size_t len = MAX_TITLE - strlen (buf2);
@@ -923,8 +922,8 @@ public:
       }
       //}}}
 
-    if (cookie.errors && errored == 0) {
-      errored = 1;
+    if (cookie.errors && mErrored == 0) {
+      mErrored = 1;
       winWarn ("Errors found on page, page rendering may be incomplete");
       }
 
@@ -979,28 +978,28 @@ public:
 
     winCursor (WAIT);
 
-    int firstpage = pageno;
+    int firstpage = mPageNumber;
 
     int page;
-    if (searchpage == pageno)
-      page = pageno + dir;
+    if (searchpage == mPageNumber)
+      page = mPageNumber + dir;
     else
-      page = pageno;
+      page = mPageNumber;
     if (page < 1)
       page = mPageCount;
     if (page > mPageCount)
       page = 1;
 
     do {
-      if (page != pageno) {
-        pageno = page;
+      if (page != mPageNumber) {
+        mPageNumber = page;
         showPage (1, 0, 0, 1);
         }
 
       hit_count = fz_search_stext_page (mContext, page_text, search, hit_bbox, nelem(hit_bbox));
       if (hit_count > 0) {
         *panTo = dir == 1 ? PAN_TO_TOP : PAN_TO_BOTTOM;
-        searchpage = pageno;
+        searchpage = mPageNumber;
         winCursor (HAND);
         InvalidateRect (hwndview, NULL, 0);
         return;
@@ -1015,7 +1014,7 @@ public:
 
       winWarn ("String '%s' not found.", search);
 
-    pageno = firstpage;
+    mPageNumber = firstpage;
     showPage (1, 0, 0, 0);
     winCursor (HAND);
     InvalidateRect (hwndview, NULL, 0);
@@ -1097,11 +1096,11 @@ public:
   //{{{
   void onKey (int c, int modifiers) {
 
-    int oldpage = pageno;
+    int oldpage = mPageNumber;
     enum panning panTo = PAN_TO_TOP;
     int loadpage = 1;
 
-    if (issearching) {
+    if (isSearching) {
       //{{{  searching
       size_t n = strlen(search);
       if (c < ' ') {
@@ -1110,14 +1109,14 @@ public:
           InvalidateRect (hwndview, NULL, 0);
           }
         if (c == '\n' || c == '\r') {
-          issearching = 0;
+          isSearching = 0;
           if (n > 0) {
             InvalidateRect (hwndview, NULL, 0);
             if (searchdir < 0) {
-              if (pageno == 1)
-                pageno = mPageCount;
+              if (mPageNumber == 1)
+                mPageNumber = mPageCount;
               else
-                pageno--;
+                mPageNumber--;
               showPage(1, 1, 0, 1);
               }
 
@@ -1127,7 +1126,7 @@ public:
             InvalidateRect (hwndview, NULL, 0);
           }
         if (c == '\033') {
-          issearching = 0;
+          isSearching = 0;
           InvalidateRect (hwndview, NULL, 0);
           }
         }
@@ -1152,10 +1151,7 @@ public:
       case 'q':
       //{{{
       case 0x1B: {
-        close();
-        free (gDibinf);
-        fz_drop_context (mContext);
-        exit (0);
+        mExit = true;
         break;
         }
       //}}}
@@ -1248,7 +1244,7 @@ public:
           int h = fz_pixmap_height(mContext, image);
           if (h <= winh || pany <= winh - h) {
             panTo = PAN_TO_TOP;
-            pageno++;
+            mPageNumber++;
           }
           else {
             pany -= h / 10;
@@ -1263,7 +1259,7 @@ public:
           int h = fz_pixmap_height(mContext, image);
           if (h <= winh || pany == 0) {
             panTo = PAN_TO_BOTTOM;
-            pageno--;
+            mPageNumber--;
           }
           else {
             pany += h / 10;
@@ -1298,18 +1294,18 @@ public:
       case ',':
         panTo = PAN_TO_BOTTOM;
         if (numberlen > 0)
-          pageno -= atoi(number);
+          mPageNumber -= atoi(number);
         else
-          pageno--;
+          mPageNumber--;
         break;
       //}}}
       //{{{
       case '.':
         panTo = PAN_TO_TOP;
         if (numberlen > 0)
-          pageno += atoi(number);
+          mPageNumber += atoi(number);
         else
-          pageno++;
+          mPageNumber++;
         break;
       //}}}
 
@@ -1318,9 +1314,9 @@ public:
       case 'b':
         panTo = DONT_PAN;
         if (numberlen > 0)
-          pageno -= atoi(number);
+          mPageNumber -= atoi(number);
         else
-          pageno--;
+          mPageNumber--;
         break;
       //}}}
       //{{{
@@ -1329,28 +1325,28 @@ public:
         if (modifiers & 1)
         {
           if (numberlen > 0)
-            pageno -= atoi(number);
+            mPageNumber -= atoi(number);
           else
-            pageno--;
+            mPageNumber--;
         }
         else
         { if (numberlen > 0)
-            pageno += atoi(number);
+            mPageNumber += atoi(number);
           else
-            pageno++;
+            mPageNumber++;
         }
         break;
       //}}}
       //{{{
       case '<':
         panTo = PAN_TO_TOP;
-        pageno -= 10;
+        mPageNumber -= 10;
         break;
       //}}}
       //{{{
       case '>':
         panTo = PAN_TO_TOP;
-        pageno += 10;
+        mPageNumber += 10;
         break;
       //}}}
       //{{{
@@ -1362,7 +1358,7 @@ public:
       //}}}
       //{{{
       case '?':
-        issearching = 1;
+        isSearching = 1;
         searchdir = -1;
         search[0] = 0;
         hit_count = 0;
@@ -1372,7 +1368,7 @@ public:
       //}}}
       //{{{
       case '/':
-        issearching = 1;
+        isSearching = 1;
         searchdir = 1;
         search[0] = 0;
         hit_count = 0;
@@ -1403,12 +1399,12 @@ public:
     if (c < '0' || c > '9')
       numberlen = 0;
 
-    if (pageno < 1)
-      pageno = 1;
-    if (pageno > mPageCount)
-      pageno = mPageCount;
+    if (mPageNumber < 1)
+      mPageNumber = 1;
+    if (mPageNumber > mPageCount)
+      mPageNumber = mPageCount;
 
-    if (pageno != oldpage) {
+    if (mPageNumber != oldpage) {
       switch (panTo) {
         //{{{
         case PAN_TO_TOP:
@@ -1634,8 +1630,8 @@ public:
           /* Updating how far we are beyond and flipping pages if beyond threshold */
           beyondy += deltay;
           if (beyondy > BEYOND_THRESHHOLD) {
-            if( pageno > 1) {
-              pageno--;
+            if( mPageNumber > 1) {
+              mPageNumber--;
               showPage (1, 1, 1, 0);
               if (image)
                 newy = -fz_pixmap_height (mContext, image);
@@ -1643,8 +1639,8 @@ public:
             beyondy = 0;
             }
           else if (beyondy < -BEYOND_THRESHHOLD) {
-            if (pageno < mPageCount) {
-              pageno++;
+            if (mPageNumber < mPageCount) {
+              mPageNumber++;
               showPage (1, 1, 1, 0);
               newy = 0;
               }
@@ -1692,7 +1688,22 @@ public:
   char* mDocTitle;
   fz_outline* outline;
   int outline_deferred;
+  //{{{  page params
   int mPageCount;
+  int mPageNumber;
+
+  fz_page* page;
+  fz_rect page_bbox;
+
+  fz_display_list* page_list;
+  fz_display_list* annotations_list;
+
+  fz_stext_page* page_text;
+  fz_link* page_links;
+
+  int mErrored;
+  int incomplete;
+  //}}}
   //{{{  layout
   float layout_w;
   float layout_h;
@@ -1703,26 +1714,18 @@ public:
   //{{{  current view params
   int resolution;
   int rotate;
+
   fz_pixmap* image;
   int grayscale;
   fz_colorspace* colorspace;
+
   int invert;
   int tint, tint_r, tint_g, tint_b;
-  //}}}
-  //{{{  current page params
-  int pageno;
-  fz_page* page;
-  fz_rect page_bbox;
-  fz_display_list* page_list;
-  fz_display_list* annotations_list;
-  fz_stext_page* page_text;
-  fz_link* page_links;
-  int errored;
-  int incomplete;
   //}}}
   //{{{  window system sizes
   int winw, winh;
   int scrw, scrh;
+
   int fullscreen;
   bool mExit = false;
   //}}}
@@ -1741,12 +1744,13 @@ public:
   int nowaitcursor;
   //}}}
   //{{{  search state
-  int issearching;
+  int isSearching;
   int searchdir;
   char search[512];
   int searchpage;
-  fz_quad hit_bbox[512];
+
   int hit_count;
+  fz_quad hit_bbox[512];
   //}}}
 
 private:
@@ -1796,7 +1800,7 @@ private:
   //{{{
   void recreateAnnotations() {
 
-    int errored = 0;
+    int mErrored = 0;
     fz_cookie cookie = { 0 };
 
     fz_device* mdev = NULL;
@@ -1818,7 +1822,7 @@ private:
         incomplete = 1;
       else if (cookie.errors) {
         winWarn ("Errors found on page");
-        errored = 1;
+        mErrored = 1;
         }
       fz_close_device (mContext, mdev);
       }
@@ -1827,10 +1831,8 @@ private:
       }
     fz_catch (mContext) {
       winWarn ("Cannot load page");
-      errored = 1;
+      mErrored = 1;
       }
-
-    errored = errored;
     }
   //}}}
   //{{{
@@ -1941,13 +1943,13 @@ private:
       }
       if (pagestep == 0)
         panView (panx + xstep, pany + ystep);
-      else if (pagestep > 0 && pageno < mPageCount) {
-        pageno++;
+      else if (pagestep > 0 && mPageNumber < mPageCount) {
+        mPageNumber++;
         pany = 0;
         showPage (1, 1, 1, 0);
       }
-      else if (pagestep < 0 && pageno > 1) {
-        pageno--;
+      else if (pagestep < 0 && mPageNumber > 1) {
+        mPageNumber--;
         pany = INT_MIN;
         showPage (1, 1, 1, 0);
       }
@@ -1958,13 +1960,13 @@ private:
   const int zoomList[11] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
   };
 //}}}
-cApp* gApp;
+cPdf* gPdf;
 
 //{{{
 INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
-  fz_context* context = gApp->mContext;
-  fz_document* document = gApp->mDocument;
+  fz_context* context = gPdf->mContext;
+  fz_document* document = gPdf->mDocument;
 
   char buf[256];
   wchar_t bufx[256];
@@ -2060,7 +2062,7 @@ void handleKey (int c) {
       }
     }
 
-  gApp->onKey (c, modifier);
+  gPdf->onKey (c, modifier);
   InvalidateRect (hwndview, NULL, 0);
   }
 //}}}
@@ -2079,7 +2081,7 @@ void handleMouse (int x, int y, int btn, int state) {
   if (state == -1)
     ReleaseCapture();
 
-  gApp->onMouse (x, y, btn, modifier, state);
+  gPdf->onMouse (x, y, btn, modifier, state);
   }
 //}}}
 //{{{
@@ -2097,7 +2099,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
       if (wParam == SIZE_MINIMIZED)
         return 0;
 
-      gApp->onResize (LOWORD(lParam), HIWORD(lParam));
+      gPdf->onResize (LOWORD(lParam), HIWORD(lParam));
       break;
     //}}}
     //{{{
@@ -2213,7 +2215,7 @@ LRESULT CALLBACK viewproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     /* We use WM_APP to trigger a reload and repaint of a page */
     case WM_APP:
-      gApp->reloadPage();
+      gPdf->reloadPage();
       break;
     //}}}
     }
@@ -2235,7 +2237,7 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
       return 0;
 
     case WM_DESTROY:
-      gApp->mExit = true;
+      gPdf->mExit = true;
       PostQuitMessage (0);
       return 0;
 
@@ -2277,7 +2279,7 @@ LRESULT CALLBACK frameproc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 //{{{
 int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
 
-  gApp = new cApp();
+  gPdf = new cPdf();
 
   // get command line
   int argc;
@@ -2335,8 +2337,8 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   //{{{  get screen size
   RECT r;
   SystemParametersInfo (SPI_GETWORKAREA, 0, &r, 0);
-  gApp->scrw = r.right - r.left;
-  gApp->scrh = r.bottom - r.top;
+  gPdf->scrw = r.right - r.left;
+  gPdf->scrh = r.bottom - r.top;
   //}}}
   //{{{  create cursors
   gArrowCursor = LoadCursor (NULL, IDC_ARROW);
@@ -2379,12 +2381,13 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   if (!hwndview)
     winError ("cannot create view");
   //}}}
+
   hdc = NULL;
   SetWindowTextW (hwndframe, L"MuPDF");
   HMENU menu = GetSystemMenu (hwndframe, 0);
   AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
-  AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF...");
-  AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties...");
+  AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF");
+  AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties");
   SetCursor (gArrowCursor);
 
   if (fz_optind < argc) {
@@ -2394,21 +2397,21 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
     // has page number
     if (fz_optind < argc)
-      gApp->pageno = atoi (argv[fz_optind++]);
+      gPdf->mPageNumber = atoi (argv[fz_optind++]);
 
-    gApp->open (filename, 0, 0);
+    gPdf->openFile (filename, 0, 0);
 
     MSG msg;
-    while (GetMessage (&msg, NULL, 0, 0) && !gApp->mExit) {
+    while (GetMessage (&msg, NULL, 0, 0) && !gPdf->mExit) {
       TranslateMessage (&msg);
       DispatchMessage (&msg);
       }
 
-    gApp->close();
+    gPdf->closeFile();
     }
 
   free (gDibinf);
-  fz_drop_context (gApp->mContext);
+  fz_drop_context (gPdf->mContext);
   fz_free_argv (argc, argv);
 
   return 0;
