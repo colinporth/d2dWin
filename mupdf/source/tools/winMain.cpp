@@ -53,10 +53,9 @@
 #define SET_KEY(parent, name, value) RegSetValueExA (parent, name, 0, REG_SZ, (const BYTE*)(value), (DWORD)strlen(value) + 1)
 //}}}
 //{{{  enums
-enum { ARROW, HAND, WAIT, CARET };
-enum { DISCARD, SAVE, CANCEL };
+enum eCursor { eARROW, eHAND, eWAIT, eCARET };
 enum ePanning { DONT_PAN = 0, PAN_TO_TOP, PAN_TO_BOTTOM };
-enum { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
+enum eOutline { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 //}}}
 
 //{{{  global vars
@@ -309,15 +308,15 @@ void winHelp() {
   }
 //}}}
 //{{{
-void winCursor (int curs) {
+void winCursor (eCursor cursor) {
 
-  if (curs == ARROW)
+  if (cursor == eARROW)
     SetCursor (gArrowCursor);
-  if (curs == HAND)
+  else if (cursor == eHAND)
     SetCursor (gHandCursor);
-  if (curs == WAIT)
+  else if (cursor == eWAIT)
     SetCursor (gWaitCursor);
-  if (curs == CARET)
+  else if (cursor == eCARET)
     SetCursor (gCaretCursor);
   }
 //}}}
@@ -788,7 +787,7 @@ public:
   void showPage (int load, int draw, int repaint, int searching) {
 
     if (!nowaitcursor)
-      winCursor (WAIT);
+      winCursor (eWAIT);
 
     fz_cookie cookie = { 0 };
     if (load) {
@@ -884,7 +883,7 @@ public:
         winResize (layout_w, layout_h);
 
       InvalidateRect (hwndview, NULL, 0);
-      winCursor (ARROW);
+      winCursor (eARROW);
       }
       //}}}
 
@@ -942,7 +941,7 @@ public:
       return;
       }
 
-    winCursor (WAIT);
+    winCursor (eWAIT);
 
     int firstpage = mPageNumber;
 
@@ -966,7 +965,7 @@ public:
       if (hit_count > 0) {
         *panTo = dir == 1 ? PAN_TO_TOP : PAN_TO_BOTTOM;
         searchpage = mPageNumber;
-        winCursor (HAND);
+        winCursor (eHAND);
         InvalidateRect (hwndview, NULL, 0);
         return;
         }
@@ -982,7 +981,7 @@ public:
 
     mPageNumber = firstpage;
     showPage (1, 0, 0, 0);
-    winCursor (HAND);
+    winCursor (eHAND);
     InvalidateRect (hwndview, NULL, 0);
     }
   //}}}
@@ -1514,7 +1513,7 @@ public:
 
     if (link) {
       //{{{  link
-      winCursor (HAND);
+      winCursor (eHAND);
       if (btn == 1 && state == 1 && !processed) {
         if (fz_is_external_link (mContext, link->uri)) {
           //appgotouri (app, link->uri);
@@ -1534,9 +1533,9 @@ public:
             break;
         }
       if (annot)
-        winCursor (CARET);
+        winCursor (eCARET);
       else
-        winCursor (ARROW);
+        winCursor (eARROW);
       }
 
     if (state == 1 && !processed) {
