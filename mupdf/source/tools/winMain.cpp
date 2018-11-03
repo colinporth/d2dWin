@@ -65,11 +65,11 @@ HWND gHwndView = NULL;
 BITMAPINFO* gDibinf = NULL;
 HCURSOR gArrowCursor;
 HCURSOR gHandCursor;
-HCURSOR gWaitCursor ;
+HCURSOR gWaitCursor;
 HCURSOR gCaretCursor;
 
-char td_textinput[1024] = "";
 int td_retry = 0;
+char td_textinput[1024] = "";
 
 int cd_nopts;
 int* cd_nvals;
@@ -79,15 +79,10 @@ const char** cd_vals;
 int gPdOk = 0;
 bool gJustCopied = false;
 
-WINDOWPLACEMENT gSavedPlacement;
 bool gIsFullScreen = false;
+WINDOWPLACEMENT gSavedPlacement;
 //}}}
 
-//{{{
-char* versionStr() {
-  return "MuPDF " FZ_VERSION "\n" "Copyright 2006-2017 Artifex Software, Inc.\n";
-  }
-//}}}
 //{{{
 char* usageStr() {
   return
@@ -120,6 +115,11 @@ char* usageStr() {
     "i\t\t-- toggle inverted color mode\n"
     "q\t\t-- quit\n"
     ;
+  }
+//}}}
+//{{{
+char* versionStr() {
+  return "MuPDF " FZ_VERSION "\n" "Copyright 2006-2017 Artifex Software, Inc.\n";
   }
 //}}}
 //{{{
