@@ -66,14 +66,11 @@ enum { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 HWND hwndframe = NULL;
 HWND hwndview = NULL;
 HDC hdc;
-BITMAPINFO* dibinf = NULL;
-HCURSOR arrowCursor;
-HCURSOR handCursor;
-HCURSOR waitCursor ;
-HCURSOR caretCursor;
-
-wchar_t wbuf[PATH_MAX];
-char filename[PATH_MAX];
+BITMAPINFO* gDibinf = NULL;
+HCURSOR gArrowCursor;
+HCURSOR gHandCursor;
+HCURSOR gWaitCursor ;
+HCURSOR gCaretCursor;
 
 char td_textinput[1024] = "";
 int td_retry = 0;
@@ -317,13 +314,13 @@ void winHelp() {
 void winCursor (int curs) {
 
   if (curs == ARROW)
-    SetCursor (arrowCursor);
+    SetCursor (gArrowCursor);
   if (curs == HAND)
-    SetCursor (handCursor);
+    SetCursor (gHandCursor);
   if (curs == WAIT)
-    SetCursor (waitCursor);
+    SetCursor (gWaitCursor);
   if (curs == CARET)
-    SetCursor (caretCursor);
+    SetCursor (gCaretCursor);
   }
 //}}}
 //{{{
@@ -521,19 +518,6 @@ public:
     }
   //}}}
 
-  //{{{
-  void invertHit() {
-
-    fz_matrix ctm = fz_transform_page (page_bbox, resolution, rotate);
-
-    for (int i = 0; i < hit_count; i++) {
-      fz_rect bbox;
-      bbox = fz_rect_from_quad (hit_bbox[i]);
-      bbox = fz_transform_rect (bbox, ctm);
-      fz_invert_pixmap_rect (mContext, image, fz_round_rect (bbox));
-      }
-    }
-  //}}}
   //{{{
   void blitSearch() {
 
@@ -1169,7 +1153,7 @@ public:
       //{{{
       case 0x1B: {
         close();
-        free (dibinf);
+        free (gDibinf);
         fz_drop_context (mContext);
         exit (0);
         break;
@@ -1849,6 +1833,19 @@ private:
     errored = errored;
     }
   //}}}
+  //{{{
+  void invertHit() {
+
+    fz_matrix ctm = fz_transform_page (page_bbox, resolution, rotate);
+
+    for (int i = 0; i < hit_count; i++) {
+      fz_rect bbox;
+      bbox = fz_rect_from_quad (hit_bbox[i]);
+      bbox = fz_transform_rect (bbox, ctm);
+      fz_invert_pixmap_rect (mContext, image, fz_round_rect (bbox));
+      }
+    }
+  //}}}
 
   //{{{
   void panView (int newx, int newy) {
@@ -1974,6 +1971,7 @@ INT_PTR CALLBACK dlogInfoProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
 
   switch (message) {
     case WM_INITDIALOG:
+     wchar_t wbuf[PATH_MAX];
       SetDlgItemTextW (hwnd, 0x10, wbuf);
       if (fz_lookup_metadata (context, document, FZ_META_FORMAT, buf, sizeof buf) >= 0)
         SetDlgItemTextA (hwnd, 0x11, buf);
@@ -2341,22 +2339,22 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   gApp->scrh = r.bottom - r.top;
   //}}}
   //{{{  create cursors
-  arrowCursor = LoadCursor (NULL, IDC_ARROW);
-  handCursor = LoadCursor (NULL, IDC_HAND);
-  waitCursor = LoadCursor (NULL, IDC_WAIT);
-  caretCursor = LoadCursor (NULL, IDC_IBEAM);
+  gArrowCursor = LoadCursor (NULL, IDC_ARROW);
+  gHandCursor = LoadCursor (NULL, IDC_HAND);
+  gWaitCursor = LoadCursor (NULL, IDC_WAIT);
+  gCaretCursor = LoadCursor (NULL, IDC_IBEAM);
   //}}}
   //{{{  init DIB info for buffer
-  dibinf = (BITMAPINFO*)malloc (sizeof(BITMAPINFO) + 12);
-  dibinf->bmiHeader.biSize = sizeof(dibinf->bmiHeader);
-  dibinf->bmiHeader.biPlanes = 1;
-  dibinf->bmiHeader.biBitCount = 32;
-  dibinf->bmiHeader.biCompression = BI_RGB;
-  dibinf->bmiHeader.biXPelsPerMeter = 2834;
-  dibinf->bmiHeader.biYPelsPerMeter = 2834;
-  dibinf->bmiHeader.biClrUsed = 0;
-  dibinf->bmiHeader.biClrImportant = 0;
-  dibinf->bmiHeader.biClrUsed = 0;
+  gDibinf = (BITMAPINFO*)malloc (sizeof(BITMAPINFO) + 12);
+  gDibinf->bmiHeader.biSize = sizeof (gDibinf->bmiHeader);
+  gDibinf->bmiHeader.biPlanes = 1;
+  gDibinf->bmiHeader.biBitCount = 32;
+  gDibinf->bmiHeader.biCompression = BI_RGB;
+  gDibinf->bmiHeader.biXPelsPerMeter = 2834;
+  gDibinf->bmiHeader.biYPelsPerMeter = 2834;
+  gDibinf->bmiHeader.biClrUsed = 0;
+  gDibinf->bmiHeader.biClrImportant = 0;
+  gDibinf->bmiHeader.biClrUsed = 0;
   //}}}
   //{{{  create window
   hwndframe = CreateWindowW (L"FrameWindow", // window class name
@@ -2387,10 +2385,11 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   AppendMenuW (menu, MF_SEPARATOR, 0, NULL);
   AppendMenuW (menu, MF_STRING, ID_ABOUT, L"About MuPDF...");
   AppendMenuW (menu, MF_STRING, ID_DOCINFO, L"Document Properties...");
-  SetCursor (arrowCursor);
+  SetCursor (gArrowCursor);
 
   if (fz_optind < argc) {
     // has filename
+    char filename[PATH_MAX];
     strcpy (filename, argv[fz_optind++]);
 
     // has page number
@@ -2408,7 +2407,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     gApp->close();
     }
 
-  free (dibinf);
+  free (gDibinf);
   fz_drop_context (gApp->mContext);
   fz_free_argv (argc, argv);
 
