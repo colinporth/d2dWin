@@ -54,7 +54,7 @@
 //}}}
 //{{{  enums
 enum eCursor { eARROW, eHAND, eWAIT, eCARET };
-enum ePanning { DONT_PAN = 0, PAN_TO_TOP, PAN_TO_BOTTOM };
+enum ePanning { eDONT_PAN = 0, ePAN_TO_TOP, ePAN_TO_BOTTOM };
 enum eOutline { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 //}}}
 
@@ -80,6 +80,8 @@ const char** cd_vals;
 int gPdOk = 0;
 bool gJustCopied = false;
 
+int gOldx = 0;
+int gOldy = 0;
 bool gIsFullScreen = false;
 WINDOWPLACEMENT gSavedPlacement;
 //}}}
@@ -482,7 +484,7 @@ public:
     mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
     colorspace = fz_device_bgr (mContext);
 
-    resolution = 96;
+    mResolution = 96;
 
     layout_w = 450;
     layout_h = 600;
@@ -596,10 +598,10 @@ public:
       mPageNumber = 1;
     if (mPageNumber > mPageCount)
       mPageNumber = mPageCount;
-    if (resolution < MINRES)
-      resolution = MINRES;
-    if (resolution > MAXRES)
-      resolution = MAXRES;
+    if (mResolution < MINRES)
+      mResolution = MINRES;
+    if (mResolution > MAXRES)
+      mResolution = MAXRES;
 
     if (!reload) {
       rotate = 0;
@@ -657,10 +659,10 @@ public:
   //}}}
 
   //{{{
-  void loadPage (int no_cache) {
+  void loadPage (int noCache) {
 
     mErrored = 0;
-    incomplete = 0;
+    mIncomplete = 0;
 
     fz_drop_display_list (mContext, mPageList);
     fz_drop_display_list (mContext, mAnnotationsList);
@@ -684,7 +686,7 @@ public:
       }
     fz_catch (mContext) {
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
-        incomplete = 1;
+        mIncomplete = 1;
       else
         winWarn ("Cannot load page");
       return;
@@ -698,7 +700,7 @@ public:
       /* Create display lists */
       mPageList = fz_new_display_list (mContext, fz_infinite_rect);
       mdev = fz_new_list_device (mContext, mPageList);
-      if (no_cache)
+      if (noCache)
         fz_enable_device_hints (mContext, mdev, FZ_NO_CACHE);
       cookie.incomplete_ok = 1;
       fz_run_page_contents (mContext, mPage, mdev, fz_identity, &cookie);
@@ -711,7 +713,7 @@ public:
       for (fz_annot* annot = fz_first_annot (mContext, mPage); annot; annot = fz_next_annot(mContext, annot))
         fz_run_annot (mContext, annot, mdev, fz_identity, &cookie);
       if (cookie.incomplete)
-        incomplete = 1;
+        mIncomplete = 1;
       else if (cookie.errors) {
         winWarn ("Errors found on page");
         mErrored = 1;
@@ -723,7 +725,7 @@ public:
       }
     fz_catch (mContext) {
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
-        incomplete = 1;
+        mIncomplete = 1;
       else {
         winWarn ("Cannot load page");
         mErrored = 1;
@@ -735,7 +737,7 @@ public:
       }
     fz_catch (mContext) {
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
-        incomplete = 1;
+        mIncomplete = 1;
       else if (!mErrored)
         winWarn ("Cannot load page");
       }
@@ -820,7 +822,7 @@ public:
     if (draw) {
       //{{{  draw
       char buf2[64];
-      sprintf (buf2, " - %d/%d (%d dpi)", mPageNumber, mPageCount, resolution);
+      sprintf (buf2, " - %d/%d (%d dpi)", mPageNumber, mPageCount, mResolution);
 
       char buf[MAX_TITLE];
       size_t len = MAX_TITLE - strlen (buf2);
@@ -833,7 +835,7 @@ public:
         sprintf (buf, "%s%s", mDocTitle, buf2);
       winTitle (buf);
 
-      fz_matrix ctm = fz_transform_page (mPageBoundingBox, resolution, rotate);
+      fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
       fz_rect bounds = fz_transform_rect (mPageBoundingBox, ctm);
       fz_irect ibounds = fz_round_rect (bounds);
       bounds = fz_rect_from_irect (ibounds);
@@ -899,11 +901,11 @@ public:
   //{{{
   void autoZoomVert() {
 
-    resolution *= (float)winh / fz_pixmap_height (mContext, image);
-    if (resolution > MAXRES)
-      resolution = MAXRES;
-    else if (resolution < MINRES)
-      resolution = MINRES;
+    mResolution *= (float)mWinHeight / fz_pixmap_height (mContext, image);
+    if (mResolution > MAXRES)
+      mResolution = MAXRES;
+    else if (mResolution < MINRES)
+      mResolution = MINRES;
 
     showPage (0, 1, 1, 0);
     }
@@ -911,11 +913,11 @@ public:
   //{{{
   void autoZoomHoriz() {
 
-    resolution *= (float)winw / fz_pixmap_width (mContext, image);
-    if (resolution > MAXRES)
-      resolution = MAXRES;
-    else if (resolution < MINRES)
-      resolution = MINRES;
+    mResolution *= (float)mWinWidth / fz_pixmap_width (mContext, image);
+    if (mResolution > MAXRES)
+      mResolution = MAXRES;
+    else if (mResolution < MINRES)
+      mResolution = MINRES;
 
     showPage (0, 1, 1, 0);
     }
@@ -923,9 +925,9 @@ public:
   //{{{
   void autoZoom() {
 
-    float page_aspect = (float) fz_pixmap_width (mContext, image) / fz_pixmap_height (mContext, image);
-    float win_aspect = (float) winw / winh;
-    if (page_aspect > win_aspect)
+    float pageAspect = (float) fz_pixmap_width (mContext, image) / fz_pixmap_height (mContext, image);
+    float winAspect = (float) mWinWidth / mWinHeight;
+    if (pageAspect > winAspect)
       autoZoomHoriz();
     else
       autoZoomVert();
@@ -958,7 +960,7 @@ public:
 
       hit_count = fz_search_stext_page (mContext, mPageText, search, hit_bbox, nelem (hit_bbox));
       if (hit_count > 0) {
-        *panTo = dir == 1 ? PAN_TO_TOP : PAN_TO_BOTTOM;
+        *panTo = dir == 1 ? ePAN_TO_TOP : ePAN_TO_BOTTOM;
         searchpage = mPageNumber;
         winCursor (eHAND);
         InvalidateRect (gHwndView, NULL, 0);
@@ -984,7 +986,7 @@ public:
   //{{{
   void onCopy (unsigned short *ucsbuf, int ucslen) {
 
-    fz_matrix ctm = fz_transform_page (mPageBoundingBox, resolution, rotate);
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
     ctm = fz_invert_matrix (ctm);
 
     fz_rect sel = fz_transform_rect (selr, ctm);
@@ -1054,7 +1056,7 @@ public:
   void onKey (int c, int modifiers) {
 
     int oldpage = mPageNumber;
-    enum ePanning panTo = PAN_TO_TOP;
+    enum ePanning panTo = ePAN_TO_TOP;
     int loadpage = 1;
 
     if (isSearching) {
@@ -1116,13 +1118,13 @@ public:
       case '+':
       //{{{
       case '=':
-        resolution = zoomIn (resolution);
+        mResolution = zoomIn (mResolution);
         showPage (0, 1, 1, 0);
         break;
       //}}}
       //{{{
       case '-':
-        resolution = zoomOut (resolution);
+        mResolution = zoomOut (mResolution);
         showPage (0, 1, 1, 0);
         break;
       //}}}
@@ -1199,8 +1201,8 @@ public:
       case 'j':
         {
           int h = fz_pixmap_height(mContext, image);
-          if (h <= winh || pany <= winh - h) {
-            panTo = PAN_TO_TOP;
+          if (h <= mWinHeight || pany <= mWinHeight - h) {
+            panTo = ePAN_TO_TOP;
             mPageNumber++;
           }
           else {
@@ -1214,8 +1216,8 @@ public:
       case 'k':
         {
           int h = fz_pixmap_height(mContext, image);
-          if (h <= winh || pany == 0) {
-            panTo = PAN_TO_BOTTOM;
+          if (h <= mWinHeight || pany == 0) {
+            panTo = ePAN_TO_BOTTOM;
             mPageNumber--;
           }
           else {
@@ -1249,7 +1251,7 @@ public:
       //}}}
       //{{{
       case ',':
-        panTo = PAN_TO_BOTTOM;
+        panTo = ePAN_TO_BOTTOM;
         if (numberlen > 0)
           mPageNumber -= atoi(number);
         else
@@ -1258,7 +1260,7 @@ public:
       //}}}
       //{{{
       case '.':
-        panTo = PAN_TO_TOP;
+        panTo = ePAN_TO_TOP;
         if (numberlen > 0)
           mPageNumber += atoi(number);
         else
@@ -1269,7 +1271,7 @@ public:
       case '\b':
       //{{{
       case 'b':
-        panTo = DONT_PAN;
+        panTo = eDONT_PAN;
         if (numberlen > 0)
           mPageNumber -= atoi(number);
         else
@@ -1278,7 +1280,7 @@ public:
       //}}}
       //{{{
       case ' ':
-        panTo = DONT_PAN;
+        panTo = eDONT_PAN;
         if (modifiers & 1)
         {
           if (numberlen > 0)
@@ -1296,19 +1298,19 @@ public:
       //}}}
       //{{{
       case '<':
-        panTo = PAN_TO_TOP;
+        panTo = ePAN_TO_TOP;
         mPageNumber -= 10;
         break;
       //}}}
       //{{{
       case '>':
-        panTo = PAN_TO_TOP;
+        panTo = ePAN_TO_TOP;
         mPageNumber += 10;
         break;
       //}}}
       //{{{
       case 'r':
-        panTo = DONT_PAN;
+        panTo = eDONT_PAN;
         oldpage = -1;
         reloadFile();
         break;
@@ -1364,17 +1366,17 @@ public:
     if (mPageNumber != oldpage) {
       switch (panTo) {
         //{{{
-        case PAN_TO_TOP:
+        case ePAN_TO_TOP:
           pany = 0;
           break;
         //}}}
         //{{{
-        case PAN_TO_BOTTOM:
+        case ePAN_TO_BOTTOM:
           pany = -2000;
           break;
         //}}}
         //{{{
-        case DONT_PAN:
+        case eDONT_PAN:
           break;
         //}}}
         }
@@ -1392,7 +1394,7 @@ public:
     p.x = x - panx + irect.x0;
     p.y = y - pany + irect.y0;
 
-    fz_matrix ctm = fz_transform_page (mPageBoundingBox, resolution, rotate);
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
     ctm = fz_invert_matrix (ctm);
 
     p = fz_transform_point (p, ctm);
@@ -1572,13 +1574,13 @@ public:
       //{{{  panning
       int newx = panx + x - selx;
       int newy = pany + y - sely;
-      int imgh = winh;
+      int imgh = mWinHeight;
       if (image)
         imgh = fz_pixmap_height (mContext, image);
 
       /* Scrolling beyond limits implies flipping pages */
       /* Are we requested to scroll beyond limits? */
-      if (newy + imgh < winh || newy > 0) {
+      if (newy + imgh < mWinHeight || newy > 0) {
         /* Yes. We can assume that deltay != 0 */
         int deltay = y - sely;
         /* Check whether the panning has occurred in the direction that we are already crossing the
@@ -1629,9 +1631,9 @@ public:
   //{{{
   void onResize (int w, int h) {
 
-    if (winw != w || winh != h) {
-      winw = w;
-      winh = h;
+    if (mWinWidth != w || mWinHeight != h) {
+      mWinWidth = w;
+      mWinHeight = h;
       panView (panx, pany);
       InvalidateRect (gHwndView, NULL, 0);
       }
@@ -1658,7 +1660,7 @@ public:
   fz_link* mPageLinks;
 
   int mErrored;
-  int incomplete;
+  int mIncomplete;
   //}}}
   //{{{  layout
   float layout_w;
@@ -1668,7 +1670,7 @@ public:
   int layout_use_doc_css;
   //}}}
   //{{{  current view
-  int resolution;
+  int mResolution;
   int rotate;
 
   fz_pixmap* image;
@@ -1679,7 +1681,7 @@ public:
   int tint, tint_r, tint_g, tint_b;
   //}}}
   //{{{  window system sizes
-  int winw, winh;
+  int mWinWidth, mWinHeight;
   int scrw, scrh;
 
   int fullscreen;
@@ -1721,7 +1723,7 @@ private:
 
     pdf_document* pdf = NULL;
     fz_try(mContext) {
-      fz_rect mediabox = { 0, 0, (float)winw, (float)winh };
+      fz_rect mediabox = { 0, 0, (float)mWinWidth, (float)mWinHeight };
       int i;
 
       pdf = pdf_create_document (mContext);
@@ -1759,23 +1761,21 @@ private:
     int mErrored = 0;
     fz_cookie cookie = { 0 };
 
-    fz_device* mdev = NULL;
-    fz_var (mdev);
-
     fz_drop_display_list (mContext, mAnnotationsList);
     mAnnotationsList = NULL;
 
+    fz_device* mdev = NULL;
+    fz_var (mdev);
     fz_try (mContext) {
       /* Create display list */
-      mAnnotationsList = fz_new_display_list(mContext, fz_infinite_rect);
+      mAnnotationsList = fz_new_display_list (mContext, fz_infinite_rect);
       mdev = fz_new_list_device (mContext, mAnnotationsList);
 
-      fz_annot* annot;
-      for (annot = fz_first_annot (mContext, mPage); annot; annot = fz_next_annot(mContext, annot))
+      for (fz_annot* annot = fz_first_annot (mContext, mPage); annot; annot = fz_next_annot(mContext, annot))
         fz_run_annot (mContext, annot, mdev, fz_identity, &cookie);
 
       if (cookie.incomplete)
-        incomplete = 1;
+        mIncomplete = 1;
       else if (cookie.errors) {
         winWarn ("Errors found on page");
         mErrored = 1;
@@ -1794,7 +1794,7 @@ private:
   //{{{
   void invertHit() {
 
-    fz_matrix ctm = fz_transform_page (mPageBoundingBox, resolution, rotate);
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
 
     for (int i = 0; i < hit_count; i++) {
       fz_rect bbox;
@@ -1820,15 +1820,15 @@ private:
     if (newy > 0)
       newy = 0;
 
-    if (newx + image_w < winw)
-      newx = winw - image_w;
-    if (newy + image_h < winh)
-      newy = winh - image_h;
+    if (newx + image_w < mWinWidth)
+      newx = mWinWidth - image_w;
+    if (newy + image_h < mWinHeight)
+      newy = mWinHeight - image_h;
 
-    if (winw >= image_w)
-      newx = (winw - image_w) / 2;
-    if (winh >= image_h)
-      newy = (winh - image_h) / 2;
+    if (mWinWidth >= image_w)
+      newx = (mWinWidth - image_w) / 2;
+    if (mWinHeight >= image_h)
+      newy = (mWinHeight - image_h) / 2;
 
     if (newx != panx || newy != pany)
       InvalidateRect (gHwndView, NULL, 0);
@@ -1864,27 +1864,26 @@ private:
     if (modifiers & (1<<2)) {
       /* zoom in/out if ctrl is pressed */
       if (dir < 0)
-        resolution = zoomIn (resolution);
+        mResolution = zoomIn (mResolution);
       else
-        resolution = zoomOut (resolution);
-      if (resolution > MAXRES)
-        resolution = MAXRES;
-      if (resolution < MINRES)
-        resolution = MINRES;
+        mResolution = zoomOut (mResolution);
+      if (mResolution > MAXRES)
+        mResolution = MAXRES;
+      if (mResolution < MINRES)
+        mResolution = MINRES;
       showPage (0, 1, 1, 0);
     }
     else {
-      /* scroll up/down, or left/right if
-      shift is pressed */
-      int w = fz_pixmap_width(mContext, image);
-      int h = fz_pixmap_height(mContext, image);
+      /* scroll up/down, or left/right if shift is pressed */
+      int w = fz_pixmap_width (mContext, image);
+      int h = fz_pixmap_height (mContext, image);
       int xstep = 0;
       int ystep = 0;
       int pagestep = 0;
       if (modifiers & (1<<0)) {
         if (dir > 0 && panx >= 0)
           pagestep = -1;
-        else if (dir < 0 && panx <= winw - w)
+        else if (dir < 0 && panx <= mWinWidth - w)
           pagestep = 1;
         else
           xstep = 20 * dir;
@@ -1892,7 +1891,7 @@ private:
       else {
         if (dir > 0 && pany >= 0)
           pagestep = -1;
-        else if (dir < 0 && pany <= winh - h)
+        else if (dir < 0 && pany <= mWinHeight - h)
           pagestep = 1;
         else
           ystep = 20 * dir;
@@ -2042,9 +2041,6 @@ void handleMouse (int x, int y, int btn, int state) {
 //{{{
 LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
-  static int oldx = 0;
-  static int oldy = 0;
-
   int x = (signed short)LOWORD(lParam);
   int y = (signed short)HIWORD(lParam);
 
@@ -2074,16 +2070,16 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     case WM_LBUTTONDOWN:
       SetFocus (gHwndView);
-      oldx = x;
-      oldy = y;
+      gOldx = x;
+      gOldy = y;
       handleMouse (x, y, 1, 1);
 
       return 0;
     //}}}
     //{{{
     case WM_LBUTTONUP:
-      oldx = x;
-      oldy = y;
+      gOldx = x;
+      gOldy = y;
       handleMouse (x, y, 1, -1);
 
       return 0;
@@ -2092,16 +2088,16 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     case WM_MBUTTONDOWN:
       SetFocus (gHwndView);
-      oldx = x;
-      oldy = y;
+      gOldx = x;
+      gOldy = y;
       handleMouse (x, y, 2, 1);
 
       return 0;
     //}}}
     //{{{
     case WM_MBUTTONUP:
-      oldx = x;
-      oldy = y;
+      gOldx = x;
+      gOldy = y;
       handleMouse (x, y, 2, -1);
 
       return 0;
@@ -2110,16 +2106,16 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //{{{
     case WM_RBUTTONDOWN:
       SetFocus (gHwndView);
-      oldx = x;
-      oldy = y;
+      gOldx = x;
+      gOldy = y;
       handleMouse (x, y, 3, 1);
 
       return 0;
     //}}}
     //{{{
     case WM_RBUTTONUP:
-      oldx = x;
-      oldy = y;
+      gOldx = x;
+      gOldy = y;
       handleMouse(x, y, 3, -1);
 
       return 0;
@@ -2127,20 +2123,20 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
 
     //{{{
     case WM_MOUSEMOVE:
-      oldx = x;
-      oldy = y;
-      handleMouse(x, y, 0, 0);
+      gOldx = x;
+      gOldy = y;
+      handleMouse (x, y, 0, 0);
       return 0;
     //}}}
     //{{{
     case WM_MOUSEWHEEL:
       if ((signed short)HIWORD(wParam) <= 0) {
-        handleMouse (oldx, oldy, 4, 1);
-        handleMouse(oldx, oldy, 4, -1);
+        handleMouse (gOldx, gOldy, 4, 1);
+        handleMouse (gOldx, gOldy, 4, -1);
         }
       else {
-        handleMouse(oldx, oldy, 5, 1);
-        handleMouse(oldx, oldy, 5, -1);
+        handleMouse (gOldx, gOldy, 5, 1);
+        handleMouse (gOldx, gOldy, 5, -1);
         }
 
       return 0;
@@ -2159,7 +2155,7 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
         case VK_NEXT:
         case VK_ESCAPE:
           handleKey (wParam + 256);
-          handleMouse (oldx, oldy, 0, 0);  /* update cursor */
+          handleMouse (gOldx, gOldy, 0, 0);  /* update cursor */
           return 0;
         }
 
@@ -2170,7 +2166,7 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     case WM_CHAR:
       if (wParam < 256) {
         handleKey (wParam);
-        handleMouse (oldx, oldy, 0, 0);  /* update cursor */
+        handleMouse (gOldx, gOldy, 0, 0);  /* update cursor */
         }
 
       return 0;
@@ -2210,7 +2206,7 @@ LRESULT CALLBACK frameProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         winHelp();
         return 0;
         }
-      if (wParam == ID_DOCINFO) {
+      else if (wParam == ID_DOCINFO) {
         winInfo();
         return 0;
         }
@@ -2220,8 +2216,7 @@ LRESULT CALLBACK frameProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
       // More generally, you should use GetEffectiveClientRect if you have a toolbar etc.
       RECT rect;
       GetClientRect (hwnd, &rect);
-      MoveWindow (gHwndView, rect.left, rect.top,
-      rect.right-rect.left, rect.bottom-rect.top, TRUE);
+      MoveWindow (gHwndView, rect.left, rect.top, rect.right-rect.left, rect.bottom-rect.top, TRUE);
       return 0;
       }
 
