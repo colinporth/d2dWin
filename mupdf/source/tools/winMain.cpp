@@ -28,7 +28,6 @@
 //#include "mupdf/helpers/pkcs7-openssl.h"
 //}}}
 //{{{  defines
-// 25% .. 1600%
 #define MINRES 18
 #define MAXRES 1152
 
@@ -755,20 +754,6 @@ public:
     }
   //}}}
   //{{{
-  void reloadPage() {
-
-    if (outline_deferred == appOUTLINE_LOAD_NOW) {
-      fz_try (mContext)
-        outline = fz_load_outline (mContext, mDocument);
-      fz_catch (mContext)
-        outline = NULL;
-      outline_deferred = 0;
-      }
-
-    showPage (1, 1, 1, 0);
-    }
-  //}}}
-  //{{{
   void gotoPage (int number) {
 
     isSearching = 0;
@@ -927,6 +912,7 @@ public:
 
     float pageAspect = (float) fz_pixmap_width (mContext, image) / fz_pixmap_height (mContext, image);
     float winAspect = (float) mWinWidth / mWinHeight;
+
     if (pageAspect > winAspect)
       autoZoomHoriz();
     else
@@ -2173,9 +2159,8 @@ LRESULT CALLBACK viewProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
     //}}}
 
     //{{{
-    /* We use WM_APP to trigger a reload and repaint of a page */
+    // use WM_APP to trigge a reload and repaint of a page
     case WM_APP:
-      gPdf->reloadPage();
       break;
     //}}}
     }
