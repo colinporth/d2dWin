@@ -532,7 +532,7 @@ public:
       fz_layout_document (mContext, mDocument, layoutWidth, layoutHeight, mLayoutEm);
 
       while (true) {
-        fz_try(mContext) {
+        fz_try (mContext) {
           mPageCount = fz_count_pages (mContext, mDocument);
           if (mPageCount <= 0)
             fz_throw (mContext, FZ_ERROR_GENERIC, "No pages in document");
@@ -614,15 +614,6 @@ public:
     mDocument = NULL;
 
     fz_flush_warnings (mContext);
-    }
-  //}}}
-  //{{{
-  void reloadFile() {
-
-    char filename[PATH_MAX];
-    fz_strlcpy (filename, mDocPath, PATH_MAX);
-    closeFile();
-    openFile (filename, 1);
     }
   //}}}
 
@@ -714,7 +705,7 @@ public:
   //{{{
   void gotoPage (int number) {
 
-    isSearching = 0;
+    mIsSearching = 0;
 
     if (number < 1)
       number = 1;
@@ -729,18 +720,7 @@ public:
     }
   //}}}
   //{{{
-  void updatePage() {
-
-    if (pdf_update_page (mContext, (pdf_page*)mPage)) {
-      recreateAnnotations();
-      showPage (0, 1, 1, 0);
-      }
-    else
-      showPage (0, 0, 1, 0);
-    }
-  //}}}
-  //{{{
-  void showPage (int load, int draw, int repaint, int searching) {
+  void showPage (int load, int draw, int repaint, int search) {
 
     if (!nowaitcursor)
       winCursor (eWAIT);
@@ -748,14 +728,14 @@ public:
     fz_cookie cookie = { 0 };
     if (load) {
       //{{{  load
-      loadPage (searching);
+      loadPage (search);
 
-      /* Zero search hit position */
+      // Zero search hit position
       hit_count = 0;
 
-      /* Extract text */
-      fz_rect mediabox = fz_bound_page (mContext, mPage);
-      mPageText = fz_new_stext_page (mContext, mediabox);
+      // Extract text
+      fz_rect mediaBox = fz_bound_page (mContext, mPage);
+      mPageText = fz_new_stext_page (mContext, mediaBox);
 
       if (mPageList || mAnnotationsList) {
         fz_device* tdev = fz_new_stext_device (mContext, mPageText, NULL);
@@ -796,7 +776,6 @@ public:
 
       // Draw
       fz_drop_pixmap (mContext, mImage);
-
       mImage = NULL;
       fz_var (mImage);
 
@@ -837,10 +816,21 @@ public:
 
     if (cookie.errors && mErrored == 0) {
       mErrored = 1;
-      winWarn ("Errors found on page, page rendering may be incomplete");
+      winWarn ("Errors on page, rendering may be incomplete");
       }
 
     fz_flush_warnings (mContext);
+    }
+  //}}}
+  //{{{
+  void updatePage() {
+
+    if (pdf_update_page (mContext, (pdf_page*)mPage)) {
+      recreateAnnotations();
+      showPage (0, 1, 1, 0);
+      }
+    else
+      showPage (0, 0, 1, 0);
     }
   //}}}
 
@@ -921,81 +911,12 @@ public:
         page = 1;
       } while (page != firstpage);
 
-      winWarn ("String '%s' not found.", search);
+    winWarn ("String '%s' not found.", search);
 
     mPageNumber = firstpage;
     showPage (1, 0, 0, 0);
     winCursor (eHAND);
     InvalidateRect (gHwndView, NULL, 0);
-    }
-  //}}}
-
-  //{{{
-  void onCopy (unsigned short *ucsbuf, int ucslen) {
-
-    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
-    ctm = fz_invert_matrix (ctm);
-
-    fz_rect sel = fz_transform_rect (selr, ctm);
-
-    int p = 0;
-    int need_newline = 0;
-
-    fz_stext_page* page = mPageText;
-    for (fz_stext_block* block = page->first_block; block; block = block->next) {
-      if (block->type != FZ_STEXT_BLOCK_TEXT)
-        continue;
-
-      for (fz_stext_line* line = block->u.t.first_line; line; line = line->next) {
-        int saw_text = 0;
-        for (fz_stext_char* ch = line->first_char; ch; ch = ch->next) {
-          fz_rect bbox = fz_rect_from_quad(ch->quad);
-          int c = ch->c;
-          if (c < 32)
-            c = 0xFFFD;
-          if (bbox.x1 >= sel.x0 && bbox.x0 <= sel.x1 && bbox.y1 >= sel.y0 && bbox.y0 <= sel.y1) {
-            saw_text = 1;
-            if (need_newline) {
-              if (p < ucslen - 1)
-                ucsbuf[p++] = '\r';
-              if (p < ucslen - 1)
-                ucsbuf[p++] = '\n';
-              need_newline = 0;
-              }
-            if (p < ucslen - 1)
-              ucsbuf[p++] = c;
-            }
-          }
-        if (saw_text)
-          need_newline = 1;
-        }
-      }
-
-    ucsbuf[p] = 0;
-    }
-  //}}}
-  //{{{
-  void doCopy() {
-
-    if (!OpenClipboard (gHwndFrame))
-      return;
-
-    EmptyClipboard();
-
-    HGLOBAL handle = GlobalAlloc (GMEM_MOVEABLE, 4096 * sizeof(unsigned short));
-    if (!handle) {
-      CloseClipboard();
-      return;
-      }
-
-    unsigned short* ucsbuf = (unsigned short*)GlobalLock (handle);
-    onCopy (ucsbuf, 4096);
-    GlobalUnlock (handle);
-
-    SetClipboardData (CF_UNICODETEXT, handle);
-    CloseClipboard();
-
-    gJustCopied = true;
     }
   //}}}
 
@@ -1006,7 +927,7 @@ public:
     enum ePanning panTo = ePAN_TO_TOP;
     int loadpage = 1;
 
-    if (isSearching) {
+    if (mIsSearching) {
       //{{{  searching
       size_t n = strlen(search);
       if (c < ' ') {
@@ -1015,7 +936,7 @@ public:
           InvalidateRect (gHwndView, NULL, 0);
           }
         if (c == '\n' || c == '\r') {
-          isSearching = 0;
+          mIsSearching = 0;
           if (n > 0) {
             InvalidateRect (gHwndView, NULL, 0);
             if (searchdir < 0) {
@@ -1032,7 +953,7 @@ public:
             InvalidateRect (gHwndView, NULL, 0);
           }
         if (c == '\033') {
-          isSearching = 0;
+          mIsSearching = 0;
           InvalidateRect (gHwndView, NULL, 0);
           }
         }
@@ -1244,15 +1165,8 @@ public:
         break;
       //}}}
       //{{{
-      case 'r':
-        panTo = eDONT_PAN;
-        oldpage = -1;
-        reloadFile();
-        break;
-      //}}}
-      //{{{
       case '?':
-        isSearching = 1;
+        mIsSearching = 1;
         searchdir = -1;
         search[0] = 0;
         hit_count = 0;
@@ -1262,7 +1176,7 @@ public:
       //}}}
       //{{{
       case '/':
-        isSearching = 1;
+        mIsSearching = 1;
         searchdir = 1;
         search[0] = 0;
         hit_count = 0;
@@ -1468,14 +1382,14 @@ public:
       }
 
     if (state == 1 && !processed) {
-      if (btn == 1 && !iscopying) {
+      if (btn == 1 && !mIsCopying) {
         isPanning = 1;
         selx = x;
         sely = y;
         beyondy = 0;
         }
       if (btn == 3 && !isPanning) {
-        iscopying = 1;
+        mIsCopying = 1;
         selx = x;
         sely = y;
         selr.x0 = x;
@@ -1491,16 +1405,34 @@ public:
       }
 
     else if (state == -1) {
-      if (iscopying) {
+      if (mIsCopying) {
         //{{{  copying
-        iscopying = 0;
+        mIsCopying = 0;
         selr.x0 = fz_mini (selx, x) - panx + irect.x0;
         selr.x1 = fz_maxi (selx, x) - panx + irect.x0;
         selr.y0 = fz_mini (sely, y) - pany + irect.y0;
         selr.y1 = fz_maxi (sely, y) - pany + irect.y0;
         InvalidateRect (gHwndView, NULL, 0);
-        if (selr.x0 < selr.x1 && selr.y0 < selr.y1)
-          doCopy();
+        if (selr.x0 < selr.x1 && selr.y0 < selr.y1) {
+          if (OpenClipboard (gHwndFrame)) {
+            EmptyClipboard();
+
+            HGLOBAL handle = GlobalAlloc (GMEM_MOVEABLE, 4096 * sizeof(unsigned short));
+            if (!handle) {
+              CloseClipboard();
+              return;
+              }
+
+            unsigned short* ucsbuf = (unsigned short*)GlobalLock (handle);
+            onCopy (ucsbuf, 4096);
+            GlobalUnlock (handle);
+
+            SetClipboardData (CF_UNICODETEXT, handle);
+            CloseClipboard();
+
+            gJustCopied = true;
+            }
+          }
         }
         //}}}
       isPanning = 0;
@@ -1552,7 +1484,7 @@ public:
       sely = y;
       }
       //}}}
-    else if (iscopying) {
+    else if (mIsCopying) {
       //{{{  copying
       selr.x0 = fz_mini (selx, x) - panx + irect.x0;
       selr.x1 = fz_maxi (selx, x) - panx + irect.x0;
@@ -1626,7 +1558,7 @@ public:
   int isPanning;
   int panx, pany;
 
-  int iscopying;
+  int mIsCopying;
   int selx, sely;
   int beyondy;
   fz_rect selr;
@@ -1634,7 +1566,7 @@ public:
   int nowaitcursor;
   //}}}
   //{{{  search state
-  int isSearching;
+  int mIsSearching;
   int searchdir;
   char search[512];
   int searchpage;
@@ -1774,7 +1706,7 @@ private:
   //{{{
   void onScroll (int modifiers, int dir) {
 
-    isPanning = iscopying = 0;
+    isPanning = mIsCopying = 0;
     if (modifiers & (1<<2)) {
       /* zoom in/out if ctrl is pressed */
       if (dir < 0)
@@ -1824,6 +1756,51 @@ private:
       }
     }
   }
+  //}}}
+
+  //{{{
+  void onCopy (unsigned short* ucsbuf, int ucslen) {
+
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
+    ctm = fz_invert_matrix (ctm);
+
+    fz_rect sel = fz_transform_rect (selr, ctm);
+
+    int p = 0;
+    int need_newline = 0;
+
+    fz_stext_page* page = mPageText;
+    for (fz_stext_block* block = page->first_block; block; block = block->next) {
+      if (block->type != FZ_STEXT_BLOCK_TEXT)
+        continue;
+
+      for (fz_stext_line* line = block->u.t.first_line; line; line = line->next) {
+        int saw_text = 0;
+        for (fz_stext_char* ch = line->first_char; ch; ch = ch->next) {
+          fz_rect bbox = fz_rect_from_quad(ch->quad);
+          int c = ch->c;
+          if (c < 32)
+            c = 0xFFFD;
+          if (bbox.x1 >= sel.x0 && bbox.x0 <= sel.x1 && bbox.y1 >= sel.y0 && bbox.y0 <= sel.y1) {
+            saw_text = 1;
+            if (need_newline) {
+              if (p < ucslen - 1)
+                ucsbuf[p++] = '\r';
+              if (p < ucslen - 1)
+                ucsbuf[p++] = '\n';
+              need_newline = 0;
+              }
+            if (p < ucslen - 1)
+              ucsbuf[p++] = c;
+            }
+          }
+        if (saw_text)
+          need_newline = 1;
+        }
+      }
+
+    ucsbuf[p] = 0;
+    }
   //}}}
 
   const int zoomList[11] = { 18, 24, 36, 54, 72, 96, 120, 144, 180, 216, 288 };
