@@ -870,55 +870,6 @@ public:
   //}}}
 
   //{{{
-  void doSearch (enum ePanning* panTo, int dir) {
-
-    if (search[0] == 0) {
-      // abort if no search string
-      InvalidateRect (gHwndView, NULL, 0);
-      return;
-      }
-
-    winCursor (eWAIT);
-
-    int firstpage = mPageNumber;
-    int page = (searchpage == mPageNumber) ? mPageNumber + dir : mPageNumber;
-    if (page < 1)
-      page = mPageCount;
-    if (page > mPageCount)
-      page = 1;
-
-    do {
-      if (page != mPageNumber) {
-        mPageNumber = page;
-        showPage (1, 0, 0, 1);
-        }
-
-      mHitCount = fz_search_stext_page (mContext, mPageText, search, mHitBoundingBox, nelem (mHitBoundingBox));
-      if (mHitCount > 0) {
-        *panTo = dir == 1 ? ePAN_TO_TOP : ePAN_TO_BOTTOM;
-        searchpage = mPageNumber;
-        winCursor (eHAND);
-        InvalidateRect (gHwndView, NULL, 0);
-        return;
-        }
-
-      page += dir;
-      if (page < 1)
-        page = mPageCount;
-      if (page > mPageCount)
-        page = 1;
-      } while (page != firstpage);
-
-    winWarn ("String '%s' not found.", search);
-
-    mPageNumber = firstpage;
-    showPage (1, 0, 0, 0);
-    winCursor (eHAND);
-    InvalidateRect (gHwndView, NULL, 0);
-    }
-  //}}}
-
-  //{{{
   void onKey (int c, int modifiers) {
 
     int oldpage = mPageNumber;
@@ -1416,7 +1367,7 @@ public:
               }
 
             unsigned short* ucsbuf = (unsigned short*)GlobalLock (handle);
-            onCopy (ucsbuf, 4096);
+            doCopy (ucsbuf, 4096);
             GlobalUnlock (handle);
 
             SetClipboardData (CF_UNICODETEXT, handle);
@@ -1524,6 +1475,7 @@ public:
   float layoutWidth;
   float layoutHeight;
   float mLayoutEm;
+
   char* layout_css;
   int layout_use_doc_css;
   //}}}
@@ -1538,7 +1490,7 @@ public:
   int mWinWidth, mWinHeight;
   int scrw, scrh;
 
-  int mFullscreen;
+  int mFullscreen = false;
   bool mExit = false;
   //}}}
   //{{{  event handling state
@@ -1723,7 +1675,7 @@ private:
           pagestep = 1;
         else
           xstep = 20 * dir;
-      }
+        }
       else {
         if (dir > 0 && mPany >= 0)
           pagestep = -1;
@@ -1731,25 +1683,73 @@ private:
           pagestep = 1;
         else
           ystep = 20 * dir;
-      }
+        }
       if (pagestep == 0)
         panView (mPanx + xstep, mPany + ystep);
       else if (pagestep > 0 && mPageNumber < mPageCount) {
         mPageNumber++;
         mPany = 0;
         showPage (1, 1, 1, 0);
-      }
+        }
       else if (pagestep < 0 && mPageNumber > 1) {
         mPageNumber--;
         mPany = INT_MIN;
         showPage (1, 1, 1, 0);
+        }
       }
     }
-  }
   //}}}
 
   //{{{
-  void onCopy (unsigned short* ucsbuf, int ucslen) {
+  void doSearch (enum ePanning* panTo, int dir) {
+
+    if (search[0] == 0) {
+      // abort if no search string
+      InvalidateRect (gHwndView, NULL, 0);
+      return;
+      }
+
+    winCursor (eWAIT);
+
+    int firstpage = mPageNumber;
+    int page = (searchpage == mPageNumber) ? mPageNumber + dir : mPageNumber;
+    if (page < 1)
+      page = mPageCount;
+    if (page > mPageCount)
+      page = 1;
+
+    do {
+      if (page != mPageNumber) {
+        mPageNumber = page;
+        showPage (1, 0, 0, 1);
+        }
+
+      mHitCount = fz_search_stext_page (mContext, mPageText, search, mHitBoundingBox, nelem (mHitBoundingBox));
+      if (mHitCount > 0) {
+        *panTo = dir == 1 ? ePAN_TO_TOP : ePAN_TO_BOTTOM;
+        searchpage = mPageNumber;
+        winCursor (eHAND);
+        InvalidateRect (gHwndView, NULL, 0);
+        return;
+        }
+
+      page += dir;
+      if (page < 1)
+        page = mPageCount;
+      if (page > mPageCount)
+        page = 1;
+      } while (page != firstpage);
+
+    winWarn ("String '%s' not found.", search);
+
+    mPageNumber = firstpage;
+    showPage (1, 0, 0, 0);
+    winCursor (eHAND);
+    InvalidateRect (gHwndView, NULL, 0);
+    }
+  //}}}
+  //{{{
+  void doCopy (unsigned short* ucsbuf, int ucslen) {
 
     fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, mRotate);
     ctm = fz_invert_matrix (ctm);
