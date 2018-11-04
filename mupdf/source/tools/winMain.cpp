@@ -572,9 +572,9 @@ public:
       mResolution = MAXRES;
 
     if (!reload) {
-      rotate = 0;
-      panx = 0;
-      pany = 0;
+      mRotate = 0;
+      mPanx = 0;
+      mPany = 0;
       }
 
     showPage (1, 1, 1, 0);
@@ -731,7 +731,7 @@ public:
       loadPage (search);
 
       // Zero search hit position
-      hit_count = 0;
+      mHitCount = 0;
 
       // Extract text
       fz_rect mediaBox = fz_bound_page (mContext, mPage);
@@ -769,7 +769,7 @@ public:
         sprintf (buf, "%s%s", mDocTitle, buf2);
       winTitle (buf);
 
-      fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
+      fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, mRotate);
       fz_rect bounds = fz_transform_rect (mPageBoundingBox, ctm);
       fz_irect ibounds = fz_round_rect (bounds);
       bounds = fz_rect_from_irect (ibounds);
@@ -793,8 +793,6 @@ public:
             fz_run_display_list (mContext, mAnnotationsList, idev, ctm, bounds, &cookie);
           fz_close_device (mContext, idev);
           }
-        if (invert)
-          fz_invert_pixmap (mContext, mImage);
         }
       fz_always (mContext)
         fz_drop_device (mContext, idev);
@@ -804,7 +802,7 @@ public:
       //}}}
     if (repaint) {
       //{{{  repaint
-      panView (panx, pany);
+      panView (mPanx, mPany);
 
       if (!mImage)
         winResize (layoutWidth, layoutHeight);
@@ -895,8 +893,8 @@ public:
         showPage (1, 0, 0, 1);
         }
 
-      hit_count = fz_search_stext_page (mContext, mPageText, search, hit_bbox, nelem (hit_bbox));
-      if (hit_count > 0) {
+      mHitCount = fz_search_stext_page (mContext, mPageText, search, mHitBoundingBox, nelem (mHitBoundingBox));
+      if (mHitCount > 0) {
         *panTo = dir == 1 ? ePAN_TO_TOP : ePAN_TO_BOTTOM;
         searchpage = mPageNumber;
         winCursor (eHAND);
@@ -1013,43 +1011,37 @@ public:
       //}}}
       //{{{
       case 'L':
-        rotate -= 90;
+        mRotate -= 90;
         showPage (0, 1, 1, 0);
         break;
       //}}}
       //{{{
       case 'R':
-        rotate += 90;
-        showPage (0, 1, 1, 0);
-        break;
-      //}}}
-      //{{{
-      case 'i':
-        invert ^= 1;
+        mRotate += 90;
         showPage (0, 1, 1, 0);
         break;
       //}}}
       //{{{
       case 'a':
-        rotate -= 15;
+        mRotate -= 15;
         showPage (0, 1, 1, 0);
         break;
       //}}}
       //{{{
       case 's':
-        rotate += 15;
+        mRotate += 15;
         showPage (0, 1, 1, 0);
         break;
       //}}}
       //{{{
       case 'f':
-        winFullScreen (!fullscreen);
-        fullscreen = !fullscreen;
+        winFullScreen (!mFullscreen);
+        mFullscreen = !mFullscreen;
         break;
       //}}}
       //{{{
       case 'h':
-        panx += fz_pixmap_width (mContext, mImage) / 10;
+        mPanx += fz_pixmap_width (mContext, mImage) / 10;
         showPage (0, 0, 1, 0);
         break;
       //}}}
@@ -1057,12 +1049,12 @@ public:
       case 'j':
         {
           int h = fz_pixmap_height(mContext, mImage);
-          if (h <= mWinHeight || pany <= mWinHeight - h) {
+          if (h <= mWinHeight || mPany <= mWinHeight - h) {
             panTo = ePAN_TO_TOP;
             mPageNumber++;
           }
           else {
-            pany -= h / 10;
+            mPany -= h / 10;
             showPage (0, 0, 1, 0);
           }
           break;
@@ -1072,12 +1064,12 @@ public:
       case 'k':
         {
           int h = fz_pixmap_height(mContext, mImage);
-          if (h <= mWinHeight || pany == 0) {
+          if (h <= mWinHeight || mPany == 0) {
             panTo = ePAN_TO_BOTTOM;
             mPageNumber--;
           }
           else {
-            pany += h / 10;
+            mPany += h / 10;
             showPage ( 0, 0, 1, 0);
           }
           break;
@@ -1085,7 +1077,7 @@ public:
       //}}}
       //{{{
       case 'l':
-        panx -= fz_pixmap_width(mContext, mImage) / 10;
+        mPanx -= fz_pixmap_width(mContext, mImage) / 10;
         showPage (0, 0, 1, 0);
         break;
       //}}}
@@ -1169,7 +1161,7 @@ public:
         mIsSearching = 1;
         searchdir = -1;
         search[0] = 0;
-        hit_count = 0;
+        mHitCount = 0;
         searchpage = -1;
         InvalidateRect (gHwndView, NULL, 0);
         break;
@@ -1179,7 +1171,7 @@ public:
         mIsSearching = 1;
         searchdir = 1;
         search[0] = 0;
-        hit_count = 0;
+        mHitCount = 0;
         searchpage = -1;
         InvalidateRect (gHwndView, NULL, 0);
         break;
@@ -1216,12 +1208,12 @@ public:
       switch (panTo) {
         //{{{
         case ePAN_TO_TOP:
-          pany = 0;
+          mPany = 0;
           break;
         //}}}
         //{{{
         case ePAN_TO_BOTTOM:
-          pany = -2000;
+          mPany = -2000;
           break;
         //}}}
         //{{{
@@ -1240,10 +1232,10 @@ public:
     fz_irect irect = { 0, 0, (int)layoutWidth, (int)layoutHeight };
     if (mImage)
       irect = fz_pixmap_bbox (mContext, mImage);
-    p.x = x - panx + irect.x0;
-    p.y = y - pany + irect.y0;
+    p.x = x - mPanx + irect.x0;
+    p.y = y - mPany + irect.y0;
 
-    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, mRotate);
     ctm = fz_invert_matrix (ctm);
 
     p = fz_transform_point (p, ctm);
@@ -1408,10 +1400,10 @@ public:
       if (mIsCopying) {
         //{{{  copying
         mIsCopying = 0;
-        selr.x0 = fz_mini (selx, x) - panx + irect.x0;
-        selr.x1 = fz_maxi (selx, x) - panx + irect.x0;
-        selr.y0 = fz_mini (sely, y) - pany + irect.y0;
-        selr.y1 = fz_maxi (sely, y) - pany + irect.y0;
+        selr.x0 = fz_mini (selx, x) - mPanx + irect.x0;
+        selr.x1 = fz_maxi (selx, x) - mPanx + irect.x0;
+        selr.y0 = fz_mini (sely, y) - mPany + irect.y0;
+        selr.y1 = fz_maxi (sely, y) - mPany + irect.y0;
         InvalidateRect (gHwndView, NULL, 0);
         if (selr.x0 < selr.x1 && selr.y0 < selr.y1) {
           if (OpenClipboard (gHwndFrame)) {
@@ -1439,8 +1431,8 @@ public:
       }
     else if (isPanning) {
       //{{{  panning
-      int newx = panx + x - selx;
-      int newy = pany + y - sely;
+      int newx = mPanx + x - selx;
+      int newy = mPany + y - sely;
       int imgh = mWinHeight;
       if (mImage)
         imgh = fz_pixmap_height (mContext, mImage);
@@ -1486,10 +1478,10 @@ public:
       //}}}
     else if (mIsCopying) {
       //{{{  copying
-      selr.x0 = fz_mini (selx, x) - panx + irect.x0;
-      selr.x1 = fz_maxi (selx, x) - panx + irect.x0;
-      selr.y0 = fz_mini (sely, y) - pany + irect.y0;
-      selr.y1 = fz_maxi (sely, y) - pany + irect.y0;
+      selr.x0 = fz_mini (selx, x) - mPanx + irect.x0;
+      selr.x1 = fz_maxi (selx, x) - mPanx + irect.x0;
+      selr.y0 = fz_mini (sely, y) - mPany + irect.y0;
+      selr.y1 = fz_maxi (sely, y) - mPany + irect.y0;
       InvalidateRect (gHwndView, NULL, 0);
       }
       //}}}
@@ -1501,7 +1493,7 @@ public:
     if (mWinWidth != w || mWinHeight != h) {
       mWinWidth = w;
       mWinHeight = h;
-      panView (panx, pany);
+      panView (mPanx, mPany);
       InvalidateRect (gHwndView, NULL, 0);
       }
     }
@@ -1537,18 +1529,16 @@ public:
   //}}}
   //{{{  current view
   int mResolution;
-  int rotate;
+  int mRotate;
 
   fz_pixmap* mImage;
   fz_colorspace* mColorspace;
-
-  int invert;
   //}}}
   //{{{  window system sizes
   int mWinWidth, mWinHeight;
   int scrw, scrh;
 
-  int fullscreen;
+  int mFullscreen;
   bool mExit = false;
   //}}}
   //{{{  event handling state
@@ -1556,7 +1546,7 @@ public:
   int numberlen;
 
   int isPanning;
-  int panx, pany;
+  int mPanx, mPany;
 
   int mIsCopying;
   int selx, sely;
@@ -1571,8 +1561,8 @@ public:
   char search[512];
   int searchpage;
 
-  int hit_count;
-  fz_quad hit_bbox[512];
+  int mHitCount;
+  fz_quad mHitBoundingBox[512];
   //}}}
 
 private:
@@ -1676,11 +1666,11 @@ private:
     if (mWinHeight >= imageHeight)
       newy = (mWinHeight - imageHeight) / 2;
 
-    if (newx != panx || newy != pany)
+    if (newx != mPanx || newy != mPany)
       InvalidateRect (gHwndView, NULL, 0);
 
-    panx = newx;
-    pany = newy;
+    mPanx = newx;
+    mPany = newy;
     }
   //}}}
   //{{{
@@ -1727,31 +1717,31 @@ private:
       int ystep = 0;
       int pagestep = 0;
       if (modifiers & (1<<0)) {
-        if (dir > 0 && panx >= 0)
+        if (dir > 0 && mPanx >= 0)
           pagestep = -1;
-        else if (dir < 0 && panx <= mWinWidth - w)
+        else if (dir < 0 && mPanx <= mWinWidth - w)
           pagestep = 1;
         else
           xstep = 20 * dir;
       }
       else {
-        if (dir > 0 && pany >= 0)
+        if (dir > 0 && mPany >= 0)
           pagestep = -1;
-        else if (dir < 0 && pany <= mWinHeight - h)
+        else if (dir < 0 && mPany <= mWinHeight - h)
           pagestep = 1;
         else
           ystep = 20 * dir;
       }
       if (pagestep == 0)
-        panView (panx + xstep, pany + ystep);
+        panView (mPanx + xstep, mPany + ystep);
       else if (pagestep > 0 && mPageNumber < mPageCount) {
         mPageNumber++;
-        pany = 0;
+        mPany = 0;
         showPage (1, 1, 1, 0);
       }
       else if (pagestep < 0 && mPageNumber > 1) {
         mPageNumber--;
-        pany = INT_MIN;
+        mPany = INT_MIN;
         showPage (1, 1, 1, 0);
       }
     }
@@ -1761,7 +1751,7 @@ private:
   //{{{
   void onCopy (unsigned short* ucsbuf, int ucslen) {
 
-    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, mRotate);
     ctm = fz_invert_matrix (ctm);
 
     fz_rect sel = fz_transform_rect (selr, ctm);
