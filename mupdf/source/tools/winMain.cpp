@@ -54,7 +54,6 @@
 //{{{  enums
 enum eCursor { eARROW, eHAND, eWAIT, eCARET };
 enum ePanning { eDONT_PAN = 0, ePAN_TO_TOP, ePAN_TO_BOTTOM };
-enum eOutline { appOUTLINE_DEFERRED = 1, appOUTLINE_LOAD_NOW = 2 };
 //}}}
 
 //{{{  global vars
@@ -65,8 +64,6 @@ HCURSOR gArrowCursor;
 HCURSOR gHandCursor;
 HCURSOR gWaitCursor;
 HCURSOR gCaretCursor;
-
-BITMAPINFO* gBitMapInfo = NULL;
 
 int td_retry = 0;
 char td_textinput[1024] = "";
@@ -113,8 +110,6 @@ char* usageStr() {
     "?\t\t-- search backwards for text\n"
     "n\t\t-- find next search result\n"
     "N\t\t-- find previous search result\n"
-    "c\t\t-- toggle between color and grayscale\n"
-    "i\t\t-- toggle inverted color mode\n"
     "q\t\t-- quit\n"
     ;
   }
@@ -481,53 +476,30 @@ public:
     memset (this, 0, sizeof(cPdf));
 
     mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
-    colorspace = fz_device_bgr (mContext);
+    mColorspace = fz_device_bgr (mContext);
 
     mResolution = 96;
 
-    layout_w = 450;
-    layout_h = 600;
-    layout_em = 12;
+    layoutWidth = 450;
+    layoutHeight = 600;
+    mLayoutEm = 12;
     layout_css = NULL;
     layout_use_doc_css = 1;
-
-    tint_r = 255;
-    tint_g = 250;
-    tint_b = 240;
     }
   //}}}
 
   //{{{
-  void openFile (char* filename, int reload, int bps) {
+  void openFile (char* filename, int reload) {
 
     fz_try (mContext) {
       fz_register_document_handlers (mContext);
       if (layout_css) {
-        fz_buffer* buf = fz_read_file (mContext, layout_css);
-        fz_set_user_css (mContext, fz_string_from_buffer (mContext, buf));
-        fz_drop_buffer (mContext, buf);
+        fz_buffer* buffer = fz_read_file (mContext, layout_css);
+        fz_set_user_css (mContext, fz_string_from_buffer (mContext, buffer));
+        fz_drop_buffer (mContext, buffer);
         }
       fz_set_use_document_css (mContext, layout_use_doc_css);
-
-      if (bps == 0)
-        mDocument = fz_open_document (mContext, filename);
-      else {
-        fz_stream* stream = fz_open_file_progressive (mContext, filename, bps);
-        while (true) {
-          fz_try (mContext) {
-            fz_seek (mContext, stream, 0, SEEK_SET);
-            mDocument = fz_open_document_with_stream (mContext, filename, stream);
-            }
-          fz_catch (mContext) {
-            if (fz_caught (mContext) == FZ_ERROR_TRYLATER) {
-              winWarn ("not enough data to open yet");
-              continue;
-              }
-            fz_rethrow (mContext);
-            }
-          break;
-          }
-        }
+      mDocument = fz_open_document (mContext, filename);
       }
     fz_catch (mContext) {
       if (!reload || makeFakeDoc())
@@ -557,7 +529,7 @@ public:
         mDocTitle = strrchr (mDocTitle, '/') + 1;
       mDocTitle = fz_strdup (mContext, mDocTitle);
 
-      fz_layout_document (mContext, mDocument, layout_w, layout_h, layout_em);
+      fz_layout_document (mContext, mDocument, layoutWidth, layoutHeight, mLayoutEm);
 
       while (true) {
         fz_try(mContext) {
@@ -577,14 +549,11 @@ public:
 
       while (true) {
         fz_try (mContext) {
-          outline = fz_load_outline (mContext, mDocument);
+          mOutline = fz_load_outline (mContext, mDocument);
           }
         fz_catch (mContext) {
-          outline = NULL;
-          if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
-            outline_deferred = appOUTLINE_DEFERRED;
-          else
-            winWarn ("failed to load outline");
+          mOutline = NULL;
+          winWarn ("failed to load outline");
           }
         break;
         }
@@ -632,11 +601,11 @@ public:
     fz_free (mContext, mDocPath);
     mDocPath = NULL;
 
-    fz_drop_pixmap (mContext, image);
-    image = NULL;
+    fz_drop_pixmap (mContext, mImage);
+    mImage = NULL;
 
-    fz_drop_outline (mContext, outline);
-    outline = NULL;
+    fz_drop_outline (mContext, mOutline);
+    mOutline = NULL;
 
     fz_drop_page (mContext, mPage);
     mPage = NULL;
@@ -653,12 +622,12 @@ public:
     char filename[PATH_MAX];
     fz_strlcpy (filename, mDocPath, PATH_MAX);
     closeFile();
-    openFile (filename, 1, 0);
+    openFile (filename, 1);
     }
   //}}}
 
   //{{{
-  void loadPage (int noCache) {
+  void loadPage (bool noCache) {
 
     mErrored = 0;
     mIncomplete = 0;
@@ -696,7 +665,7 @@ public:
     fz_device* mdev = NULL;
     fz_var (mdev);
     fz_try (mContext) {
-      /* Create display lists */
+      // Create display lists
       mPageList = fz_new_display_list (mContext, fz_infinite_rect);
       mdev = fz_new_list_device (mContext, mPageList);
       if (noCache)
@@ -743,17 +712,6 @@ public:
     }
   //}}}
   //{{{
-  void updatePage() {
-
-    if (pdf_update_page (mContext, (pdf_page*)mPage)) {
-      recreateAnnotations();
-      showPage (0, 1, 1, 0);
-      }
-    else
-      showPage (0, 0, 1, 0);
-    }
-  //}}}
-  //{{{
   void gotoPage (int number) {
 
     isSearching = 0;
@@ -768,6 +726,17 @@ public:
     mPageNumber = number;
     InvalidateRect (gHwndView, NULL, 0);
     showPage (1, 1, 1, 0);
+    }
+  //}}}
+  //{{{
+  void updatePage() {
+
+    if (pdf_update_page (mContext, (pdf_page*)mPage)) {
+      recreateAnnotations();
+      showPage (0, 1, 1, 0);
+      }
+    else
+      showPage (0, 0, 1, 0);
     }
   //}}}
   //{{{
@@ -826,25 +795,19 @@ public:
       bounds = fz_rect_from_irect (ibounds);
 
       // Draw
-      fz_drop_pixmap (mContext, image);
+      fz_drop_pixmap (mContext, mImage);
 
-      fz_colorspace* colorspace;
-      if (grayscale)
-        colorspace = fz_device_gray (mContext);
-      else
-        colorspace = colorspace;
-
-      image = NULL;
-      fz_var (image);
+      mImage = NULL;
+      fz_var (mImage);
 
       fz_device* idev = NULL;
       fz_var (idev);
 
       fz_try (mContext) {
-        image = fz_new_pixmap_with_bbox (mContext, colorspace, ibounds, NULL, 1);
-        fz_clear_pixmap_with_value (mContext, image, 255);
+        mImage = fz_new_pixmap_with_bbox (mContext, mColorspace, ibounds, NULL, 1);
+        fz_clear_pixmap_with_value (mContext, mImage, 255);
         if (mPageList || mAnnotationsList) {
-          idev = fz_new_draw_device (mContext, fz_identity, image);
+          idev = fz_new_draw_device (mContext, fz_identity, mImage);
           if (mPageList)
             fz_run_display_list (mContext, mPageList, idev, ctm, bounds, &cookie);
           if (mAnnotationsList)
@@ -852,9 +815,7 @@ public:
           fz_close_device (mContext, idev);
           }
         if (invert)
-          fz_invert_pixmap (mContext, image);
-        if (tint)
-          fz_tint_pixmap (mContext, image, tint_r, tint_g, tint_b);
+          fz_invert_pixmap (mContext, mImage);
         }
       fz_always (mContext)
         fz_drop_device (mContext, idev);
@@ -866,8 +827,8 @@ public:
       //{{{  repaint
       panView (panx, pany);
 
-      if (!image)
-        winResize (layout_w, layout_h);
+      if (!mImage)
+        winResize (layoutWidth, layoutHeight);
 
       InvalidateRect (gHwndView, NULL, 0);
       winCursor (eARROW);
@@ -886,7 +847,7 @@ public:
   //{{{
   void autoZoomVert() {
 
-    mResolution *= (float)mWinHeight / fz_pixmap_height (mContext, image);
+    mResolution *= (float)mWinHeight / fz_pixmap_height (mContext, mImage);
     if (mResolution > MAXRES)
       mResolution = MAXRES;
     else if (mResolution < MINRES)
@@ -898,7 +859,7 @@ public:
   //{{{
   void autoZoomHoriz() {
 
-    mResolution *= (float)mWinWidth / fz_pixmap_width (mContext, image);
+    mResolution *= (float)mWinWidth / fz_pixmap_width (mContext, mImage);
     if (mResolution > MAXRES)
       mResolution = MAXRES;
     else if (mResolution < MINRES)
@@ -910,7 +871,7 @@ public:
   //{{{
   void autoZoom() {
 
-    float pageAspect = (float) fz_pixmap_width (mContext, image) / fz_pixmap_height (mContext, image);
+    float pageAspect = (float) fz_pixmap_width (mContext, mImage) / fz_pixmap_height (mContext, mImage);
     float winAspect = (float) mWinWidth / mWinHeight;
 
     if (pageAspect > winAspect)
@@ -1142,18 +1103,6 @@ public:
         break;
       //}}}
       //{{{
-      case 'C':
-        tint ^= 1;
-        showPage (0, 1, 1, 0);
-        break;
-      //}}}
-      //{{{
-      case 'c':
-        grayscale ^= 1;
-        showPage (0, 1, 1, 0);
-        break;
-      //}}}
-      //{{{
       case 'i':
         invert ^= 1;
         showPage (0, 1, 1, 0);
@@ -1179,14 +1128,14 @@ public:
       //}}}
       //{{{
       case 'h':
-        panx += fz_pixmap_width (mContext, image) / 10;
+        panx += fz_pixmap_width (mContext, mImage) / 10;
         showPage (0, 0, 1, 0);
         break;
       //}}}
       //{{{
       case 'j':
         {
-          int h = fz_pixmap_height(mContext, image);
+          int h = fz_pixmap_height(mContext, mImage);
           if (h <= mWinHeight || pany <= mWinHeight - h) {
             panTo = ePAN_TO_TOP;
             mPageNumber++;
@@ -1201,7 +1150,7 @@ public:
       //{{{
       case 'k':
         {
-          int h = fz_pixmap_height(mContext, image);
+          int h = fz_pixmap_height(mContext, mImage);
           if (h <= mWinHeight || pany == 0) {
             panTo = ePAN_TO_BOTTOM;
             mPageNumber--;
@@ -1215,7 +1164,7 @@ public:
       //}}}
       //{{{
       case 'l':
-        panx -= fz_pixmap_width(mContext, image) / 10;
+        panx -= fz_pixmap_width(mContext, mImage) / 10;
         showPage (0, 0, 1, 0);
         break;
       //}}}
@@ -1374,9 +1323,9 @@ public:
   void onMouse (int x, int y, int btn, int modifiers, int state) {
 
     fz_point p;
-    fz_irect irect = { 0, 0, (int)layout_w, (int)layout_h };
-    if (image)
-      irect = fz_pixmap_bbox (mContext, image);
+    fz_irect irect = { 0, 0, (int)layoutWidth, (int)layoutHeight };
+    if (mImage)
+      irect = fz_pixmap_bbox (mContext, mImage);
     p.x = x - panx + irect.x0;
     p.y = y - pany + irect.y0;
 
@@ -1561,8 +1510,8 @@ public:
       int newx = panx + x - selx;
       int newy = pany + y - sely;
       int imgh = mWinHeight;
-      if (image)
-        imgh = fz_pixmap_height (mContext, image);
+      if (mImage)
+        imgh = fz_pixmap_height (mContext, mImage);
 
       /* Scrolling beyond limits implies flipping pages */
       /* Are we requested to scroll beyond limits? */
@@ -1578,8 +1527,8 @@ public:
             if( mPageNumber > 1) {
               mPageNumber--;
               showPage (1, 1, 1, 0);
-              if (image)
-                newy = -fz_pixmap_height (mContext, image);
+              if (mImage)
+                newy = -fz_pixmap_height (mContext, mImage);
               }
             beyondy = 0;
             }
@@ -1631,8 +1580,7 @@ public:
   fz_document* mDocument;
   char* mDocPath;
   char* mDocTitle;
-  fz_outline* outline;
-  int outline_deferred;
+  fz_outline* mOutline;
   //{{{  page
   int mPageCount;
   int mPageNumber;
@@ -1649,9 +1597,9 @@ public:
   int mIncomplete;
   //}}}
   //{{{  layout
-  float layout_w;
-  float layout_h;
-  float layout_em;
+  float layoutWidth;
+  float layoutHeight;
+  float mLayoutEm;
   char* layout_css;
   int layout_use_doc_css;
   //}}}
@@ -1659,12 +1607,10 @@ public:
   int mResolution;
   int rotate;
 
-  fz_pixmap* image;
-  int grayscale;
-  fz_colorspace* colorspace;
+  fz_pixmap* mImage;
+  fz_colorspace* mColorspace;
 
   int invert;
-  int tint, tint_r, tint_g, tint_b;
   //}}}
   //{{{  window system sizes
   int mWinWidth, mWinHeight;
@@ -1708,31 +1654,26 @@ private:
     fz_var (page_obj);
 
     pdf_document* pdf = NULL;
-    fz_try(mContext) {
-      fz_rect mediabox = { 0, 0, (float)mWinWidth, (float)mWinHeight };
-      int i;
-
+    fz_try (mContext) {
       pdf = pdf_create_document (mContext);
 
+      fz_rect mediabox = { 0, 0, (float)mWinWidth, (float)mWinHeight };
       contents = fz_new_buffer (mContext, 100);
       fz_append_printf (mContext, contents, "1 0 0 RG %g w 0 0 m %g %g l 0 %g m %g 0 l s\n",
         fz_min (mediabox.x1, mediabox.y1) / 20,
         mediabox.x1, mediabox.y1,
         mediabox.y1, mediabox.x1);
 
-      /* Create enough copies of our blank(ish) page so that the
-       * page number is preserved if and when a subsequent load works. */
+      // Create enough copies of blank page so that page number  preserved if and when subsequent load works
       page_obj = pdf_add_page (mContext, pdf, mediabox, 0, NULL, contents);
-      for (i = 0; i < mPageCount; i++)
+      for (int i = 0; i < mPageCount; i++)
         pdf_insert_page (mContext, pdf, -1, page_obj);
       }
-
-    fz_always(mContext) {
+    fz_always (mContext) {
       pdf_drop_obj (mContext, page_obj);
       fz_drop_buffer (mContext, contents);
       }
-
-    fz_catch(mContext) {
+    fz_catch (mContext) {
       fz_drop_document (mContext, (fz_document*)pdf);
       return 1;
       }
@@ -1777,28 +1718,15 @@ private:
       }
     }
   //}}}
-  //{{{
-  void invertHit() {
-
-    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, rotate);
-
-    for (int i = 0; i < hit_count; i++) {
-      fz_rect bbox;
-      bbox = fz_rect_from_quad (hit_bbox[i]);
-      bbox = fz_transform_rect (bbox, ctm);
-      fz_invert_pixmap_rect (mContext, image, fz_round_rect (bbox));
-      }
-    }
-  //}}}
 
   //{{{
   void panView (int newx, int newy) {
 
-    int image_w = 0;
-    int image_h = 0;
-    if (image) {
-      image_w = fz_pixmap_width (mContext, image);
-      image_h = fz_pixmap_height (mContext, image);
+    int imageWidth  = 0;
+    int imageHeight = 0;
+    if (mImage) {
+      imageWidth = fz_pixmap_width (mContext, mImage);
+      imageHeight = fz_pixmap_height (mContext, mImage);
       }
 
     if (newx > 0)
@@ -1806,15 +1734,15 @@ private:
     if (newy > 0)
       newy = 0;
 
-    if (newx + image_w < mWinWidth)
-      newx = mWinWidth - image_w;
-    if (newy + image_h < mWinHeight)
-      newy = mWinHeight - image_h;
+    if (newx + imageWidth < mWinWidth)
+      newx = mWinWidth - imageWidth;
+    if (newy + imageHeight < mWinHeight)
+      newy = mWinHeight - imageHeight;
 
-    if (mWinWidth >= image_w)
-      newx = (mWinWidth - image_w) / 2;
-    if (mWinHeight >= image_h)
-      newy = (mWinHeight - image_h) / 2;
+    if (mWinWidth >= imageWidth)
+      newx = (mWinWidth - imageWidth) / 2;
+    if (mWinHeight >= imageHeight)
+      newy = (mWinHeight - imageHeight) / 2;
 
     if (newx != panx || newy != pany)
       InvalidateRect (gHwndView, NULL, 0);
@@ -1861,8 +1789,8 @@ private:
     }
     else {
       /* scroll up/down, or left/right if shift is pressed */
-      int w = fz_pixmap_width (mContext, image);
-      int h = fz_pixmap_height (mContext, image);
+      int w = fz_pixmap_width (mContext, mImage);
+      int h = fz_pixmap_height (mContext, mImage);
       int xstep = 0;
       int ystep = 0;
       int pagestep = 0;
@@ -2245,7 +2173,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   GetModuleFileNameA (NULL, argv0, sizeof argv0);
   winInstallApp (argv0);
 
-  //{{{  create register window frame class
+  //{{{  create, register windowFrame class
   WNDCLASS wc;
   memset(&wc, 0, sizeof(wc));
   wc.style = 0;
@@ -2262,7 +2190,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   if (!a)
     winError ("cannot register frame window class");
   //}}}
-  //{{{  createregister window view class
+  //{{{  create, register windowView class
   memset(&wc, 0, sizeof(wc));
   wc.style = CS_HREDRAW | CS_VREDRAW;
   wc.lpfnWndProc = viewProc;
@@ -2289,18 +2217,6 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
   gHandCursor = LoadCursor (NULL, IDC_HAND);
   gWaitCursor = LoadCursor (NULL, IDC_WAIT);
   gCaretCursor = LoadCursor (NULL, IDC_IBEAM);
-  //}}}
-  //{{{  init DIB info for buffer
-  gBitMapInfo = (BITMAPINFO*)malloc (sizeof(BITMAPINFO) + 12);
-  gBitMapInfo->bmiHeader.biSize = sizeof (gBitMapInfo->bmiHeader);
-  gBitMapInfo->bmiHeader.biPlanes = 1;
-  gBitMapInfo->bmiHeader.biBitCount = 32;
-  gBitMapInfo->bmiHeader.biCompression = BI_RGB;
-  gBitMapInfo->bmiHeader.biXPelsPerMeter = 2834;
-  gBitMapInfo->bmiHeader.biYPelsPerMeter = 2834;
-  gBitMapInfo->bmiHeader.biClrUsed = 0;
-  gBitMapInfo->bmiHeader.biClrImportant = 0;
-  gBitMapInfo->bmiHeader.biClrUsed = 0;
   //}}}
   //{{{  create window
   gHwndFrame = CreateWindowW (L"FrameWindow", // window class name
@@ -2338,11 +2254,11 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     char filename[PATH_MAX];
     strcpy (filename, argv[fz_optind++]);
 
-    // has page number
+    // has pageNumber
     if (fz_optind < argc)
       gPdf->mPageNumber = atoi (argv[fz_optind++]);
 
-    gPdf->openFile (filename, 0, 0);
+    gPdf->openFile (filename, 0);
 
     MSG msg;
     while (GetMessage (&msg, NULL, 0, 0) && !gPdf->mExit) {
@@ -2353,7 +2269,6 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     gPdf->closeFile();
     }
 
-  free (gBitMapInfo);
   fz_drop_context (gPdf->mContext);
   fz_free_argv (argc, argv);
 
