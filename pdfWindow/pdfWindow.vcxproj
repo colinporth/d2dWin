@@ -156,6 +156,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\date.h" />
+    <ClInclude Include="..\..\shared\utils\resolve.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cLogBox.h" />
