@@ -2,6 +2,10 @@
 //{{{  includes
 #include "stdafx.h"
 
+// mupdf
+#include "mupdf/fitz.h"
+#include "mupdf/pdf.h"
+
 #include "../boxes/cFloatBox.h"
 #include "../boxes/cLogBox.h"
 #include "../boxes/cWindowBox.h"
