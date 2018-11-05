@@ -1,12 +1,7 @@
 // pdfWindow.cpp
 //{{{  includes
 #include "stdafx.h"
-
 #include "../../shared/utils/resolve.h"
-
-// mupdf
-#include "mupdf/fitz.h"
-#include "mupdf/pdf.h"
 
 #include "../boxes/cFloatBox.h"
 #include "../boxes/cLogBox.h"

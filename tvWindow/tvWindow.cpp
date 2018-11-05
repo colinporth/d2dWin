@@ -1,6 +1,7 @@
 // tvWindow.cpp
 //{{{  includes
 #include "stdafx.h"
+#include "../../shared/utils/resolve.h"
 
 #include "../../shared/dvb/cWinDvb.h"
 #include "../../shared/utils/cFileList.h"

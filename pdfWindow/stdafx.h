@@ -27,6 +27,7 @@
 #include <thread>
 #include <mutex>
 
+// concurrent
 #include "concurrent_vector.h"
 #include "concurrent_queue.h"
 #include "concurrent_unordered_set.h"
@@ -41,15 +42,21 @@
 #include <DXGI1_2.h>
 #include <dwrite.h>
 
+// utils
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/date.h"
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/cSemaphore.h"
 
-using namespace Microsoft::WRL;
-using namespace D2D1;
 using namespace std;
 
+// d2dWindow common
+using namespace Microsoft::WRL;
+using namespace D2D1;
 #include "../common/cD2dWindow.h"
 #pragma comment(lib,"common.lib")
 
+// mupdf
+#include "mupdf/fitz.h"
+#include "mupdf/pdf.h"
+#pragma comment(lib,"libmupdf.lib")
