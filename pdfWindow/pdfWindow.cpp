@@ -18,7 +18,7 @@ const int kThumbThreads = 2;
 
 class cAppWindow : public cD2dWindow {
 public:
-  cAppWindow() : mFileScannedSem("fileScanned") {}
+  cAppWindow() {}
   //{{{
   void run (const string& title, int width, int height, string name) {
 
@@ -45,7 +45,12 @@ public:
     //  thread ([=]() { thumbsThread (i); } ).detach();
     mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
     mColorspace = fz_device_bgr (mContext);
+
     openFile (name.c_str());
+    for (int i = 0; i < mPageCount; i++) {
+      loadPage (i, false);
+      showPage();
+      }
 
     messagePump();
     };
@@ -151,7 +156,7 @@ private:
           }
         break;
         }
-      cLog::log (LOGERROR, "pages %d", mPageCount);
+      cLog::log (LOGINFO, "pages %d", mPageCount);
 
       while (true) {
         fz_try (mContext) {
@@ -160,7 +165,7 @@ private:
         fz_catch (mContext) {
           mOutline = NULL;
           if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
-            cLog::log (LOGERROR, "load outline later");
+            cLog::log (LOGINFO, "load outline later");
           else
             cLog::log (LOGERROR,  "failed to load outline");
           }
@@ -210,18 +215,159 @@ private:
   //}}}
 
   //{{{
-  void loadPage (int number) {
+  void loadPage (int number, bool noCache) {
+
     mPageNumber = number;
+
+    fz_drop_display_list (mContext, mPageList);
+    mPageList = NULL;
+    fz_drop_display_list (mContext, mAnnotationsList);
+    mAnnotationsList = NULL;
+    fz_drop_stext_page (mContext, mPageText);
+    mPageText = NULL;
+    fz_drop_link (mContext, mPageLinks);
+    mPageLinks = NULL;
+    fz_drop_page (mContext, mPage);
+    mPage = NULL;
+
+    mPageBoundingBox.x0 = 0;
+    mPageBoundingBox.y0 = 0;
+    mPageBoundingBox.x1 = 100;
+    mPageBoundingBox.y1 = 100;
+
+    bool incomplete = false;
+
+    fz_try (mContext) {
+      mPage = fz_load_page (mContext, mDocument, mPageNumber);
+      mPageBoundingBox = fz_bound_page (mContext, mPage);
+      }
+    fz_catch(mContext) {
+      if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
+        incomplete = 1;
+      else
+        cLog::log (LOGERROR, "Cannot load page");
+      return;
+      }
+
+    bool errored = false;
+    fz_cookie cookie = { 0 };
+
+    fz_device* mdev = NULL;
+    fz_var (mdev);
+
+    fz_try (mContext) {
+      // Create display lists
+      mPageList = fz_new_display_list (mContext, fz_infinite_rect);
+      mdev = fz_new_list_device (mContext, mPageList);
+      if (noCache)
+        fz_enable_device_hints (mContext, mdev, FZ_NO_CACHE);
+      cookie.incomplete_ok = 1;
+      fz_run_page_contents (mContext, mPage, mdev, fz_identity, &cookie);
+      fz_close_device (mContext, mdev);
+      fz_drop_device (mContext, mdev);
+      mdev = NULL;
+
+      mAnnotationsList = fz_new_display_list (mContext, fz_infinite_rect);
+      mdev = fz_new_list_device(mContext, mAnnotationsList);
+      fz_annot* annot;
+      for (annot = fz_first_annot (mContext, mPage); annot; annot = fz_next_annot (mContext, annot))
+        fz_run_annot (mContext, annot, mdev, fz_identity, &cookie);
+      if (cookie.incomplete)
+        incomplete = 1;
+        //pdfapp_warn(app, "Incomplete page rendering");
+      else if (cookie.errors) {
+        cLog::log (LOGERROR, "Errors found on page");
+        errored = 1;
+        }
+      fz_close_device (mContext, mdev);
+      }
+    fz_always(mContext) {
+      fz_drop_device (mContext, mdev);
+      }
+    fz_catch (mContext) {
+      if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
+        incomplete = 1;
+      else {
+        cLog::log (LOGERROR, "Cannot load page");
+        errored = 1;
+        }
+      }
+
+    fz_try (mContext) {
+      mPageLinks = fz_load_links (mContext, mPage);
+      }
+    fz_catch(mContext) {
+      if (fz_caught(mContext) == FZ_ERROR_TRYLATER)
+        incomplete = 1;
+      else if (!errored)
+        cLog::log (LOGERROR, "Cannot load page");
+      }
+
+    errored = errored;
     }
   //}}}
   //{{{
   void showPage() {
+
+    #define MAX_TITLE 256
+    char buf[MAX_TITLE];
+
+    fz_cookie cookie = { 0 };
+
+    char buf2[64];
+    size_t len;
+    sprintf (buf2, " - %d/%d (%d dpi)", mPageNumber, mPageCount, mResolution);
+    len = MAX_TITLE - strlen (buf2);
+    if (strlen (mDocumentTitle) > len) {
+      fz_strlcpy (buf, mDocumentTitle, len-3);
+      fz_strlcat (buf, "...", MAX_TITLE);
+      fz_strlcat (buf, buf2, MAX_TITLE);
+      }
+    else
+      sprintf (buf, "%s%s", mDocumentTitle, buf2);
+    //wintitle(app, buf);
+
+    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, mRotate);
+    fz_rect bounds = fz_transform_rect (mPageBoundingBox, ctm);
+    fz_irect ibounds = fz_round_rect (bounds);
+    bounds = fz_rect_from_irect (ibounds);
+
+    fz_drop_pixmap (mContext, mImage);
+    mImage = NULL;
+    fz_var (mImage);
+
+    fz_device* idev = NULL;
+    fz_var (idev);
+    fz_try (mContext) {
+      mImage = fz_new_pixmap_with_bbox (mContext, mColorspace, ibounds, NULL, 1);
+      fz_clear_pixmap_with_value (mContext, mImage, 255);
+      if (mPageList || mAnnotationsList) {
+        idev = fz_new_draw_device (mContext, fz_identity, mImage);
+        if (mPageList)
+          fz_run_display_list (mContext, mPageList, idev, ctm, bounds, &cookie);
+        if (mAnnotationsList)
+          fz_run_display_list (mContext, mAnnotationsList, idev, ctm, bounds, &cookie);
+        fz_close_device (mContext, idev);
+        }
+      }
+    fz_always (mContext)
+      fz_drop_device (mContext, idev);
+    fz_catch (mContext)
+      cookie.errors++;
+
+    if (cookie.errors) {
+      cLog::log (LOGERROR, "Errors found on page. Page rendering may be incomplete.");
+      }
+
+    fz_flush_warnings (mContext);
+
+    int width = fz_pixmap_width (mContext, mImage);
+    int height = fz_pixmap_height (mContext, mImage);
+    cLog::log (LOGINFO, "page %d  %d x %d", mPageNumber, width, height);
     }
   //}}}
 
   // vars
-  cSemaphore mFileScannedSem;
-
   fz_context* mContext = NULL;
   fz_document* mDocument = NULL;
   char* mDocumentPath = NULL;
@@ -233,6 +379,8 @@ private:
   float mLayoutEm = 12;
   char* mLayout_css = NULL;
   int mLayout_use_doc_css = 1;
+  int mResolution = 96;
+  int mRotate = 0;
 
   int mPageCount = 0;
   fz_pixmap* mImage = NULL;
