@@ -43,6 +43,9 @@ public:
 
     //for (auto i = 0; i < kThumbThreads; i++)
     //  thread ([=]() { thumbsThread (i); } ).detach();
+    mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
+    mColorspace = fz_device_bgr (mContext);
+    openFile (name.c_str());
 
     messagePump();
     };
@@ -93,8 +96,156 @@ protected:
   //}}}
 
 private:
+  //{{{
+  void openFile (const char* filename) {
+
+    pdf_document* idoc;
+
+    fz_try (mContext) {
+      fz_register_document_handlers (mContext);
+      fz_set_use_document_css (mContext, mLayout_use_doc_css);
+      mDocument = fz_open_document (mContext, filename);
+      }
+    fz_catch (mContext) {
+      cLog::log (LOGERROR, "cannot open document");
+      }
+
+    idoc = pdf_specifics (mContext, mDocument);
+    if (idoc) {
+      fz_try (mContext) {
+        pdf_enable_js (mContext, idoc);
+        //pdf_set_doc_event_callback (mContext, idoc, event_cb, app);
+        }
+      fz_catch (mContext) {
+        cLog::log (LOGERROR, "cannot load document javascript");
+        }
+      }
+
+    fz_try (mContext) {
+      if (fz_needs_password (mContext, mDocument)) {
+        cLog::log (LOGERROR, "document needs password");
+        }
+
+      mDocumentPath = fz_strdup (mContext, filename);
+      mDocumentTitle = (char*)filename;
+      if (strrchr (mDocumentTitle, '\\'))
+        mDocumentTitle = strrchr (mDocumentTitle, '\\') + 1;
+      if (strrchr (mDocumentTitle, '/'))
+        mDocumentTitle = strrchr (mDocumentTitle, '/') + 1;
+      mDocumentTitle = fz_strdup (mContext, mDocumentTitle);
+
+      fz_layout_document (mContext, mDocument, mLayoutWidth, mLayoutHeight, mLayoutEm);
+
+      while (true) {
+        fz_try (mContext) {
+          mPageCount = fz_count_pages (mContext, mDocument);
+          if (mPageCount <= 0)
+            cLog::log (LOGERROR, "no pages");
+            }
+        fz_catch (mContext) {
+          if (fz_caught (mContext) == FZ_ERROR_TRYLATER) {
+            cLog::log (LOGERROR,  "not enough data to count pages yet");
+            continue;
+            }
+          fz_rethrow (mContext);
+          }
+        break;
+        }
+      cLog::log (LOGERROR, "pages %d", mPageCount);
+
+      while (true) {
+        fz_try (mContext) {
+          mOutline = fz_load_outline (mContext, mDocument);
+          }
+        fz_catch (mContext) {
+          mOutline = NULL;
+          if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
+            cLog::log (LOGERROR, "load outline later");
+          else
+            cLog::log (LOGERROR,  "failed to load outline");
+          }
+          break;
+        }
+      }
+    fz_catch (mContext) {
+      cLog::log (LOGERROR,  "cannot open document");
+      }
+    }
+  //}}}
+  //{{{
+  void close() {
+
+    fz_drop_display_list (mContext, mPageList);
+    mPageList = NULL;
+
+    fz_drop_display_list (mContext, mAnnotationsList);
+    mAnnotationsList = NULL;
+
+    fz_drop_stext_page (mContext, mPageText);
+    mPageText = NULL;
+
+    fz_drop_link (mContext, mPageLinks);
+    mPageLinks = NULL;
+
+    fz_free (mContext, mDocumentTitle);
+    mDocumentTitle = NULL;
+
+    fz_free (mContext, mDocumentPath);
+    mDocumentPath = NULL;
+
+    fz_drop_pixmap (mContext, mImage);
+    mImage = NULL;
+
+    fz_drop_outline (mContext, mOutline);
+    mOutline = NULL;
+
+    fz_drop_page (mContext, mPage);
+    mPage = NULL;
+
+    fz_drop_document (mContext, mDocument);
+    mDocument = NULL;
+
+    fz_flush_warnings (mContext);
+    }
+  //}}}
+
+  //{{{
+  void loadPage (int number) {
+    mPageNumber = number;
+    }
+  //}}}
+  //{{{
+  void showPage() {
+    }
+  //}}}
+
   // vars
   cSemaphore mFileScannedSem;
+
+  fz_context* mContext = NULL;
+  fz_document* mDocument = NULL;
+  char* mDocumentPath = NULL;
+  char* mDocumentTitle = NULL;
+  fz_outline* mOutline = NULL;
+
+  float mLayoutWidth = 450;
+  float mLayoutHeight = 600;
+  float mLayoutEm = 12;
+  char* mLayout_css = NULL;
+  int mLayout_use_doc_css = 1;
+
+  int mPageCount = 0;
+  fz_pixmap* mImage = NULL;
+  fz_colorspace* mColorspace = NULL;
+
+  int mPageNumber = 0;
+  fz_page* mPage = NULL;
+  fz_rect mPageBoundingBox;
+  fz_display_list* mPageList = NULL;
+  fz_display_list* mAnnotationsList = NULL;
+  fz_stext_page* mPageText = NULL;
+  fz_link* mPageLinks = NULL;
+  fz_quad mHitBoundingBox[512];
   };
 
 //{{{
