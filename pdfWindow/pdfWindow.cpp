@@ -156,6 +156,9 @@ public:
         name = fullName;
       }
 
+    mPdfImageView = new cPdfImageView (this, 0.f,0.f, nullptr);
+    add (mPdfImageView);
+
     mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
     mColorspace = fz_device_bgr (mContext);
 
@@ -507,6 +510,8 @@ private:
   fz_stext_page* mPageText = NULL;
   fz_link* mPageLinks = NULL;
   fz_quad mHitBoundingBox[512];
+
+  cPdfImageView* mPdfImageView = nullptr;
   //}}}
   };
 
