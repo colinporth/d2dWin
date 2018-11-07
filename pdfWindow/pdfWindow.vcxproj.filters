@@ -34,9 +34,6 @@
     <ClInclude Include="..\..\shared\utils\resolve.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="iImage.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp" />

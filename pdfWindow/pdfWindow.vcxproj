@@ -162,7 +162,6 @@
     <ClInclude Include="..\common\cLogBox.h" />
     <ClInclude Include="..\common\cWindowBox.h" />
     <ClInclude Include="cView2d.h" />
-    <ClInclude Include="iImage.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
