@@ -22,11 +22,6 @@ public:
    cPdfImage() {}
    ~cPdfImage() {}
 
-  bool isOk() { return true; }
-  bool isLoaded() { return mBitmap != nullptr; }
-
-  int getImageLen() { return mImageLen; }
-
   cPoint getSize() { return mSize; }
   int getWidth() { return mSize.width; }
   int getHeight() { return mSize.height; }
@@ -37,7 +32,9 @@ public:
 
   ID2D1Bitmap* getBitmap() { return mBitmap; }
 
-  uint32_t loadImage (ID2D1DeviceContext* dc, int scale) {
+  void loadImage (ID2D1DeviceContext* dc, fz_pixmap* image) {
+    mImageSize = {100,100};
+    mSize = {100,100};
     }
   void releaseImage() {
     }
@@ -50,7 +47,6 @@ private:
   D2D1_SIZE_U mImageSize = {0,0};
   D2D1_SIZE_U mSize = {0,0};
 
-  int mLoadScale = 0;
   ID2D1Bitmap* mBitmap = nullptr;
   };
 //}}}
@@ -75,7 +71,7 @@ public:
   // overrides
   //{{{
   cPoint getSrcSize() {
-    return (mImage && mImage->isLoaded()) ? mImage->getSize() : getSize();
+    return mImage ? mImage->getSize() : getSize();
     }
   //}}}
   //{{{
@@ -97,7 +93,7 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    if (mImage && mImage->isOk()) {
+    if (mImage) {
       setScale();
 
       // needs refreshing after load
@@ -156,6 +152,7 @@ public:
         name = fullName;
       }
 
+    mPdfImage = new cPdfImage();
     mPdfImageView = new cPdfImageView (this, 0.f,0.f, nullptr);
     add (mPdfImageView);
 
@@ -165,6 +162,7 @@ public:
     openFile (name.c_str());
     loadPage (0, false);
     showPage();
+    mPdfImage->loadImage (getDc(), mImage);
 
     messagePump();
 
@@ -511,6 +509,7 @@ private:
   fz_link* mPageLinks = NULL;
   fz_quad mHitBoundingBox[512];
 
+  cPdfImage* mPdfImage = nullptr;
   cPdfImageView* mPdfImageView = nullptr;
   //}}}
   };
