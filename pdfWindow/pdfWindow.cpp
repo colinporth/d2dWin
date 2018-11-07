@@ -32,7 +32,7 @@ public:
 
   ID2D1Bitmap* getBitmap() { return mBitmap; }
 
-  void loadImage (ID2D1DeviceContext* dc, fz_pixmap* image) {
+  void loadImage (ID2D1DeviceContext* dc, fz_pixmap* pixmap) {
     mImageSize = {100,100};
     mSize = {100,100};
     }
@@ -45,7 +45,7 @@ private:
   int mImageLen = 0;
 
   D2D1_SIZE_U mImageSize = {0,0};
-  D2D1_SIZE_U mSize = {0,0};
+  D2D1_SIZE_U mSize = {100,100};
 
   ID2D1Bitmap* mBitmap = nullptr;
   };
@@ -53,8 +53,8 @@ private:
 //{{{
 class cPdfImageView : public cD2dWindow::cView {
 public:
-  cPdfImageView (cD2dWindow* window, float width, float height, cPdfImage* image)
-      : cView("image", window, width, height), mImage(image) {
+  cPdfImageView (cD2dWindow* window, float width, float height, cPdfImage* pdfImage)
+      : cView("pdfImageView", window, width, height), mPdfImage(pdfImage) {
 
     mPin = true;
     window->getDc()->CreateSolidColorBrush (ColorF (ColorF::Black), &mBrush);
@@ -64,14 +64,14 @@ public:
     mBrush->Release();
     }
 
-  void setImage (cPdfImage* image) {
-    mImage = image;
+  void setImage (cPdfImage* pdfImage) {
+    mPdfImage = pdfImage;
     }
 
   // overrides
   //{{{
   cPoint getSrcSize() {
-    return mImage ? mImage->getSize() : getSize();
+    return mPdfImage ? mPdfImage->getSize() : getSize();
     }
   //}}}
   //{{{
@@ -93,26 +93,27 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    if (mImage) {
+    if (mPdfImage) {
       setScale();
 
-      // needs refreshing after load
       auto dstRect = mView2d.getSrcToDst (cRect(getSrcSize()));
-      if (mImage->getBitmap()) {
+      if (mPdfImage->getBitmap()) {
         // draw bitmap
         dc->SetTransform (mView2d.mTransform);
-        dc->DrawBitmap (mImage->getBitmap(), cRect (mImage->getSize()));
-        dc->DrawRectangle (cRect (mImage->getSize()), mWindow->getWhiteBrush());
+        dc->DrawBitmap (mPdfImage->getBitmap(), cRect (mPdfImage->getSize()));
+        dc->DrawRectangle (cRect (mPdfImage->getSize()), mWindow->getWhiteBrush());
         dc->SetTransform (Matrix3x2F::Identity());
         }
       }
+    else
+      dc->DrawRectangle (cRect (mPdfImage->getSize()), mWindow->getWhiteBrush());
     }
   //}}}
 
 private:
   void setScale () {
     auto dstRect = mView2d.getSrcToDst (cRect(getSrcSize()));
-    int scale = 1 + int(mImage->getImageSize().x / dstRect.getWidth());
+    int scale = 1 + int(mPdfImage->getImageSize().x / dstRect.getWidth());
     auto srcScaleX = getSize().x / getSrcSize().x;
     auto srcScaleY = getSize().y / getSrcSize().y;
     auto bestScale = (srcScaleX < srcScaleY) ? srcScaleX : srcScaleY;
@@ -120,11 +121,11 @@ private:
     mView2d.setSrcPos (getSrcSize() * bestScale / -2.f);
     }
 
-  cPdfImage* mImage;
-
+  cPdfImage* mPdfImage;
   ID2D1SolidColorBrush* mBrush;
-  cPoint mSamplePos;
+
   cPoint mPos;
+  cPoint mSamplePos;
   };
 //}}}
 
@@ -136,12 +137,8 @@ public:
 
     initialise (title, width, height, kFullScreen);
     add (new cClockBox (this, 50.f, mTimePoint), -110.f,-120.f);
-    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f-120.f,-150.f);
+    //add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f-120.f,-150.f);
     add (new cLogBox (this, 200.f,0.f, true), -200.f,0);
-
-    //add (new cImageSetView (this, 0.f,0.f, mImageSet));
-    //mJpegImageView = new cJpegImageView (this, 0.f,0.f, nullptr);
-    //add (mJpegImageView);
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
     add (new cFloatBox (this, 50.f, kLineHeight, mRenderTime), 0.f,-kLineHeight);
@@ -153,7 +150,7 @@ public:
       }
 
     mPdfImage = new cPdfImage();
-    mPdfImageView = new cPdfImageView (this, 0.f,0.f, nullptr);
+    mPdfImageView = new cPdfImageView (this, 100.f,100.f, mPdfImage);
     add (mPdfImageView);
 
     mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
@@ -162,7 +159,8 @@ public:
     openFile (name.c_str());
     loadPage (0, false);
     showPage();
-    mPdfImage->loadImage (getDc(), mImage);
+
+    mPdfImage->loadImage (getDc(), mPixmap);
 
     messagePump();
 
@@ -312,8 +310,8 @@ private:
     fz_free (mContext, mDocumentPath);
     mDocumentPath = NULL;
 
-    fz_drop_pixmap (mContext, mImage);
-    mImage = NULL;
+    fz_drop_pixmap (mContext, mPixmap);
+    mPixmap = NULL;
 
     fz_drop_outline (mContext, mOutline);
     mOutline = NULL;
@@ -446,17 +444,17 @@ private:
     fz_irect ibounds = fz_round_rect (bounds);
     bounds = fz_rect_from_irect (ibounds);
 
-    fz_drop_pixmap (mContext, mImage);
-    mImage = NULL;
-    fz_var (mImage);
+    fz_drop_pixmap (mContext, mPixmap);
+    mPixmap = NULL;
+    fz_var (mPixmap);
 
     fz_device* idev = NULL;
     fz_var (idev);
     fz_try (mContext) {
-      mImage = fz_new_pixmap_with_bbox (mContext, mColorspace, ibounds, NULL, 1);
-      fz_clear_pixmap_with_value (mContext, mImage, 255);
+      mPixmap = fz_new_pixmap_with_bbox (mContext, mColorspace, ibounds, NULL, 1);
+      fz_clear_pixmap_with_value (mContext, mPixmap, 255);
       if (mPageList || mAnnotationsList) {
-        idev = fz_new_draw_device (mContext, fz_identity, mImage);
+        idev = fz_new_draw_device (mContext, fz_identity, mPixmap);
         if (mPageList)
           fz_run_display_list (mContext, mPageList, idev, ctm, bounds, &cookie);
         if (mAnnotationsList)
@@ -475,31 +473,23 @@ private:
 
     fz_flush_warnings (mContext);
 
-    int width = fz_pixmap_width (mContext, mImage);
-    int height = fz_pixmap_height (mContext, mImage);
+    int width = fz_pixmap_width (mContext, mPixmap);
+    int height = fz_pixmap_height (mContext, mPixmap);
     cLog::log (LOGINFO, "page %d  %d x %d", mPageNumber, width, height);
     }
   //}}}
 
   //{{{  vars
   fz_context* mContext = NULL;
+
+  // document
   fz_document* mDocument = NULL;
   char* mDocumentPath = NULL;
   char* mDocumentTitle = NULL;
   fz_outline* mOutline = NULL;
-
-  float mLayoutWidth = 450;
-  float mLayoutHeight = 600;
-  float mLayoutEm = 12;
-  char* mLayout_css = NULL;
-  int mLayout_use_doc_css = 1;
-  int mResolution = 96;
-  int mRotate = 0;
-
   int mPageCount = 0;
-  fz_pixmap* mImage = NULL;
-  fz_colorspace* mColorspace = NULL;
 
+  // page
   int mPageNumber = 0;
   fz_page* mPage = NULL;
   fz_rect mPageBoundingBox;
@@ -508,6 +498,18 @@ private:
   fz_stext_page* mPageText = NULL;
   fz_link* mPageLinks = NULL;
   fz_quad mHitBoundingBox[512];
+
+  // view
+  float mLayoutWidth = 450;
+  float mLayoutHeight = 600;
+  float mLayoutEm = 12;
+  char* mLayout_css = NULL;
+  int mLayout_use_doc_css = 1;
+  fz_colorspace* mColorspace = NULL;
+  int mResolution = 96;
+  int mRotate = 0;
+
+  fz_pixmap* mPixmap = NULL;
 
   cPdfImage* mPdfImage = nullptr;
   cPdfImageView* mPdfImageView = nullptr;
