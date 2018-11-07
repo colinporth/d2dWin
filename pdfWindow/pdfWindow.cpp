@@ -16,6 +16,122 @@ const int kFullScreen = false;
 const int kThumbThreads = 2;
 //}}}
 
+//{{{
+class cPdfImage {
+public:
+   cPdfImage() {}
+   ~cPdfImage() {}
+
+  bool isOk() { return true; }
+  bool isLoaded() { return mBitmap != nullptr; }
+
+  int getImageLen() { return mImageLen; }
+
+  cPoint getSize() { return mSize; }
+  int getWidth() { return mSize.width; }
+  int getHeight() { return mSize.height; }
+
+  cPoint getImageSize() { return mImageSize; }
+  int getImageWidth() { return mImageSize.width; }
+  int getImageHeight() { return mImageSize.height; }
+
+  ID2D1Bitmap* getBitmap() { return mBitmap; }
+
+  uint32_t loadImage (ID2D1DeviceContext* dc, int scale) {
+    }
+  void releaseImage() {
+    }
+
+private:
+  uint8_t* mBuf = nullptr;
+  int mBufLen = 0;
+  int mImageLen = 0;
+
+  D2D1_SIZE_U mImageSize = {0,0};
+  D2D1_SIZE_U mSize = {0,0};
+
+  int mLoadScale = 0;
+  ID2D1Bitmap* mBitmap = nullptr;
+  };
+//}}}
+//{{{
+class cPdfImageView : public cD2dWindow::cView {
+public:
+  cPdfImageView (cD2dWindow* window, float width, float height, cPdfImage* image)
+      : cView("image", window, width, height), mImage(image) {
+
+    mPin = true;
+    window->getDc()->CreateSolidColorBrush (ColorF (ColorF::Black), &mBrush);
+    }
+
+  virtual ~cPdfImageView() {
+    mBrush->Release();
+    }
+
+  void setImage (cPdfImage* image) {
+    mImage = image;
+    }
+
+  // overrides
+  //{{{
+  cPoint getSrcSize() {
+    return (mImage && mImage->isLoaded()) ? mImage->getSize() : getSize();
+    }
+  //}}}
+  //{{{
+  void layout() {
+    cView::layout();
+    mView2d.setPos (getCentre());
+    }
+  //}}}
+  //{{{
+  bool onProx (bool inClient, cPoint pos) {
+
+    mPos = pos;
+    mSamplePos = mView2d.getDstToSrc (pos);
+    mWindow->changed();
+
+    return cView::onProx (inClient, pos);
+    }
+  //}}}
+  //{{{
+  void onDraw (ID2D1DeviceContext* dc) {
+
+    if (mImage && mImage->isOk()) {
+      setScale();
+
+      // needs refreshing after load
+      auto dstRect = mView2d.getSrcToDst (cRect(getSrcSize()));
+      if (mImage->getBitmap()) {
+        // draw bitmap
+        dc->SetTransform (mView2d.mTransform);
+        dc->DrawBitmap (mImage->getBitmap(), cRect (mImage->getSize()));
+        dc->DrawRectangle (cRect (mImage->getSize()), mWindow->getWhiteBrush());
+        dc->SetTransform (Matrix3x2F::Identity());
+        }
+      }
+    }
+  //}}}
+
+private:
+  void setScale () {
+    auto dstRect = mView2d.getSrcToDst (cRect(getSrcSize()));
+    int scale = 1 + int(mImage->getImageSize().x / dstRect.getWidth());
+    auto srcScaleX = getSize().x / getSrcSize().x;
+    auto srcScaleY = getSize().y / getSrcSize().y;
+    auto bestScale = (srcScaleX < srcScaleY) ? srcScaleX : srcScaleY;
+    mView2d.setSrcScale (bestScale);
+    mView2d.setSrcPos (getSrcSize() * bestScale / -2.f);
+    }
+
+  cPdfImage* mImage;
+
+  ID2D1SolidColorBrush* mBrush;
+  cPoint mSamplePos;
+  cPoint mPos;
+  };
+//}}}
+
 class cAppWindow : public cD2dWindow {
 public:
   cAppWindow() {}
@@ -39,21 +155,18 @@ public:
       if (resolveShortcut (name.c_str(), fullName))
         name = fullName;
       }
-    //thread ([=]() { filesThread (name); } ).detach();
 
-    //for (auto i = 0; i < kThumbThreads; i++)
-    //  thread ([=]() { thumbsThread (i); } ).detach();
     mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
     mColorspace = fz_device_bgr (mContext);
 
     openFile (name.c_str());
-    for (int i = 0; i < mPageCount; i++) {
-      loadPage (i, false);
-      showPage();
-      }
+    loadPage (0, false);
+    showPage();
 
     messagePump();
-    };
+
+    close();
+    }
   //}}}
 
 protected:
@@ -367,7 +480,7 @@ private:
     }
   //}}}
 
-  // vars
+  //{{{  vars
   fz_context* mContext = NULL;
   fz_document* mDocument = NULL;
   char* mDocumentPath = NULL;
@@ -394,6 +507,7 @@ private:
   fz_stext_page* mPageText = NULL;
   fz_link* mPageLinks = NULL;
   fz_quad mHitBoundingBox[512];
+  //}}}
   };
 
 //{{{

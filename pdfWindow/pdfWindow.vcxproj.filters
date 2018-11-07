@@ -28,19 +28,10 @@
     <ClInclude Include="..\common\cWindowBox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\cPointRectView2d.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\utils\date.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\utils\resolve.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="cPdfImage.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="cPdfImageView.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="iImage.h">
@@ -50,6 +41,5 @@
   <ItemGroup>
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="pdfWindow.cpp" />
-    <ClCompile Include="cPdfImage.cpp" />
   </ItemGroup>
 </Project>
