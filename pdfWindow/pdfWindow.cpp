@@ -228,17 +228,17 @@ protected:
 
       case 0x1B: return true; // escape abort
 
-      case  ' ': break; // space bar
+      case 0x23: changePage (mPageCount-1); break;   // end
+      case 0x24: changePage (0); break; // home
 
-      case 0x21: break; // page up
-      case 0x22: break; // page down
+      case  ' ': // space bar
+      case 0x22: // page down
+      case 0x27: changePage (nextPage()); break;    // right arrow
 
-      case 0x23: changed(); break;   // end
-      case 0x24: changed();  break; // home
+      case 0x21: // page up
+      case 0x25: changePage (prevPage()); break;    // left arrow
 
-      case 0x25: changePage (prevPage()); changed();  break;    // left arrow
       case 0x26: changed();  break; // up arrow
-      case 0x27: changePage (nextPage()); changed();  break;    // right arrow
       case 0x28: changed();  break; // down arrow
 
       case 'F':  toggleFullScreen(); break;
@@ -577,7 +577,7 @@ private:
   char* mLayout_css = NULL;
   int mLayout_use_doc_css = 1;
   fz_colorspace* mColorspace = NULL;
-  int mResolution = 96;
+  int mResolution = 200;
   int mRotate = 0;
 
   fz_pixmap* mPixmap = NULL;
