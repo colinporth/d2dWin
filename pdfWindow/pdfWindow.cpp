@@ -189,7 +189,7 @@ public:
     initialise (title, width, height, kFullScreen);
     add (new cClockBox (this, 50.f, mTimePoint), -110.f,-120.f);
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
-    add (new cLogBox (this, 200.f,0.f, true), -200.f,0);
+    add (new cLogBox (this, 200.f,0.f, true), -200.f,0.f);
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
     add (new cFloatBox (this, 50.f, kLineHeight, mRenderTime), 0.f,-kLineHeight);
@@ -208,10 +208,12 @@ public:
     add (mPdfImageView);
 
     openFile (name.c_str());
-
-    changePage (0);
+    selectPage (0);
 
     messagePump();
+
+    delete mPdfImage;
+    delete mPdfImageView;
 
     close();
     }
@@ -228,15 +230,15 @@ protected:
 
       case 0x1B: return true; // escape abort
 
-      case 0x23: changePage (mPageCount-1); break;   // end
-      case 0x24: changePage (0); break; // home
+      case 0x23: selectPage (mPageCount-1); break;   // end
+      case 0x24: selectPage (0); break; // home
 
       case  ' ': // space bar
       case 0x22: // page down
-      case 0x27: changePage (nextPage()); break;    // right arrow
+      case 0x27: selectPage (nextPage()); break;    // right arrow
 
       case 0x21: // page up
-      case 0x25: changePage (prevPage()); break;    // left arrow
+      case 0x25: selectPage (prevPage()); break;    // left arrow
 
       case 0x26: changed();  break; // up arrow
       case 0x28: changed();  break; // down arrow
@@ -413,26 +415,26 @@ private:
     bool errored = false;
     fz_cookie cookie = { 0 };
 
-    fz_device* mdev = NULL;
-    fz_var (mdev);
+    fz_device* dev = NULL;
+    fz_var (dev);
 
     fz_try (mContext) {
-      // Create display lists
+      // create pageList
       mPageList = fz_new_display_list (mContext, fz_infinite_rect);
-      mdev = fz_new_list_device (mContext, mPageList);
+      dev = fz_new_list_device (mContext, mPageList);
       if (noCache)
-        fz_enable_device_hints (mContext, mdev, FZ_NO_CACHE);
+        fz_enable_device_hints (mContext, dev, FZ_NO_CACHE);
       cookie.incomplete_ok = 1;
-      fz_run_page_contents (mContext, mPage, mdev, fz_identity, &cookie);
-      fz_close_device (mContext, mdev);
-      fz_drop_device (mContext, mdev);
-      mdev = NULL;
+      fz_run_page_contents (mContext, mPage, dev, fz_identity, &cookie);
+      fz_close_device (mContext, dev);
+      fz_drop_device (mContext, dev);
+      dev = NULL;
 
+      // create annotationsList
       mAnnotationsList = fz_new_display_list (mContext, fz_infinite_rect);
-      mdev = fz_new_list_device(mContext, mAnnotationsList);
-      fz_annot* annot;
-      for (annot = fz_first_annot (mContext, mPage); annot; annot = fz_next_annot (mContext, annot))
-        fz_run_annot (mContext, annot, mdev, fz_identity, &cookie);
+      dev = fz_new_list_device(mContext, mAnnotationsList);
+      for (fz_annot* annot = fz_first_annot (mContext, mPage); annot; annot = fz_next_annot (mContext, annot))
+        fz_run_annot (mContext, annot, dev, fz_identity, &cookie);
       if (cookie.incomplete)
         incomplete = 1;
         //pdfapp_warn(app, "Incomplete page rendering");
@@ -440,23 +442,20 @@ private:
         cLog::log (LOGERROR, "Errors found on page");
         errored = 1;
         }
-      fz_close_device (mContext, mdev);
+      fz_close_device (mContext, dev);
       }
-    fz_always(mContext) {
-      fz_drop_device (mContext, mdev);
-      }
-    fz_catch (mContext) {
+    fz_always (mContext) 
+      fz_drop_device (mContext, dev);
+    fz_catch (mContext)
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
         incomplete = 1;
       else {
         cLog::log (LOGERROR, "Cannot load page");
         errored = 1;
         }
-      }
 
-    fz_try (mContext) {
+    fz_try (mContext) 
       mPageLinks = fz_load_links (mContext, mPage);
-      }
     fz_catch(mContext) {
       if (fz_caught(mContext) == FZ_ERROR_TRYLATER)
         incomplete = 1;
@@ -468,17 +467,14 @@ private:
     }
   //}}}
   //{{{
-  void showPage() {
+  void renderPage() {
 
     #define MAX_TITLE 256
     char buf[MAX_TITLE];
 
-    fz_cookie cookie = { 0 };
-
     char buf2[64];
-    size_t len;
-    sprintf (buf2, " - %d/%d (%d dpi)", mPageNumber, mPageCount, mResolution);
-    len = MAX_TITLE - strlen (buf2);
+    sprintf (buf2, " - %d of %d @%ddpi)", mPageNumber, mPageCount, mResolution);
+    size_t len = MAX_TITLE - strlen (buf2);
     if (strlen (mDocumentTitle) > len) {
       fz_strlcpy (buf, mDocumentTitle, len-3);
       fz_strlcat (buf, "...", MAX_TITLE);
@@ -486,49 +482,51 @@ private:
       }
     else
       sprintf (buf, "%s%s", mDocumentTitle, buf2);
-    //wintitle(app, buf);
 
+    // calc bounds
     fz_matrix matrix = fz_transform_page (mPageBoundingBox, mResolution, mRotate);
     fz_rect bounds = fz_transform_rect (mPageBoundingBox, matrix);
     fz_irect ibounds = fz_round_rect (bounds);
     bounds = fz_rect_from_irect (ibounds);
 
+    fz_device* dev = NULL;
+    fz_var (dev);
+
     fz_drop_pixmap (mContext, mPixmap);
     mPixmap = NULL;
     fz_var (mPixmap);
 
-    fz_device* idev = NULL;
-    fz_var (idev);
+    fz_cookie cookie = { 0 };
+
     fz_try (mContext) {
       mPixmap = fz_new_pixmap_with_bbox (mContext, mColorspace, ibounds, NULL, 1);
       fz_clear_pixmap_with_value (mContext, mPixmap, 255);
       if (mPageList || mAnnotationsList) {
-        idev = fz_new_draw_device (mContext, fz_identity, mPixmap);
+        dev = fz_new_draw_device (mContext, fz_identity, mPixmap);
         if (mPageList)
-          fz_run_display_list (mContext, mPageList, idev, matrix, bounds, &cookie);
+          fz_run_display_list (mContext, mPageList, dev, matrix, bounds, &cookie);
         if (mAnnotationsList)
-          fz_run_display_list (mContext, mAnnotationsList, idev, matrix, bounds, &cookie);
-        fz_close_device (mContext, idev);
+          fz_run_display_list (mContext, mAnnotationsList, dev, matrix, bounds, &cookie);
+        fz_close_device (mContext, dev);
         }
       }
     fz_always (mContext)
-      fz_drop_device (mContext, idev);
+      fz_drop_device (mContext, dev);
     fz_catch (mContext)
       cookie.errors++;
 
-    if (cookie.errors) {
-      cLog::log (LOGERROR, "Errors found on page. Page rendering may be incomplete.");
-      }
+    if (cookie.errors) 
+      cLog::log (LOGERROR, "errors on page rendering");
 
     fz_flush_warnings (mContext);
     }
   //}}}
 
   //{{{
-  void changePage (int number) {
+  void selectPage (int number) {
 
     loadPage (number, false);
-    showPage();
+    renderPage();
     mPdfImage->load (getDc(), mContext, mPixmap);
     changed();
     }
