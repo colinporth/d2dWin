@@ -66,7 +66,8 @@ public:
   ID2D1Bitmap* getBitmap() { return mBitmap; }
 
   //{{{
-  void loadImage (ID2D1DeviceContext* dc, fz_context* context, fz_pixmap* pixmap) {
+  void load (ID2D1DeviceContext* dc, fz_context* context, fz_pixmap* pixmap) {
+
     mSize.width = fz_pixmap_width (context, pixmap);
     mSize.height = fz_pixmap_height (context, pixmap);
 
@@ -85,7 +86,7 @@ public:
     }
   //}}}
   //{{{
-  void releaseImage() {
+  void release() {
     if (mBitmap) {
       mBitmap->Release();
       mBitmap = nullptr;
@@ -528,7 +529,7 @@ private:
 
     loadPage (number, false);
     showPage();
-    mPdfImage->loadImage (getDc(), mContext, mPixmap);
+    mPdfImage->load (getDc(), mContext, mPixmap);
     changed();
     }
   //}}}
