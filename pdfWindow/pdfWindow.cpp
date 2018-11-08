@@ -26,27 +26,38 @@ public:
   int getWidth() { return mSize.width; }
   int getHeight() { return mSize.height; }
 
-  cPoint getImageSize() { return mImageSize; }
-  int getImageWidth() { return mImageSize.width; }
-  int getImageHeight() { return mImageSize.height; }
-
   ID2D1Bitmap* getBitmap() { return mBitmap; }
 
-  void loadImage (ID2D1DeviceContext* dc, fz_pixmap* pixmap) {
-    mImageSize = {100,100};
-    mSize = {100,100};
+  //{{{
+  void loadImage (ID2D1DeviceContext* dc, fz_context* context, fz_pixmap* pixmap) {
+    mSize.width = fz_pixmap_width (context, pixmap);
+    mSize.height = fz_pixmap_height (context, pixmap);
+
+    if (mBitmap)  {
+      mBitmap->Release();
+      mBitmap = nullptr;
+      }
+
+    if (!mBitmap)
+      dc->CreateBitmap (SizeU(mSize.width, mSize.height),
+                        { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
+                        &mBitmap);
+
+    mBitmap->CopyFromMemory (&RectU(0, 0, mSize.width, mSize.height),
+                             fz_pixmap_samples (context, pixmap), mSize.width * 4);
     }
+  //}}}
+  //{{{
   void releaseImage() {
+    if (mBitmap) {
+      mBitmap->Release();
+      mBitmap = nullptr;
+      }
     }
+  //}}}
 
 private:
-  uint8_t* mBuf = nullptr;
-  int mBufLen = 0;
-  int mImageLen = 0;
-
-  D2D1_SIZE_U mImageSize = {0,0};
-  D2D1_SIZE_U mSize = {100,100};
-
+  D2D1_SIZE_U mSize = {0,0};
   ID2D1Bitmap* mBitmap = nullptr;
   };
 //}}}
@@ -97,23 +108,20 @@ public:
       setScale();
 
       auto dstRect = mView2d.getSrcToDst (cRect(getSrcSize()));
-      if (mPdfImage->getBitmap()) {
-        // draw bitmap
-        dc->SetTransform (mView2d.mTransform);
+      dc->SetTransform (mView2d.mTransform);
+
+      if (mPdfImage->getBitmap())
         dc->DrawBitmap (mPdfImage->getBitmap(), cRect (mPdfImage->getSize()));
-        dc->DrawRectangle (cRect (mPdfImage->getSize()), mWindow->getWhiteBrush());
-        dc->SetTransform (Matrix3x2F::Identity());
-        }
-      }
-    else
+
       dc->DrawRectangle (cRect (mPdfImage->getSize()), mWindow->getWhiteBrush());
+      dc->SetTransform (Matrix3x2F::Identity());
+      }
     }
   //}}}
 
 private:
   void setScale () {
     auto dstRect = mView2d.getSrcToDst (cRect(getSrcSize()));
-    int scale = 1 + int(mPdfImage->getImageSize().x / dstRect.getWidth());
     auto srcScaleX = getSize().x / getSrcSize().x;
     auto srcScaleY = getSize().y / getSrcSize().y;
     auto bestScale = (srcScaleX < srcScaleY) ? srcScaleX : srcScaleY;
@@ -137,7 +145,7 @@ public:
 
     initialise (title, width, height, kFullScreen);
     add (new cClockBox (this, 50.f, mTimePoint), -110.f,-120.f);
-    //add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f-120.f,-150.f);
+    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
     add (new cLogBox (this, 200.f,0.f, true), -200.f,0);
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
@@ -149,18 +157,16 @@ public:
         name = fullName;
       }
 
-    mPdfImage = new cPdfImage();
-    mPdfImageView = new cPdfImageView (this, 100.f,100.f, mPdfImage);
-    add (mPdfImageView);
-
     mContext = fz_new_context (NULL, NULL, FZ_STORE_DEFAULT);
     mColorspace = fz_device_bgr (mContext);
 
-    openFile (name.c_str());
-    loadPage (0, false);
-    showPage();
+    mPdfImage = new cPdfImage();
+    mPdfImageView = new cPdfImageView (this, 500.f,400.f, mPdfImage);
+    add (mPdfImageView);
 
-    mPdfImage->loadImage (getDc(), mPixmap);
+    openFile (name.c_str());
+
+    changePage (0);
 
     messagePump();
 
@@ -187,9 +193,9 @@ protected:
       case 0x23: changed(); break;   // end
       case 0x24: changed();  break; // home
 
-      case 0x25: changed();  break;    // left arrow
+      case 0x25: changePage (prevPage()); changed();  break;    // left arrow
       case 0x26: changed();  break; // up arrow
-      case 0x27: changed();  break;    // right arrow
+      case 0x27: changePage (nextPage()); changed();  break;    // right arrow
       case 0x28: changed();  break; // down arrow
 
       case 'F':  toggleFullScreen(); break;
@@ -357,7 +363,7 @@ private:
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
         incomplete = 1;
       else
-        cLog::log (LOGERROR, "Cannot load page");
+        cLog::log (LOGERROR, "loadPage failed %d of %d", mPageNumber, mPageCount);
       return;
       }
 
@@ -439,8 +445,8 @@ private:
       sprintf (buf, "%s%s", mDocumentTitle, buf2);
     //wintitle(app, buf);
 
-    fz_matrix ctm = fz_transform_page (mPageBoundingBox, mResolution, mRotate);
-    fz_rect bounds = fz_transform_rect (mPageBoundingBox, ctm);
+    fz_matrix matrix = fz_transform_page (mPageBoundingBox, mResolution, mRotate);
+    fz_rect bounds = fz_transform_rect (mPageBoundingBox, matrix);
     fz_irect ibounds = fz_round_rect (bounds);
     bounds = fz_rect_from_irect (ibounds);
 
@@ -456,9 +462,9 @@ private:
       if (mPageList || mAnnotationsList) {
         idev = fz_new_draw_device (mContext, fz_identity, mPixmap);
         if (mPageList)
-          fz_run_display_list (mContext, mPageList, idev, ctm, bounds, &cookie);
+          fz_run_display_list (mContext, mPageList, idev, matrix, bounds, &cookie);
         if (mAnnotationsList)
-          fz_run_display_list (mContext, mAnnotationsList, idev, ctm, bounds, &cookie);
+          fz_run_display_list (mContext, mAnnotationsList, idev, matrix, bounds, &cookie);
         fz_close_device (mContext, idev);
         }
       }
@@ -472,13 +478,35 @@ private:
       }
 
     fz_flush_warnings (mContext);
-
-    int width = fz_pixmap_width (mContext, mPixmap);
-    int height = fz_pixmap_height (mContext, mPixmap);
-    cLog::log (LOGINFO, "page %d  %d x %d", mPageNumber, width, height);
     }
   //}}}
 
+  //{{{
+  void changePage (int number) {
+
+    loadPage (number, false);
+    showPage();
+    mPdfImage->loadImage (getDc(), mContext, mPixmap);
+    changed();
+    }
+  //}}}
+
+  //{{{
+  int prevPage() {
+    if (mPageNumber > 0)
+      return mPageNumber - 1;
+    else
+      return mPageNumber;
+    }
+  //}}}
+  //{{{
+  int nextPage() {
+    if (mPageNumber > mPageCount - 1)
+      return mPageCount - 1;
+    else
+      return mPageNumber + 1;
+    }
+  //}}}
   //{{{  vars
   fz_context* mContext = NULL;
 
