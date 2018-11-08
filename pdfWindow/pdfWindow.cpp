@@ -17,6 +17,43 @@ const int kThumbThreads = 2;
 //}}}
 
 //{{{
+void installApp (char* argv0) {
+
+  #define OPEN_KEY(parent, name, ptr) \
+    RegCreateKeyExA(parent, name, 0, 0, 0, KEY_WRITE, 0, &ptr, 0)
+
+  #define SET_KEY(parent, name, value) \
+    RegSetValueExA(parent, name, 0, REG_SZ, (const BYTE *)(value), (DWORD)strlen(value) + 1)
+
+
+  HKEY software, classes, pdfWindow, dotpdf, pdf_progids;
+  OPEN_KEY(HKEY_CURRENT_USER, "Software", software);
+  OPEN_KEY(software, "Classes", classes);
+  OPEN_KEY(classes, ".pdf", dotpdf);
+  OPEN_KEY(dotpdf, "OpenWithProgids", pdf_progids);
+
+  HKEY shell, open, command, supported_types;
+  OPEN_KEY(classes, "PdfWindow", pdfWindow);
+  OPEN_KEY(pdfWindow, "SupportedTypes", supported_types);
+  OPEN_KEY(pdfWindow, "shell", shell);
+  OPEN_KEY(shell, "open", open);
+  OPEN_KEY(open, "command", command);
+
+  char buf[512];
+  sprintf (buf, "\"%s\" \"%%1\"", argv0);
+  SET_KEY(open, "FriendlyAppName", "PdfWindow");
+  SET_KEY(command, "", buf);
+  SET_KEY(supported_types, ".pdf", "");
+  SET_KEY(pdf_progids, "PdfWindow", "");
+
+  RegCloseKey (dotpdf);
+  RegCloseKey (pdfWindow);
+  RegCloseKey (classes);
+  RegCloseKey (software);
+  }
+//}}}
+
+//{{{
 class cPdfImage {
 public:
    cPdfImage() {}
@@ -107,11 +144,12 @@ public:
     if (mPdfImage) {
       setScale();
 
-      auto dstRect = mView2d.getSrcToDst (cRect(getSrcSize()));
+      auto dstRect = mView2d.getSrcToDst (cRect (getSrcSize()));
       dc->SetTransform (mView2d.mTransform);
 
-      if (mPdfImage->getBitmap())
-        dc->DrawBitmap (mPdfImage->getBitmap(), cRect (mPdfImage->getSize()));
+      auto bitmap = mPdfImage->getBitmap();
+      if (bitmap)
+        dc->DrawBitmap (bitmap, cRect (mPdfImage->getSize()));
 
       dc->DrawRectangle (cRect (mPdfImage->getSize()), mWindow->getWhiteBrush());
       dc->SetTransform (Matrix3x2F::Identity());
@@ -120,14 +158,18 @@ public:
   //}}}
 
 private:
+  //{{{
   void setScale () {
     auto dstRect = mView2d.getSrcToDst (cRect(getSrcSize()));
+
     auto srcScaleX = getSize().x / getSrcSize().x;
     auto srcScaleY = getSize().y / getSrcSize().y;
     auto bestScale = (srcScaleX < srcScaleY) ? srcScaleX : srcScaleY;
     mView2d.setSrcScale (bestScale);
+
     mView2d.setSrcPos (getSrcSize() * bestScale / -2.f);
     }
+  //}}}
 
   cPdfImage* mPdfImage;
   ID2D1SolidColorBrush* mBrush;
@@ -549,6 +591,10 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO1, true);
+
+  char argv0[256];
+  GetModuleFileNameA (NULL, argv0, sizeof argv0);
+  installApp (argv0);
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
