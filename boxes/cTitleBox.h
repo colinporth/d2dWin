@@ -1,13 +1,13 @@
 // cLogBox.h
 //{{{  includes
 #pragma once
-#include "../cD2dWindow.h"
+#include "../common/cD2dWindow.h"
 //}}}
 
 class cTitleBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cTitleBox (cD2dWindow* window, float width, float height, const std::string& title)
+  cTitleBox (cD2dWindow* window, float width, float height, std::string& title)
       : cBox("title", window, width, height), mTitle(title) {}
   //}}}
   virtual ~cTitleBox() {}

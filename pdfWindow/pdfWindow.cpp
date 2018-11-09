@@ -3,7 +3,7 @@
 #include "stdafx.h"
 #include "../../shared/utils/resolve.h"
 
-#include "../boxes/cFloatBox.h"
+#include "../boxes/cTitleBox.h"
 #include "../boxes/cLogBox.h"
 #include "../boxes/cWindowBox.h"
 #include "../boxes/cClockBox.h"
@@ -19,12 +19,8 @@ const int kThumbThreads = 2;
 //{{{
 void installApp (char* argv0) {
 
-  #define OPEN_KEY(parent, name, ptr) \
-    RegCreateKeyExA(parent, name, 0, 0, 0, KEY_WRITE, 0, &ptr, 0)
-
-  #define SET_KEY(parent, name, value) \
-    RegSetValueExA(parent, name, 0, REG_SZ, (const BYTE *)(value), (DWORD)strlen(value) + 1)
-
+  #define OPEN_KEY(parent, name, ptr) RegCreateKeyExA (parent, name, 0, 0, 0, KEY_WRITE, 0, &ptr, 0)
+  #define SET_KEY(parent, name, value) RegSetValueExA (parent, name, 0, REG_SZ, (const BYTE*)(value), (DWORD)strlen(value) + 1)
 
   HKEY software, classes, pdfWindow, dotpdf, pdf_progids;
   OPEN_KEY(HKEY_CURRENT_USER, "Software", software);
@@ -56,13 +52,9 @@ void installApp (char* argv0) {
 //{{{
 class cPdfImage {
 public:
-   cPdfImage() {}
-   ~cPdfImage() {}
-
   cPoint getSize() { return mSize; }
   int getWidth() { return mSize.width; }
   int getHeight() { return mSize.height; }
-
   ID2D1Bitmap* getBitmap() { return mBitmap; }
 
   //{{{
@@ -187,12 +179,13 @@ public:
   void run (const string& title, int width, int height, string name) {
 
     initialise (title, width, height, kFullScreen);
+    add (new cTitleBox (this, 0.f,kLineHeight, mTitleStr));
+
     add (new cClockBox (this, 50.f, mTimePoint), -110.f,-120.f);
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
     add (new cLogBox (this, 200.f,0.f, true), -200.f,0.f);
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
-    add (new cFloatBox (this, 50.f, kLineHeight, mRenderTime), 0.f,-kLineHeight);
 
     if (name.find (".lnk") <= name.size()) {
       string fullName;
@@ -294,13 +287,7 @@ private:
         cLog::log (LOGERROR, "document needs password");
         }
 
-      mDocumentPath = fz_strdup (mContext, filename);
-      mDocumentTitle = (char*)filename;
-      if (strrchr (mDocumentTitle, '\\'))
-        mDocumentTitle = strrchr (mDocumentTitle, '\\') + 1;
-      if (strrchr (mDocumentTitle, '/'))
-        mDocumentTitle = strrchr (mDocumentTitle, '/') + 1;
-      mDocumentTitle = fz_strdup (mContext, mDocumentTitle);
+      mDocumentTitle = filename;
 
       fz_layout_document (mContext, mDocument, mLayoutWidth, mLayoutHeight, mLayoutEm);
 
@@ -343,26 +330,11 @@ private:
   //{{{
   void close() {
 
-    fz_drop_display_list (mContext, mPageList);
-    mPageList = NULL;
-
-    fz_drop_display_list (mContext, mAnnotationsList);
-    mAnnotationsList = NULL;
-
     fz_drop_stext_page (mContext, mPageText);
     mPageText = NULL;
 
     fz_drop_link (mContext, mPageLinks);
     mPageLinks = NULL;
-
-    fz_free (mContext, mDocumentTitle);
-    mDocumentTitle = NULL;
-
-    fz_free (mContext, mDocumentPath);
-    mDocumentPath = NULL;
-
-    fz_drop_pixmap (mContext, mPixmap);
-    mPixmap = NULL;
 
     fz_drop_outline (mContext, mOutline);
     mOutline = NULL;
@@ -382,14 +354,12 @@ private:
 
     mPageNumber = number;
 
-    fz_drop_display_list (mContext, mPageList);
-    mPageList = NULL;
-    fz_drop_display_list (mContext, mAnnotationsList);
-    mAnnotationsList = NULL;
     fz_drop_stext_page (mContext, mPageText);
     mPageText = NULL;
+
     fz_drop_link (mContext, mPageLinks);
     mPageLinks = NULL;
+
     fz_drop_page (mContext, mPage);
     mPage = NULL;
 
@@ -437,14 +407,13 @@ private:
         fz_run_annot (mContext, annot, dev, fz_identity, &cookie);
       if (cookie.incomplete)
         incomplete = 1;
-        //pdfapp_warn(app, "Incomplete page rendering");
       else if (cookie.errors) {
         cLog::log (LOGERROR, "Errors found on page");
         errored = 1;
         }
       fz_close_device (mContext, dev);
       }
-    fz_always (mContext) 
+    fz_always (mContext)
       fz_drop_device (mContext, dev);
     fz_catch (mContext)
       if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
@@ -454,10 +423,10 @@ private:
         errored = 1;
         }
 
-    fz_try (mContext) 
+    fz_try (mContext)
       mPageLinks = fz_load_links (mContext, mPage);
-    fz_catch(mContext) {
-      if (fz_caught(mContext) == FZ_ERROR_TRYLATER)
+    fz_catch (mContext) {
+      if (fz_caught (mContext) == FZ_ERROR_TRYLATER)
         incomplete = 1;
       else if (!errored)
         cLog::log (LOGERROR, "Cannot load page");
@@ -469,20 +438,6 @@ private:
   //{{{
   void renderPage() {
 
-    #define MAX_TITLE 256
-    char buf[MAX_TITLE];
-
-    char buf2[64];
-    sprintf (buf2, " - %d of %d @%ddpi)", mPageNumber, mPageCount, mResolution);
-    size_t len = MAX_TITLE - strlen (buf2);
-    if (strlen (mDocumentTitle) > len) {
-      fz_strlcpy (buf, mDocumentTitle, len-3);
-      fz_strlcat (buf, "...", MAX_TITLE);
-      fz_strlcat (buf, buf2, MAX_TITLE);
-      }
-    else
-      sprintf (buf, "%s%s", mDocumentTitle, buf2);
-
     // calc bounds
     fz_matrix matrix = fz_transform_page (mPageBoundingBox, mResolution, mRotate);
     fz_rect bounds = fz_transform_rect (mPageBoundingBox, matrix);
@@ -492,7 +447,6 @@ private:
     fz_device* dev = NULL;
     fz_var (dev);
 
-    fz_drop_pixmap (mContext, mPixmap);
     mPixmap = NULL;
     fz_var (mPixmap);
 
@@ -515,19 +469,28 @@ private:
     fz_catch (mContext)
       cookie.errors++;
 
-    if (cookie.errors) 
+    if (cookie.errors)
       cLog::log (LOGERROR, "errors on page rendering");
 
     fz_flush_warnings (mContext);
+
+    mTitleStr = mDocumentTitle +  " " + dec (mPageNumber) + " of " + dec(mPageCount+1) + " @" +
+                dec(mResolution) + "dpi " +
+                dec (fz_pixmap_width (mContext, mPixmap)) + "x" + dec (fz_pixmap_height (mContext, mPixmap)) + " " +
+                dec (bounds.x0) + ":" + dec (bounds.y0) + ":" + dec (bounds.x1) + ":" + dec (bounds.y1);
     }
   //}}}
-
   //{{{
   void selectPage (int number) {
 
     loadPage (number, false);
     renderPage();
     mPdfImage->load (getDc(), mContext, mPixmap);
+
+    fz_drop_pixmap (mContext, mPixmap);
+    fz_drop_display_list (mContext, mPageList);
+    fz_drop_display_list (mContext, mAnnotationsList);
+
     changed();
     }
   //}}}
@@ -552,9 +515,8 @@ private:
   fz_context* mContext = NULL;
 
   // document
+  string mDocumentTitle;
   fz_document* mDocument = NULL;
-  char* mDocumentPath = NULL;
-  char* mDocumentTitle = NULL;
   fz_outline* mOutline = NULL;
   int mPageCount = 0;
 
@@ -582,6 +544,8 @@ private:
 
   cPdfImage* mPdfImage = nullptr;
   cPdfImageView* mPdfImageView = nullptr;
+
+  string mTitleStr;
   //}}}
   };
 
