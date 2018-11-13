@@ -48,11 +48,14 @@ LRESULT CALLBACK WndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lpa
 //}}}
 
 // public
+//{{{
 cD2dWindow::~cD2dWindow() {
   for (auto boxIt = mBoxes.begin(); boxIt != mBoxes.end(); ++boxIt)
     delete (*boxIt);
   mBoxes.clear();
   }
+//}}}
+
 //{{{
 void cD2dWindow::initialise (string title, int width, int height, bool fullScreen) {
 

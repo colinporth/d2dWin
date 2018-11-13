@@ -470,14 +470,16 @@ private:
       cookie.errors++;
 
     if (cookie.errors)
-      cLog::log (LOGERROR, "errors on page rendering");
+      cLog::log (LOGERROR, "error on page rendering");
 
     fz_flush_warnings (mContext);
 
-    mTitleStr = mDocumentTitle +  " " + dec (mPageNumber) + " of " + dec(mPageCount+1) + " @" +
+    mTitleStr = mDocumentTitle +  " " + dec(mPageNumber+1) + " of " + dec(mPageCount) + " @" +
                 dec(mResolution) + "dpi " +
-                dec (fz_pixmap_width (mContext, mPixmap)) + "x" + dec (fz_pixmap_height (mContext, mPixmap)) + " " +
-                dec (bounds.x0) + ":" + dec (bounds.y0) + ":" + dec (bounds.x1) + ":" + dec (bounds.y1);
+                dec(fz_pixmap_width (mContext, mPixmap)) + "x" + 
+                dec (fz_pixmap_height (mContext, mPixmap)) + " " +
+                dec(bounds.x0) + ":" + dec(bounds.y0) + ":" + 
+                dec(bounds.x1) + ":" + dec(bounds.y1);
     }
   //}}}
   //{{{
