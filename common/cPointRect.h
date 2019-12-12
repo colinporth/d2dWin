@@ -108,7 +108,7 @@ public:
   //{{{
   float magnitude() const {
   // return magnitude of point as vector
-    return sqrt ((x*x) + (y*y));
+    return float(sqrt ((x*x) + (y*y)));
     }
   //}}}
   };
