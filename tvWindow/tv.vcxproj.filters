@@ -1,9 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="tvWindow.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="cPlayView.cpp" />
+    <ClCompile Include="..\..\shared\dvb\cWinDvb.cpp" />
+    <ClCompile Include="..\..\shared\dvb\cTransportStream.cpp" />
+    <ClCompile Include="tvWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\utils\utils.h">

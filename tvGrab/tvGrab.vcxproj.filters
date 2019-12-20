@@ -29,5 +29,7 @@
   <ItemGroup>
     <ClCompile Include="tvGrab.cpp" />
     <ClCompile Include="..\..\shared\utils\cLog.cpp" />
+    <ClCompile Include="..\..\shared\dvb\cWinDvb.cpp" />
+    <ClCompile Include="..\..\shared\dvb\cTransportStream.cpp" />
   </ItemGroup>
 </Project>

@@ -162,6 +162,8 @@
     <ClInclude Include="..\..\shared\utils\utils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\shared\dvb\cTransportStream.cpp" />
+    <ClCompile Include="..\..\shared\dvb\cWinDvb.cpp" />
     <ClCompile Include="..\..\shared\utils\cLog.cpp" />
     <ClCompile Include="tvGrab.cpp" />
   </ItemGroup>
