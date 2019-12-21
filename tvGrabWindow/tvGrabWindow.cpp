@@ -23,13 +23,11 @@ public:
 
     auto frequency = param.empty() ? 674 : atoi (param.c_str());
     if (frequency) {
-      mDvb = new cDvb (rootName);
-      if (mDvb->createGraph (frequency * 1000)) {
-        add (new cDvbBox (this, getHeight()/2.f, 0.f, mDvb));
-        add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
-        thread ([=]() { mDvb->grabThread(); }).detach();
-        thread ([=]() { mDvb->signalThread(); }).detach();
-        }
+      mDvb = new cDvb (frequency * 1000, rootName);
+      add (new cDvbBox (this, getHeight()/2.f, 0.f, mDvb));
+      add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
+      thread ([=]() { mDvb->grabThread(); }).detach();
+      thread ([=]() { mDvb->signalThread(); }).detach();
       }
     else {
       mDumpTs = new cDumpTransportStream (rootName, false);

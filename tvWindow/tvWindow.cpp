@@ -27,12 +27,10 @@ public:
 
     int frequency = atoi (rootOrFrequency.c_str());
     if (frequency) {
-      mDvb = new cDvb (kTvRoot);
-      if (mDvb->createGraph (frequency * 1000)) {
-        thread ([=]() { mDvb->grabThread(); }).detach();
-        thread ([=]() { mDvb->signalThread(); }).detach();
-        add (new cDvbBox (this, 480.f,0.f, mDvb))->setTimedOn();
-        }
+      mDvb = new cDvb (frequency * 1000, kTvRoot);
+      thread ([=]() { mDvb->grabThread(); }).detach();
+      thread ([=]() { mDvb->signalThread(); }).detach();
+      add (new cDvbBox (this, 480.f,0.f, mDvb))->setTimedOn();
       }
 
     // fileList

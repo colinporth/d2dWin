@@ -38,10 +38,10 @@ public:
       r.right = r.left + 40.f;
       mBoxItemVec.push_back (new cTune (this, textHeight, r, mDvb, "hd", 706));
 
-      r.left = mRect.right - 200.f;
-      r.right = r.left + 100.f;
-      mBoxItemVec.push_back (new cValue (this, textHeight, r, "sig " + dec(mDvb->getSignal())));
-      r.left = r.right;
+      //r.left = mRect.right - 200.f;
+      //r.right = r.left + 100.f;
+      //mBoxItemVec.push_back (new cValue (this, textHeight, r, "sig " + dec(mDvb->getSignal())));
+      //r.left = r.right;
 
       r.right = mRect.right + 100.f;
       mBoxItemVec.push_back (new cValue (this, textHeight, r, "err " + dec(mDvb->getDiscontinuity())));
@@ -60,7 +60,8 @@ private:
     cTune (cTsEpgBox* box, float textHeight, cRect r, cDvb* dvb, const string& name, int frequency) :
         cBoxItem(box, nullptr, textHeight, r), mDvb(dvb), mFrequency(frequency)  {
       mStr = name;
-      mBrush = (mDvb->getFrequency() == (frequency*1000)) ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getGreyBrush();
+      mBrush = mBox->getWindow()->getWhiteBrush();
+      //mBrush = (mDvb->getFrequency() == (frequency * 1000)) ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getGreyBrush();
       }
     virtual ~cTune() {}
 
