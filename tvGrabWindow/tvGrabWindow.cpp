@@ -4,10 +4,10 @@
 
 #include "../../shared/dvb/cWinDvb.h"
 
+#include "../boxes/cTitleBox.h"
 #include "../boxes/cTsEpgBox.h"
-#include "../boxes/cDvbBox.h"
 #include "../boxes/cTsPidBox.h"
-#include "../boxes/cIntBox.h"
+
 #include "../boxes/cLogBox.h"
 #include "../boxes/cWindowBox.h"
 //}}}
@@ -21,13 +21,25 @@ public:
     setChangeCountDown (4);
     add (new cLogBox (this, 200.f,0, true), 0,200.f)->setPin (false);
 
-    auto frequency = param.empty() ? 674 : atoi (param.c_str());
+    auto frequency = param.empty() ? 626 : atoi (param.c_str());
     if (frequency) {
       mDvb = new cDvb (frequency * 1000, rootName);
-      add (new cDvbBox (this, getHeight()/2.f, 0.f, mDvb));
+      add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDvb));
       add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
-      thread ([=]() { mDvb->grabThread(); }).detach();
-      thread ([=]() { mDvb->signalThread(); }).detach();
+      thread ([=]() {
+        //{{{  grabthread
+        CoInitializeEx (NULL, COINIT_MULTITHREADED);
+        mDvb->grabThread();
+        CoUninitialize();
+        //}}}
+        }).detach();
+      thread ([=]() {
+        //{{{  signalThread
+        CoInitializeEx (NULL, COINIT_MULTITHREADED);
+        mDvb->signalThread();
+        CoUninitialize();
+        //}}}
+        }).detach();
       }
     else {
       mDumpTs = new cDumpTransportStream (rootName, false);
@@ -37,6 +49,8 @@ public:
       }
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
+    add (new cTitleBox (this, 60.f,24.f, mDvb->mSignalStr), -120.f,0.f);
+    add (new cTitleBox (this, 60.f,24.f, mDvb->mErrorStr), -180.f,0.f);
 
     messagePump();
 

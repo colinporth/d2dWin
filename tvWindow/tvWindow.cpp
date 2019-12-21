@@ -8,8 +8,6 @@
 
 #include "../boxes/cClockBox.h"
 #include "../boxes/cFileListBox.h"
-#include "../boxes/cIntBox.h"
-#include "../boxes/cDvbBox.h"
 #include "../boxes/cLogBox.h"
 #include "../boxes/cWindowBox.h"
 
@@ -28,9 +26,20 @@ public:
     int frequency = atoi (rootOrFrequency.c_str());
     if (frequency) {
       mDvb = new cDvb (frequency * 1000, kTvRoot);
-      thread ([=]() { mDvb->grabThread(); }).detach();
-      thread ([=]() { mDvb->signalThread(); }).detach();
-      add (new cDvbBox (this, 480.f,0.f, mDvb))->setTimedOn();
+      thread ([=]() {
+        //{{{  grabthread
+        CoInitializeEx (NULL, COINIT_MULTITHREADED);
+        mDvb->grabThread();
+        CoUninitialize();
+        //}}}
+        }).detach();
+      thread ([=]() {
+        //{{{  signalThread
+        CoInitializeEx (NULL, COINIT_MULTITHREADED);
+        mDvb->signalThread();
+        CoUninitialize();
+        //}}}
+        }).detach();
       }
 
     // fileList
