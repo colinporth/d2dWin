@@ -25,7 +25,7 @@ public:
 
     int frequency = atoi (rootOrFrequency.c_str());
     if (frequency) {
-      mDvb = new cDvb (frequency * 1000, kTvRoot);
+      mDvb = new cDvb (frequency * 1000, kTvRoot, false);
       thread ([=]() {
         //{{{  grabthread
         CoInitializeEx (NULL, COINIT_MULTITHREADED);
