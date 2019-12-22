@@ -26,6 +26,10 @@ public:
       mDvb = new cDvb (frequency * 1000, rootName, false);
       add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDvb));
       add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
+
+      add (new cTitleBox (this, 60.f,24.f, mDvb->mErrorStr), -200.f,0.f);
+      add (new cTitleBox (this, 60.f,24.f, mDvb->mSignalStr), -130.f,0.f);
+
       thread ([=]() {
         //{{{  grabthread
         CoInitializeEx (NULL, COINIT_MULTITHREADED);
@@ -41,6 +45,7 @@ public:
         //}}}
         }).detach();
       }
+
     else {
       mDumpTs = new cDumpTransportStream (rootName, false);
       add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDumpTs), 0.f,0.f);
@@ -49,8 +54,6 @@ public:
       }
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
-    add (new cTitleBox (this, 60.f,24.f, mDvb->mSignalStr), -120.f,0.f);
-    add (new cTitleBox (this, 60.f,24.f, mDvb->mErrorStr), -180.f,0.f);
 
     messagePump();
 
@@ -113,14 +116,14 @@ private:
     CoUninitialize();
     }
   //}}}
-  //{{{  vars
+
+  // vars
   cDvb* mDvb = nullptr;
-  cDumpTransportStream* mDumpTs;
-  //}}}
+  cDumpTransportStream* mDumpTs = nullptr;
   };
 
+
 // main
-//{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
@@ -142,4 +145,3 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   CoUninitialize();
   }
-//}}}
