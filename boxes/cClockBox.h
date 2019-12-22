@@ -9,7 +9,7 @@
 class cClockBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cClockBox (cD2dWindow* window, float radius, chrono::system_clock::time_point& timePoint,
+  cClockBox (cD2dWindow* window, float radius, std::chrono::system_clock::time_point& timePoint,
              bool applyDaylight = true, bool showSubSec = false)
       : cBox("clock", window, radius*2, radius*2), mTimePoint(timePoint),
         mApplyDaylight(applyDaylight),  mShowSubSec(showSubSec) {}
@@ -25,9 +25,9 @@ public:
     //auto timePointTz = date::make_zoned (date::current_zone(), mTimePoint);
     auto timePoint = mTimePoint;
     if (mApplyDaylight)
-      timePoint += chrono::seconds (mWindow->getDaylightSeconds());
+      timePoint += std::chrono::seconds (mWindow->getDaylightSeconds());
     auto datePoint = floor<date::days>(timePoint);
-    auto timeOfDay = date::make_time (chrono::duration_cast<chrono::milliseconds>(timePoint - datePoint));
+    auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::milliseconds>(timePoint - datePoint));
 
     auto hourRadius = radius * 0.6f;
     auto h = timeOfDay.hours().count() + (timeOfDay.minutes().count() / 60.f);
@@ -67,7 +67,7 @@ public:
 private:
   const float kPi = 3.14159265358979323846f;
 
-  chrono::system_clock::time_point& mTimePoint;
+  std::chrono::system_clock::time_point& mTimePoint;
   bool mApplyDaylight;
   bool mShowSubSec;
   };

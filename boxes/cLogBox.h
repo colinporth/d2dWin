@@ -71,7 +71,7 @@ public:
     auto y = logHeight + (mLogScroll % int(textHeight));
     int logLineNum = int(mLogScroll / int(textHeight));
 
-    chrono::system_clock::time_point lastTimePoint;
+    std::chrono::system_clock::time_point lastTimePoint;
 
     cLog::cLine logLine;
     unsigned lastLineIndex = 0;
@@ -80,11 +80,11 @@ public:
       mBrush->SetColor (kColours[logLine.mLogLevel]);
 
       //{{{  draw timeElapsed interLine bar
-      auto timeDiff = chrono::duration_cast<chrono::milliseconds>(lastTimePoint - logLine.mTimePoint).count();
+      auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(lastTimePoint - logLine.mTimePoint).count();
       if (timeDiff < 20)
         dc->FillRectangle (RectF(0, y+1.f, timeDiff*10.f, y+2.f), mBrush);
       else {
-        timeDiff = min (timeDiff, 4000ll);
+        timeDiff = std::min (timeDiff, 4000ll);
         dc->FillRectangle (RectF(0, y+3.f, timeDiff/10.f, y+4.f), mWindow->getWhiteBrush());
         y -= 1.f;
         }
@@ -93,7 +93,7 @@ public:
       //}}}
 
       auto datePoint = floor<date::days>(lastTimePoint);
-      auto timeOfDay = date::make_time (chrono::duration_cast<chrono::microseconds>(lastTimePoint - datePoint));
+      auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::microseconds>(lastTimePoint - datePoint));
       auto str = wdec(timeOfDay.hours().count()) +
                  L":" + wdec(timeOfDay.hours().count(),2,L'0') +
                  L":" + wdec(timeOfDay.seconds().count(),2,'0') +
@@ -115,8 +115,8 @@ public:
       dc->DrawTextLayout (Point2F(0,y), textLayout, mBrush);
       textLayout->Release();
 
-      logWidth = max (logWidth, textMetrics.width);
-      logHeight = min (logHeight, float(y));
+      logWidth = std::max (logWidth, textMetrics.width);
+      logHeight = std::min (logHeight, float(y));
       mLayoutWidth = logWidth;
       mLayoutHeight = logHeight;
 

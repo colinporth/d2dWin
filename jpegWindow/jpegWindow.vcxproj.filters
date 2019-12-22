@@ -16,19 +16,7 @@
     <ClInclude Include="..\..\shared\utils\cLog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cView2d.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\cD2dWindow.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\cLogBox.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\cWindowBox.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\cPointRectView2d.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\common\cJpegImage.h">
@@ -41,6 +29,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\utils\resolve.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cLogBox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cWindowBox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

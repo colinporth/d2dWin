@@ -13,7 +13,7 @@ public:
       : cBox("float", window, width, height), mValue(value), mDigits(digits), mPrecision(precision) {}
   //}}}
   //{{{
-  cFloatBox (cD2dWindow* window, float width, float height, string title, float& value, int digits = 6, int precision = 3)
+  cFloatBox (cD2dWindow* window, float width, float height, std::string title, float& value, int digits = 6, int precision = 3)
       : cBox("float", window, width, height), mTitle(title), mValue(value), mDigits(digits), mPrecision(precision) {
     mPin = true;
     }
@@ -22,11 +22,11 @@ public:
 
   void onDraw (ID2D1DeviceContext* dc) {
 
-    string str = mTitle + frac(mValue, mDigits, mPrecision, '0');
+    std::string str = mTitle + frac(mValue, mDigits, mPrecision, '0');
 
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
-      wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+      std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
       mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
 
     dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
@@ -36,7 +36,7 @@ public:
     }
 
 private:
-  string mTitle;
+  std::string mTitle;
   float& mValue;
   int mDigits;
   int mPrecision;
@@ -45,7 +45,7 @@ private:
 class cFloatBgndBox : public cFloatBox {
 public:
   //{{{
-  cFloatBgndBox (cD2dWindow* window, float width, float height, string title, float& value) :
+  cFloatBgndBox (cD2dWindow* window, float width, float height, std::string title, float& value) :
       cFloatBox(window, width, height, title, value) {
     }
   //}}}

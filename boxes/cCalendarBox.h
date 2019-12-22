@@ -8,7 +8,7 @@
 class cCalendarBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cCalendarBox (cD2dWindow* window, float width, float height, chrono::system_clock::time_point& timePoint) :
+  cCalendarBox (cD2dWindow* window, float width, float height, std::chrono::system_clock::time_point& timePoint) :
       cBox("date", window, width, height), mTimePoint(timePoint) {}
   //}}}
 
@@ -29,8 +29,8 @@ public:
     //{{{  print month year
     auto p = r.getTL();
 
-    string str = format ("%B", yearMonth);
-    mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+    std::string str = format ("%B", yearMonth);
+    mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
                mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
     dc->DrawTextLayout (p, textLayout, mWindow->getWhiteBrush());
     textLayout->Release();
@@ -39,7 +39,7 @@ public:
     p.x = r.getTL().x + r.getWidth() - 45.f;
 
     str = format ("%Y", yearMonth);
-    mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+    mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
                mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
     dc->DrawTextLayout (p, textLayout, mWindow->getWhiteBrush());
     textLayout->Release();
@@ -56,7 +56,7 @@ public:
       str = format ("%a", titleWeekDay);
       str.resize (2);
 
-      mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+      mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
                  mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
       dc->DrawTextLayout (p, textLayout,
         weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGreyBrush());
@@ -81,7 +81,7 @@ public:
       // iterate days of week
       str = format ("%e", curDay);
       mWindow->getDwriteFactory()->CreateTextLayout (
-        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+        std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
         mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
       dc->DrawTextLayout (p, textLayout, today == curDay ? mWindow->getWhiteBrush() : mWindow->getGreyBrush());
       textLayout->Release();
@@ -103,5 +103,5 @@ public:
     }
 
 private:
-  chrono::system_clock::time_point& mTimePoint;
+  std::chrono::system_clock::time_point& mTimePoint;
   };

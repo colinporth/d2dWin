@@ -154,13 +154,11 @@
     <ClInclude Include="..\..\shared\utils\date.h" />
     <ClInclude Include="..\..\shared\utils\resolve.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
+    <ClInclude Include="..\boxes\cLogBox.h" />
+    <ClInclude Include="..\boxes\cWindowBox.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cJpegImage.h" />
-    <ClInclude Include="..\common\cLogBox.h" />
-    <ClInclude Include="..\common\cPointRectView2d.h" />
-    <ClInclude Include="..\common\cWindowBox.h" />
     <ClInclude Include="..\common\iImage.h" />
-    <ClInclude Include="cView2d.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>

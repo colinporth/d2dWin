@@ -24,7 +24,7 @@ class cAppWindow : public cD2dWindow {
 public:
   cAppWindow() : mFileScannedSem("fileScanned") {}
   //{{{
-  void run (const string& title, int width, int height, string name) {
+  void run (const std::string& title, int width, int height, std::string name) {
 
     initialise (title, width, height, kFullScreen);
     add (new cClockBox (this, 50.f, mTimePoint), -110.f,-120.f);
@@ -39,14 +39,14 @@ public:
     add (new cFloatBox (this, 50.f, kLineHeight, mRenderTime), 0.f,-kLineHeight);
 
     if (name.find (".lnk") <= name.size()) {
-      string fullName;
+      std::string fullName;
       if (resolveShortcut (name.c_str(), fullName))
         name = fullName;
       }
-    thread ([=]() { filesThread (name); } ).detach();
+    std::thread ([=]() { filesThread (name); } ).detach();
 
     for (auto i = 0; i < kThumbThreads; i++)
-      thread ([=]() { thumbsThread (i); } ).detach();
+      std::thread ([=]() { thumbsThread (i); } ).detach();
 
     messagePump();
     };
@@ -101,14 +101,14 @@ private:
   class cDirectory {
   public:
     //{{{
-    cDirectory (const string& pathName, const string& dirName, int depth)
+    cDirectory (const std::string& pathName, const std::string& dirName, int depth)
       :  mPathName(pathName), mDirName(dirName), mDepth(depth) {}
     //}}}
     ~cDirectory() {}
 
-    string getDirName() { return mDirName; }
-    string getPathName() { return mPathName; }
-    string getPathDirName() { return mPathName + "/" + mDirName; }
+    std::string getDirName() { return mDirName; }
+    std::string getPathName() { return mPathName; }
+    std::string getPathDirName() { return mPathName + "/" + mDirName; }
 
     int getDepth() { return mDepth; }
     bool getSelected() { return mSelected; }
@@ -120,8 +120,8 @@ private:
     //}}}
 
   private:
-    string mPathName;
-    string mDirName;
+    std::string mPathName;
+    std::string mDirName;
 
     int mDepth;
     bool mSelected = false;
@@ -224,7 +224,7 @@ private:
     //}}}
     //{{{  selects
     cJpegImage* selectImageByIndex (int index) {
-      mSelectIndex = max (0, min (getNumImages() - 1, index));
+      mSelectIndex = std::max (0, std::min (getNumImages() - 1, index));
       return mImages[mSelectIndex];
       }
 
@@ -277,12 +277,12 @@ private:
     //}}}
 
     //{{{
-    void fileScan (const string& parentDirName, const string& dirName, const string& matchName, int depth) {
+    void fileScan (const std::string& parentDirName, const std::string& dirName, const std::string& matchName, int depth) {
     // recursive filescan
 
-      mMaxDirDepth = max (mMaxDirDepth, depth);
+      mMaxDirDepth = std::max (mMaxDirDepth, depth);
 
-      string indexStr;
+      std::string indexStr;
       for (auto i = 0; i < depth; i++)
         indexStr += "  ";
       cLog::log (LOGINFO, "fileScan - " + indexStr + dirName);
@@ -321,7 +321,7 @@ private:
     concurrent_vector<cDirectory*> mDirs;
     uint32_t mAllocSize = 0;
 
-    chrono::time_point<chrono::system_clock> mExifTimePoint;
+    std::chrono::time_point<std::chrono::system_clock> mExifTimePoint;
 
   private:
     const cPoint kThumbSize = cPoint(160.f, 120.f);
@@ -439,12 +439,12 @@ private:
       auto r = mRect;
       //{{{  draw dirs
       for (auto dir : mImageSet.mDirs) {
-        string str;
+        std::string str;
         r.bottom = r.top + kLineHeight;
         for (auto i = 0; i < dir->getDepth(); i++)
           str += " -";
         str += dir->getDirName();
-        dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+        dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                       r, dir->getSelected() ? mWindow->getYellowBrush() : mWindow->getWhiteBrush());
         r.top = r.bottom;
         }
@@ -470,22 +470,22 @@ private:
         if (!image->getGpsString().empty())
           height += kLineHeight;
 
-        height = kBorder + max (mImageSet.getThumbSize().y + kLineHeight, height) + kBorder;
+        height = kBorder + std::max (mImageSet.getThumbSize().y + kLineHeight, height) + kBorder;
         //}}}
 
         dc->FillRectangle (cRect(tl.x-1.f, br.y+1.f, br.x+1.f, br.y + height), mBrush);
         //{{{  draw panel text
         cRect r (tl.x + kBorder, br.y + kBorder, br.x, br.y + kBorder + kLineHeight);
         //{{{  draw fullFileName text
-        string str = image->getPathFileName();
-        dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+        std::string str = image->getPathFileName();
+        dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                       r, mWindow->getWhiteBrush());
         r.top = r.bottom;
         r.bottom += kLineHeight;
         //}}}
         //{{{  draw imageSize text
         str = dec(image->getImageSize().x) + "x" + dec(image->getImageSize().y);
-        dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+        dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                       r, mWindow->getWhiteBrush());
         r.top = r.bottom;
         r.bottom += kLineHeight;
@@ -493,8 +493,8 @@ private:
 
         if (!image->getMakeString().empty() || !image->getModelString().empty()) {
           //{{{  draw make model text
-          string str = image->getMakeString() + " " + image->getModelString();
-          dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+          std::string str = image->getMakeString() + " " + image->getModelString();
+          dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
           r.bottom += kLineHeight;
@@ -502,8 +502,8 @@ private:
           //}}}
         if (image->getOrientation()) {
           //{{{  draw orientation text
-          string str = "orientation " + dec(image->getOrientation());
-          dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+          std::string str = "orientation " + dec(image->getOrientation());
+          dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
           r.bottom += kLineHeight;
@@ -511,8 +511,8 @@ private:
           //}}}
         if (image->getFocalLength() > 0) {
           //{{{  draw focalLength text
-          string str = "focal length " + dec(image->getFocalLength());
-          dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+          std::string str = "focal length " + dec(image->getFocalLength());
+          dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
           r.bottom += kLineHeight;
@@ -520,8 +520,8 @@ private:
           //}}}
         if (image->getExposure() > 0) {
           //{{{  draw exposure text
-          string str = "exposure " + dec(image->getExposure());
-          dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+          std::string str = "exposure " + dec(image->getExposure());
+          dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
           r.bottom += kLineHeight;
@@ -529,8 +529,8 @@ private:
           //}}}
         if (image->getAperture() > 0) {
           //{{{  draw aperture text
-          string str = "aperture " + dec(image->getAperture());
-          dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+          std::string str = "aperture " + dec(image->getAperture());
+          dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           r.top = r.bottom;
           r.bottom += kLineHeight;
@@ -538,8 +538,8 @@ private:
           //}}}
         if (!image->getGpsString().empty()) {
           //{{{  draw GPSinfo text
-          string str = image->getGpsString();
-          dc->DrawText (wstring(str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+          std::string str = image->getGpsString();
+          dc->DrawText (std::wstring(str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           }
           //}}}
@@ -564,7 +564,7 @@ private:
 
           auto centre = r.getCentre();
 
-          auto timeOfDay = date::make_time (chrono::duration_cast<chrono::seconds>(image->getExifTimePoint() - datePoint));
+          auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::seconds>(image->getExifTimePoint() - datePoint));
           auto hourRadius = radius * 0.6f;
           auto h = timeOfDay.hours().count();
           auto hourAngle = (1.f - (h / 6.f)) * kPi;
@@ -600,8 +600,8 @@ private:
           //{{{  print month year
           auto p = r.getTL();
 
-          string str = format ("%B", yearMonth);
-          mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+          std::string str = format ("%B", yearMonth);
+          mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
                      mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
           dc->DrawTextLayout (p, textLayout, mWindow->getWhiteBrush());
           textLayout->Release();
@@ -610,7 +610,7 @@ private:
           p.x = r.getTL().x + r.getWidth() - 45.f;
 
           str = format ("%Y", yearMonth);
-          mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+          mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
                      mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
           dc->DrawTextLayout (p, textLayout, mWindow->getWhiteBrush());
           textLayout->Release();
@@ -627,7 +627,7 @@ private:
             str = format ("%a", titleWeekDay);
             str.resize (2);
 
-            mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+            mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
                        mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
             dc->DrawTextLayout (p, textLayout,
               weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGreyBrush());
@@ -652,7 +652,7 @@ private:
             // iterate days of week
             str = format ("%e", curDay);
             mWindow->getDwriteFactory()->CreateTextLayout (
-              wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+              std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
               mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
             dc->DrawTextLayout (p, textLayout, today == curDay ? mWindow->getWhiteBrush() : mWindow->getGreyBrush());
             textLayout->Release();
@@ -676,7 +676,7 @@ private:
                      br.y + kBorder + mImageSet.getThumbSize().y,
                      br.x - kBorder, br.y + height);
           str = image->getExifTimeString();
-          dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+          dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                         r, mWindow->getWhiteBrush());
           //}}}
           }
@@ -704,7 +704,7 @@ private:
       //}}}
       dc->SetTransform (Matrix3x2F::Identity());
 
-      string str = mImageSet.mDirs[0]->getDirName() + " - " +
+      std::string str = mImageSet.mDirs[0]->getDirName() + " - " +
                    dec(mImageSet.mAllocSize/1000000) + "m - " +
                    dec(mImageSet.getNumImages()) + " images";
       drawTab (dc, str, dst, mWindow->getLightGreyBrush());
@@ -726,7 +726,7 @@ private:
   //}}}
 
   //{{{
-  void filesThread (const string& rootDir) {
+  void filesThread (const std::string& rootDir) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("file");
@@ -792,10 +792,10 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-  string rootDirName;
+  std::string rootDirName;
   if (numArgs > 1) {
-    wstring wstr(args[1]);
-    rootDirName = string(wstr.begin(), wstr.end());
+    std::wstring wstr(args[1]);
+    rootDirName = std::string(wstr.begin(), wstr.end());
     cLog::log (LOGINFO, "JpegWindow resolved " + rootDirName);
     }
   else
