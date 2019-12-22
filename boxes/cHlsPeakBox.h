@@ -124,9 +124,9 @@ public:
     double leftSample = mHls->getPlaySample() - (getCentreX() + mAnimation)*samplesPerPix;
     //{{{  draw clock
     //auto timePointTz = date::make_zoned (date::current_zone(), mTimePoint);
-    auto timePoint = mHls->mPlayTimePoint + chrono::seconds (mWindow->getDaylightSeconds());
+    auto timePoint = mHls->mPlayTimePoint + std::chrono::seconds (mWindow->getDaylightSeconds());
     auto datePoint = floor<date::days>(timePoint);
-    auto timeOfDay = date::make_time (chrono::duration_cast<chrono::milliseconds>(timePoint - datePoint));
+    auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::milliseconds>(timePoint - datePoint));
 
     float radius = getHeight() / 8.f;
     auto centre = cPoint (getCentreX(), mRect.bottom - radius - 12.f);
@@ -160,8 +160,8 @@ public:
                   //mWindow->getDarkGreyBrush(), 2.f);
     //}}}
 
-    auto timeOfDay1 = date::make_time (chrono::duration_cast<chrono::milliseconds>(mWindow->mTimePoint - datePoint));
-    auto timeDiff = chrono::duration_cast<chrono::seconds>(mWindow->mTimePoint - timePoint).count();
+    auto timeOfDay1 = date::make_time (std::chrono::duration_cast<std::chrono::milliseconds>(mWindow->mTimePoint - datePoint));
+    auto timeDiff = std::chrono::duration_cast<std::chrono::seconds>(mWindow->mTimePoint - timePoint).count();
     if (timeDiff < 60) {
       //{{{  draw clock seconds
       auto secRadius = radius * 0.85f;
@@ -237,7 +237,7 @@ public:
 
       if (seconds % 5 == 0) {
         auto str = getTimeString (seconds);
-        dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mTextFormat,
+        dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mTextFormat,
                       cRect (r.left-kTextWidth, r.top-3.f, r.left-3.f, r.bottom),
                       mWindow->getWhiteBrush());
         }

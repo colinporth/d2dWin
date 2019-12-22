@@ -10,7 +10,7 @@
 class cValueBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cValueBox (cD2dWindow* window, float width, float height, const string& title, float min, float max, float& value, bool& changed)
+  cValueBox (cD2dWindow* window, float width, float height, const std::string& title, float min, float max, float& value, bool& changed)
       : cBox("offset", window, width, height), mTitle(title), mMin(min), mMax(max),
         mValue(value), mChanged(changed) {
     mChanged = false;
@@ -32,9 +32,9 @@ public:
   //}}}
 
   void onDraw (ID2D1DeviceContext* dc) {
-    string str = mTitle + " " + dec (mValue);
+    std::string str = mTitle + " " + dec (mValue);
     dc->FillRectangle (mRect, mPick ? mWindow->getYellowBrush() : mWindow->getGreyBrush());
-    dc->DrawText (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+    dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                   mRect, mPick ? mWindow->getBlackBrush() : mWindow->getWhiteBrush());
     }
 
@@ -42,13 +42,13 @@ private:
   //{{{
   void setValue (float value) {
     mValue = value;
-    mValue = max (mValue, mMin);
-    mValue = min (mValue, mMax);
+    mValue = std::max (mValue, mMin);
+    mValue = std::min (mValue, mMax);
     mChanged = true;
     }
   //}}}
 
-  string mTitle;
+  std::string mTitle;
   bool& mChanged;
   float& mValue;
   float mMin = 0.f;

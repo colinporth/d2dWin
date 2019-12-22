@@ -34,7 +34,7 @@ class cAppWindow : public cHls, public cD2dWindow, public cWinAudio {
 public:
   cAppWindow (int chan, int bitrate) : cHls(chan, bitrate, getDaylightSeconds()) {}
   //{{{
-  void run (const string& title, int width, int height) {
+  void run (const std::string& title, int width, int height) {
 
     initialise (title, width, height, false);
     add (new cCalendarBox (this, 190.f,160.f, mTimePoint), -190.f - 24.f,0);
@@ -55,7 +55,7 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     // launch loaderThread
-    thread ([=]() {
+    std::thread ([=]() {
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
       cWinSockHttp http;
       loader (http);
@@ -63,7 +63,7 @@ public:
       }).detach();
 
     // launch playerThread, high priority
-    auto playerThread = thread ([=]() {
+    auto playerThread = std::thread ([=]() {
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
       player (this, this);
       CoUninitialize();
