@@ -28,7 +28,7 @@ const int kChunkSize = 2048*188;
 //}}}
 
 //{{{
-cPlayView::cPlayView (cD2dWindow* window, float width, float height, const string& fileName) :
+cPlayView::cPlayView (cD2dWindow* window, float width, float height, const std::string& fileName) :
     cView("playerView", window, width, height),
     mFileName(fileName), mFirstVidPtsSem("firstVidPts") {
 
@@ -42,14 +42,14 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const strin
   mAudFrameBox = window->add (new cAudFrameBox (window, 82.f,240.0f, mPlayAudFrame, this), -84.f,-240.f-6.0f);
 
   // launch anal
-  auto threadHandle = thread ([=](){ analyserThread(); });
+  auto threadHandle = std::thread ([=](){ analyserThread(); });
   SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
   threadHandle.detach();
 
-  thread ([=]() { audThread(); }).detach();
-  thread ([=]() { vidThread(); }).detach();
+  std::thread ([=]() { audThread(); }).detach();
+  std::thread ([=]() { vidThread(); }).detach();
 
-  threadHandle = thread ([=](){ playThread(); });
+  threadHandle = std::thread ([=](){ playThread(); });
   SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_HIGHEST);
   threadHandle.detach();
   }

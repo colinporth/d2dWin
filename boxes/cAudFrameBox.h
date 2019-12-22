@@ -81,7 +81,7 @@ public:
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
-        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+        std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
         mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
 
       dc->DrawTextLayout (getBL() + cPoint(2.f, -kLineHeight), textLayout, mWindow->getBlackBrush());

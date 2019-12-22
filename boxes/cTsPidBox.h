@@ -28,7 +28,7 @@ public:
 
     if (mTs->mPidInfoMap.size()) {
 
-      lock_guard<mutex> lockGuard (mTs->mMutex);
+      std::lock_guard<std::mutex> lockGuard (mTs->mMutex);
 
       mLineHeight = (mTs->mServiceMap.size() >= 10) ? kDefaultLineHeight : kLargeLineHeight;
       auto r = mRect;
@@ -36,7 +36,7 @@ public:
       // draw pids
       auto maxPidPackets = 10000;
       for (auto& pidInfo : mTs->mPidInfoMap)
-        maxPidPackets = max (maxPidPackets, pidInfo.second.mPackets);
+        maxPidPackets = std::max (maxPidPackets, pidInfo.second.mPackets);
 
       for (auto &pidInfo : mTs->mPidInfoMap) {
         auto str = wdec (pidInfo.second.mPackets,mPacketDigits) +

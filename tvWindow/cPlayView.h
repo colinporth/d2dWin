@@ -18,7 +18,7 @@ extern "C" {
 
 class cPlayView : public cD2dWindow::cView, public cWinAudio {
 public:
-  cPlayView (cD2dWindow* window, float width, float height, const string& fileName);
+  cPlayView (cD2dWindow* window, float width, float height, const std::string& fileName);
   ~cPlayView();
 
   // cView overrides
@@ -130,8 +130,8 @@ private:
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
 
-      string str = getPtsString(mPlayView->mPlayPts) + " " + getPtsString(mPlayView->mAnalTs->mLengthPts);
-      wstring wstr(str.begin(), str.end());
+      std::string str = getPtsString(mPlayView->mPlayPts) + " " + getPtsString(mPlayView->mAnalTs->mLengthPts);
+      std::wstring wstr(str.begin(), str.end());
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (wstr.data(), (uint32_t)wstr.size(), mTextFormat,
@@ -397,7 +397,7 @@ private:
             //  draw index
             r = cRect (x,y, x + audFrameWidth - 1.f, y + kIndexHeight);
             dc->FillRectangle (r, blue);
-            auto wstr = to_wstring (index);
+            auto wstr = wdec (index);
             dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat, r,
                           frame->isFirstPesFrame() ? white : black);
             }
@@ -566,12 +566,12 @@ private:
 
         // draw index
         dc->FillRectangle (RectF(x,y1, x + vidFrameWidth - 1.f,y1 + kIndexHeight), yellow);
-        auto wstr (to_wstring (index));
+        auto wstr (wdec (index));
         dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat,
                       RectF(x,y1, x + vidFrameWidth - 1.f,y1 + kIndexHeight), black);
         y1 += kIndexHeight + 1.f;
 
-        maxY = max (maxY, y1);
+        maxY = std::max (maxY, y1);
         if (frame->isOk()) {
           // draw type
           wstr = frame->mFrameType;
@@ -583,9 +583,9 @@ private:
           // draw size
           auto l = frame->mPesSize / 1000.f;
           dc->FillRectangle (RectF(x,y1, x + vidFrameWidth - 1.f,y1 + l), white);
-          maxY = max (maxY,y1+l);
+          maxY = std::max (maxY,y1+l);
 
-          wstr = (frame->mPesSize >= 1000) ? to_wstring (frame->mPesSize / 1000) + L"k" : to_wstring (frame->mPesSize);
+          wstr = (frame->mPesSize >= 1000) ? wdec (frame->mPesSize / 1000) + L"k" : wdec (frame->mPesSize);
           dc->DrawText (wstr.data(), (uint32_t)wstr.size(), textFormat,
                         RectF(x,y1, x + vidFrameWidth - 1.f,y1 + kIndexHeight), black);
           }
@@ -607,7 +607,7 @@ private:
         char frameType = getFrameType (pidInfo->mBuffer, pesSize, pidInfo->mStreamType);
         cLog::log (LOGINFO1, "vPes " + dec (pesSize,5) +
                              " pts:" + getPtsString(pidInfo->mPts) +
-                             " " + string (&frameType,1) +
+                             " " + std::string (&frameType,1) +
                              (skip ? " skip":""));
 
         mBitstream.Data = pidInfo->mBuffer;
@@ -943,7 +943,7 @@ private:
   void playThread();
 
   //{{{  vars
-  string mFileName;
+  std::string mFileName;
 
   cBox* mTimecodeBox;
   cBox* mProgressBox;

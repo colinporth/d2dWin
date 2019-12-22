@@ -37,7 +37,7 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     if (!getTimedOn() || mWindow->getTimedMenuOn()) {
-      lock_guard<mutex> lockGuard (mTs->mMutex);
+      std::lock_guard<std::mutex> lockGuard (mTs->mMutex);
       clear();
       if (mTs->mServiceMap.size() > 1) {
         draw (dc, mRect);
@@ -70,7 +70,7 @@ protected:
     cRect mRect;
     const float mTextHeight;
 
-    string mStr;
+    std::string mStr;
     ID2D1SolidColorBrush* mBgndBrush = nullptr;
     ID2D1SolidColorBrush* mBrush = nullptr;
     };
@@ -139,7 +139,7 @@ protected:
 
   // vars
   cTransportStream* mTs;
-  vector<cBoxItem*> mBoxItemVec;
+  std::vector<cBoxItem*> mBoxItemVec;
 
 private:
   //{{{
