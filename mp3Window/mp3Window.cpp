@@ -17,6 +17,7 @@
 #include "../boxes/cVolumeBox.h"
 #include "../boxes/cWindowBox.h"
 
+using namespace std;
 using namespace chrono;
 using namespace concurrency;
 //}}}
@@ -33,6 +34,8 @@ const int kSilentWindow = 12;
 
 const int kPlayFrameThreshold = 40; // about a second of analyse before playing
 //}}}
+
+string fileName = "C:/Users/colin/Music/Elton John";
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
@@ -730,7 +733,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-  string fileName = "C:/Users/colin/Music/Elton John";
   if (numArgs > 1) {
     wstring wstr (args[1]);
     fileName = string (wstr.begin(), wstr.end());

@@ -266,7 +266,7 @@ public:
   //{{{
   class cView : public cBox {
   public:
-    cView (string name, cD2dWindow* window, float width, float height)
+    cView (std::string name, cD2dWindow* window, float width, float height)
       : cBox(name, window, width, height) {}
     virtual ~cView() {}
 
@@ -303,7 +303,7 @@ public:
     //}}}
 
     //{{{
-    void drawTab (ID2D1DeviceContext* dc, string str, cRect dst, ID2D1SolidColorBrush* brush) {
+    void drawTab (ID2D1DeviceContext* dc, std::string str, cRect dst, ID2D1SolidColorBrush* brush) {
 
       if (dst.left < 0)
         dst.left = 0;
@@ -312,7 +312,7 @@ public:
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
-        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+        std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
         dst.right - dst.left, kLineHeight, &textLayout);
 
       struct DWRITE_TEXT_METRICS textMetrics;
@@ -333,7 +333,7 @@ public:
 
   ~cD2dWindow();
 
-  void initialise (string title, int width, int height, bool fullScreen);
+  void initialise (std::string title, int width, int height, bool fullScreen);
   cBox* add (cBox* box, cPoint pos);
   cBox* add (cBox* box, float x, float y);
   cBox* add (cBox* box);
@@ -397,7 +397,7 @@ public:
   LRESULT wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lparam);
   void messagePump();
 
-  chrono::system_clock::time_point mTimePoint;
+  std::chrono::system_clock::time_point mTimePoint;
 
 protected:
   virtual bool onKey (int key) = 0;
@@ -497,6 +497,6 @@ private:
   uint32_t mCursorDown = 50;
   uint32_t mCursorCountDown = 50;
 
-  thread mRenderThread;
+  std::thread mRenderThread;
   //}}}
   };
