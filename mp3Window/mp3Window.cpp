@@ -594,6 +594,26 @@ private:
   bool getAbort() { return getExit() || mChanged; }
 
   //{{{
+  void makeWaveform (int numSamples, int16_t* samples, uint8_t* waveform) {
+
+    int decimate = 1;
+    int numDecimatedSamples = numSamples/decimate;
+
+    int left = 0;
+    int right = 0;
+
+    for (int i = 0; i < numDecimatedSamples; i++) {
+      left += *samples > 0 ? *samples : -(*samples);
+      samples++;
+      right += *samples > 0 ? *samples : -(*samples);
+      samples += (decimate * 2) - 1;
+      }
+
+    *waveform = uint8_t ((left / numDecimatedSamples) >> 8);
+    *(waveform+1) = uint8_t ((right / numDecimatedSamples) >> 8);
+    }
+  //}}}
+  //{{{
   void analyseThread() {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
@@ -616,6 +636,7 @@ private:
       if (jpegBuf) {
         //{{{  handle jpeg image
         cLog::log (LOGINFO2, "found jpeg tag");
+
         // delete old
         auto temp = mFrameSet.mImage;
         mFrameSet.mImage = nullptr;
@@ -628,13 +649,18 @@ private:
         }
         //}}}
 
+      auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
+      memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
+
       auto frameNum = 0;
       while (!getAbort() && (streamPos < mStreamLen)) {
-        uint8_t values[kChannels];
-        int frameLen = mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, values, nullptr);
+        int frameLen = mMp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
         if (frameLen <= 0)
           break;
-        if (mFrameSet.addFrame (streamPos, frameLen, values, mStreamLen)) {
+
+        uint8_t power[kChannels];
+        makeWaveform (kSamplesPerFrame, samples, power);
+        if (mFrameSet.addFrame (streamPos, frameLen, power, mStreamLen)) {
           auto threadHandle = thread ([=](){ playThread(); });
           SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
           threadHandle.detach();
@@ -643,6 +669,8 @@ private:
         streamPos += frameLen;
         changed();
         }
+
+      free (samples);
 
       // report analyse time
       auto doneTime = (float)duration_cast<milliseconds>(system_clock::now() - time).count();
@@ -685,7 +713,7 @@ private:
     while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
       if (mPlaying) {
         auto streamPos = mFrameSet.getPlayFrameStreamPos();
-        mMp3Decoder.decodeNextFrame (mStreamBuf + streamPos, mStreamLen - streamPos, nullptr, samples);
+        mMp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
         if (samples) {
           audPlay (2, samples, kSamplesPerFrame, 1.f);
           mFrameSet.incPlayFrame (1);

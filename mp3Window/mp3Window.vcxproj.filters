@@ -46,6 +46,9 @@
     <ClInclude Include="..\boxes\cWindowBox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\miniMp3.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="mp3Window.cpp" />
