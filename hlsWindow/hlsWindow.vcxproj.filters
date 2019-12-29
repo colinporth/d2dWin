@@ -5,10 +5,10 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
-    <Filter Include="tinyAac">
+    <Filter Include="teenstAac">
       <UniqueIdentifier>{cc365e3f-0aea-4ada-88d5-f2d540c39e6a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="tinyAac\header">
+    <Filter Include="teenstAac\h">
       <UniqueIdentifier>{a3c5f7a2-ecbf-4f12-b974-6f905f0b4d0e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -16,13 +16,13 @@
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="hlsWindow.cpp" />
     <ClCompile Include="..\..\shared\teensyAac\cAacDecoder.cpp">
-      <Filter>tinyAac</Filter>
+      <Filter>teenstAac</Filter>
     </ClCompile>
     <ClCompile Include="..\..\shared\teensyAac\huffman.cpp">
-      <Filter>tinyAac</Filter>
+      <Filter>teenstAac</Filter>
     </ClCompile>
     <ClCompile Include="..\..\shared\teensyAac\sbr.cpp">
-      <Filter>tinyAac</Filter>
+      <Filter>teenstAac</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -51,22 +51,22 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\teensyAac\aaccommon.h">
-      <Filter>tinyAac\header</Filter>
+      <Filter>teenstAac\h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\teensyAac\assembly.h">
-      <Filter>tinyAac\header</Filter>
+      <Filter>teenstAac\h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\teensyAac\cAacDecoder.h">
-      <Filter>tinyAac\header</Filter>
+      <Filter>teenstAac\h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\teensyAac\sbr.h">
-      <Filter>tinyAac\header</Filter>
+      <Filter>teenstAac\h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\teensyAac\tables.h">
-      <Filter>tinyAac\header</Filter>
+      <Filter>teenstAac\h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\teensyAac\cBitStream.h">
-      <Filter>tinyAac\header</Filter>
+      <Filter>teenstAac\h</Filter>
     </ClInclude>
     <ClInclude Include="..\common\cClockBox.h">
       <Filter>Header Files</Filter>
@@ -85,6 +85,9 @@
     </ClInclude>
     <ClInclude Include="..\common\box\cHlsPeakBox.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\teensyAac\huffman.h">
+      <Filter>teenstAac\h</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

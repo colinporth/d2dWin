@@ -5,6 +5,12 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
+    <Filter Include="teensyAac">
+      <UniqueIdentifier>{8d642395-59af-4004-b948-05c95fac1e99}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="teensyAac\h">
+      <UniqueIdentifier>{2c24539b-884f-4ffe-a62c-97d5538b707d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -49,9 +55,36 @@
     <ClInclude Include="..\..\shared\decoders\miniMp3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\teensyAac\aaccommon.h">
+      <Filter>teensyAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\teensyAac\assembly.h">
+      <Filter>teensyAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\teensyAac\cAacDecoder.h">
+      <Filter>teensyAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\teensyAac\sbr.h">
+      <Filter>teensyAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\teensyAac\tables.h">
+      <Filter>teensyAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\teensyAac\huffman.h">
+      <Filter>teensyAac\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="mp3Window.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="..\..\shared\teensyAac\cAacDecoder.cpp">
+      <Filter>teensyAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\teensyAac\sbr.cpp">
+      <Filter>teensyAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\teensyAac\huffman.cpp">
+      <Filter>teensyAac</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

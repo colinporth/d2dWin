@@ -5,6 +5,8 @@
 
 #include "../../shared/utils/cWinAudio.h"
 #include "../../shared/decoders/cMp3Decoder.h"
+#include "../../shared/teensyAac/cAacDecoder.h"
+
 #include "../../shared/utils/cFileList.h"
 
 #include "../common/cJpegImage.h"
@@ -628,11 +630,11 @@ private:
       mFrameSet.init (mFileList->getCurFileItem().getFullName());
 
       auto time = system_clock::now();
-      cMp3Decoder mMp3Decoder;
-      unsigned streamPos = mMp3Decoder.findId3tag (mStreamBuf, mStreamLen);
+      cMp3Decoder mp3Decoder;
+      unsigned streamPos = mp3Decoder.findId3tag (mStreamBuf, mStreamLen);
 
       int jpegLen;
-      auto jpegBuf = mMp3Decoder.getJpeg (jpegLen);
+      auto jpegBuf = mp3Decoder.getJpeg (jpegLen);
       if (jpegBuf) {
         //{{{  handle jpeg image
         cLog::log (LOGINFO2, "found jpeg tag");
@@ -654,7 +656,7 @@ private:
 
       auto frameNum = 0;
       while (!getAbort() && (streamPos < mStreamLen)) {
-        int frameLen = mMp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
+        int frameLen = mp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
         if (frameLen <= 0)
           break;
 
@@ -705,7 +707,7 @@ private:
     auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
     memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
 
-    cMp3Decoder mMp3Decoder;
+    cMp3Decoder mp3Decoder;
     audOpen (kChannels, kSamplesPerSec);
 
     mPlaying = true;
@@ -713,7 +715,120 @@ private:
     while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
       if (mPlaying) {
         auto streamPos = mFrameSet.getPlayFrameStreamPos();
-        mMp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
+        mp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
+        if (samples) {
+          audPlay (2, samples, kSamplesPerFrame, 1.f);
+          mFrameSet.incPlayFrame (1);
+          changed();
+          }
+        else
+          break;
+        }
+      else
+        audPlay (2, nullptr, kSamplesPerFrame, 1.f);
+      }
+
+    audClose();
+
+    free (samples);
+    CoUninitialize();
+
+    cLog::log (LOGINFO, "exit");
+
+    mPlayDoneSem.notifyAll();
+    }
+  //}}}
+
+  //{{{
+  void analyseThreadAac() {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("anal");
+
+    while (!getExit()) {
+      //{{{  open file mapping
+      auto fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+      mStreamBuf = (uint8_t*)MapViewOfFile (CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL), FILE_MAP_READ, 0, 0, 0);
+      mStreamLen = (int)GetFileSize (fileHandle, NULL);
+      //}}}
+      mFrameSet.init (mFileList->getCurFileItem().getFullName());
+
+      auto time = system_clock::now();
+      cAacDecoder aacDecoder;
+      unsigned streamPos = 0;
+
+      auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
+      memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
+
+      auto frameNum = 0;
+      while (!getAbort() && (streamPos < mStreamLen)) {
+        unsigned char* srcPtr = (unsigned char*)(mStreamBuf + streamPos);
+        int bytesLeft = mStreamLen - streamPos;
+        int frameLen = aacDecoder.AACDecode (&srcPtr, &bytesLeft, samples);
+        if (frameLen <= 0)
+          break;
+
+        uint8_t power[kChannels];
+        makeWaveform (kSamplesPerFrame, samples, power);
+        if (mFrameSet.addFrame (streamPos, frameLen, power, mStreamLen)) {
+          auto threadHandle = thread ([=](){ playThread(); });
+          SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
+          threadHandle.detach();
+          }
+
+        streamPos += frameLen;
+        changed();
+        }
+
+      free (samples);
+
+      // report analyse time
+      auto doneTime = (float)duration_cast<milliseconds>(system_clock::now() - time).count();
+      cLog::log (LOGINFO, "last took " + dec(doneTime) + "ms");
+
+      // wait for play to end
+      mPlayDoneSem.wait();
+      //{{{  close old file mapping
+      UnmapViewOfFile (mStreamBuf);
+      CloseHandle (fileHandle);
+      //}}}
+
+      if (mChanged) // use changed fileIndex
+        mChanged = false;
+      else if (!mFileList->nextIndex())
+        break;
+      }
+
+    cLog::log (LOGINFO, "exit - frames loaded:%d calc:%d streamLen:%d",
+                        mFrameSet.getNumLoadedFrames(), mFrameSet.mNumFrames, mStreamLen);
+    CoUninitialize();
+
+    setExit();
+    }
+  //}}}
+  //{{{
+  void playThreadAac() {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("play");
+
+    auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
+    memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
+
+    cAacDecoder aacDecoder;
+
+    // int framesPerAacFrame = bitrate <= 96000 ? 2 : 1;
+
+    audOpen (kChannels, kSamplesPerSec);
+
+    mPlaying = true;
+    mFrameSet.setPlayFrame (0);
+    while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
+      if (mPlaying) {
+        auto streamPos = mFrameSet.getPlayFrameStreamPos();
+        unsigned char* srcPtr = (unsigned char*)(mStreamBuf + streamPos);
+        int bytesLeft = mStreamLen - streamPos;
+        aacDecoder.AACDecode (&srcPtr, &bytesLeft, samples);
         if (samples) {
           audPlay (2, samples, kSamplesPerFrame, 1.f);
           mFrameSet.incPlayFrame (1);

@@ -53,6 +53,7 @@
     <ClInclude Include="..\..\shared\teensyAac\assembly.h" />
     <ClInclude Include="..\..\shared\teensyAac\cAacDecoder.h" />
     <ClInclude Include="..\..\shared\teensyAac\cBitStream.h" />
+    <ClInclude Include="..\..\shared\teensyAac\huffman.h" />
     <ClInclude Include="..\..\shared\teensyAac\sbr.h" />
     <ClInclude Include="..\..\shared\teensyAac\tables.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
