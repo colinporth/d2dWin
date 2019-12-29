@@ -1,13 +1,13 @@
 // mp3Window.cpp
 //{{{  includes
 #include "stdafx.h"
-#include "../../shared/utils/resolve.h"
 
+#include "../../shared/utils/resolve.h"
+#include "../../shared/utils/cFileList.h"
 #include "../../shared/utils/cWinAudio.h"
+
 #include "../../shared/decoders/cMp3Decoder.h"
 #include "../../shared/teensyAac/cAacDecoder.h"
-
-#include "../../shared/utils/cFileList.h"
 
 #include "../common/cJpegImage.h"
 #include "../common/cJpegImageView.h"
