@@ -55,7 +55,7 @@ public:
     add (new cFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
     add (new cFrameSetTimeBox (this, 600.f,50.f, mFrameSet), -600.f,-50.f);
 
-    mFileList = new cFileList (fileName, "*.mp3");
+    mFileList = new cFileList (fileName, "*.aac,*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
     add (new cAppFileListBox (this, 0.f,-220.f, mFileList));
 
@@ -140,7 +140,7 @@ private:
     //}}}
 
     //{{{
-    void init (string fileName) {
+    void init (string fileName, bool aac) {
 
       mFrames.clear();
 
@@ -150,6 +150,8 @@ private:
 
       mFileName = fileName;
       mPathName = "";
+
+      mAac = aac;
       }
     //}}}
     //{{{
@@ -222,6 +224,7 @@ private:
 
     // vars
     concurrent_vector<cFrame> mFrames;
+
     int mNumFrames = 0;
     uint8_t mMaxValue = 0;
 
@@ -230,6 +233,7 @@ private:
     string mFileName;
     string mPathName;
     cJpegImage* mImage = nullptr;
+    bool mAac = false;
 
   private:
     //{{{
@@ -598,21 +602,16 @@ private:
   //{{{
   void makeWaveform (int numSamples, int16_t* samples, uint8_t* waveform) {
 
-    int decimate = 1;
-    int numDecimatedSamples = numSamples/decimate;
+    unsigned int left = 0;
+    unsigned int right = 0;
 
-    int left = 0;
-    int right = 0;
-
-    for (int i = 0; i < numDecimatedSamples; i++) {
-      left += *samples > 0 ? *samples : -(*samples);
-      samples++;
-      right += *samples > 0 ? *samples : -(*samples);
-      samples += (decimate * 2) - 1;
+    for (int i = 0; i < numSamples; i++) {
+      left += *samples > 0 ? *samples++ : -(*samples++);
+      right += *samples > 0 ? *samples++ : -(*samples++);
       }
 
-    *waveform = uint8_t ((left / numDecimatedSamples) >> 8);
-    *(waveform+1) = uint8_t ((right / numDecimatedSamples) >> 8);
+    *waveform++ = uint8_t ((left / numSamples) >> 8);
+    *waveform = uint8_t ((right / numSamples) >> 8);
     }
   //}}}
   //{{{
@@ -622,57 +621,92 @@ private:
     cLog::setThreadName ("anal");
 
     while (!getExit()) {
+      bool aac = mFileList->getCurFileItem().getExtension() == "aac";
       //{{{  open file mapping
       auto fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
       mStreamBuf = (uint8_t*)MapViewOfFile (CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL), FILE_MAP_READ, 0, 0, 0);
       mStreamLen = (int)GetFileSize (fileHandle, NULL);
       //}}}
-      mFrameSet.init (mFileList->getCurFileItem().getFullName());
 
+      mFrameSet.init (mFileList->getCurFileItem().getFullName(), aac);
       auto time = system_clock::now();
-      cMp3Decoder mp3Decoder;
-      unsigned streamPos = mp3Decoder.findId3tag (mStreamBuf, mStreamLen);
 
-      int jpegLen;
-      auto jpegBuf = mp3Decoder.getJpeg (jpegLen);
-      if (jpegBuf) {
-        //{{{  handle jpeg image
-        cLog::log (LOGINFO2, "found jpeg tag");
+      if (aac) {
+        //{{{  aac
+        cAacDecoder aacDecoder;
 
-        // delete old
-        auto temp = mFrameSet.mImage;
-        mFrameSet.mImage = nullptr;
-        delete temp;
+        auto samples = (int16_t*)malloc (1024 * 2 * 2 * 2);
+        memset (samples, 0, 1024 * 2 * 2 * 2);
 
-        // create new
-        mFrameSet.mImage = new cJpegImage();
-        mFrameSet.mImage->setBuf (jpegBuf, jpegLen);
-        mJpegImageView->setImage (mFrameSet.mImage);
-        }
-        //}}}
+        unsigned streamPos = 0;
+        uint8_t* srcPtr = mStreamBuf;
+        int bytesLeft = mStreamLen;
+        while (!getAbort() && (bytesLeft > 0)) {
+          int startStreamPos = int(srcPtr - mStreamBuf);
+          if (aacDecoder.AACDecode (&srcPtr, &bytesLeft, samples) != 0)
+            break;
 
-      auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
-      memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
+          uint8_t power[kChannels];
+          makeWaveform (1024, samples, power);
+          if (mFrameSet.addFrame (startStreamPos, bytesLeft, power, mStreamLen)) {
+            auto threadHandle = thread ([=](){ playThread(); });
+            SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
+            threadHandle.detach();
+            }
 
-      auto frameNum = 0;
-      while (!getAbort() && (streamPos < mStreamLen)) {
-        int frameLen = mp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
-        if (frameLen <= 0)
-          break;
-
-        uint8_t power[kChannels];
-        makeWaveform (kSamplesPerFrame, samples, power);
-        if (mFrameSet.addFrame (streamPos, frameLen, power, mStreamLen)) {
-          auto threadHandle = thread ([=](){ playThread(); });
-          SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
-          threadHandle.detach();
+          changed();
           }
 
-        streamPos += frameLen;
-        changed();
+        free (samples);
         }
+        //}}}
+      else {
+        //{{{  mp3
+        cMp3Decoder mp3Decoder;
+        unsigned streamPos = mp3Decoder.findId3tag (mStreamBuf, mStreamLen);
 
-      free (samples);
+        int jpegLen;
+        auto jpegBuf = mp3Decoder.getJpeg (jpegLen);
+        if (jpegBuf) {
+          //{{{  handle jpeg image
+          cLog::log (LOGINFO2, "found jpeg tag");
+
+          // delete old
+          auto temp = mFrameSet.mImage;
+          mFrameSet.mImage = nullptr;
+          delete temp;
+
+          // create new
+          mFrameSet.mImage = new cJpegImage();
+          mFrameSet.mImage->setBuf (jpegBuf, jpegLen);
+          mJpegImageView->setImage (mFrameSet.mImage);
+          }
+          //}}}
+
+        auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
+        memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
+
+        auto frameNum = 0;
+        while (!getAbort() && (streamPos < mStreamLen)) {
+          int frameLen = mp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
+          if (frameLen <= 0)
+            break;
+
+          uint8_t power[kChannels];
+          makeWaveform (kSamplesPerFrame, samples, power);
+          if (mFrameSet.addFrame (streamPos, frameLen, power, mStreamLen)) {
+            auto threadHandle = thread ([=](){ playThread(); });
+            SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
+            threadHandle.detach();
+            }
+
+          streamPos += frameLen;
+          changed();
+          }
+
+        free (samples);
+        }
+        //}}}
 
       // report analyse time
       auto doneTime = (float)duration_cast<milliseconds>(system_clock::now() - time).count();
@@ -707,141 +741,59 @@ private:
     auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
     memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
 
-    cMp3Decoder mp3Decoder;
-    audOpen (kChannels, kSamplesPerSec);
-
-    mPlaying = true;
-    mFrameSet.setPlayFrame (0);
-    while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
-      if (mPlaying) {
-        auto streamPos = mFrameSet.getPlayFrameStreamPos();
-        mp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
-        if (samples) {
-          audPlay (2, samples, kSamplesPerFrame, 1.f);
-          mFrameSet.incPlayFrame (1);
-          changed();
-          }
-        else
-          break;
-        }
-      else
-        audPlay (2, nullptr, kSamplesPerFrame, 1.f);
-      }
-
-    audClose();
-
-    free (samples);
-    CoUninitialize();
-
-    cLog::log (LOGINFO, "exit");
-
-    mPlayDoneSem.notifyAll();
-    }
-  //}}}
-
-  //{{{
-  void analyseThreadAac() {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("anal");
-
-    while (!getExit()) {
-      //{{{  open file mapping
-      auto fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-      mStreamBuf = (uint8_t*)MapViewOfFile (CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL), FILE_MAP_READ, 0, 0, 0);
-      mStreamLen = (int)GetFileSize (fileHandle, NULL);
-      //}}}
-      mFrameSet.init (mFileList->getCurFileItem().getFullName());
-
-      auto time = system_clock::now();
+    if (mFrameSet.mAac) {
+      //{{{  aac
       cAacDecoder aacDecoder;
-      unsigned streamPos = 0;
+      audOpen (2, 44100/2);
 
-      auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
-      memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
+      mPlaying = true;
+      mFrameSet.setPlayFrame (0);
 
-      auto frameNum = 0;
-      while (!getAbort() && (streamPos < mStreamLen)) {
-        unsigned char* srcPtr = (unsigned char*)(mStreamBuf + streamPos);
-        int bytesLeft = mStreamLen - streamPos;
-        int frameLen = aacDecoder.AACDecode (&srcPtr, &bytesLeft, samples);
-        if (frameLen <= 0)
-          break;
-
-        uint8_t power[kChannels];
-        makeWaveform (kSamplesPerFrame, samples, power);
-        if (mFrameSet.addFrame (streamPos, frameLen, power, mStreamLen)) {
-          auto threadHandle = thread ([=](){ playThread(); });
-          SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
-          threadHandle.detach();
-          }
-
-        streamPos += frameLen;
-        changed();
-        }
-
-      free (samples);
-
-      // report analyse time
-      auto doneTime = (float)duration_cast<milliseconds>(system_clock::now() - time).count();
-      cLog::log (LOGINFO, "last took " + dec(doneTime) + "ms");
-
-      // wait for play to end
-      mPlayDoneSem.wait();
-      //{{{  close old file mapping
-      UnmapViewOfFile (mStreamBuf);
-      CloseHandle (fileHandle);
-      //}}}
-
-      if (mChanged) // use changed fileIndex
-        mChanged = false;
-      else if (!mFileList->nextIndex())
-        break;
-      }
-
-    cLog::log (LOGINFO, "exit - frames loaded:%d calc:%d streamLen:%d",
-                        mFrameSet.getNumLoadedFrames(), mFrameSet.mNumFrames, mStreamLen);
-    CoUninitialize();
-
-    setExit();
-    }
-  //}}}
-  //{{{
-  void playThreadAac() {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("play");
-
-    auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
-    memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
-
-    cAacDecoder aacDecoder;
-
-    // int framesPerAacFrame = bitrate <= 96000 ? 2 : 1;
-
-    audOpen (kChannels, kSamplesPerSec);
-
-    mPlaying = true;
-    mFrameSet.setPlayFrame (0);
-    while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
-      if (mPlaying) {
-        auto streamPos = mFrameSet.getPlayFrameStreamPos();
-        unsigned char* srcPtr = (unsigned char*)(mStreamBuf + streamPos);
-        int bytesLeft = mStreamLen - streamPos;
-        aacDecoder.AACDecode (&srcPtr, &bytesLeft, samples);
-        if (samples) {
-          audPlay (2, samples, kSamplesPerFrame, 1.f);
-          mFrameSet.incPlayFrame (1);
-          changed();
+      while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
+        if (mPlaying) {
+          auto streamPos = mFrameSet.getPlayFrameStreamPos();
+          uint8_t* srcPtr = mStreamBuf + streamPos;
+          int bytesLeft = mStreamLen - streamPos;
+          aacDecoder.AACDecode (&srcPtr, &bytesLeft, samples);
+          if (samples) {
+            audPlay (2, samples, 1024, 1.f);
+            mFrameSet.incPlayFrame (1);
+            changed();
+            }
+          else
+            break;
           }
         else
-          break;
+          audPlay (2, nullptr, kSamplesPerFrame, 1.f);
         }
-      else
-        audPlay (2, nullptr, kSamplesPerFrame, 1.f);
+      audClose();
       }
+      //}}}
+    else {
+      //{{{  mp3
+      cMp3Decoder mp3Decoder;
+      audOpen (kChannels, kSamplesPerSec);
 
-    audClose();
+      mPlaying = true;
+      mFrameSet.setPlayFrame (0);
+      while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
+        if (mPlaying) {
+          auto streamPos = mFrameSet.getPlayFrameStreamPos();
+          mp3Decoder.decodeFrame (mStreamBuf + streamPos, mStreamLen - streamPos, samples);
+          if (samples) {
+            audPlay (2, samples, kSamplesPerFrame, 1.f);
+            mFrameSet.incPlayFrame (1);
+            changed();
+            }
+          else
+            break;
+          }
+        else
+          audPlay (2, nullptr, kSamplesPerFrame, 1.f);
+        }
+      audClose();
+      }
+      //}}}
 
     free (samples);
     CoUninitialize();
