@@ -21,25 +21,26 @@
 
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/cWinAudio.h"
+
 #include "../../shared/teensyAac/cAacDecoder.h"
 
 #include "../../shared/libfaad/neaacdec.h"
+
 extern "C" {
   #include <libavcodec/avcodec.h>
   #include <libavformat/avformat.h>
   }
 
-#pragma comment(lib,"common.lib")
-
 using namespace std;
 //}}}
 
 bool ffmpeg = true;
-bool faad = true;
+bool faad = false;
 
 int main (int argc, char *argv[]) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
+  avcodec_register_all();
 
   cLog::init (LOGINFO, false, "");
   cLog::log (LOGNOTICE, "aac test");
@@ -75,18 +76,19 @@ int main (int argc, char *argv[]) {
     avPacket.size = 0;
 
     cWinAudio audio;
-    audio.audOpen (2, 44100/2);
+    audio.audOpen (2, 44100);
 
-    auto pesPtr = streamBuf;
-    auto pesSize = streamLen;
+    auto srcPtr = streamBuf;
+    auto srcSize = streamLen;
 
     auto avFrame = av_frame_alloc();
-    while (pesSize) {
-      int startStreamPos = int(pesPtr - streamBuf);
+    while (srcSize) {
       auto bytesUsed = av_parser_parse2 (mAudParser, mAudContext, &avPacket.data, &avPacket.size,
-                                         pesPtr, (int)pesSize, 0, 0, AV_NOPTS_VALUE);
-      pesPtr += bytesUsed;
-      pesSize -= bytesUsed;
+                                         srcPtr, (int)srcSize, 0, 0, AV_NOPTS_VALUE);
+      cLog::log (LOGINFO, "av_parser_parse2 %d %d", bytesUsed, avPacket.size);
+
+      srcPtr += bytesUsed;
+      srcSize -= bytesUsed;
       if (avPacket.size) {
         auto ret = avcodec_send_packet (mAudContext, &avPacket);
         while (ret >= 0) {
@@ -94,22 +96,20 @@ int main (int argc, char *argv[]) {
           if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
             break;
 
+          cLog::log (LOGINFO, "avcodec_receive_frame %d %d", avFrame->channels, avFrame->nb_samples);
+
           //frame->set (interpolatedPts, avFrame->nb_samples*90/48, pidInfo->mPts, avFrame->channels, avFrame->nb_samples);
-          uint8_t powers[2];
           switch (mAudContext->sample_fmt) {
             case AV_SAMPLE_FMT_S16P:
               //{{{  16bit signed planar, copy planar to interleaved, calc channel power
               for (auto channel = 0; channel < avFrame->channels; channel++) {
-                float power = 0.f;
                 auto srcPtr = (short*)avFrame->data[channel];
                 auto dstPtr = (short*)(samples) + channel;
                 for (auto i = 0; i < avFrame->nb_samples; i++) {
                   auto sample = *srcPtr++;
-                  power += sample * sample;
                   *dstPtr = sample;
                   dstPtr += avFrame->channels;
                   }
-                powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples);
                 }
 
               break;
@@ -117,23 +117,20 @@ int main (int argc, char *argv[]) {
             case AV_SAMPLE_FMT_FLTP:
               //{{{  32bit float planar, copy planar channel to interleaved, calc channel power
               for (auto channel = 0; channel < avFrame->channels; channel++) {
-                float power = 0.f;
                 auto srcPtr = (float*)avFrame->data[channel];
                 auto dstPtr = (short*)(samples) + channel;
                 for (auto i = 0; i < avFrame->nb_samples; i++) {
                   auto sample = (short)(*srcPtr++ * 0x8000);
-                  power += sample * sample;
                   *dstPtr = sample;
                   dstPtr += avFrame->channels;
                   }
-                powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples);
                 }
 
               break;
               //}}}
             default:;
             }
-          audio.audPlay (2, (int16_t*)samples, 1024, 1.f);
+          audio.audPlay (avFrame->channels, (int16_t*)samples, avFrame->nb_samples, 1.f);
           }
         }
       }
@@ -147,8 +144,6 @@ int main (int argc, char *argv[]) {
     //}}}
   else if (faad) {
     //{{{  aac
-    cWinAudio audio;
-
     NeAACDecHandle hDecoder = NeAACDecOpen();
     NeAACDecFrameInfo frameInfo;
     //NeAACDecConfigurationPtr config;
@@ -159,14 +154,16 @@ int main (int argc, char *argv[]) {
 
     unsigned long samplerate = 0;
     unsigned char channels = 0;
-    auto res = NeAACDecInit (hDecoder, streamBuf, streamPos, &samplerate, &channels);
+    auto res = NeAACDecInit (hDecoder, streamBuf, bytesLeft, &samplerate, &channels);
+    cLog::log (LOGINFO, "NeAACDecInit %d %d %d", res, samplerate, channels);
 
+    cWinAudio audio;
     audio.audOpen (2, 44100/2);
 
     streamPos = 0;
     while ((bytesLeft > 0)) {
-      int startStreamPos = streamPos;
-      auto samples = NeAACDecDecode (hDecoder, &frameInfo, streamBuf, streamPos);
+      auto samples = NeAACDecDecode (hDecoder, &frameInfo, streamBuf + streamPos, bytesLeft);
+      streamPos += frameInfo.bytesconsumed;
 
       audio.audPlay (2, (int16_t*)samples, 1024, 1.f);
 

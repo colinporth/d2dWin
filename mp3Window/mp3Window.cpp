@@ -44,7 +44,7 @@ const int kPlayFrameThreshold = 40; // about a second of analyse before playing
 //}}}
 
 string fileName = "C:/Users/colin/Music/Elton John";
-bool ffmpeg = false;
+bool ffmpeg = true;
 bool faad = false;
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
@@ -641,8 +641,8 @@ private:
 
       if (ffmpeg) {
         //{{{  ffmpeg
-        auto samples = (int16_t*)malloc (1152 * 2 * 2 * 2);
-        memset (samples, 0, 1152 * 2 * 2 * 2);
+        auto samples = (int16_t*)malloc (2048 * 2 * 2);
+        memset (samples, 0, 2048 * 2 * 2);
 
         AVCodecID streamType;
         if (aac)
@@ -660,16 +660,15 @@ private:
         avPacket.data = mStreamBuf;
         avPacket.size = 0;
 
-        auto pesPtr = mStreamBuf;
-        auto pesSize = mStreamLen;
+        auto srcPtr = mStreamBuf;
+        auto srcSize = mStreamLen;
 
         auto avFrame = av_frame_alloc();
-        while (pesSize) {
-          int startStreamPos = int(pesPtr - mStreamBuf);
+        while (srcSize > 0) {
           auto bytesUsed = av_parser_parse2 (mAudParser, mAudContext, &avPacket.data, &avPacket.size,
-                                             pesPtr, (int)pesSize, 0, 0, AV_NOPTS_VALUE);
-          pesPtr += bytesUsed;
-          pesSize -= bytesUsed;
+                                             srcPtr, (int)srcSize, 0, 0, AV_NOPTS_VALUE);
+          srcPtr += bytesUsed;
+          srcSize -= bytesUsed;
           if (avPacket.size) {
             auto ret = avcodec_send_packet (mAudContext, &avPacket);
             while (ret >= 0) {
@@ -718,7 +717,7 @@ private:
                   cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
                 }
 
-              if (mFrameSet.addFrame (startStreamPos, pesSize, powers, mStreamLen)) {
+              if (mFrameSet.addFrame (uint32_t(avPacket.data-mStreamBuf), avPacket.size, powers, mStreamLen)) {
                 auto threadHandle = thread ([=](){ playThread(); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
                 threadHandle.detach();
@@ -879,10 +878,105 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("play");
 
-    auto samples = (int16_t*)malloc (kSamplesPerFrame * kChannels * kBytesPerSample);
-    memset (samples, 0, kSamplesPerFrame * kChannels * kBytesPerSample);
+    auto samples = (int16_t*)malloc (2048 * kChannels * kBytesPerSample);
+    memset (samples, 0, 2048 * kChannels * kBytesPerSample);
 
-    if (mFrameSet.mAac) {
+    if (ffmpeg) {
+      //{{{  ffmpeg
+      AVCodecID streamType;
+      if (mFrameSet.mAac)
+        streamType = AV_CODEC_ID_AAC;
+      else
+        streamType = AV_CODEC_ID_MP3;
+
+      mAudParser = av_parser_init (streamType);
+      mAudCodec = avcodec_find_decoder (streamType);
+      mAudContext = avcodec_alloc_context3 (mAudCodec);
+      avcodec_open2 (mAudContext, mAudCodec, NULL);
+
+      AVPacket avPacket;
+      av_init_packet (&avPacket);
+      avPacket.data = mStreamBuf;
+      avPacket.size = 0;
+
+      audOpen (2, 44100);
+
+      auto streamPos = mFrameSet.getPlayFrameStreamPos();
+      uint8_t* srcPtr = mStreamBuf + streamPos;
+      auto srcLen = mStreamLen;
+
+      auto avFrame = av_frame_alloc();
+      while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
+        if (mPlaying) {
+          auto bytesUsed = av_parser_parse2 (mAudParser, mAudContext, &avPacket.data, &avPacket.size,
+                                             srcPtr, (int)srcLen, 0, 0, AV_NOPTS_VALUE);
+          cLog::log (LOGINFO, "av_parser_parse2 %d %d", bytesUsed, avPacket.size);
+
+          srcPtr += bytesUsed;
+          srcLen -= bytesUsed;
+          if (avPacket.size) {
+            auto ret = avcodec_send_packet (mAudContext, &avPacket);
+            while (ret >= 0) {
+              ret = avcodec_receive_frame (mAudContext, avFrame);
+              if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
+                break;
+
+              cLog::log (LOGINFO, "avcodec_receive_frame %d %d", avFrame->channels, avFrame->nb_samples);
+
+              switch (mAudContext->sample_fmt) {
+                case AV_SAMPLE_FMT_S16P:
+                  //{{{  16bit signed planar, copy planar to interleaved, calc channel power
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    auto srcPtr = (short*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      auto sample = *srcPtr++;
+                      *dstPtr = sample;
+                      dstPtr += avFrame->channels;
+                      }
+                    }
+
+                  break;
+                  //}}}
+                case AV_SAMPLE_FMT_FLTP:
+                  //{{{  32bit float planar, copy planar channel to interleaved, calc channel power
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    auto srcPtr = (float*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      auto sample = (short)(*srcPtr++ * 0x8000);
+                      *dstPtr = sample;
+                      dstPtr += avFrame->channels;
+                      }
+                    }
+
+                  break;
+                  //}}}
+                default:
+                  cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
+                }
+
+              if (avFrame->nb_samples)
+                audPlay (avFrame->channels, samples, avFrame->nb_samples, 1.f);
+              changed();
+              }
+            }
+          }
+        else
+          audPlay (2, nullptr, 1024, 1.f);
+        }
+
+      av_frame_free (&avFrame);
+
+      if (mAudContext)
+        avcodec_close (mAudContext);
+      if (mAudParser)
+        av_parser_close (mAudParser);
+
+      audClose();
+      }
+      //}}}
+    else if (mFrameSet.mAac) {
       //{{{  aac
       cAacDecoder aacDecoder;
       audOpen (2, 44100/2);
@@ -907,6 +1001,7 @@ private:
         else
           audPlay (2, nullptr, kSamplesPerFrame, 1.f);
         }
+
       audClose();
       }
       //}}}
@@ -970,6 +1065,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO1, true);
+
+  avcodec_register_all();
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
