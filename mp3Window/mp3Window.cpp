@@ -8,6 +8,7 @@
 
 #include "../../shared/decoders/cMp3Decoder.h"
 #include "../../shared/teensyAac/cAacDecoder.h"
+#include "../../shared/libfaad/neaacdec.h"
 
 #include "../common/cJpegImage.h"
 #include "../common/cJpegImageView.h"
@@ -18,6 +19,11 @@
 #include "../boxes/cLogBox.h"
 #include "../boxes/cVolumeBox.h"
 #include "../boxes/cWindowBox.h"
+
+extern "C" {
+  #include <libavcodec/avcodec.h>
+  #include <libavformat/avformat.h>
+  }
 
 using namespace std;
 using namespace chrono;
@@ -38,6 +44,8 @@ const int kPlayFrameThreshold = 40; // about a second of analyse before playing
 //}}}
 
 string fileName = "C:/Users/colin/Music/Elton John";
+bool ffmpeg = false;
+bool faad = false;
 
 class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
@@ -621,17 +629,150 @@ private:
     cLog::setThreadName ("anal");
 
     while (!getExit()) {
-      bool aac = mFileList->getCurFileItem().getExtension() == "aac";
       //{{{  open file mapping
       auto fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
       mStreamBuf = (uint8_t*)MapViewOfFile (CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL), FILE_MAP_READ, 0, 0, 0);
       mStreamLen = (int)GetFileSize (fileHandle, NULL);
       //}}}
+      bool aac = mFileList->getCurFileItem().getExtension() == "aac";
 
       mFrameSet.init (mFileList->getCurFileItem().getFullName(), aac);
       auto time = system_clock::now();
 
-      if (aac) {
+      if (ffmpeg) {
+        //{{{  ffmpeg
+        auto samples = (int16_t*)malloc (1152 * 2 * 2 * 2);
+        memset (samples, 0, 1152 * 2 * 2 * 2);
+
+        AVCodecID streamType;
+        if (aac)
+          streamType = AV_CODEC_ID_AAC;
+        else
+          streamType = AV_CODEC_ID_MP3;
+
+        mAudParser = av_parser_init (streamType);
+        mAudCodec = avcodec_find_decoder (streamType);
+        mAudContext = avcodec_alloc_context3 (mAudCodec);
+        avcodec_open2 (mAudContext, mAudCodec, NULL);
+
+        AVPacket avPacket;
+        av_init_packet (&avPacket);
+        avPacket.data = mStreamBuf;
+        avPacket.size = 0;
+
+        auto pesPtr = mStreamBuf;
+        auto pesSize = mStreamLen;
+
+        auto avFrame = av_frame_alloc();
+        while (pesSize) {
+          int startStreamPos = int(pesPtr - mStreamBuf);
+          auto bytesUsed = av_parser_parse2 (mAudParser, mAudContext, &avPacket.data, &avPacket.size,
+                                             pesPtr, (int)pesSize, 0, 0, AV_NOPTS_VALUE);
+          pesPtr += bytesUsed;
+          pesSize -= bytesUsed;
+          if (avPacket.size) {
+            auto ret = avcodec_send_packet (mAudContext, &avPacket);
+            while (ret >= 0) {
+              ret = avcodec_receive_frame (mAudContext, avFrame);
+              if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
+                break;
+
+              //frame->set (interpolatedPts, avFrame->nb_samples*90/48, pidInfo->mPts, avFrame->channels, avFrame->nb_samples);
+              uint8_t powers[kChannels];
+              switch (mAudContext->sample_fmt) {
+                case AV_SAMPLE_FMT_S16P:
+                  //{{{  16bit signed planar, copy planar to interleaved, calc channel power
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    float power = 0.f;
+                    auto srcPtr = (short*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      auto sample = *srcPtr++;
+                      power += sample * sample;
+                      *dstPtr = sample;
+                      dstPtr += avFrame->channels;
+                      }
+                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples);
+                    }
+
+                  break;
+                  //}}}
+                case AV_SAMPLE_FMT_FLTP:
+                  //{{{  32bit float planar, copy planar channel to interleaved, calc channel power
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    float power = 0.f;
+                    auto srcPtr = (float*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      auto sample = (short)(*srcPtr++ * 0x8000);
+                      power += sample * sample;
+                      *dstPtr = sample;
+                      dstPtr += avFrame->channels;
+                      }
+                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples);
+                    }
+
+                  break;
+                  //}}}
+                default:
+                  cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
+                }
+
+              if (mFrameSet.addFrame (startStreamPos, pesSize, powers, mStreamLen)) {
+                auto threadHandle = thread ([=](){ playThread(); });
+                SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
+                threadHandle.detach();
+                }
+              changed();
+              }
+            }
+          }
+        av_frame_free (&avFrame);
+
+        if (mAudContext)
+          avcodec_close (mAudContext);
+        if (mAudParser)
+          av_parser_close (mAudParser);
+
+        free (samples);
+        }
+        //}}}
+      else if (faad) {
+        //{{{  aac
+        NeAACDecHandle hDecoder = NeAACDecOpen();
+        NeAACDecFrameInfo frameInfo;
+        //NeAACDecConfigurationPtr config;
+
+        unsigned streamPos = 0;
+        uint8_t* srcPtr = mStreamBuf;
+        unsigned long bytesLeft = mStreamLen;
+
+        unsigned long samplerate = 0;
+        unsigned char channels = 0;
+        auto res = NeAACDecInit (hDecoder, mStreamBuf, streamPos, &samplerate, &channels);
+
+        streamPos = 0;
+        while (!getAbort() && (bytesLeft > 0)) {
+          int startStreamPos = streamPos;
+          auto samples = NeAACDecDecode (hDecoder, &frameInfo, mStreamBuf, streamPos);
+
+          uint8_t power[kChannels];
+          makeWaveform (1024, (int16_t*)samples, power);
+          if (mFrameSet.addFrame (startStreamPos, bytesLeft, power, mStreamLen)) {
+            auto threadHandle = thread ([=](){ playThread(); });
+            SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
+            threadHandle.detach();
+            }
+          changed();
+
+          if (samples)
+            free (samples);
+          }
+
+        NeAACDecClose (hDecoder);
+        }
+        //}}}
+      else if (aac) {
         //{{{  aac
         cAacDecoder aacDecoder;
 
@@ -817,6 +958,10 @@ private:
 
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;
+
+  AVCodec* mAudCodec = nullptr;
+  AVCodecContext* mAudContext = nullptr;
+  AVCodecParserContext* mAudParser = nullptr;
   //}}}
   };
 
