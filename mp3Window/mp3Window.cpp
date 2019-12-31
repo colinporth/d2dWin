@@ -58,7 +58,7 @@ public:
     add (new cAudFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
     add (new cAudFrameSetTimeBox (this, 600.f,50.f, mFrameSet), -600.f,-50.f);
 
-    mFileList = new cFileList (fileName, "*.aac,*.mp3");
+    mFileList = new cFileList (fileName, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
     add (new cAppFileListBox (this, 0.f,-220.f, mFileList));
 
