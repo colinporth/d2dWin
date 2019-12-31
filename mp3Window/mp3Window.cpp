@@ -2,7 +2,7 @@
 //{{{  includes
 #include "stdafx.h"
 
-//#include "../../shared/utils/resolve.h"
+#include "../../shared/utils/resolve.h"
 #include "../../shared/utils/cFileList.h"
 #include "../../shared/utils/cWinAudio.h"
 
@@ -40,7 +40,13 @@ class cAppWindow : public cD2dWindow, public cWinAudio {
 public:
   cAppWindow() : mPlayDoneSem("playDone") {}
   //{{{
-  void run (const string& title, int width, int height, const string& fileName) {
+  void run (const string& title, int width, int height, string fileName) {
+
+    if (fileName.find (".lnk") <= fileName.size()) {
+      string fullName;
+      if (resolveShortcut (fileName.c_str(), fullName))
+        fileName = fullName;
+      }
 
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f)->setPin (false);
@@ -48,9 +54,9 @@ public:
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
 
     mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-220.f, false, false, mFrameSet.mImage));
-    add (new cFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
-    add (new cFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
-    add (new cFrameSetTimeBox (this, 600.f,50.f, mFrameSet), -600.f,-50.f);
+    add (new cAudFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
+    add (new cAudFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
+    add (new cAudFrameSetTimeBox (this, 600.f,50.f, mFrameSet), -600.f,-50.f);
 
     mFileList = new cFileList (fileName, "*.aac,*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -103,10 +109,10 @@ protected:
 
 private:
   //{{{
-  class cFrame {
+  class cAudFrame {
   public:
     //{{{
-    cFrame (uint32_t streamPos, uint32_t len, uint8_t values[kMaxChannels]) :
+    cAudFrame (uint32_t streamPos, uint32_t len, uint8_t values[kMaxChannels]) :
         mStreamPos(streamPos), mLen(len) {
 
       for (auto i = 0; i < kMaxChannels; i++)
@@ -128,10 +134,10 @@ private:
     };
   //}}}
   //{{{
-  class cFrameSet {
+  class cAudFrameSet {
   public:
     //{{{
-    virtual ~cFrameSet() {
+    virtual ~cAudFrameSet() {
       mFrames.clear();
       }
     //}}}
@@ -156,7 +162,7 @@ private:
     bool addFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels], uint32_t streamLen) {
     // return true if enough frames added to start playing
 
-      mFrames.push_back (cFrame (streamPos, frameLen, values));
+      mFrames.push_back (cAudFrame (streamPos, frameLen, values));
 
       mMaxValue = max (mMaxValue, values[0]);
       mMaxValue = max (mMaxValue, values[1]);
@@ -225,7 +231,7 @@ private:
     string mFileName;
     string mPathName;
 
-    concurrent_vector<cFrame> mFrames;
+    concurrent_vector<cAudFrame> mFrames;
 
     int mPlayFrame = 0;
     int mNumFrames = 0;
@@ -267,15 +273,15 @@ private:
   //}}}
 
   //{{{
-  class cFrameSetBox : public cBox {
+  class cAudFrameSetBox : public cBox {
   public:
     //{{{
-    cFrameSetBox (cD2dWindow* window, float width, float height, cFrameSet& frameSet) :
+    cAudFrameSetBox (cD2dWindow* window, float width, float height, cAudFrameSet& frameSet) :
         cBox ("frameSet", window, width, height), mFrameSet(frameSet) {
       mPin = true;
       }
     //}}}
-    virtual ~cFrameSetBox() {}
+    virtual ~cAudFrameSetBox() {}
 
     //{{{
     bool onWheel (int delta, cPoint pos)  {
@@ -345,19 +351,92 @@ private:
       }
     //}}}
 
-    cFrameSet& mFrameSet;
+    cAudFrameSet& mFrameSet;
     int mZoom = 1;
     };
   //}}}
   //{{{
-  class cFrameSetLensBox : public cFrameSetBox {
+  class cAudFrameSetTimeBox : public cBox {
   public:
     //{{{
-    cFrameSetLensBox (cD2dWindow* window, float width, float height, cFrameSet& frameSet)
-      : cFrameSetBox (window, width, height, frameSet) {}
+    cAudFrameSetTimeBox (cAppWindow* window, float width, float height, cAudFrameSet& frameSet) :
+        cBox("frameSetTime", window, width, height), mFrameSet(frameSet) {
+
+      mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
+        DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
+        &mTextFormat);
+      mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+
+      mPin = true;
+      }
     //}}}
     //{{{
-    virtual ~cFrameSetLensBox() {
+    virtual ~cAudFrameSetTimeBox() {
+      mTextFormat->Release();
+      }
+    //}}}
+
+    //{{{
+    bool onDown (bool right, cPoint pos)  {
+
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+      appWindow->mPlaying = !appWindow->mPlaying;
+      return true;
+      }
+    //}}}
+    //{{{
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      string str = getFrameStr (mFrameSet.mPlayFrame) + " " + getFrameStr (mFrameSet.mNumFrames);
+
+      IDWriteTextLayout* textLayout;
+      mWindow->getDwriteFactory()->CreateTextLayout (
+        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+        mTextFormat, getWidth(), getHeight(), &textLayout);
+
+      dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+
+      textLayout->Release();
+      }
+    //}}}
+
+  private:
+    //{{{
+    string getFrameStr (uint32_t frame) {
+
+      uint32_t frameHs = frame * mFrameSet.mSamplesPerFrame / (mFrameSet.mSamplesPerSec / 100);
+
+      uint32_t hs = frameHs % 100;
+
+      frameHs /= 100;
+      uint32_t secs = frameHs % 60;
+
+      frameHs /= 60;
+      uint32_t mins = frameHs % 60;
+
+      frameHs /= 60;
+      uint32_t hours = frameHs % 60;
+
+      string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
+      return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
+      }
+    //}}}
+
+    cAudFrameSet& mFrameSet;
+
+    IDWriteTextFormat* mTextFormat = nullptr;
+    };
+  //}}}
+  //{{{
+  class cAudFrameSetLensBox : public cAudFrameSetBox {
+  public:
+    //{{{
+    cAudFrameSetLensBox (cD2dWindow* window, float width, float height, cAudFrameSet& frameSet)
+      : cAudFrameSetBox (window, width, height, frameSet) {}
+    //}}}
+    //{{{
+    virtual ~cAudFrameSetLensBox() {
       bigFree (mSummedValues);
       }
     //}}}
@@ -365,7 +444,7 @@ private:
     //{{{
     void layout() {
       mSummedFrame = -1;
-      cFrameSetBox::layout();
+      cAudFrameSetBox::layout();
       }
     //}}}
     //{{{
@@ -386,7 +465,7 @@ private:
     //{{{
     bool onUp (bool right, bool mouseMoved, cPoint pos) {
       mOn = false;
-      return cFrameSetBox::onUp (right, mouseMoved, pos);
+      return cAudFrameSetBox::onUp (right, mouseMoved, pos);
       }
     //}}}
     //{{{
@@ -422,7 +501,7 @@ private:
       else
         draw (dc, rightLensX, getWidthInt());
 
-      cFrameSetBox::draw (dc, mFrameSet.mPlayFrame - mLens, mFrameSet.mPlayFrame + mLens, leftLensX, 1);
+      cAudFrameSetBox::draw (dc, mFrameSet.mPlayFrame - mLens, mFrameSet.mPlayFrame + mLens, leftLensX, 1);
 
       dc->DrawRectangle (cRect(mRect.left + leftLensX, mRect.top + 1.f,
                                mRect.left + rightLensX, mRect.top + getHeight() - 1.f),
@@ -519,79 +598,7 @@ private:
     int mLens = 0;
     };
   //}}}
-  //{{{
-  class cFrameSetTimeBox : public cBox {
-  public:
-    //{{{
-    cFrameSetTimeBox (cAppWindow* window, float width, float height, cFrameSet& frameSet) :
-        cBox("frameSetTime", window, width, height), mFrameSet(frameSet) {
 
-      mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-        DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
-        &mTextFormat);
-      mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
-
-      mPin = true;
-      }
-    //}}}
-    //{{{
-    virtual ~cFrameSetTimeBox() {
-      mTextFormat->Release();
-      }
-    //}}}
-
-    //{{{
-    bool onDown (bool right, cPoint pos)  {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      appWindow->mPlaying = !appWindow->mPlaying;
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      string str = getFrameStr (mFrameSet.mPlayFrame) + " " + getFrameStr (mFrameSet.mNumFrames);
-
-      IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (
-        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-        mTextFormat, getWidth(), getHeight(), &textLayout);
-
-      dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
-      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-
-      textLayout->Release();
-      }
-    //}}}
-
-  private:
-    //{{{
-    string getFrameStr (uint32_t frame) {
-
-      uint32_t frameHs = frame * mFrameSet.mSamplesPerFrame / (mFrameSet.mSamplesPerSec / 100);
-
-      uint32_t hs = frameHs % 100;
-
-      frameHs /= 100;
-      uint32_t secs = frameHs % 60;
-
-      frameHs /= 60;
-      uint32_t mins = frameHs % 60;
-
-      frameHs /= 60;
-      uint32_t hours = frameHs % 60;
-
-      string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
-      return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
-      }
-    //}}}
-
-    cFrameSet& mFrameSet;
-
-    IDWriteTextFormat* mTextFormat = nullptr;
-    };
-  //}}}
   //{{{
   class cAppFileListBox : public cFileListBox {
   public:
@@ -607,6 +614,83 @@ private:
   bool getAbort() { return getExit() || mChanged; }
 
   //{{{
+  void parseAdts (uint8_t* buf, int bufLen) {
+  // start of aac adts parser
+
+    const int sampleRates[16] = { 96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350, 0,0,0};
+
+    int frames = 0;
+    int sampleRate = 0;
+    int lostSync = 0;
+
+    auto ptr = buf;
+    while (bufLen > 0) {
+      if ((ptr[0] == 0xFF) && ((ptr[1] & 0xF6) == 0xF0)) {
+        // syncWord found
+        sampleRate = sampleRates [(ptr[2] & 0x3c) >> 2];
+        auto frameLength = (((unsigned int)ptr[3] & 0x3) << 11) | (((unsigned int)ptr[4]) << 3) | (ptr[5] >> 5);
+
+        frames++;
+        ptr += frameLength;
+        bufLen -= frameLength;
+        }
+      else {
+        lostSync++;
+        ptr++;
+        bufLen--;
+        }
+      }
+
+    cLog::log (LOGINFO, "parseAdts frames:%d sampleRate:%d lostSync:%d", frames, sampleRate, lostSync);
+    }
+  //}}}
+  //{{{
+  uint8_t* findId3JpegTag (uint8_t* buf, int bufLen, int& jpegLen) {
+  // check for ID3 tag
+
+    auto ptr = buf;
+    auto tag = ((*ptr)<<24) | (*(ptr+1)<<16) | (*(ptr+2)<<8) | *(ptr+3);
+
+    if (tag == 0x49443303)  {
+      // got ID3 tag
+      auto tagSize = (*(ptr+6)<<21) | (*(ptr+7)<<14) | (*(ptr+8)<<7) | *(ptr+9);
+      cLog::log (LOGINFO, "findId3JpegTag - %c%c%c ver:%d %02x flags:%02x tagSize:%d",
+                           *ptr, *(ptr+1), *(ptr+2), *(ptr+3), *(ptr+4), *(ptr+5), tagSize);
+      ptr += 10;
+
+      while (ptr < buf + tagSize) {
+        auto tag = ((*ptr)<<24) | (*(ptr+1)<<16) | (*(ptr+2)<<8) | *(ptr+3);
+        auto frameSize = (*(ptr+4)<<24) | (*(ptr+5)<<16) | (*(ptr+6)<<8) | (*(ptr+7));
+        if (!frameSize)
+          break;
+
+        auto frameFlags1 = *(ptr+8);
+        auto frameFlags2 = *(ptr+9);
+        cLog::log (LOGINFO, "findId3JpegTag - %c%c%c%c - %02x %02x - frameSize:%d",
+                             *ptr, *(ptr+1), *(ptr+2), *(ptr+3), frameFlags1, frameFlags2, frameSize);
+        //for (auto i = 0; i < (tag == 0x41504943 ? 11 : frameSize); i++)
+        //  printf ("%c", *(ptr+10+i));
+        //printf ("\n");
+        //for (auto i = 0; i < (frameSize < 32 ? frameSize : 32); i++)
+        //  printf ("%02x ", *(ptr+10+i));
+        //printf ("\n");
+
+        if (tag == 0x41504943) {
+          cLog::log (LOGINFO3, "cMp3decoder - jpeg tag found");
+          jpegLen = frameSize - 14;
+          auto jpegBuf =  (uint8_t*)malloc (jpegLen);
+          memcpy (jpegBuf, ptr + 10 + 14, jpegLen);
+          return jpegBuf;
+          }
+        ptr += frameSize + 10;
+        }
+      }
+
+    return nullptr;
+    }
+  //}}}
+
+  //{{{
   void analyseThread() {
 
     cLog::setThreadName ("anal");
@@ -618,15 +702,35 @@ private:
       mStreamLen = (int)GetFileSize (fileHandle, NULL);
       //}}}
       bool aac = mFileList->getCurFileItem().getExtension() == "aac";
-
       mFrameSet.init (mFileList->getCurFileItem().getFullName(), aac, aac ? 2048 : 1152);
+
+      int jpegLen;
+      auto jpegBuf = findId3JpegTag (mStreamBuf, mStreamLen, jpegLen);
+      if (jpegBuf) {
+        //{{{  load jpeg
+        cLog::log (LOGINFO2, "found jpeg tag");
+
+        // delete old
+        auto temp = mFrameSet.mImage;
+        mFrameSet.mImage = nullptr;
+        delete temp;
+
+        // create new
+        mFrameSet.mImage = new cJpegImage();
+        mFrameSet.mImage->setBuf (jpegBuf, jpegLen);
+        mJpegImageView->setImage (mFrameSet.mImage);
+        }
+        //}}}
+      if (aac)
+        parseAdts (mStreamBuf, mStreamLen);
+
       auto time = system_clock::now();
 
       AVCodecID streamType = aac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3;
-      auto audParser = av_parser_init (streamType);
-      auto audCodec = avcodec_find_decoder (streamType);
-      auto audContext = avcodec_alloc_context3 (audCodec);
-      avcodec_open2 (audContext, audCodec, NULL);
+      auto parser = av_parser_init (streamType);
+      auto codec = avcodec_find_decoder (streamType);
+      auto context = avcodec_alloc_context3 (codec);
+      avcodec_open2 (context, codec, NULL);
 
       AVPacket avPacket;
       av_init_packet (&avPacket);
@@ -637,16 +741,17 @@ private:
       auto streamPtr = mStreamBuf;
       auto bytesLeft = mStreamLen;
       while (bytesLeft > 0) {
-        auto bytesUsed = av_parser_parse2 (audParser, audContext, &avPacket.data, &avPacket.size,
-                                           streamPtr, bytesLeft, 0, 0, AV_NOPTS_VALUE);
+        // parse stream into packets
+        auto bytesUsed = av_parser_parse2 (parser, context, &avPacket.data, &avPacket.size, streamPtr, bytesLeft, 0, 0, AV_NOPTS_VALUE);
         streamPtr += bytesUsed;
         bytesLeft -= bytesUsed;
 
-        if (avPacket.size) {
-          auto ret = avcodec_send_packet (audContext, &avPacket);
+        if (avPacket.size > 0) {
+          // parse packet into audFrames
+          auto ret = avcodec_send_packet (context, &avPacket);
           while (ret >= 0) {
-            // possible multiple frames per packet
-            ret = avcodec_receive_frame (audContext, avFrame);
+            // possible multiple frames per packet ?
+            ret = avcodec_receive_frame (context, avFrame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
               break;
 
@@ -654,7 +759,7 @@ private:
             //{{{  calc power for each channel
             int decimate = 2;
 
-            switch (audContext->sample_fmt) {
+            switch (context->sample_fmt) {
               case AV_SAMPLE_FMT_S16P:
                 // 16bit signed planar, copy planar to interleaved, calc channel power
                 for (auto channel = 0; channel < avFrame->channels; channel++) {
@@ -684,7 +789,7 @@ private:
                 break;
 
               default:
-                cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (audContext->sample_fmt));
+                cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
               }
             //}}}
             if (mFrameSet.addFrame (uint32_t(avPacket.data - mStreamBuf), avPacket.size, powers, mStreamLen)) {
@@ -701,18 +806,18 @@ private:
       free (samples);
       av_frame_free (&avFrame);
 
-      if (audContext)
-        avcodec_close (audContext);
-      if (audParser)
-        av_parser_close (audParser);
+      if (context)
+        avcodec_close (context);
+      if (parser)
+        av_parser_close (parser);
 
       // report analyse time
       auto doneTime = (float)duration_cast<milliseconds>(system_clock::now() - time).count();
       cLog::log (LOGINFO, "last took " + dec(doneTime) + "ms");
 
-      // wait for play to end
+      // wait for play to end or abort
       mPlayDoneSem.wait();
-      //{{{  close old file mapping
+      //{{{  close file mapping
       UnmapViewOfFile (mStreamBuf);
       CloseHandle (fileHandle);
       //}}}
@@ -731,7 +836,6 @@ private:
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("play");
-
 
     AVCodecID streamType = mFrameSet.mAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3;
     auto audParser = av_parser_init (streamType);
@@ -753,17 +857,18 @@ private:
         uint8_t* streamPtr = mStreamBuf + streamPos;
         int bytesLeft = mStreamLen - streamPos;
 
+        // parse stream into packets
         auto bytesUsed = av_parser_parse2 (audParser, audContext, &avPacket.data, &avPacket.size,
                                            streamPtr, bytesLeft, 0, 0, AV_NOPTS_VALUE);
-
-        if (avPacket.size) {
+        if (avPacket.size > 0) {
+          // parse packet into audFrames
           auto ret = avcodec_send_packet (audContext, &avPacket);
           while (ret >= 0) {
             ret = avcodec_receive_frame (audContext, avFrame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
               break;
 
-            if (avFrame->nb_samples) {
+            if (avFrame->nb_samples > 0) {
               switch (audContext->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
                   //{{{  16bit signed planar, copy planar to interleaved, calc channel power
@@ -776,7 +881,6 @@ private:
                       dstPtr += avFrame->channels;
                       }
                     }
-
                   break;
                   //}}}
                 case AV_SAMPLE_FMT_FLTP:
@@ -790,13 +894,11 @@ private:
                       dstPtr += avFrame->channels;
                       }
                     }
-
                   break;
                   //}}}
                 default:
                   cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (audContext->sample_fmt));
                 }
-
               audPlay (avFrame->channels, samples, avFrame->nb_samples, 1.f);
               mFrameSet.incPlayFrame (1);
               changed();
@@ -826,20 +928,17 @@ private:
     }
   //}}}
 
-  //{{{  vars
+  //  vars
   cFileList* mFileList;
-  cFrameSet mFrameSet;
+  cAudFrameSet mFrameSet;
 
+  uint8_t* mStreamBuf = nullptr;
+  uint32_t mStreamLen = 0;
   cJpegImageView* mJpegImageView = nullptr;
 
   bool mChanged = false;
   bool mPlaying = true;
-
-  uint8_t* mStreamBuf = nullptr;
-  uint32_t mStreamLen = 0;
-
   cSemaphore mPlayDoneSem;
-  //}}}
   };
 
 //{{{

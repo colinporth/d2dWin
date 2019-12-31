@@ -34,8 +34,9 @@ extern "C" {
 using namespace std;
 //}}}
 
-bool ffmpeg = true;
-bool faad = false;
+#define FFMPEG
+//#define FAAD
+//#define TEENSY
 
 int main (int argc, char *argv[]) {
 
@@ -53,9 +54,9 @@ int main (int argc, char *argv[]) {
   auto streamLen = (int)GetFileSize (fileHandle, NULL);
 
   auto samples = (int16_t*)malloc (2048 * 2 * 2);
-  memset (samples, 0, 1024 * 2 * 2);
+  memset (samples, 0, 2048 * 2 * 2);
 
-  if (ffmpeg) {
+  #ifdef FFMPEG
     //{{{  ffmpeg
     AVCodecID streamType;
 
@@ -140,9 +141,10 @@ int main (int argc, char *argv[]) {
       avcodec_close (mAudContext);
     if (mAudParser)
       av_parser_close (mAudParser);
-    }
     //}}}
-  else if (faad) {
+  #endif
+
+  #ifdef FAAD
     //{{{  aac
     NeAACDecHandle hDecoder = NeAACDecOpen();
     NeAACDecFrameInfo frameInfo;
@@ -174,9 +176,10 @@ int main (int argc, char *argv[]) {
     NeAACDecClose (hDecoder);
 
     audio.audClose();
-    }
     //}}}
-  else {
+  #endif
+
+  #ifdef TEENS
     //{{{  teensy
     // int framesPerAacFrame = bitrate <= 96000 ? 2 : 1;
     cAacDecoder aacDecoder;
@@ -197,8 +200,8 @@ int main (int argc, char *argv[]) {
       }
 
     audio.audClose();
-    }
     //}}}
+  #endif
 
   free (samples);
 
