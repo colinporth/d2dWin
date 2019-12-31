@@ -643,25 +643,25 @@ private:
   // check for ID3 tag
 
     auto ptr = buf;
-    auto tag = ((*ptr)<<24) | (*(ptr+1)<<16) | (*(ptr+2)<<8) | *(ptr+3);
+    auto tag = (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
 
     if (tag == 0x49443303)  {
       // got ID3 tag
-      auto tagSize = (*(ptr+6)<<21) | (*(ptr+7)<<14) | (*(ptr+8)<<7) | *(ptr+9);
+      auto tagSize = (ptr[6] << 21) | (ptr[7] << 14) | (ptr[8] << 7) | ptr[9];
       cLog::log (LOGINFO, "findId3JpegTag - %c%c%c ver:%d %02x flags:%02x tagSize:%d",
-                           *ptr, *(ptr+1), *(ptr+2), *(ptr+3), *(ptr+4), *(ptr+5), tagSize);
+                           ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5], tagSize);
       ptr += 10;
 
       while (ptr < buf + tagSize) {
-        auto tag = ((*ptr)<<24) | (*(ptr+1)<<16) | (*(ptr+2)<<8) | *(ptr+3);
-        auto frameSize = (*(ptr+4)<<24) | (*(ptr+5)<<16) | (*(ptr+6)<<8) | (*(ptr+7));
+        auto tag = (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
+        auto frameSize = (ptr[4] << 24) | (ptr[5] << 16) | (ptr[6] << 8) | ptr[7];
         if (!frameSize)
           break;
 
-        auto frameFlags1 = *(ptr+8);
-        auto frameFlags2 = *(ptr+9);
+        auto frameFlags1 = ptr[8];
+        auto frameFlags2 = ptr[9];
         cLog::log (LOGINFO, "findId3JpegTag - %c%c%c%c - %02x %02x - frameSize:%d",
-                             *ptr, *(ptr+1), *(ptr+2), *(ptr+3), frameFlags1, frameFlags2, frameSize);
+                             ptr[0], ptr[1], ptr[2], ptr[3], frameFlags1, frameFlags2, frameSize);
         //for (auto i = 0; i < (tag == 0x41504943 ? 11 : frameSize); i++)
         //  printf ("%c", *(ptr+10+i));
         //printf ("\n");
