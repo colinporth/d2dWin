@@ -111,23 +111,17 @@ private:
   //{{{
   class cAudFrame {
   public:
-    //{{{
-    cAudFrame (uint32_t streamPos, uint32_t len, uint8_t values[kMaxChannels]) :
-        mStreamPos(streamPos), mLen(len) {
-
+    cAudFrame (uint32_t streamPos, uint8_t values[kMaxChannels]) : mStreamPos(streamPos) {
       for (auto i = 0; i < kMaxChannels; i++)
         mValues[i] = values[i];
-
       mSilent = isSilentThreshold();
       }
-    //}}}
 
     bool isSilent() { return mSilent; }
     bool isSilentThreshold() { return mValues[0] + mValues[1] <= kSilentThreshold; }
 
     // vars
     uint32_t mStreamPos;
-    uint32_t mLen;
 
     uint8_t mValues[kMaxChannels];
     bool mSilent;
@@ -162,7 +156,7 @@ private:
     bool addFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels], uint32_t streamLen) {
     // return true if enough frames added to start playing
 
-      mFrames.push_back (cAudFrame (streamPos, frameLen, values));
+      mFrames.push_back (cAudFrame (streamPos, values));
 
       mMaxValue = max (mMaxValue, values[0]);
       mMaxValue = max (mMaxValue, values[1]);
