@@ -350,79 +350,6 @@ private:
     };
   //}}}
   //{{{
-  class cSongTimeBox : public cBox {
-  public:
-    //{{{
-    cSongTimeBox (cAppWindow* window, float width, float height, cSong& frameSet) :
-        cBox("frameSetTime", window, width, height), mSong(frameSet) {
-
-      mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-        DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
-        &mTextFormat);
-      mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
-
-      mPin = true;
-      }
-    //}}}
-    //{{{
-    virtual ~cSongTimeBox() {
-      mTextFormat->Release();
-      }
-    //}}}
-
-    //{{{
-    bool onDown (bool right, cPoint pos)  {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      appWindow->mPlaying = !appWindow->mPlaying;
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      string str = getFrameStr (mSong.mPlayFrame) + " " + getFrameStr (mSong.mNumFrames);
-
-      IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (
-        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-        mTextFormat, getWidth(), getHeight(), &textLayout);
-
-      dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
-      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-
-      textLayout->Release();
-      }
-    //}}}
-
-  private:
-    //{{{
-    string getFrameStr (uint32_t frame) {
-
-      uint32_t frameHs = frame * mSong.mSamplesPerFrame / (mSong.mSamplesPerSec / 100);
-
-      uint32_t hs = frameHs % 100;
-
-      frameHs /= 100;
-      uint32_t secs = frameHs % 60;
-
-      frameHs /= 60;
-      uint32_t mins = frameHs % 60;
-
-      frameHs /= 60;
-      uint32_t hours = frameHs % 60;
-
-      string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
-      return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
-      }
-    //}}}
-
-    cSong& mSong;
-
-    IDWriteTextFormat* mTextFormat = nullptr;
-    };
-  //}}}
-  //{{{
   class cSongLensBox : public cSongBox {
   public:
     //{{{
@@ -590,6 +517,79 @@ private:
 
     bool mOn = false;
     int mLens = 0;
+    };
+  //}}}
+  //{{{
+  class cSongTimeBox : public cBox {
+  public:
+    //{{{
+    cSongTimeBox (cAppWindow* window, float width, float height, cSong& frameSet) :
+        cBox("frameSetTime", window, width, height), mSong(frameSet) {
+
+      mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
+        DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
+        &mTextFormat);
+      mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+
+      mPin = true;
+      }
+    //}}}
+    //{{{
+    virtual ~cSongTimeBox() {
+      mTextFormat->Release();
+      }
+    //}}}
+
+    //{{{
+    bool onDown (bool right, cPoint pos)  {
+
+      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
+      appWindow->mPlaying = !appWindow->mPlaying;
+      return true;
+      }
+    //}}}
+    //{{{
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      string str = getFrameStr (mSong.mPlayFrame) + " " + getFrameStr (mSong.mNumFrames);
+
+      IDWriteTextLayout* textLayout;
+      mWindow->getDwriteFactory()->CreateTextLayout (
+        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+        mTextFormat, getWidth(), getHeight(), &textLayout);
+
+      dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+
+      textLayout->Release();
+      }
+    //}}}
+
+  private:
+    //{{{
+    string getFrameStr (uint32_t frame) {
+
+      uint32_t frameHs = frame * mSong.mSamplesPerFrame / (mSong.mSamplesPerSec / 100);
+
+      uint32_t hs = frameHs % 100;
+
+      frameHs /= 100;
+      uint32_t secs = frameHs % 60;
+
+      frameHs /= 60;
+      uint32_t mins = frameHs % 60;
+
+      frameHs /= 60;
+      uint32_t hours = frameHs % 60;
+
+      string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
+      return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
+      }
+    //}}}
+
+    cSong& mSong;
+
+    IDWriteTextFormat* mTextFormat = nullptr;
     };
   //}}}
 
