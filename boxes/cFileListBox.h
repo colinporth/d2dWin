@@ -105,6 +105,13 @@ public:
   //}}}
 
   //{{{
+  bool onWheel (int delta, cPoint pos)  {
+    if (mWindow->getTimedMenuOn()) 
+      incScroll (-delta / 30.f);
+    return true;
+    }
+  //}}}
+  //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
     if (mWindow->getTimedMenuOn()) {
