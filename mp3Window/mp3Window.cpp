@@ -673,17 +673,20 @@ private:
 
               uint8_t powers[kChannels];
               //{{{  calc power for each channel
+              int decimate = 2;
+
               switch (audContext->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
                   // 16bit signed planar, copy planar to interleaved, calc channel power
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
                     float power = 0.f;
                     auto srcPtr = (short*)avFrame->data[channel];
-                    for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = *srcPtr++;
+                    for (auto i = 0; i < avFrame->nb_samples; i += decimate) {
+                      auto sample = *srcPtr;
                       power += sample * sample;
+                      srcPtr += decimate;
                       }
-                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples);
+                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples/decimate);
                     }
                   break;
 
@@ -692,16 +695,17 @@ private:
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
                     float power = 0.f;
                     auto srcPtr = (float*)avFrame->data[channel];
-                    for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = (short)(*srcPtr++ * 0x8000);
+                    for (auto i = 0; i < avFrame->nb_samples; i += decimate) {
+                      auto sample = (short)(*srcPtr * 0x8000);
                       power += sample * sample;
+                      srcPtr += decimate;
                       }
-                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples);
+                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples/decimate);
                     }
                   break;
 
                 default:
-                  cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (audContext->sample_fmt));
+                  cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (audContext->sample_fmt));
                 }
               //}}}
 
