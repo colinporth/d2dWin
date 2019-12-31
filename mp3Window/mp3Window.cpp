@@ -2,19 +2,19 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "../../shared/utils/resolve.h"
+//#include "../../shared/utils/resolve.h"
 #include "../../shared/utils/cFileList.h"
 #include "../../shared/utils/cWinAudio.h"
 
 #include "../common/cJpegImage.h"
 #include "../common/cJpegImageView.h"
 
+#include "../boxes/cLogBox.h"
+#include "../boxes/cFileListBox.h"
+#include "../boxes/cWindowBox.h"
+#include "../boxes/cVolumeBox.h"
 #include "../boxes/cCalendarBox.h"
 #include "../boxes/cClockBox.h"
-#include "../boxes/cFileListBox.h"
-#include "../boxes/cLogBox.h"
-#include "../boxes/cVolumeBox.h"
-#include "../boxes/cWindowBox.h"
 
 extern "C" {
   #include <libavcodec/avcodec.h>
@@ -609,7 +609,6 @@ private:
   //{{{
   void analyseThread() {
 
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("anal");
 
     while (!getExit()) {
@@ -688,12 +687,13 @@ private:
                 cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (audContext->sample_fmt));
               }
             //}}}
-
             if (mFrameSet.addFrame (uint32_t(avPacket.data - mStreamBuf), avPacket.size, powers, mStreamLen)) {
+              //{{{  launch playThread
               auto threadHandle = thread ([=](){ playThread(); });
               SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
               threadHandle.detach();
               }
+              //}}}
             changed();
             }
           }
@@ -722,10 +722,6 @@ private:
       else if (!mFileList->nextIndex())
         break;
       }
-
-    cLog::log (LOGINFO, "exit - frames loaded:%d calc:%d streamLen:%d",
-                        mFrameSet.getNumLoadedFrames(), mFrameSet.mNumFrames, mStreamLen);
-    CoUninitialize();
 
     setExit();
     }
@@ -850,7 +846,8 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init (LOGINFO1, true);
+  cLog::init (LOGINFO, false, "");
+  cLog::log (LOGNOTICE, "mp3Window");
 
   avcodec_register_all();
 

@@ -45,5 +45,3 @@ using namespace Microsoft::WRL;
 using namespace D2D1;
 
 #include "../common/cD2dWindow.h"
-
-#pragma comment(lib,"common.lib")
