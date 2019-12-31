@@ -53,10 +53,10 @@ public:
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
 
-    mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-220.f, false, false, mFrameSet.mImage));
-    add (new cAudFrameSetLensBox (this, 0,100.f, mFrameSet), 0.f,-120.f);
-    add (new cAudFrameSetBox (this, 0,100.f, mFrameSet), 0,-220.f);
-    add (new cAudFrameSetTimeBox (this, 600.f,50.f, mFrameSet), -600.f,-50.f);
+    mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-220.f, false, false, mSong.mImage));
+    add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
+    add (new cSongBox (this, 0,100.f, mSong), 0,-220.f);
+    add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
 
     mFileList = new cFileList (fileName, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -87,14 +87,14 @@ protected:
 
       case  ' ': mPlaying = !mPlaying; break;
 
-      case 0x21: mFrameSet.prevSilence(); changed(); break;; // page up
-      case 0x22: mFrameSet.nextSilence(); changed(); break;; // page down
+      case 0x21: mSong.prevSilence(); changed(); break;; // page up
+      case 0x22: mSong.nextSilence(); changed(); break;; // page down
 
-      case 0x25: mFrameSet.incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
-      case 0x27: mFrameSet.incPlaySec (getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
+      case 0x25: mSong.incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
+      case 0x27: mSong.incPlaySec (getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
 
-      case 0x24: mFrameSet.setPlayFrame (0); changed(); break; // home
-      case 0x23: mFrameSet.setPlayFrame (mFrameSet.mNumFrames-1); mPlaying = false; changed(); break; // end
+      case 0x24: mSong.setPlayFrame (0); changed(); break; // home
+      case 0x23: mSong.setPlayFrame (mSong.mNumFrames-1); mPlaying = false; changed(); break; // end
 
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
@@ -128,18 +128,18 @@ private:
     };
   //}}}
   //{{{
-  class cAudFrameSet {
+  class cSong {
   public:
     //{{{
-    virtual ~cAudFrameSet() {
-      mFrames.clear();
+    virtual ~cSong() {
+      mAudFrames.clear();
       }
     //}}}
 
     //{{{
     void init (string fileName, bool aac, uint16_t samplesPerFrame) {
 
-      mFrames.clear();
+      mAudFrames.clear();
 
       mPlayFrame = 0;
       mMaxValue = 0;
@@ -156,24 +156,24 @@ private:
     bool addFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels], uint32_t streamLen) {
     // return true if enough frames added to start playing
 
-      mFrames.push_back (cAudFrame (streamPos, values));
+      mAudFrames.push_back (cAudFrame (streamPos, values));
 
       mMaxValue = max (mMaxValue, values[0]);
       mMaxValue = max (mMaxValue, values[1]);
 
       // estimate numFrames
-      mNumFrames = int (uint64_t (streamLen - mFrames[0].mStreamPos) * (uint64_t)mFrames.size() /
-                        uint64_t(streamPos + frameLen - mFrames[0].mStreamPos));
+      mNumFrames = int (uint64_t (streamLen - mAudFrames[0].mStreamPos) * (uint64_t)mAudFrames.size() /
+                        uint64_t(streamPos + frameLen - mAudFrames[0].mStreamPos));
 
       // calc silent window
       auto frame = getNumLoadedFrames()-1;
-      if (mFrames[frame].isSilent()) {
+      if (mAudFrames[frame].isSilent()) {
         auto window = kSilentWindow;
         auto windowFrame = frame - 1;
         while ((window >= 0) && (windowFrame >= 0)) {
           // walk backwards looking for no silence
-          if (!mFrames[windowFrame].isSilentThreshold()) {
-            mFrames[frame].mSilent = false;
+          if (!mAudFrames[windowFrame].isSilentThreshold()) {
+            mAudFrames[frame].mSilent = false;
             break;
             }
           windowFrame--;
@@ -187,16 +187,16 @@ private:
 
     // gets
     int getNumdFrames() { return mNumFrames; }
-    int getNumLoadedFrames() { return (int)mFrames.size(); }
+    int getNumLoadedFrames() { return (int)mAudFrames.size(); }
     //{{{
     uint32_t getPlayFrameStreamPos() {
 
-      if (mFrames.empty())
+      if (mAudFrames.empty())
         return 0;
-      else if (mPlayFrame < mFrames.size())
-        return mFrames[mPlayFrame].mStreamPos;
+      else if (mPlayFrame < mAudFrames.size())
+        return mAudFrames[mPlayFrame].mStreamPos;
       else
-        return mFrames[0].mStreamPos;
+        return mAudFrames[0].mStreamPos;
       }
     //}}}
     int getSamplesSize() { return mMaxSamplesPerFrame * mChannels * mBytesPerSample; }
@@ -225,7 +225,7 @@ private:
     string mFileName;
     string mPathName;
 
-    concurrent_vector<cAudFrame> mFrames;
+    concurrent_vector<cAudFrame> mAudFrames;
 
     int mPlayFrame = 0;
     int mNumFrames = 0;
@@ -247,7 +247,7 @@ private:
     int skipPrev (int fromFrame, bool silent) {
 
       for (auto frame = fromFrame-1; frame >= 0; frame--)
-        if (mFrames[frame].isSilent() ^ silent)
+        if (mAudFrames[frame].isSilent() ^ silent)
           return frame;
 
       return fromFrame;
@@ -257,7 +257,7 @@ private:
     int skipNext (int fromFrame, bool silent) {
 
       for (auto frame = fromFrame; frame < getNumLoadedFrames(); frame++)
-        if (mFrames[frame].isSilent() ^ silent)
+        if (mAudFrames[frame].isSilent() ^ silent)
           return frame;
 
       return fromFrame;
@@ -267,22 +267,22 @@ private:
   //}}}
 
   //{{{
-  class cAudFrameSetBox : public cBox {
+  class cSongBox : public cBox {
   public:
     //{{{
-    cAudFrameSetBox (cD2dWindow* window, float width, float height, cAudFrameSet& frameSet) :
-        cBox ("frameSet", window, width, height), mFrameSet(frameSet) {
+    cSongBox (cD2dWindow* window, float width, float height, cSong& frameSet) :
+        cBox ("frameSet", window, width, height), mSong(frameSet) {
       mPin = true;
       }
     //}}}
-    virtual ~cAudFrameSetBox() {}
+    virtual ~cSongBox() {}
 
     //{{{
     bool onWheel (int delta, cPoint pos)  {
 
       if (getShow()) {
         mZoom -= delta/120;
-        mZoom = min (max(mZoom, 1), 2 * (1 + mFrameSet.mNumFrames / getWidthInt()));
+        mZoom = min (max(mZoom, 1), 2 * (1 + mSong.mNumFrames / getWidthInt()));
         return true;
         }
 
@@ -292,8 +292,8 @@ private:
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
 
-      auto leftFrame = mFrameSet.mPlayFrame - (mZoom * getWidthInt()/2);
-      auto rightFrame = mFrameSet.mPlayFrame + (mZoom * getWidthInt()/2);
+      auto leftFrame = mSong.mPlayFrame - (mZoom * getWidthInt()/2);
+      auto rightFrame = mSong.mPlayFrame + (mZoom * getWidthInt()/2);
       auto firstX = (leftFrame < 0) ? (-leftFrame) / mZoom : 0;
 
       draw (dc, leftFrame, rightFrame, firstX, mZoom);
@@ -301,13 +301,13 @@ private:
     //}}}
 
   protected:
-    int getMaxValue() { return mFrameSet.mMaxValue > 0 ? mFrameSet.mMaxValue : 1; }
+    int getMaxValue() { return mSong.mMaxValue > 0 ? mSong.mMaxValue : 1; }
     //{{{
     void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
 
       leftFrame = (leftFrame < 0) ? 0 : leftFrame;
-      if (rightFrame > mFrameSet.getNumLoadedFrames())
-        rightFrame = mFrameSet.getNumLoadedFrames();
+      if (rightFrame > mSong.getNumLoadedFrames())
+        rightFrame = mSong.getNumLoadedFrames();
 
       // draw frames
       auto colour = mWindow->getBlueBrush();
@@ -319,12 +319,12 @@ private:
       float xl = mRect.left + firstX;
       for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
         float xr = xl + 1.f;
-        if (mFrameSet.mFrames[frame].isSilent())
+        if (mSong.mAudFrames[frame].isSilent())
           dc->FillRectangle (cRect (xl, yCentre-kSilentThreshold, xr, yCentre+kSilentThreshold), mWindow->getRedBrush());
 
-        if (!centre && (frame >= mFrameSet.mPlayFrame)) {
-          auto yLeft = mFrameSet.mFrames[frame].mValues[0] * valueScale;
-          auto yRight = mFrameSet.mFrames[frame].mValues[1] * valueScale;
+        if (!centre && (frame >= mSong.mPlayFrame)) {
+          auto yLeft = mSong.mAudFrames[frame].mValues[0] * valueScale;
+          auto yRight = mSong.mAudFrames[frame].mValues[1] * valueScale;
           dc->FillRectangle (cRect (xl, yCentre - yLeft, xr, yCentre + yRight), mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
           centre = true;
@@ -333,8 +333,8 @@ private:
           float yLeft = 0;
           float yRight = 0;
           for (auto i = 0; i < zoom; i++) {
-            yLeft += mFrameSet.mFrames[frame+i].mValues[0];
-            yRight += mFrameSet.mFrames[frame+i].mValues[1];
+            yLeft += mSong.mAudFrames[frame+i].mValues[0];
+            yRight += mSong.mAudFrames[frame+i].mValues[1];
             }
           yLeft = (yLeft / zoom) * valueScale;
           yRight = (yRight / zoom) * valueScale;
@@ -345,16 +345,16 @@ private:
       }
     //}}}
 
-    cAudFrameSet& mFrameSet;
+    cSong& mSong;
     int mZoom = 1;
     };
   //}}}
   //{{{
-  class cAudFrameSetTimeBox : public cBox {
+  class cSongTimeBox : public cBox {
   public:
     //{{{
-    cAudFrameSetTimeBox (cAppWindow* window, float width, float height, cAudFrameSet& frameSet) :
-        cBox("frameSetTime", window, width, height), mFrameSet(frameSet) {
+    cSongTimeBox (cAppWindow* window, float width, float height, cSong& frameSet) :
+        cBox("frameSetTime", window, width, height), mSong(frameSet) {
 
       mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
         DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
@@ -365,7 +365,7 @@ private:
       }
     //}}}
     //{{{
-    virtual ~cAudFrameSetTimeBox() {
+    virtual ~cSongTimeBox() {
       mTextFormat->Release();
       }
     //}}}
@@ -381,7 +381,7 @@ private:
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
 
-      string str = getFrameStr (mFrameSet.mPlayFrame) + " " + getFrameStr (mFrameSet.mNumFrames);
+      string str = getFrameStr (mSong.mPlayFrame) + " " + getFrameStr (mSong.mNumFrames);
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
@@ -399,7 +399,7 @@ private:
     //{{{
     string getFrameStr (uint32_t frame) {
 
-      uint32_t frameHs = frame * mFrameSet.mSamplesPerFrame / (mFrameSet.mSamplesPerSec / 100);
+      uint32_t frameHs = frame * mSong.mSamplesPerFrame / (mSong.mSamplesPerSec / 100);
 
       uint32_t hs = frameHs % 100;
 
@@ -417,20 +417,20 @@ private:
       }
     //}}}
 
-    cAudFrameSet& mFrameSet;
+    cSong& mSong;
 
     IDWriteTextFormat* mTextFormat = nullptr;
     };
   //}}}
   //{{{
-  class cAudFrameSetLensBox : public cAudFrameSetBox {
+  class cSongLensBox : public cSongBox {
   public:
     //{{{
-    cAudFrameSetLensBox (cD2dWindow* window, float width, float height, cAudFrameSet& frameSet)
-      : cAudFrameSetBox (window, width, height, frameSet) {}
+    cSongLensBox (cD2dWindow* window, float width, float height, cSong& frameSet)
+      : cSongBox (window, width, height, frameSet) {}
     //}}}
     //{{{
-    virtual ~cAudFrameSetLensBox() {
+    virtual ~cSongLensBox() {
       bigFree (mSummedValues);
       }
     //}}}
@@ -438,7 +438,7 @@ private:
     //{{{
     void layout() {
       mSummedFrame = -1;
-      cAudFrameSetBox::layout();
+      cSongBox::layout();
       }
     //}}}
     //{{{
@@ -450,8 +450,8 @@ private:
     bool onDown (bool right, cPoint pos)  {
       mOn = true;
 
-      auto frame = int((pos.x * mFrameSet.mNumFrames) / getWidth());
-      mFrameSet.setPlayFrame (frame);
+      auto frame = int((pos.x * mSong.mNumFrames) / getWidth());
+      mSong.setPlayFrame (frame);
 
       return true;
       }
@@ -459,7 +459,7 @@ private:
     //{{{
     bool onUp (bool right, bool mouseMoved, cPoint pos) {
       mOn = false;
-      return cAudFrameSetBox::onUp (right, mouseMoved, pos);
+      return cSongBox::onUp (right, mouseMoved, pos);
       }
     //}}}
     //{{{
@@ -478,7 +478,7 @@ private:
       else // animate off
         mLens /= 2;
 
-      int curFrameX = (mFrameSet.mNumFrames > 0) ? (mFrameSet.mPlayFrame * getWidthInt()) / mFrameSet.mNumFrames : 0;
+      int curFrameX = (mSong.mNumFrames > 0) ? (mSong.mPlayFrame * getWidthInt()) / mSong.mNumFrames : 0;
       int leftLensX = curFrameX - mLens;
       int rightLensX = curFrameX + mLens;
       if (leftLensX < 0) {
@@ -495,7 +495,7 @@ private:
       else
         draw (dc, rightLensX, getWidthInt());
 
-      cAudFrameSetBox::draw (dc, mFrameSet.mPlayFrame - mLens, mFrameSet.mPlayFrame + mLens, leftLensX, 1);
+      cSongBox::draw (dc, mSong.mPlayFrame - mLens, mSong.mPlayFrame + mLens, leftLensX, 1);
 
       dc->DrawRectangle (cRect(mRect.left + leftLensX, mRect.top + 1.f,
                                mRect.left + rightLensX, mRect.top + getHeight() - 1.f),
@@ -507,9 +507,9 @@ private:
     //{{{
     void makeSummedWave() {
 
-      if (mSummedFrame != mFrameSet.getNumLoadedFrames()) {
+      if (mSummedFrame != mSong.getNumLoadedFrames()) {
         // frameSet changed, cache values summed to width, scaled to height
-        mSummedFrame = mFrameSet.getNumLoadedFrames();
+        mSummedFrame = mSong.getNumLoadedFrames();
 
         mSummedValues = (uint8_t*)realloc (mSummedValues, getWidthInt() * 2 * sizeof(int16_t));
         auto summedValuesPtr = mSummedValues;
@@ -517,17 +517,17 @@ private:
         mMaxSummedX = 0;
         auto startFrame = 0;
         for (auto x = 0; x < getWidthInt(); x++) {
-          int frame = x * mFrameSet.mNumFrames / getWidthInt();
-          if (frame >= mFrameSet.getNumLoadedFrames())
+          int frame = x * mSong.mNumFrames / getWidthInt();
+          if (frame >= mSong.getNumLoadedFrames())
             break;
 
-          int leftValue = mFrameSet.mFrames[frame].mValues[0];
-          int rightValue = mFrameSet.mFrames[frame].mValues[1];
+          int leftValue = mSong.mAudFrames[frame].mValues[0];
+          int rightValue = mSong.mAudFrames[frame].mValues[1];
           if (frame > startFrame) {
             int num = 1;
             for (auto i = startFrame; i < frame; i++) {
-              leftValue += mFrameSet.mFrames[i].mValues[0];
-              rightValue += mFrameSet.mFrames[i].mValues[1];
+              leftValue += mSong.mAudFrames[i].mValues[0];
+              rightValue += mSong.mAudFrames[i].mValues[1];
               num++;
               }
             leftValue /= num;
@@ -554,17 +554,17 @@ private:
       float valueScale = getHeight() / 2 / getMaxValue();
 
       float curFrameX = mRect.left;
-      if (mFrameSet.mNumFrames > 0)
-        curFrameX += mFrameSet.mPlayFrame * getWidth() / mFrameSet.mNumFrames;
+      if (mSong.mNumFrames > 0)
+        curFrameX += mSong.mPlayFrame * getWidth() / mSong.mNumFrames;
 
       bool centre = false;
       float xl = mRect.left + firstX;
       auto summedValuesPtr = mSummedValues + (firstX * 2);
       for (auto x = firstX; x < lastX; x++) {
         float xr = xl + 1.f;
-        if (!centre && (x >= curFrameX) && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames())) {
-          float leftValue = mFrameSet.mFrames[mFrameSet.mPlayFrame].mValues[0] * valueScale;
-          float rightValue = mFrameSet.mFrames[mFrameSet.mPlayFrame].mValues[1] * valueScale;
+        if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumLoadedFrames())) {
+          float leftValue = mSong.mAudFrames[mSong.mPlayFrame].mValues[0] * valueScale;
+          float rightValue = mSong.mAudFrames[mSong.mPlayFrame].mValues[1] * valueScale;
           dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
                              mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
@@ -696,7 +696,7 @@ private:
       mStreamLen = (int)GetFileSize (fileHandle, NULL);
       //}}}
       bool aac = mFileList->getCurFileItem().getExtension() == "aac";
-      mFrameSet.init (mFileList->getCurFileItem().getFullName(), aac, aac ? 2048 : 1152);
+      mSong.init (mFileList->getCurFileItem().getFullName(), aac, aac ? 2048 : 1152);
 
       int jpegLen;
       auto jpegBuf = findId3JpegTag (mStreamBuf, mStreamLen, jpegLen);
@@ -705,14 +705,14 @@ private:
         cLog::log (LOGINFO2, "found jpeg tag");
 
         // delete old
-        auto temp = mFrameSet.mImage;
-        mFrameSet.mImage = nullptr;
+        auto temp = mSong.mImage;
+        mSong.mImage = nullptr;
         delete temp;
 
         // create new
-        mFrameSet.mImage = new cJpegImage();
-        mFrameSet.mImage->setBuf (jpegBuf, jpegLen);
-        mJpegImageView->setImage (mFrameSet.mImage);
+        mSong.mImage = new cJpegImage();
+        mSong.mImage->setBuf (jpegBuf, jpegLen);
+        mJpegImageView->setImage (mSong.mImage);
         }
         //}}}
       if (aac)
@@ -730,7 +730,7 @@ private:
       av_init_packet (&avPacket);
 
       auto avFrame = av_frame_alloc();
-      auto samples = (int16_t*)malloc (mFrameSet.getSamplesSize());
+      auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
       auto streamPtr = mStreamBuf;
       auto bytesLeft = mStreamLen;
@@ -786,7 +786,7 @@ private:
                 cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
               }
             //}}}
-            if (mFrameSet.addFrame (uint32_t(avPacket.data - mStreamBuf), avPacket.size, powers, mStreamLen)) {
+            if (mSong.addFrame (uint32_t(avPacket.data - mStreamBuf), avPacket.size, powers, mStreamLen)) {
               //{{{  launch playThread
               auto threadHandle = thread ([=](){ playThread(); });
               SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -831,7 +831,7 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("play");
 
-    AVCodecID streamType = mFrameSet.mAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3;
+    AVCodecID streamType = mSong.mAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3;
     auto audParser = av_parser_init (streamType);
     auto audCodec = avcodec_find_decoder (streamType);
     auto audContext = avcodec_alloc_context3 (audCodec);
@@ -841,13 +841,13 @@ private:
     av_init_packet (&avPacket);
 
     auto avFrame = av_frame_alloc();
-    auto samples = (int16_t*)malloc (mFrameSet.getSamplesSize());
+    auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
-    audOpen (mFrameSet.mChannels, mFrameSet.mSamplesPerSec);
+    audOpen (mSong.mChannels, mSong.mSamplesPerSec);
 
-    while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
+    while (!getAbort() && (mSong.mPlayFrame < mSong.getNumLoadedFrames()-1)) {
       if (mPlaying) {
-        auto streamPos = mFrameSet.getPlayFrameStreamPos();
+        auto streamPos = mSong.getPlayFrameStreamPos();
         uint8_t* streamPtr = mStreamBuf + streamPos;
         int bytesLeft = mStreamLen - streamPos;
 
@@ -894,14 +894,14 @@ private:
                   cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (audContext->sample_fmt));
                 }
               audPlay (avFrame->channels, samples, avFrame->nb_samples, 1.f);
-              mFrameSet.incPlayFrame (1);
+              mSong.incPlayFrame (1);
               changed();
               }
             }
           }
         }
       else
-        audPlay (mFrameSet.mChannels, nullptr, mFrameSet.mSamplesPerFrame, 1.f);
+        audPlay (mSong.mChannels, nullptr, mSong.mSamplesPerFrame, 1.f);
       }
 
     audClose();
@@ -924,7 +924,7 @@ private:
 
   //  vars
   cFileList* mFileList;
-  cAudFrameSet mFrameSet;
+  cSong mSong;
 
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;
