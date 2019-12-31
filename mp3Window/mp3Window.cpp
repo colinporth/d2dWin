@@ -109,9 +109,9 @@ protected:
 
 private:
   //{{{
-  class cAudFrame {
+  class cDecoderFrame {
   public:
-    cAudFrame (uint32_t streamPos, uint8_t values[kMaxChannels]) : mStreamPos(streamPos) {
+    cDecoderFrame (uint32_t streamPos, uint8_t values[kMaxChannels]) : mStreamPos(streamPos) {
       for (auto i = 0; i < kMaxChannels; i++)
         mValues[i] = values[i];
       mSilent = isSilentThreshold();
@@ -132,14 +132,14 @@ private:
   public:
     //{{{
     virtual ~cSong() {
-      mAudFrames.clear();
+      mDecoderFrames.clear();
       }
     //}}}
 
     //{{{
     void init (string fileName, bool aac, uint16_t samplesPerFrame) {
 
-      mAudFrames.clear();
+      mDecoderFrames.clear();
 
       mPlayFrame = 0;
       mMaxValue = 0;
@@ -153,27 +153,27 @@ private:
       }
     //}}}
     //{{{
-    bool addFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels], uint32_t streamLen) {
+    bool addDecoderFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels], uint32_t streamLen) {
     // return true if enough frames added to start playing
 
-      mAudFrames.push_back (cAudFrame (streamPos, values));
+      mDecoderFrames.push_back (cDecoderFrame (streamPos, values));
 
       mMaxValue = max (mMaxValue, values[0]);
       mMaxValue = max (mMaxValue, values[1]);
 
       // estimate numFrames
-      mNumFrames = int (uint64_t (streamLen - mAudFrames[0].mStreamPos) * (uint64_t)mAudFrames.size() /
-                        uint64_t(streamPos + frameLen - mAudFrames[0].mStreamPos));
+      mNumFrames = int (uint64_t (streamLen - mDecoderFrames[0].mStreamPos) * (uint64_t)mDecoderFrames.size() /
+                        uint64_t(streamPos + frameLen - mDecoderFrames[0].mStreamPos));
 
       // calc silent window
       auto frame = getNumLoadedFrames()-1;
-      if (mAudFrames[frame].isSilent()) {
+      if (mDecoderFrames[frame].isSilent()) {
         auto window = kSilentWindow;
         auto windowFrame = frame - 1;
         while ((window >= 0) && (windowFrame >= 0)) {
           // walk backwards looking for no silence
-          if (!mAudFrames[windowFrame].isSilentThreshold()) {
-            mAudFrames[frame].mSilent = false;
+          if (!mDecoderFrames[windowFrame].isSilentThreshold()) {
+            mDecoderFrames[frame].mSilent = false;
             break;
             }
           windowFrame--;
@@ -187,16 +187,16 @@ private:
 
     // gets
     int getNumdFrames() { return mNumFrames; }
-    int getNumLoadedFrames() { return (int)mAudFrames.size(); }
+    int getNumLoadedFrames() { return (int)mDecoderFrames.size(); }
     //{{{
     uint32_t getPlayFrameStreamPos() {
 
-      if (mAudFrames.empty())
+      if (mDecoderFrames.empty())
         return 0;
-      else if (mPlayFrame < mAudFrames.size())
-        return mAudFrames[mPlayFrame].mStreamPos;
+      else if (mPlayFrame < mDecoderFrames.size())
+        return mDecoderFrames[mPlayFrame].mStreamPos;
       else
-        return mAudFrames[0].mStreamPos;
+        return mDecoderFrames[0].mStreamPos;
       }
     //}}}
     int getSamplesSize() { return mMaxSamplesPerFrame * mChannels * mBytesPerSample; }
@@ -225,7 +225,7 @@ private:
     string mFileName;
     string mPathName;
 
-    concurrent_vector<cAudFrame> mAudFrames;
+    concurrent_vector<cDecoderFrame> mDecoderFrames;
 
     int mPlayFrame = 0;
     int mNumFrames = 0;
@@ -247,7 +247,7 @@ private:
     int skipPrev (int fromFrame, bool silent) {
 
       for (auto frame = fromFrame-1; frame >= 0; frame--)
-        if (mAudFrames[frame].isSilent() ^ silent)
+        if (mDecoderFrames[frame].isSilent() ^ silent)
           return frame;
 
       return fromFrame;
@@ -257,7 +257,7 @@ private:
     int skipNext (int fromFrame, bool silent) {
 
       for (auto frame = fromFrame; frame < getNumLoadedFrames(); frame++)
-        if (mAudFrames[frame].isSilent() ^ silent)
+        if (mDecoderFrames[frame].isSilent() ^ silent)
           return frame;
 
       return fromFrame;
@@ -319,12 +319,12 @@ private:
       float xl = mRect.left + firstX;
       for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
         float xr = xl + 1.f;
-        if (mSong.mAudFrames[frame].isSilent())
+        if (mSong.mDecoderFrames[frame].isSilent())
           dc->FillRectangle (cRect (xl, yCentre-kSilentThreshold, xr, yCentre+kSilentThreshold), mWindow->getRedBrush());
 
         if (!centre && (frame >= mSong.mPlayFrame)) {
-          auto yLeft = mSong.mAudFrames[frame].mValues[0] * valueScale;
-          auto yRight = mSong.mAudFrames[frame].mValues[1] * valueScale;
+          auto yLeft = mSong.mDecoderFrames[frame].mValues[0] * valueScale;
+          auto yRight = mSong.mDecoderFrames[frame].mValues[1] * valueScale;
           dc->FillRectangle (cRect (xl, yCentre - yLeft, xr, yCentre + yRight), mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
           centre = true;
@@ -333,8 +333,8 @@ private:
           float yLeft = 0;
           float yRight = 0;
           for (auto i = 0; i < zoom; i++) {
-            yLeft += mSong.mAudFrames[frame+i].mValues[0];
-            yRight += mSong.mAudFrames[frame+i].mValues[1];
+            yLeft += mSong.mDecoderFrames[frame+i].mValues[0];
+            yRight += mSong.mDecoderFrames[frame+i].mValues[1];
             }
           yLeft = (yLeft / zoom) * valueScale;
           yRight = (yRight / zoom) * valueScale;
@@ -448,13 +448,13 @@ private:
           if (frame >= mSong.getNumLoadedFrames())
             break;
 
-          int leftValue = mSong.mAudFrames[frame].mValues[0];
-          int rightValue = mSong.mAudFrames[frame].mValues[1];
+          int leftValue = mSong.mDecoderFrames[frame].mValues[0];
+          int rightValue = mSong.mDecoderFrames[frame].mValues[1];
           if (frame > startFrame) {
             int num = 1;
             for (auto i = startFrame; i < frame; i++) {
-              leftValue += mSong.mAudFrames[i].mValues[0];
-              rightValue += mSong.mAudFrames[i].mValues[1];
+              leftValue += mSong.mDecoderFrames[i].mValues[0];
+              rightValue += mSong.mDecoderFrames[i].mValues[1];
               num++;
               }
             leftValue /= num;
@@ -490,8 +490,8 @@ private:
       for (auto x = firstX; x < lastX; x++) {
         float xr = xl + 1.f;
         if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumLoadedFrames())) {
-          float leftValue = mSong.mAudFrames[mSong.mPlayFrame].mValues[0] * valueScale;
-          float rightValue = mSong.mAudFrames[mSong.mPlayFrame].mValues[1] * valueScale;
+          float leftValue = mSong.mDecoderFrames[mSong.mPlayFrame].mValues[0] * valueScale;
+          float rightValue = mSong.mDecoderFrames[mSong.mPlayFrame].mValues[1] * valueScale;
           dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
                              mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
@@ -786,7 +786,7 @@ private:
                 cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
               }
             //}}}
-            if (mSong.addFrame (uint32_t(avPacket.data - mStreamBuf), avPacket.size, powers, mStreamLen)) {
+            if (mSong.addDecoderFrame (uint32_t(avPacket.data - mStreamBuf), avPacket.size, powers, mStreamLen)) {
               //{{{  launch playThread
               auto threadHandle = thread ([=](){ playThread(); });
               SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -832,10 +832,10 @@ private:
     cLog::setThreadName ("play");
 
     AVCodecID streamType = mSong.mAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3;
-    auto audParser = av_parser_init (streamType);
-    auto audCodec = avcodec_find_decoder (streamType);
-    auto audContext = avcodec_alloc_context3 (audCodec);
-    avcodec_open2 (audContext, audCodec, NULL);
+    auto parser = av_parser_init (streamType);
+    auto codec = avcodec_find_decoder (streamType);
+    auto context = avcodec_alloc_context3 (codec);
+    avcodec_open2 (context, codec, NULL);
 
     AVPacket avPacket;
     av_init_packet (&avPacket);
@@ -852,18 +852,17 @@ private:
         int bytesLeft = mStreamLen - streamPos;
 
         // parse stream into packets
-        auto bytesUsed = av_parser_parse2 (audParser, audContext, &avPacket.data, &avPacket.size,
-                                           streamPtr, bytesLeft, 0, 0, AV_NOPTS_VALUE);
+        auto bytesUsed = av_parser_parse2 (parser, context, &avPacket.data, &avPacket.size, streamPtr, bytesLeft, 0, 0, AV_NOPTS_VALUE);
         if (avPacket.size > 0) {
           // parse packet into audFrames
-          auto ret = avcodec_send_packet (audContext, &avPacket);
+          auto ret = avcodec_send_packet (context, &avPacket);
           while (ret >= 0) {
-            ret = avcodec_receive_frame (audContext, avFrame);
+            ret = avcodec_receive_frame (context, avFrame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
               break;
 
             if (avFrame->nb_samples > 0) {
-              switch (audContext->sample_fmt) {
+              switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
                   //{{{  16bit signed planar, copy planar to interleaved, calc channel power
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
@@ -891,7 +890,7 @@ private:
                   break;
                   //}}}
                 default:
-                  cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (audContext->sample_fmt));
+                  cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                 }
               audPlay (avFrame->channels, samples, avFrame->nb_samples, 1.f);
               mSong.incPlayFrame (1);
@@ -909,10 +908,10 @@ private:
     free (samples);
     av_frame_free (&avFrame);
 
-    if (audContext)
-      avcodec_close (audContext);
-    if (audParser)
-      av_parser_close (audParser);
+    if (context)
+      avcodec_close (context);
+    if (parser)
+      av_parser_close (parser);
 
     cLog::log (LOGINFO, "exit");
 
