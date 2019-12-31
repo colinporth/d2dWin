@@ -60,7 +60,7 @@ public:
 
     mFileList = new cFileList (fileName, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
-    add (new cAppFileListBox (this, 0.f,-220.f, mFileList));
+    add (new cAppFileListBox (this, 0.f,-220.f, mFileList))->setPin (true);
 
     add (new cVolumeBox (this, 12.f,0.f), -12.f,0.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
