@@ -644,80 +644,68 @@ private:
         auto samples = (int16_t*)malloc (2048 * 2 * 2);
         memset (samples, 0, 2048 * 2 * 2);
 
-        AVCodecID streamType;
-        if (aac)
-          streamType = AV_CODEC_ID_AAC;
-        else
-          streamType = AV_CODEC_ID_MP3;
-
-        mAudParser = av_parser_init (streamType);
-        mAudCodec = avcodec_find_decoder (streamType);
-        mAudContext = avcodec_alloc_context3 (mAudCodec);
-        avcodec_open2 (mAudContext, mAudCodec, NULL);
+        AVCodecID streamType = aac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3;
+        auto audParser = av_parser_init (streamType);
+        auto audCodec = avcodec_find_decoder (streamType);
+        auto audContext = avcodec_alloc_context3 (audCodec);
+        avcodec_open2 (audContext, audCodec, NULL);
 
         AVPacket avPacket;
         av_init_packet (&avPacket);
-        avPacket.data = mStreamBuf;
-        avPacket.size = 0;
-
-        auto srcPtr = mStreamBuf;
-        auto srcSize = mStreamLen;
 
         auto avFrame = av_frame_alloc();
-        while (srcSize > 0) {
-          auto bytesUsed = av_parser_parse2 (mAudParser, mAudContext, &avPacket.data, &avPacket.size,
-                                             srcPtr, (int)srcSize, 0, 0, AV_NOPTS_VALUE);
-          srcPtr += bytesUsed;
-          srcSize -= bytesUsed;
+
+        auto streamPtr = mStreamBuf;
+        auto bytesLeft = mStreamLen;
+        while (bytesLeft > 0) {
+          auto bytesUsed = av_parser_parse2 (audParser, audContext, &avPacket.data, &avPacket.size,
+                                             streamPtr, bytesLeft, 0, 0, AV_NOPTS_VALUE);
+          streamPtr += bytesUsed;
+          bytesLeft -= bytesUsed;
+
           if (avPacket.size) {
-            auto ret = avcodec_send_packet (mAudContext, &avPacket);
+            auto ret = avcodec_send_packet (audContext, &avPacket);
             while (ret >= 0) {
-              ret = avcodec_receive_frame (mAudContext, avFrame);
+              // possible multiple frames per packet
+              ret = avcodec_receive_frame (audContext, avFrame);
               if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
                 break;
 
-              //frame->set (interpolatedPts, avFrame->nb_samples*90/48, pidInfo->mPts, avFrame->channels, avFrame->nb_samples);
               uint8_t powers[kChannels];
-              switch (mAudContext->sample_fmt) {
+              //{{{  calc power for each channel
+              switch (audContext->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
-                  //{{{  16bit signed planar, copy planar to interleaved, calc channel power
+                  // 16bit signed planar, copy planar to interleaved, calc channel power
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
                     float power = 0.f;
                     auto srcPtr = (short*)avFrame->data[channel];
-                    auto dstPtr = (short*)(samples) + channel;
                     for (auto i = 0; i < avFrame->nb_samples; i++) {
                       auto sample = *srcPtr++;
                       power += sample * sample;
-                      *dstPtr = sample;
-                      dstPtr += avFrame->channels;
                       }
                     powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples);
                     }
-
                   break;
-                  //}}}
+
                 case AV_SAMPLE_FMT_FLTP:
-                  //{{{  32bit float planar, copy planar channel to interleaved, calc channel power
+                  // 32bit float planar, copy planar channel to interleaved, calc channel power
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
                     float power = 0.f;
                     auto srcPtr = (float*)avFrame->data[channel];
-                    auto dstPtr = (short*)(samples) + channel;
                     for (auto i = 0; i < avFrame->nb_samples; i++) {
                       auto sample = (short)(*srcPtr++ * 0x8000);
                       power += sample * sample;
-                      *dstPtr = sample;
-                      dstPtr += avFrame->channels;
                       }
                     powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples);
                     }
-
                   break;
-                  //}}}
-                default:
-                  cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
-                }
 
-              if (mFrameSet.addFrame (uint32_t(avPacket.data-mStreamBuf), avPacket.size, powers, mStreamLen)) {
+                default:
+                  cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (audContext->sample_fmt));
+                }
+              //}}}
+
+              if (mFrameSet.addFrame (uint32_t(avPacket.data - mStreamBuf), avPacket.size, powers, mStreamLen)) {
                 auto threadHandle = thread ([=](){ playThread(); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
                 threadHandle.detach();
@@ -728,10 +716,10 @@ private:
           }
         av_frame_free (&avFrame);
 
-        if (mAudContext)
-          avcodec_close (mAudContext);
-        if (mAudParser)
-          av_parser_close (mAudParser);
+        if (audContext)
+          avcodec_close (audContext);
+        if (audParser)
+          av_parser_close (audParser);
 
         free (samples);
         }
@@ -743,7 +731,7 @@ private:
         //NeAACDecConfigurationPtr config;
 
         unsigned streamPos = 0;
-        uint8_t* srcPtr = mStreamBuf;
+        uint8_t* streamPtr = mStreamBuf;
         unsigned long bytesLeft = mStreamLen;
 
         unsigned long samplerate = 0;
@@ -779,11 +767,11 @@ private:
         memset (samples, 0, 1024 * 2 * 2 * 2);
 
         unsigned streamPos = 0;
-        uint8_t* srcPtr = mStreamBuf;
+        uint8_t* streamPtr = mStreamBuf;
         int bytesLeft = mStreamLen;
         while (!getAbort() && (bytesLeft > 0)) {
-          int startStreamPos = int(srcPtr - mStreamBuf);
-          if (aacDecoder.AACDecode (&srcPtr, &bytesLeft, samples) != 0)
+          int startStreamPos = int(streamPtr - mStreamBuf);
+          if (aacDecoder.AACDecode (&streamPtr, &bytesLeft, samples) != 0)
             break;
 
           uint8_t power[kChannels];
@@ -883,82 +871,73 @@ private:
 
     if (ffmpeg) {
       //{{{  ffmpeg
-      AVCodecID streamType;
-      if (mFrameSet.mAac)
-        streamType = AV_CODEC_ID_AAC;
-      else
-        streamType = AV_CODEC_ID_MP3;
-
-      mAudParser = av_parser_init (streamType);
-      mAudCodec = avcodec_find_decoder (streamType);
-      mAudContext = avcodec_alloc_context3 (mAudCodec);
-      avcodec_open2 (mAudContext, mAudCodec, NULL);
+      AVCodecID streamType = mFrameSet.mAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3;
+      auto audParser = av_parser_init (streamType);
+      auto audCodec = avcodec_find_decoder (streamType);
+      auto audContext = avcodec_alloc_context3 (audCodec);
+      avcodec_open2 (audContext, audCodec, NULL);
 
       AVPacket avPacket;
       av_init_packet (&avPacket);
-      avPacket.data = mStreamBuf;
-      avPacket.size = 0;
+
+      auto avFrame = av_frame_alloc();
 
       audOpen (2, 44100);
 
-      auto streamPos = mFrameSet.getPlayFrameStreamPos();
-      uint8_t* srcPtr = mStreamBuf + streamPos;
-      auto srcLen = mStreamLen;
-
-      auto avFrame = av_frame_alloc();
       while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
         if (mPlaying) {
-          auto bytesUsed = av_parser_parse2 (mAudParser, mAudContext, &avPacket.data, &avPacket.size,
-                                             srcPtr, (int)srcLen, 0, 0, AV_NOPTS_VALUE);
-          cLog::log (LOGINFO, "av_parser_parse2 %d %d", bytesUsed, avPacket.size);
+          auto streamPos = mFrameSet.getPlayFrameStreamPos();
+          uint8_t* streamPtr = mStreamBuf + streamPos;
+          int bytesLeft = mStreamLen - streamPos;
 
-          srcPtr += bytesUsed;
-          srcLen -= bytesUsed;
+          auto bytesUsed = av_parser_parse2 (audParser, audContext, &avPacket.data, &avPacket.size,
+                                             streamPtr, bytesLeft, 0, 0, AV_NOPTS_VALUE);
+
           if (avPacket.size) {
-            auto ret = avcodec_send_packet (mAudContext, &avPacket);
+            auto ret = avcodec_send_packet (audContext, &avPacket);
             while (ret >= 0) {
-              ret = avcodec_receive_frame (mAudContext, avFrame);
+              ret = avcodec_receive_frame (audContext, avFrame);
               if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
                 break;
 
-              cLog::log (LOGINFO, "avcodec_receive_frame %d %d", avFrame->channels, avFrame->nb_samples);
-
-              switch (mAudContext->sample_fmt) {
-                case AV_SAMPLE_FMT_S16P:
-                  //{{{  16bit signed planar, copy planar to interleaved, calc channel power
-                  for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    auto srcPtr = (short*)avFrame->data[channel];
-                    auto dstPtr = (short*)(samples) + channel;
-                    for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = *srcPtr++;
-                      *dstPtr = sample;
-                      dstPtr += avFrame->channels;
+              if (avFrame->nb_samples) {
+                switch (audContext->sample_fmt) {
+                  case AV_SAMPLE_FMT_S16P:
+                    //{{{  16bit signed planar, copy planar to interleaved, calc channel power
+                    for (auto channel = 0; channel < avFrame->channels; channel++) {
+                      auto srcPtr = (short*)avFrame->data[channel];
+                      auto dstPtr = (short*)(samples) + channel;
+                      for (auto i = 0; i < avFrame->nb_samples; i++) {
+                        auto sample = *srcPtr++;
+                        *dstPtr = sample;
+                        dstPtr += avFrame->channels;
+                        }
                       }
-                    }
 
-                  break;
-                  //}}}
-                case AV_SAMPLE_FMT_FLTP:
-                  //{{{  32bit float planar, copy planar channel to interleaved, calc channel power
-                  for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    auto srcPtr = (float*)avFrame->data[channel];
-                    auto dstPtr = (short*)(samples) + channel;
-                    for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = (short)(*srcPtr++ * 0x8000);
-                      *dstPtr = sample;
-                      dstPtr += avFrame->channels;
+                    break;
+                    //}}}
+                  case AV_SAMPLE_FMT_FLTP:
+                    //{{{  32bit float planar, copy planar channel to interleaved, calc channel power
+                    for (auto channel = 0; channel < avFrame->channels; channel++) {
+                      auto srcPtr = (float*)avFrame->data[channel];
+                      auto dstPtr = (short*)(samples) + channel;
+                      for (auto i = 0; i < avFrame->nb_samples; i++) {
+                        auto sample = (short)(*srcPtr++ * 0x8000);
+                        *dstPtr = sample;
+                        dstPtr += avFrame->channels;
+                        }
                       }
-                    }
 
-                  break;
-                  //}}}
-                default:
-                  cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
-                }
+                    break;
+                    //}}}
+                  default:
+                    cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (audContext->sample_fmt));
+                  }
 
-              if (avFrame->nb_samples)
                 audPlay (avFrame->channels, samples, avFrame->nb_samples, 1.f);
-              changed();
+                mFrameSet.incPlayFrame (1);
+                changed();
+                }
               }
             }
           }
@@ -968,10 +947,10 @@ private:
 
       av_frame_free (&avFrame);
 
-      if (mAudContext)
-        avcodec_close (mAudContext);
-      if (mAudParser)
-        av_parser_close (mAudParser);
+      if (audContext)
+        avcodec_close (audContext);
+      if (audParser)
+        av_parser_close (audParser);
 
       audClose();
       }
@@ -987,9 +966,9 @@ private:
       while (!getAbort() && (mFrameSet.mPlayFrame < mFrameSet.getNumLoadedFrames()-1)) {
         if (mPlaying) {
           auto streamPos = mFrameSet.getPlayFrameStreamPos();
-          uint8_t* srcPtr = mStreamBuf + streamPos;
+          uint8_t* streamPtr = mStreamBuf + streamPos;
           int bytesLeft = mStreamLen - streamPos;
-          aacDecoder.AACDecode (&srcPtr, &bytesLeft, samples);
+          aacDecoder.AACDecode (&streamPtr, &bytesLeft, samples);
           if (samples) {
             audPlay (2, samples, 1024, 1.f);
             mFrameSet.incPlayFrame (1);
@@ -1049,14 +1028,10 @@ private:
   bool mChanged = false;
   bool mPlaying = true;
 
-  cSemaphore mPlayDoneSem;
-
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;
 
-  AVCodec* mAudCodec = nullptr;
-  AVCodecContext* mAudContext = nullptr;
-  AVCodecParserContext* mAudParser = nullptr;
+  cSemaphore mPlayDoneSem;
   //}}}
   };
 
