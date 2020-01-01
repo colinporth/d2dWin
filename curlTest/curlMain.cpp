@@ -37,12 +37,18 @@ using namespace std;
 
 cBipBuffer mBipBuffer;
 CURL* curl;
-bool mAac = false;
 
 //{{{
 static size_t headerData (void* ptr, size_t size, size_t nmemb, void* stream) {
 
-  cLog::log (LOGINFO, "header %d %d %x %s", size, nmemb, stream, ptr);
+  if (nmemb > 2) {
+    // knock out cr lf
+    auto bytePtr = (uint8_t*)ptr;
+    bytePtr[nmemb-1] = 0;
+    bytePtr[nmemb-2] = 0;
+    cLog::log (LOGINFO, "%d %d %x %s", size, nmemb, stream, bytePtr);
+    }
+
   return nmemb;
   }
 //}}}
@@ -60,11 +66,6 @@ static size_t writeData (void* ptr, size_t size, size_t nmemb, void* stream) {
   else
     cLog::log (LOGINFO, "mBipBuffer full");
 
-  char* contentType = NULL;
-  auto res = curl_easy_getinfo (curl, CURLINFO_CONTENT_TYPE, &contentType);
-  if (!res && contentType)
-    mAac = strcmp (contentType, "audio/aacp") == 0;
-
   return nmemb;
   }
 //}}}
@@ -75,11 +76,15 @@ void readThread() {
   cLog::setThreadName ("read");
 
   while (mBipBuffer.getCommittedSize() == 0) {
-    cLog::log (LOGINFO, "reader waiting for first data");
-    Sleep (100);
+    cLog::log (LOGINFO, "waiting for body");
+    Sleep (200);
     }
 
-  AVCodecID streamType = mAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3;
+  char* contentType = NULL;
+  bool ok = (curl_easy_getinfo (curl, CURLINFO_CONTENT_TYPE, &contentType) == 0);
+  bool aac = ok && contentType && (strcmp (contentType, "audio/aacp") == 0);
+
+  AVCodecID streamType = aac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3;
   auto parser = av_parser_init (streamType);
   auto codec = avcodec_find_decoder (streamType);
   auto context = avcodec_alloc_context3 (codec);
@@ -99,23 +104,18 @@ void readThread() {
   audio.open (2, 44100);
 
   while (true) {
-    int blockSize = 0;
-    auto ptr = mBipBuffer.getContiguousBlock (blockSize);
-    if (blockSize == 0) {
-      cLog::log (LOGINFO, "reader waiting");
+    int srcSize = 0;
+    auto srcPtr = mBipBuffer.getContiguousBlock (srcSize);
+    if (srcSize == 0) {
+      cLog::log (LOGINFO, "waiting for more body data");
       Sleep (100);
       }
     else {
-      cLog::log (LOGINFO, "read %d %x", blockSize, ptr);
+      cLog::log (LOGINFO, "body %d %x", srcSize, srcPtr);
       //{{{  ffmpeg decode and play block
-      auto srcPtr = ptr;
-      auto srcSize = blockSize;
-
-      while (srcSize) {
-        auto bytesUsed = av_parser_parse2 (parser, context, &avPacket.data, &avPacket.size,
-                                           srcPtr, (int)srcSize, 0, 0, AV_NOPTS_VALUE);
-        //cLog::log (LOGINFO, "av_parser_parse2 %d %d", bytesUsed, avPacket.size);
-
+      auto bytesLeft = srcSize;
+      while (bytesLeft) {
+        auto bytesUsed = av_parser_parse2 (parser, context, &avPacket.data, &avPacket.size, srcPtr, bytesLeft, 0, 0, AV_NOPTS_VALUE);
         srcPtr += bytesUsed;
         srcSize -= bytesUsed;
         if (avPacket.size) {
@@ -125,9 +125,6 @@ void readThread() {
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
               break;
 
-            //cLog::log (LOGINFO, "avcodec_receive_frame %d %d", avFrame->channels, avFrame->nb_samples);
-
-            //frame->set (interpolatedPts, avFrame->nb_samples*90/48, pidInfo->mPts, avFrame->channels, avFrame->nb_samples);
             switch (context->sample_fmt) {
               case AV_SAMPLE_FMT_S16P:
                 //{{{  16bit signed planar, copy planar to interleaved, calc channel power
@@ -164,7 +161,7 @@ void readThread() {
           }
         }
       //}}}
-      mBipBuffer.decommitBlock (blockSize);
+      mBipBuffer.decommitBlock (srcSize);
       }
     }
 
@@ -189,7 +186,7 @@ int main (int argc, char *argv[]) {
   cLog::init (LOGINFO, false, "");
   cLog::log (LOGNOTICE, "curl test");
 
-  const char* url = argc > 1 ? argv[1] : "http://us4.internet-radio.com:8266/";
+  const char* url = argc > 1 ? argv[1] : "http://stream.wqxr.org/wqxr.aac";
   cLog::log (LOGNOTICE, url);
 
   mBipBuffer.allocateBuffer (8192 * 1024);
@@ -203,8 +200,8 @@ int main (int argc, char *argv[]) {
   if (curl) {
     //curl_easy_setopt (curl, CURLOPT_URL, "http://www.example.com");
     //curl_easy_setopt (curl, CURLOPT_URL, "http://stream.wqxr.org/js-stream.aac");
-    curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
 
+    //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
     curl_easy_setopt (curl, CURLOPT_URL, url);
     curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt (curl, CURLOPT_HEADERFUNCTION, headerData);
