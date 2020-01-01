@@ -77,7 +77,7 @@ int main (int argc, char *argv[]) {
     avPacket.size = 0;
 
     cWinAudio audio;
-    audio.audOpen (2, 44100);
+    audio.open (2, 44100);
 
     auto srcPtr = streamBuf;
     auto srcSize = streamLen;
@@ -131,7 +131,7 @@ int main (int argc, char *argv[]) {
               //}}}
             default:;
             }
-          audio.audPlay (avFrame->channels, (int16_t*)samples, avFrame->nb_samples, 1.f);
+          audio.play (avFrame->channels, (int16_t*)samples, avFrame->nb_samples, 1.f);
           }
         }
       }

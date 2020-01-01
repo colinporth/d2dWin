@@ -527,7 +527,7 @@ void cPlayView::playThread() {
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::setThreadName ("play");
 
-  audOpen (2, 48000);
+  open (2, 48000);
 
   mFirstVidPtsSem.wait();
   mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
@@ -537,7 +537,7 @@ void cPlayView::playThread() {
     mPlayAudFrame = (cAudFrame*)mAudTs->findFrame (pts);
 
     // play using frame where available, else play silence
-    audPlay (mPlayAudFrame ? mPlayAudFrame->mChannels : getSrcChannels(),
+    play (mPlayAudFrame ? mPlayAudFrame->mChannels : getSrcChannels(),
       mPlayAudFrame && (mPlaying != ePause) ? mPlayAudFrame->mSamples : nullptr,
       mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame, 1.f);
 
@@ -549,7 +549,7 @@ void cPlayView::playThread() {
 
     mPlayPtsSem.notifyAll();
     }
-  audClose();
+  close();
 
   cLog::log (LOGINFO, "exit");
   CoUninitialize();

@@ -592,7 +592,6 @@ private:
     IDWriteTextFormat* mTextFormat = nullptr;
     };
   //}}}
-
   //{{{
   class cAppFileListBox : public cFileListBox {
   public:
@@ -604,6 +603,7 @@ private:
       }
     };
   //}}}
+
 
   bool getAbort() { return getExit() || mChanged; }
 
@@ -843,7 +843,7 @@ private:
     auto avFrame = av_frame_alloc();
     auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
-    audOpen (mSong.mChannels, mSong.mSamplesPerSec);
+    open (mSong.mChannels, mSong.mSamplesPerSec);
 
     while (!getAbort() && (mSong.mPlayFrame < mSong.getNumLoadedFrames()-1)) {
       if (mPlaying) {
@@ -892,7 +892,7 @@ private:
                 default:
                   cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                 }
-              audPlay (avFrame->channels, samples, avFrame->nb_samples, 1.f);
+              play (avFrame->channels, samples, avFrame->nb_samples, 1.f);
               mSong.incPlayFrame (1);
               changed();
               }
@@ -900,10 +900,10 @@ private:
           }
         }
       else
-        audPlay (mSong.mChannels, nullptr, mSong.mSamplesPerFrame, 1.f);
+        play (mSong.mChannels, nullptr, mSong.mSamplesPerFrame, 1.f);
       }
 
-    audClose();
+    close();
 
     free (samples);
     av_frame_free (&avFrame);
