@@ -604,7 +604,7 @@ private:
   bool getAbort() { return getExit() || mChanged; }
 
   //{{{
-  void parseMp3 (uint8_t* buf, int bufLen) {
+  bool parseMp3Frame (uint8_t* buf, int bufLen, uint8_t*& framePtr, int& frameLen, bool& id3Tag, int& lostSync) {
 
     const uint32_t bitRates[16] = {     0,  32000,  40000, 48000,
                                     56000,  64000,  80000,  96000,
@@ -613,24 +613,24 @@ private:
 
     const uint32_t sampleRates[4] = { 44100, 48000, 32000, 0};
 
-    int tags = 0;
-    int frames = 0;
-    int lostSync = 0;
+    while (bufLen >= 4) {
+      if (buf[0] == 'I' && buf[1] == 'D' && buf[2] == '3') {
+        //{{{  id3 header
+        auto tagSize = (buf[6] << 21) | (buf[7] << 14) | (buf[8] << 7) | buf[9];
 
-    auto ptr = buf;
-    while (bufLen > 0) {
-      if (ptr[0] == 'I' && ptr[1] == 'D' && ptr[2] == '3') {
-        // id3 header
-        auto tagSize = (ptr[6] << 21) | (ptr[7] << 14) | (ptr[8] << 7) | ptr[9];
-        ptr += 10 + tagSize;
-        bufLen -= 10 + tagSize;
-        tags++;
+        // return tag & size
+        framePtr = buf;
+        frameLen = 10 + tagSize;
+        id3Tag = true;
+        return true;
         }
-      else if (((ptr[0] & 0xFF) == 0xFF) && // syncWord
-               ((ptr[1] & 0xE0) == 0xE0) && // syncWord
-               ((ptr[1] & 0x18) != 0x08) && // version reserved
-               ((ptr[1] & 0x06) != 0x00) && // layer reserved
-               ((ptr[2] & 0xF0) != 0xF0)) { // bitrate reserved
+        //}}}
+      else if (((buf[0] & 0xFF) == 0xFF) && // syncWord
+               ((buf[1] & 0xE0) == 0xE0) && // syncWord
+               ((buf[1] & 0x18) != 0x08) && // version reserved
+               ((buf[1] & 0x06) != 0x00) && // layer reserved
+               ((buf[2] & 0xF0) != 0xF0)) { // bitrate reserved
+        //{{{  mp3 header
         // AAAAAAAA AAABBCCD EEEEFFGH IIJJKLMM
         //{{{  A 31:21  Frame sync (all bits must be set)
         //}}}
@@ -716,20 +716,20 @@ private:
         //   10 - reserved
         //   11 - CCIT J.17
         //}}}
-        uint8_t version = (ptr[1] & 0x08) >> 3;
-        uint8_t layer = (ptr[1] & 0x06) >> 1;
-        uint8_t errp = ptr[1] & 0x01;
+        uint8_t version = (buf[1] & 0x08) >> 3;
+        uint8_t layer = (buf[1] & 0x06) >> 1;
+        uint8_t errp = buf[1] & 0x01;
 
-        uint8_t bitrateIndex = (ptr[2] & 0xf0) >> 4;
-        uint8_t sampleRateIndex = (ptr[2] & 0x0c) >> 2;
-        uint8_t pad = (ptr[2] & 0x02) >> 1;
-        uint8_t priv = (ptr[2] & 0x01);
+        uint8_t bitrateIndex = (buf[2] & 0xf0) >> 4;
+        uint8_t sampleRateIndex = (buf[2] & 0x0c) >> 2;
+        uint8_t pad = (buf[2] & 0x02) >> 1;
+        uint8_t priv = (buf[2] & 0x01);
 
-        uint8_t mode = (ptr[3] & 0xc0) >> 6;
-        uint8_t modex = (ptr[3] & 0x30) >> 4;
-        uint8_t copyright = (ptr[3] & 0x08) >> 3;
-        uint8_t original = (ptr[3] & 0x04) >> 2;
-        uint8_t emphasis = (ptr[3] & 0x03);
+        uint8_t mode = (buf[3] & 0xc0) >> 6;
+        uint8_t modex = (buf[3] & 0x30) >> 4;
+        uint8_t copyright = (buf[3] & 0x08) >> 3;
+        uint8_t original = (buf[3] & 0x04) >> 2;
+        uint8_t emphasis = (buf[3] & 0x03);
 
         uint32_t bitrate = bitRates[bitrateIndex];
         uint32_t sampleRate = sampleRates[sampleRateIndex];
@@ -739,15 +739,44 @@ private:
         if (pad)
           size++;
 
-        frames++;
-        ptr += size;
-        bufLen -= size;
+        // return mp3Frame & size
+        framePtr = buf;
+        frameLen = size;
+        id3Tag = false;
+        return true;
         }
+        //}}}
       else {
         lostSync++;
-        ptr++;
+        buf++;
         bufLen--;
         }
+      }
+
+    framePtr = nullptr;
+    frameLen = 0;
+    id3Tag = false;
+    return false;
+    }
+  //}}}
+  //{{{
+  void parseMp3 (uint8_t* buf, int bufLen) {
+
+    int tags = 0;
+    int frames = 0;
+    int lostSync = 0;
+
+    uint8_t* framePtr = nullptr;
+    int frameLen = 0;
+    bool tag = false;
+    while (parseMp3Frame (buf, bufLen, framePtr, frameLen, tag, lostSync)) {
+      if (tag)
+        tags++;
+      else
+        frames++;
+      // onto next frame
+      buf += frameLen;
+      bufLen -= frameLen;
       }
 
     cLog::log (LOGINFO, "parseMp3 f:%d lost:%d tags:%d", frames, lostSync, tags);
