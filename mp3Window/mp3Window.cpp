@@ -606,96 +606,142 @@ private:
   //{{{
   void parseMp3 (uint8_t* buf, int bufLen) {
 
-    const uint8_t mpeg_versions[4] = { 25, 0, 2, 1 };  // MPEG versions - use [version]
-    const uint8_t mpeg_layers[4] = { 0, 3, 2, 1 };   // Layers - use [layer]
-    const uint8_t mpeg_slot_size[4] = { 0, 1, 1, 4 }; // Slot size  Rsvd, 3, 2, 1
-    const char* mpeg_channel[4] = { "stereo", "jointStereo", "dual", "mono" };
-    //{{{
-    // Sample rates [version][srate]
-    const uint16_t mpeg_srates[4][4] = {
-      { 11025, 12000,  8000, 0 }, // MPEG 2.5
-      {     0,     0,     0, 0 }, // Reserved
-      { 22050, 24000, 16000, 0 }, // MPEG 2
-      { 44100, 48000, 32000, 0 }  // MPEG 1
-      };
-    //}}}
-    //{{{
-    // Samples per frame  [version][layer]
-    const uint16_t mpeg_samples[4][4] = {
-    //    Rsvd     3     2     1  < Layer  v Version
-      {    0,  576, 1152,  384 }, //       2.5
-      {    0,    0,    0,    0 }, //       Reserved
-      {    0,  576, 1152,  384 }, //       2
-      {    0, 1152, 1152,  384 }  //       1
-      };
-    //}}}
-    //{{{
-    // Bitrates [version][layer][bitrate]
-    const uint16_t mpeg_bitrates[4][4][16] = {
-      { // Version 2.5
-        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Reserved
-        { 0,   8,  16,  24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160, 0 }, // Layer 3
-        { 0,   8,  16,  24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160, 0 }, // Layer 2
-        { 0,  32,  48,  56,  64,  80,  96, 112, 128, 144, 160, 176, 192, 224, 256, 0 }  // Layer 1
-      },
-      { // Reserved
-        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Invalid
-        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Invalid
-        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Invalid
-        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }  // Invalid
-      },
-      { // Version 2
-        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Reserved
-        { 0,   8,  16,  24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160, 0 }, // Layer 3
-        { 0,   8,  16,  24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160, 0 }, // Layer 2
-        { 0,  32,  48,  56,  64,  80,  96, 112, 128, 144, 160, 176, 192, 224, 256, 0 }  // Layer 1
-      },
-      { // Version 1
-        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Reserved
-        { 0,  32,  40,  48,  56,  64,  80,  96, 112, 128, 160, 192, 224, 256, 320, 0 }, // Layer 3
-        { 0,  32,  48,  56,  64,  80,  96, 112, 128, 160, 192, 224, 256, 320, 384, 0 }, // Layer 2
-        { 0,  32,  64,  96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 0 }, // Layer 1
-      }
-    };
-    //}}}
+    const uint32_t bitRates[16] = {     0,  32000,  40000, 48000,
+                                    56000,  64000,  80000,  96000,
+                                   112000, 128000, 160000, 192000,
+                                   224000, 256000, 320000,      0};
 
+    const uint32_t sampleRates[4] = { 44100, 48000, 32000, 0};
+
+    int tags = 0;
     int frames = 0;
     int lostSync = 0;
 
-    uint8_t layer = 0;
-    uint32_t bitRate = 0;
-    uint32_t sampleRate = 0;
-    uint8_t channelIndex = 0;
-
     auto ptr = buf;
     while (bufLen > 0) {
-      if (((ptr[0] & 0xFF) == 0xFF) && ((ptr[1] & 0xE0) == 0xE0)  && // 3 sync bits
-          ((ptr[1] & 0x18) != 0x08) &&  // Version rsvd
-          ((ptr[1] & 0x06) != 0x00) &&  // Layer rsvd
-          ((ptr[2] & 0xF0) != 0xF0)) {  // Bitrate rsvd
+      if (ptr[0] == 'I' && ptr[1] == 'D' && ptr[2] == '3') {
+        // id3 header
+        auto tagSize = (ptr[6] << 21) | (ptr[7] << 14) | (ptr[8] << 7) | ptr[9];
+        ptr += 10 + tagSize;
+        bufLen -= 10 + tagSize;
+        tags++;
+        }
+      else if (((ptr[0] & 0xFF) == 0xFF) && // syncWord
+               ((ptr[1] & 0xE0) == 0xE0) && // syncWord
+               ((ptr[1] & 0x18) != 0x08) && // version reserved
+               ((ptr[1] & 0x06) != 0x00) && // layer reserved
+               ((ptr[2] & 0xF0) != 0xF0)) { // bitrate reserved
+        // AAAAAAAA AAABBCCD EEEEFFGH IIJJKLMM
+        //{{{  A 31:21  Frame sync (all bits must be set)
+        //}}}
+        //{{{  B 20:19  MPEG Audio version ID
+        //   0 - MPEG Version 2.5 (later extension of MPEG 2)
+        //   01 - reserved
+        //   10 - MPEG Version 2 (ISO/IEC 13818-3)
+        //   11 - MPEG Version 1 (ISO/IEC 11172-3)
+        //   Note: MPEG Version 2.5 was added lately to the MPEG 2 standard.
+        // It is an extension used for very low bitrate files, allowing the use of lower sampling frequencies.
+        // If your decoder does not support this extension, it is recommended for you to use 12 bits for synchronization
+        // instead of 11 bits.
+        //}}}
+        //{{{  C 18:17  Layer description
+        //   00 - reserved
+        //   01 - Layer III
+        //   10 - Layer II
+        //   11 - Layer I
+        //}}}
+        //{{{  D    16  Protection bit
+        //   0 - Protected by CRC (16bit CRC follows header)
+        //   1 - Not protected
+        //}}}
+        //{{{  E 15:12  Bitrate index
+        // V1 - MPEG Version 1
+        // V2 - MPEG Version 2 and Version 2.5
+        // L1 - Layer I
+        // L2 - Layer II
+        // L3 - Layer III
+        //   bits  V1,L1   V1,L2  V1,L3  V2,L1  V2,L2L3
+        //   0000   free    free   free   free   free
+        //   0001  32  32  32  32  8
+        //   0010  64  48  40  48  16
+        //   0011  96  56  48  56  24
+        //   0100  128 64  56  64  32
+        //   0101  160 80  64  80  40
+        //   0110  192 96  80  96  48
+        //   0111  224 112 96  112 56
+        //   1000  256 128 112 128 64
+        //   1001  288 160 128 144 80
+        //   1010  320 192 160 160 96
+        //   1011  352 224 192 176 112
+        //   1100  384 256 224 192 128
+        //   1101  416 320 256 224 144
+        //   1110  448 384 320 256 160
+        //   1111  bad bad bad bad bad
+        //   values are in kbps
+        //}}}
+        //{{{  F 11:10  Sampling rate index
+        //   bits  MPEG1     MPEG2    MPEG2.5
+        //    00  44100 Hz  22050 Hz  11025 Hz
+        //    01  48000 Hz  24000 Hz  12000 Hz
+        //    10  32000 Hz  16000 Hz  8000 Hz
+        //    11  reserv.   reserv.   reserv.
+        //}}}
+        //{{{  G     9  Padding bit
+        //   0 - frame is not padded
+        //   1 - frame is padded with one extra slot
+        //   Padding is used to exactly fit the bitrate.
+        // As an example: 128kbps 44.1kHz layer II uses a lot of 418 bytes
+        // and some of 417 bytes long frames to get the exact 128k bitrate.
+        // For Layer I slot is 32 bits long, for Layer II and Layer III slot is 8 bits long.
+        //}}}
+        //{{{  H     8  Private bit. This one is only informative.
+        //}}}
+        //{{{  I   7:6  Channel Mode
+        //   00 - Stereo
+        //   01 - Joint stereo (Stereo)
+        //   10 - Dual channel (2 mono channels)
+        //   11 - Single channel (Mono)
+        //}}}
+        //{{{  K     3  Copyright
+        //   0 - Audio is not copyrighted
+        //   1 - Audio is copyrighted
+        //}}}
+        //{{{  L     2  Original
+        //   0 - Copy of original media
+        //   1 - Original media
+        //}}}
+        //{{{  M   1:0  emphasis
+        //   00 - none
+        //   01 - 50/15 ms
+        //   10 - reserved
+        //   11 - CCIT J.17
+        //}}}
+        uint8_t version = (ptr[1] & 0x08) >> 3;
+        uint8_t layer = (ptr[1] & 0x06) >> 1;
+        uint8_t errp = ptr[1] & 0x01;
 
-        uint8_t versionIndex = (ptr[1] & 0x18) >> 3;
-        uint8_t layerIndex = (ptr[1] & 0x06) >> 1;
-        bool crc = (ptr[1] & 0x01) == 0;
-
-        uint8_t padding = (ptr[2] & 0x02) >> 1;
         uint8_t bitrateIndex = (ptr[2] & 0xf0) >> 4;
         uint8_t sampleRateIndex = (ptr[2] & 0x0c) >> 2;
+        uint8_t pad = (ptr[2] & 0x02) >> 1;
+        uint8_t priv = (ptr[2] & 0x01);
 
-        channelIndex = (ptr[3] & 0xC0) >> 6;
+        uint8_t mode = (ptr[3] & 0xc0) >> 6;
+        uint8_t modex = (ptr[3] & 0x30) >> 4;
+        uint8_t copyright = (ptr[3] & 0x08) >> 3;
+        uint8_t original = (ptr[3] & 0x04) >> 2;
+        uint8_t emphasis = (ptr[3] & 0x03);
 
-        // Lookup real values of these fields
-        layer = mpeg_layers[versionIndex];
-        bitRate = mpeg_bitrates[versionIndex][layerIndex][bitrateIndex] * 1000;
-        sampleRate = mpeg_srates[versionIndex][sampleRateIndex];
-        uint16_t samples = mpeg_samples[versionIndex][layerIndex];
-        uint8_t slotSize = mpeg_slot_size[layerIndex];
+        uint32_t bitrate = bitRates[bitrateIndex];
+        uint32_t sampleRate = sampleRates[sampleRateIndex];
 
-        int frameLength = 4 + (crc ? 0 : 2) + samples;
+        int scale = (layer == 3) ? 48 : 144;
+        int size = (bitrate * scale) / sampleRate;
+        if (pad)
+          size++;
 
         frames++;
-        ptr += frameLength;
-        bufLen -= frameLength;
+        ptr += size;
+        bufLen -= size;
         }
       else {
         lostSync++;
@@ -704,8 +750,7 @@ private:
         }
       }
 
-    cLog::log (LOGINFO, "parseMp3 f:%d sr:%d br:%d l:%d lost:%d ch:%d",
-                         frames, sampleRate, bitRate, layer, lostSync, channelIndex);
+    cLog::log (LOGINFO, "parseMp3 f:%d lost:%d tags:%d", frames, lostSync, tags);
     }
   //}}}
   //{{{
