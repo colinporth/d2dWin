@@ -40,23 +40,19 @@ class cAppWindow : public cD2dWindow {
 public:
   cAppWindow() : mPlayDoneSem("playDone") {}
   //{{{
-  void run (const string& title, int width, int height, string fileName) {
-
-    if (fileName.find (".lnk") <= fileName.size()) {
-      string fullName;
-      if (resolveShortcut (fileName.c_str(), fullName))
-        fileName = fullName;
-      }
+  void run (const string& title, int width, int height, const string& fileName) {
 
     initialise (title, width, height, false);
-    add (new cLogBox (this, 200.f,0.f, true), 0.f,200.f)->setPin (false);
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
 
-    mJpegImageView = (cJpegImageView*)add (new cJpegImageView (this, 0.f,-220.f, false, false, mSong.mImage));
+    mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, mSong.mImage);
+    add (mJpegImageView);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
+
+    add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
     mFileList = new cFileList (fileName, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -605,11 +601,115 @@ private:
     };
   //}}}
 
-
   bool getAbort() { return getExit() || mChanged; }
 
   //{{{
-  void parseAdts (uint8_t* buf, int bufLen) {
+  void parseMp3 (uint8_t* buf, int bufLen) {
+
+    const uint8_t mpeg_versions[4] = { 25, 0, 2, 1 };  // MPEG versions - use [version]
+    const uint8_t mpeg_layers[4] = { 0, 3, 2, 1 };   // Layers - use [layer]
+    const uint8_t mpeg_slot_size[4] = { 0, 1, 1, 4 }; // Slot size  Rsvd, 3, 2, 1
+    const char* mpeg_channel[4] = { "stereo", "jointStereo", "dual", "mono" };
+    //{{{
+    // Sample rates [version][srate]
+    const uint16_t mpeg_srates[4][4] = {
+      { 11025, 12000,  8000, 0 }, // MPEG 2.5
+      {     0,     0,     0, 0 }, // Reserved
+      { 22050, 24000, 16000, 0 }, // MPEG 2
+      { 44100, 48000, 32000, 0 }  // MPEG 1
+      };
+    //}}}
+    //{{{
+    // Samples per frame  [version][layer]
+    const uint16_t mpeg_samples[4][4] = {
+    //    Rsvd     3     2     1  < Layer  v Version
+      {    0,  576, 1152,  384 }, //       2.5
+      {    0,    0,    0,    0 }, //       Reserved
+      {    0,  576, 1152,  384 }, //       2
+      {    0, 1152, 1152,  384 }  //       1
+      };
+    //}}}
+    //{{{
+    // Bitrates [version][layer][bitrate]
+    const uint16_t mpeg_bitrates[4][4][16] = {
+      { // Version 2.5
+        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Reserved
+        { 0,   8,  16,  24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160, 0 }, // Layer 3
+        { 0,   8,  16,  24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160, 0 }, // Layer 2
+        { 0,  32,  48,  56,  64,  80,  96, 112, 128, 144, 160, 176, 192, 224, 256, 0 }  // Layer 1
+      },
+      { // Reserved
+        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Invalid
+        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Invalid
+        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Invalid
+        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }  // Invalid
+      },
+      { // Version 2
+        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Reserved
+        { 0,   8,  16,  24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160, 0 }, // Layer 3
+        { 0,   8,  16,  24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160, 0 }, // Layer 2
+        { 0,  32,  48,  56,  64,  80,  96, 112, 128, 144, 160, 176, 192, 224, 256, 0 }  // Layer 1
+      },
+      { // Version 1
+        { 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 0 }, // Reserved
+        { 0,  32,  40,  48,  56,  64,  80,  96, 112, 128, 160, 192, 224, 256, 320, 0 }, // Layer 3
+        { 0,  32,  48,  56,  64,  80,  96, 112, 128, 160, 192, 224, 256, 320, 384, 0 }, // Layer 2
+        { 0,  32,  64,  96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 0 }, // Layer 1
+      }
+    };
+    //}}}
+
+    int frames = 0;
+    int lostSync = 0;
+
+    uint8_t layer = 0;
+    uint32_t bitRate = 0;
+    uint32_t sampleRate = 0;
+    uint8_t channelIndex = 0;
+
+    auto ptr = buf;
+    while (bufLen > 0) {
+      if (((ptr[0] & 0xFF) == 0xFF) && ((ptr[1] & 0xE0) == 0xE0)  && // 3 sync bits
+          ((ptr[1] & 0x18) != 0x08) &&  // Version rsvd
+          ((ptr[1] & 0x06) != 0x00) &&  // Layer rsvd
+          ((ptr[2] & 0xF0) != 0xF0)) {  // Bitrate rsvd
+
+        uint8_t versionIndex = (ptr[1] & 0x18) >> 3;
+        uint8_t layerIndex = (ptr[1] & 0x06) >> 1;
+        bool crc = (ptr[1] & 0x01) == 0;
+
+        uint8_t padding = (ptr[2] & 0x02) >> 1;
+        uint8_t bitrateIndex = (ptr[2] & 0xf0) >> 4;
+        uint8_t sampleRateIndex = (ptr[2] & 0x0c) >> 2;
+
+        channelIndex = (ptr[3] & 0xC0) >> 6;
+
+        // Lookup real values of these fields
+        layer = mpeg_layers[versionIndex];
+        bitRate = mpeg_bitrates[versionIndex][layerIndex][bitrateIndex] * 1000;
+        sampleRate = mpeg_srates[versionIndex][sampleRateIndex];
+        uint16_t samples = mpeg_samples[versionIndex][layerIndex];
+        uint8_t slotSize = mpeg_slot_size[layerIndex];
+
+        int frameLength = 4 + (crc ? 0 : 2) + samples;
+
+        frames++;
+        ptr += frameLength;
+        bufLen -= frameLength;
+        }
+      else {
+        lostSync++;
+        ptr++;
+        bufLen--;
+        }
+      }
+
+    cLog::log (LOGINFO, "parseMp3 f:%d sr:%d br:%d l:%d lost:%d ch:%d",
+                         frames, sampleRate, bitRate, layer, lostSync, channelIndex);
+    }
+  //}}}
+  //{{{
+  void parseAdtsAac (uint8_t* buf, int bufLen) {
   // start of aac adts parser
 
     const int sampleRates[16] = { 96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350, 0,0,0};
@@ -717,7 +817,9 @@ private:
         }
         //}}}
       if (aac)
-        parseAdts (mStreamBuf, mStreamLen);
+        parseAdtsAac (mStreamBuf, mStreamLen);
+      else
+        parseMp3 (mStreamBuf, mStreamLen);
 
       auto time = system_clock::now();
 
@@ -846,7 +948,7 @@ private:
 
     cWinAudio audio (mSong.mChannels, mSong.mSamplesPerSec);
     mVolumeBox->setAudio (&audio);
-    
+
     while (!getAbort() && (mSong.mPlayFrame < mSong.getNumLoadedFrames()-1)) {
       if (mPlaying) {
         auto streamPos = mSong.getPlayFrameStreamPos();
@@ -906,7 +1008,7 @@ private:
       }
 
     mVolumeBox->setAudio (nullptr);
-    
+
     free (samples);
     av_frame_free (&avFrame);
 
@@ -942,7 +1044,8 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init (LOGINFO, false, "");
+  cLog::init (LOGINFO, true);
+  //cLog::init (LOGINFO, false, "");
   cLog::log (LOGNOTICE, "mp3Window");
 
   avcodec_register_all();

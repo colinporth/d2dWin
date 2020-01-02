@@ -93,9 +93,7 @@ void readThread() {
   avPacket.size = 0;
 
   auto avFrame = av_frame_alloc();
-
   auto samples = (int16_t*)malloc (2048 * 2 * 2);
-  memset (samples, 0, 2048 * 2 * 2);
 
   cWinAudio audio (2, 44100);
 
@@ -168,7 +166,7 @@ void readThread() {
   if (parser)
     av_parser_close (parser);
 
-CoUninitialize();
+  CoUninitialize();
   }
 //}}}
 
