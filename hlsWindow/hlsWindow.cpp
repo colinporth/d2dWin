@@ -30,7 +30,7 @@
 #include "../boxes/cHlsDotsBox.h"
 //}}}
 
-class cAppWindow : public cHls, public cD2dWindow, public cWinAudio {
+class cAppWindow : public cHls, public cD2dWindow {
 public:
   cAppWindow (int chan, int bitrate) : cHls(chan, bitrate, getDaylightSeconds()) {}
   //{{{
@@ -51,7 +51,8 @@ public:
     add (new cBmpBox (this, 60.f, 60.f, r6x80, 6, mChan, mChanChanged), 305.f,0);
     //add (new cClockBox (this, 40.f, mTimePoint), -82.f,-82.f);
 
-    add (new cVolumeBox (this, 12.f,0), -12.f,0);
+    mVolumeBox = new cVolumeBox (this, 12.f,0, nullptr);
+    add (mVolumeBox, -12.f,0);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     // launch loaderThread
@@ -65,7 +66,9 @@ public:
     // launch playerThread, high priority
     auto playerThread = std::thread ([=]() {
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
-      player (this, this);
+      cWinAudio audio (2, 48000);
+      mVolumeBox->setAudio (&audio);
+      player (audio, this);
       CoUninitialize();
       });
     SetThreadPriority (playerThread.native_handle(), THREAD_PRIORITY_HIGHEST);
@@ -108,6 +111,9 @@ protected:
     return false;
     }
   //}}}
+
+private:
+  cVolumeBox* mVolumeBox;
   };
 
 

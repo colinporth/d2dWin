@@ -11,12 +11,8 @@
 #include <shlguid.h>
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <math.h>
-#include <fcntl.h>
-#include <io.h>
 
 #include <thread>
 
@@ -35,11 +31,10 @@ extern "C" {
 using namespace std;
 //}}}
 
-cBipBuffer mBipBuffer;
 CURL* curl;
-
+cBipBuffer mBipBuffer;
 //{{{
-static size_t headerData (void* ptr, size_t size, size_t nmemb, void* stream) {
+static size_t header (void* ptr, size_t size, size_t nmemb, void* stream) {
 
   if (nmemb > 2) {
     // knock out cr lf
@@ -53,7 +48,7 @@ static size_t headerData (void* ptr, size_t size, size_t nmemb, void* stream) {
   }
 //}}}
 //{{{
-static size_t writeData (void* ptr, size_t size, size_t nmemb, void* stream) {
+static size_t body (void* ptr, size_t size, size_t nmemb, void* stream) {
 
   //cLog::log (LOGINFO, "body %d %d %x", size, nmemb, stream);
 
@@ -76,9 +71,11 @@ void readThread() {
   cLog::setThreadName ("read");
 
   while (mBipBuffer.getCommittedSize() == 0) {
+    //{{{  wait for body data
     cLog::log (LOGINFO, "waiting for body");
     Sleep (200);
     }
+    //}}}
 
   char* contentType = NULL;
   bool ok = (curl_easy_getinfo (curl, CURLINFO_CONTENT_TYPE, &contentType) == 0);
@@ -100,8 +97,7 @@ void readThread() {
   auto samples = (int16_t*)malloc (2048 * 2 * 2);
   memset (samples, 0, 2048 * 2 * 2);
 
-  cWinAudio audio;
-  audio.open (2, 44100);
+  cWinAudio audio (2, 44100);
 
   while (true) {
     int srcSize = 0;
@@ -165,8 +161,6 @@ void readThread() {
       }
     }
 
-  audio.close();
-
   free (samples);
   av_frame_free (&avFrame);
   if (context)
@@ -174,8 +168,7 @@ void readThread() {
   if (parser)
     av_parser_close (parser);
 
-
-  CoUninitialize();
+CoUninitialize();
   }
 //}}}
 
@@ -184,35 +177,31 @@ int main (int argc, char *argv[]) {
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
 
   cLog::init (LOGINFO, false, "");
-  cLog::log (LOGNOTICE, "curl test");
-
   const char* url = argc > 1 ? argv[1] : "http://stream.wqxr.org/wqxr.aac";
-  cLog::log (LOGNOTICE, url);
+  cLog::log (LOGNOTICE, "curl test %s", url);
 
-  mBipBuffer.allocateBuffer (8192 * 1024);
   avcodec_register_all();
+  mBipBuffer.allocateBuffer (8192 * 1024);
 
-  WSADATA wsaData;
-  if (WSAStartup (MAKEWORD(2,2), &wsaData))
-    exit (0);
+  //WSADATA wsaData;
+  //if (WSAStartup (MAKEWORD(2,2), &wsaData))
+  //  exit (0);
 
   curl = curl_easy_init();
   if (curl) {
-    //curl_easy_setopt (curl, CURLOPT_URL, "http://www.example.com");
-    //curl_easy_setopt (curl, CURLOPT_URL, "http://stream.wqxr.org/js-stream.aac");
-
     //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
     curl_easy_setopt (curl, CURLOPT_URL, url);
     curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt (curl, CURLOPT_HEADERFUNCTION, headerData);
-    curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, writeData);
+    curl_easy_setopt (curl, CURLOPT_HEADERFUNCTION, header);
+    curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, body);
 
     thread ([=](){ readThread(); }).detach();
-
-    CURLcode res = curl_easy_perform (curl);
+    bool ok = curl_easy_perform (curl) == CURLE_OK;
 
     curl_easy_cleanup (curl);
     }
+  else
+    cLog::log (LOGERROR, "curl_easy_init error");
 
   CoUninitialize();
   }

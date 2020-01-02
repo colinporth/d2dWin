@@ -32,6 +32,8 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const std::
     cView("playerView", window, width, height),
     mFileName(fileName), mFirstVidPtsSem("firstVidPts") {
 
+  mAudio = new cWinAudio(2, 48000);
+
   // create transportStreams
   mAnalTs = new cAnalTransportStream();
   mAudTs = new cAudTransportStream (kMaxAudFrames);
@@ -39,7 +41,7 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const std::
 
   mTimecodeBox = window->add (new cTimecodeBox (window, 600.f,60.f, this), -600.f,-60.f)->setPin (true);
   mProgressBox = window->add (new cProgressBox (window, 0.f,6.f, this), 0.f,-6.f);
-  mAudFrameBox = window->add (new cAudFrameBox (window, 82.f,240.0f, mPlayAudFrame, this), -84.f,-240.f-6.0f);
+  mAudFrameBox = window->add (new cAudFrameBox (window, 82.f,240.0f, mPlayAudFrame, mAudio), -84.f,-240.f-6.0f);
 
   // launch anal
   auto threadHandle = std::thread ([=](){ analyserThread(); });
@@ -527,8 +529,6 @@ void cPlayView::playThread() {
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::setThreadName ("play");
 
-  open (2, 48000);
-
   mFirstVidPtsSem.wait();
   mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();
 
@@ -537,9 +537,9 @@ void cPlayView::playThread() {
     mPlayAudFrame = (cAudFrame*)mAudTs->findFrame (pts);
 
     // play using frame where available, else play silence
-    play (mPlayAudFrame ? mPlayAudFrame->mChannels : getSrcChannels(),
-      mPlayAudFrame && (mPlaying != ePause) ? mPlayAudFrame->mSamples : nullptr,
-      mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame, 1.f);
+    mAudio->play (mPlayAudFrame ? mPlayAudFrame->mChannels : mAudio->getSrcChannels(),
+                  mPlayAudFrame && (mPlaying != ePause) ? mPlayAudFrame->mSamples : nullptr,
+                  mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame, 1.f);
 
     if ((mPlaying == ePlay) && (mPlayPts < getLengthPts()))
       incPlayPts (int64_t (((mPlayAudFrame ? mPlayAudFrame->mNumSamples : kAudSamplesPerUnknownFrame) * 90) / 48));
@@ -549,7 +549,6 @@ void cPlayView::playThread() {
 
     mPlayPtsSem.notifyAll();
     }
-  close();
 
   cLog::log (LOGINFO, "exit");
   CoUninitialize();

@@ -16,7 +16,7 @@ extern "C" {
 #include "mfxvideo++.h"
 //}}}
 
-class cPlayView : public cD2dWindow::cView, public cWinAudio {
+class cPlayView : public cD2dWindow::cView {
 public:
   cPlayView (cD2dWindow* window, float width, float height, const std::string& fileName);
   ~cPlayView();
@@ -973,5 +973,7 @@ private:
   bool mVidAborted = false;
   bool mAudAborted = false;
   bool mPlayAborted = false;
+
+  cWinAudio* mAudio = nullptr;
   //}}}
   };

@@ -36,7 +36,7 @@ const int kPlayFrameThreshold = 40; // about a second of analyse before playing
 
 string fileName = "C:/Users/colin/Music/Elton John";
 
-class cAppWindow : public cD2dWindow, public cWinAudio {
+class cAppWindow : public cD2dWindow {
 public:
   cAppWindow() : mPlayDoneSem("playDone") {}
   //{{{
@@ -62,7 +62,8 @@ public:
     thread([=]() { mFileList->watchThread(); }).detach();
     add (new cAppFileListBox (this, 0.f,-220.f, mFileList))->setPin (true);
 
-    add (new cVolumeBox (this, 12.f,0.f), -12.f,0.f);
+    mVolumeBox = new cVolumeBox (this, 12.f,0.f, nullptr);
+    add (mVolumeBox, -12.f,0.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (!mFileList->empty())
@@ -843,8 +844,9 @@ private:
     auto avFrame = av_frame_alloc();
     auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
-    open (mSong.mChannels, mSong.mSamplesPerSec);
-
+    cWinAudio audio (mSong.mChannels, mSong.mSamplesPerSec);
+    mVolumeBox->setAudio (&audio);
+    
     while (!getAbort() && (mSong.mPlayFrame < mSong.getNumLoadedFrames()-1)) {
       if (mPlaying) {
         auto streamPos = mSong.getPlayFrameStreamPos();
@@ -892,7 +894,7 @@ private:
                 default:
                   cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                 }
-              play (avFrame->channels, samples, avFrame->nb_samples, 1.f);
+              audio.play (avFrame->channels, samples, avFrame->nb_samples, 1.f);
               mSong.incPlayFrame (1);
               changed();
               }
@@ -900,11 +902,11 @@ private:
           }
         }
       else
-        play (mSong.mChannels, nullptr, mSong.mSamplesPerFrame, 1.f);
+        audio.play (mSong.mChannels, nullptr, mSong.mSamplesPerFrame, 1.f);
       }
 
-    close();
-
+    mVolumeBox->setAudio (nullptr);
+    
     free (samples);
     av_frame_free (&avFrame);
 
@@ -932,6 +934,8 @@ private:
   bool mChanged = false;
   bool mPlaying = true;
   cSemaphore mPlayDoneSem;
+
+  cVolumeBox* mVolumeBox = nullptr;
   };
 
 //{{{

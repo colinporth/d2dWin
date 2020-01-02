@@ -76,8 +76,7 @@ int main (int argc, char *argv[]) {
     avPacket.data = streamBuf;
     avPacket.size = 0;
 
-    cWinAudio audio;
-    audio.open (2, 44100);
+    cWinAudio audio (2, 44100);
 
     auto srcPtr = streamBuf;
     auto srcSize = streamLen;
@@ -159,8 +158,7 @@ int main (int argc, char *argv[]) {
     auto res = NeAACDecInit (hDecoder, streamBuf, bytesLeft, &samplerate, &channels);
     cLog::log (LOGINFO, "NeAACDecInit %d %d %d", res, samplerate, channels);
 
-    cWinAudio audio;
-    audio.audOpen (2, 44100/2);
+    cWinAudio audio (2, 44100/2);
 
     streamPos = 0;
     while ((bytesLeft > 0)) {
@@ -174,18 +172,13 @@ int main (int argc, char *argv[]) {
       }
 
     NeAACDecClose (hDecoder);
-
-    audio.audClose();
     //}}}
   #endif
 
   #ifdef TEENS
     //{{{  teensy
-    // int framesPerAacFrame = bitrate <= 96000 ? 2 : 1;
     cAacDecoder aacDecoder;
-
-    cWinAudio audio;
-    audio.audOpen (2, 44100/2);
+    cWinAudio audio (2, 44100/2);
 
     uint8_t* srcPtr = streamBuf;
     int bytesLeft = streamLen;
@@ -198,8 +191,6 @@ int main (int argc, char *argv[]) {
       //cLog::log (LOGINFO, "frameLen %d %d %d", int(srcPtr - streamBuf), (int)bytesLeft, frameLen);
       audio.audPlay (2, samples, 1024, 1.f);
       }
-
-    audio.audClose();
     //}}}
   #endif
 

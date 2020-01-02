@@ -7,13 +7,15 @@
 
 class cVolumeBox : public cD2dWindow::cBox {
 public:
-  cVolumeBox (cD2dWindow* window, float width, float height)
-    : cBox("volume", window, width, height) {}
+  cVolumeBox (cD2dWindow* window, float width, float height, iAudio* audio)
+    : cBox("volume", window, width, height) { mAudio = audio; }
   virtual ~cVolumeBox() {}
 
+  void setAudio (iAudio* audio) { mAudio = audio; }
+
   bool onWheel (int delta, cPoint posy)  {
-    auto audio = dynamic_cast<iAudio*>(mWindow);
-    audio->setVolume (audio->getVolume() - delta/1200.f);
+    if (mAudio)
+      mAudio->setVolume (mAudio->getVolume() - delta/1200.f);
     return true;
     }
 
@@ -21,16 +23,19 @@ public:
   bool onMove (bool right, cPoint pos, cPoint inc) { return setFromPos (pos); }
 
   void onDraw (ID2D1DeviceContext* dc) {
-    auto audio = dynamic_cast<iAudio*>(mWindow);
-    auto r = mRect;
-    r.bottom = r.top + (getHeight() * audio->getVolume());
-    dc->FillRectangle (r, mWindow->getYellowBrush());
+    if (mAudio) {
+      auto r = mRect;
+      r.bottom = r.top + (getHeight() * mAudio->getVolume());
+      dc->FillRectangle (r, mWindow->getYellowBrush());
+      }
     }
 
 private:
   bool setFromPos (cPoint pos) {
-    auto audio = dynamic_cast<iAudio*>(mWindow);
-    audio->setVolume (pos.y / getHeight());
+    if (mAudio)
+      mAudio->setVolume (pos.y / getHeight());
     return true;
     }
+
+  iAudio* mAudio = nullptr;
   };
