@@ -48,11 +48,12 @@ public:
 
     mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, mSong.mImage);
     add (mJpegImageView);
+
+    add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
+
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
-
-    add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
     mFileList = new cFileList (fileName, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -275,6 +276,12 @@ private:
     virtual ~cSongBox() {}
 
     //{{{
+    bool onMove (bool right, cPoint pos, cPoint inc) {
+      mSong.incPlayFrame (-inc.x);
+      return true;
+      }
+    //}}}
+    //{{{
     bool onWheel (int delta, cPoint pos)  {
 
       if (getShow()) {
@@ -365,13 +372,10 @@ private:
       cSongBox::layout();
       }
     //}}}
-    //{{{
-    bool onWheel (int delta, cPoint pos)  {
-      return false;
-      }
-    //}}}
+
     //{{{
     bool onDown (bool right, cPoint pos)  {
+
       mOn = true;
 
       auto frame = int((pos.x * mSong.mNumFrames) / getWidth());
@@ -381,11 +385,24 @@ private:
       }
     //}}}
     //{{{
+    bool onMove (bool right, cPoint pos, cPoint inc) {
+      auto frame = int((pos.x * mSong.mNumFrames) / getWidth());
+      mSong.setPlayFrame (frame);
+      return true;
+      }
+    //}}}
+    //{{{
     bool onUp (bool right, bool mouseMoved, cPoint pos) {
       mOn = false;
       return cSongBox::onUp (right, mouseMoved, pos);
       }
     //}}}
+    //{{{
+    bool onWheel (int delta, cPoint pos)  {
+      return false;
+      }
+    //}}}
+
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
 
@@ -419,7 +436,7 @@ private:
       else
         draw (dc, rightLensX, getWidthInt());
 
-      cSongBox::draw (dc, mSong.mPlayFrame - mLens, mSong.mPlayFrame + mLens, leftLensX, 1);
+      cSongBox::draw (dc, mSong.mPlayFrame - mLens, mSong.mPlayFrame + mLens-2, leftLensX+1, 1);
 
       dc->DrawRectangle (cRect(mRect.left + leftLensX, mRect.top + 1.f,
                                mRect.left + rightLensX, mRect.top + getHeight() - 1.f),
@@ -642,11 +659,6 @@ private:
 
           cLog::log (LOGINFO2, "found jpeg tag");
 
-          // delete old
-          auto temp = mSong.mImage;
-          mSong.mImage = nullptr;
-          delete temp;
-
           // create new
           mSong.mImage = new cJpegImage();
           mSong.mImage->setBuf (jpegBuf, jpegLen);
@@ -662,17 +674,13 @@ private:
     }
   //}}}
   //{{{
-  bool parseMp3Frame (uint8_t* buf, int bufLen, uint8_t*& framePtr, int& frameLen, bool& id3Tag, int& bytesSkipped) {
+  bool parseFrame (uint8_t* buf, int bufLen, uint8_t*& framePtr, int& frameLen, bool& aac, bool& id3Tag, int& skipped) {
+  // start of mp3 / aac adts parser
+  // TODO return false if not enough body
 
-    const uint32_t bitRates[16] = {     0,  32000,  40000, 48000,
-                                    56000,  64000,  80000,  96000,
-                                   112000, 128000, 160000, 192000,
-                                   224000, 256000, 320000,      0};
+    skipped = 0;
 
-    const uint32_t sampleRates[4] = { 44100, 48000, 32000, 0};
-
-    bytesSkipped = 0;
-    while (bufLen >= 4) {
+    while (bufLen >= 6) {
       if (buf[0] == 'I' && buf[1] == 'D' && buf[2] == '3') {
         //{{{  id3 header
         auto tagSize = (buf[6] << 21) | (buf[7] << 14) | (buf[8] << 7) | buf[9];
@@ -680,165 +688,180 @@ private:
         // return tag & size
         framePtr = buf;
         frameLen = 10 + tagSize;
+
+        aac = false;
         id3Tag = true;
+
         return true;
         }
         //}}}
-      else if (((buf[0] & 0xFF) == 0xFF) && // syncWord
-               ((buf[1] & 0xE0) == 0xE0) && // syncWord
-               ((buf[1] & 0x18) != 0x08) && // version reserved
-               ((buf[1] & 0x06) != 0x00) && // layer reserved
-               ((buf[2] & 0xF0) != 0xF0)) { // bitrate reserved
-        //{{{  mp3 header
-        // AAAAAAAA AAABBCCD EEEEFFGH IIJJKLMM
-        //{{{  A 31:21  Frame sync (all bits must be set)
-        //}}}
-        //{{{  B 20:19  MPEG Audio version ID
-        //   0 - MPEG Version 2.5 (later extension of MPEG 2)
-        //   01 - reserved
-        //   10 - MPEG Version 2 (ISO/IEC 13818-3)
-        //   11 - MPEG Version 1 (ISO/IEC 11172-3)
-        //   Note: MPEG Version 2.5 was added lately to the MPEG 2 standard.
-        // It is an extension used for very low bitrate files, allowing the use of lower sampling frequencies.
-        // If your decoder does not support this extension, it is recommended for you to use 12 bits for synchronization
-        // instead of 11 bits.
-        //}}}
-        //{{{  C 18:17  Layer description
-        //   00 - reserved
-        //   01 - Layer III
-        //   10 - Layer II
-        //   11 - Layer I
-        //}}}
-        //{{{  D    16  Protection bit
-        //   0 - Protected by CRC (16bit CRC follows header)
-        //   1 - Not protected
-        //}}}
-        //{{{  E 15:12  Bitrate index
-        // V1 - MPEG Version 1
-        // V2 - MPEG Version 2 and Version 2.5
-        // L1 - Layer I
-        // L2 - Layer II
-        // L3 - Layer III
-        //   bits  V1,L1   V1,L2  V1,L3  V2,L1  V2,L2L3
-        //   0000   free    free   free   free   free
-        //   0001  32  32  32  32  8
-        //   0010  64  48  40  48  16
-        //   0011  96  56  48  56  24
-        //   0100  128 64  56  64  32
-        //   0101  160 80  64  80  40
-        //   0110  192 96  80  96  48
-        //   0111  224 112 96  112 56
-        //   1000  256 128 112 128 64
-        //   1001  288 160 128 144 80
-        //   1010  320 192 160 160 96
-        //   1011  352 224 192 176 112
-        //   1100  384 256 224 192 128
-        //   1101  416 320 256 224 144
-        //   1110  448 384 320 256 160
-        //   1111  bad bad bad bad bad
-        //   values are in kbps
-        //}}}
-        //{{{  F 11:10  Sampling rate index
-        //   bits  MPEG1     MPEG2    MPEG2.5
-        //    00  44100 Hz  22050 Hz  11025 Hz
-        //    01  48000 Hz  24000 Hz  12000 Hz
-        //    10  32000 Hz  16000 Hz  8000 Hz
-        //    11  reserv.   reserv.   reserv.
-        //}}}
-        //{{{  G     9  Padding bit
-        //   0 - frame is not padded
-        //   1 - frame is padded with one extra slot
-        //   Padding is used to exactly fit the bitrate.
-        // As an example: 128kbps 44.1kHz layer II uses a lot of 418 bytes
-        // and some of 417 bytes long frames to get the exact 128k bitrate.
-        // For Layer I slot is 32 bits long, for Layer II and Layer III slot is 8 bits long.
-        //}}}
-        //{{{  H     8  Private bit. This one is only informative.
-        //}}}
-        //{{{  I   7:6  Channel Mode
-        //   00 - Stereo
-        //   01 - Joint stereo (Stereo)
-        //   10 - Dual channel (2 mono channels)
-        //   11 - Single channel (Mono)
-        //}}}
-        //{{{  K     3  Copyright
-        //   0 - Audio is not copyrighted
-        //   1 - Audio is copyrighted
-        //}}}
-        //{{{  L     2  Original
-        //   0 - Copy of original media
-        //   1 - Original media
-        //}}}
-        //{{{  M   1:0  emphasis
-        //   00 - none
-        //   01 - 50/15 ms
-        //   10 - reserved
-        //   11 - CCIT J.17
-        //}}}
-        uint8_t version = (buf[1] & 0x08) >> 3;
-        uint8_t layer = (buf[1] & 0x06) >> 1;
-        uint8_t errp = buf[1] & 0x01;
 
-        uint8_t bitrateIndex = (buf[2] & 0xf0) >> 4;
-        uint8_t sampleRateIndex = (buf[2] & 0x0c) >> 2;
-        uint8_t pad = (buf[2] & 0x02) >> 1;
-        uint8_t priv = (buf[2] & 0x01);
-
-        uint8_t mode = (buf[3] & 0xc0) >> 6;
-        uint8_t modex = (buf[3] & 0x30) >> 4;
-        uint8_t copyright = (buf[3] & 0x08) >> 3;
-        uint8_t original = (buf[3] & 0x04) >> 2;
-        uint8_t emphasis = (buf[3] & 0x03);
-
-        uint32_t bitrate = bitRates[bitrateIndex];
-        uint32_t sampleRate = sampleRates[sampleRateIndex];
-
-        int scale = (layer == 3) ? 48 : 144;
-        int size = (bitrate * scale) / sampleRate;
-        if (pad)
-          size++;
-
-        // return mp3Frame & size
-        framePtr = buf;
-        frameLen = size;
-        id3Tag = false;
-        return true;
-        }
-        //}}}
-      else {
-        bytesSkipped++;
-        buf++;
-        bufLen--;
-        }
-      }
-
-    framePtr = nullptr;
-    frameLen = 0;
-    id3Tag = false;
-    return false;
-    }
-  //}}}
-  //{{{
-  bool parseAacFrame (uint8_t* buf, int bufLen, uint8_t*& framePtr, int& frameLen, bool& id3Tag, int& bytesSkipped) {
-  // start of aac adts parser
-
-    const int sampleRates[16] = { 96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350, 0,0,0};
-
-    bytesSkipped = 0;
-    while (bufLen >= 6) {
-      if ((buf[0] == 0xFF) && ((buf[1] & 0xF6) == 0xF0)) {
+      else if ((buf[0] == 0xFF) && ((buf[1] & 0xF0) == 0xF0)) {
         // syncWord found
-        auto sampleRate = sampleRates [(buf[2] & 0x3c) >> 2];
-        auto size = (((unsigned int)buf[3] & 0x3) << 11) | (((unsigned int)buf[4]) << 3) | (buf[5] >> 5);
+        if ((buf[1] & 0x06) == 0) {
+          //{{{  aac header
+          // Header consists of 7 or 9 bytes (without or with CRC).
+          // AAAAAAAA AAAABCCD EEFFFFGH HHIJKLMM MMMMMMMM MMMOOOOO OOOOOOPP (QQQQQQQQ QQQQQQQQ)
+          //
+          // A 12   syncword 0xFFF, all bits must be 1
+          // B  1  MPEG Version: 0 for MPEG-4, 1 for MPEG-2
+          // C  2  Layer: always 0
+          // D  1  protection absent, Warning, set to 1 if there is no CRC and 0 if there is CRC
+          // E  2  profile, the MPEG-4 Audio Object Type minus 1
+          // F  4  MPEG-4 Sampling Frequency Index (15 is forbidden)
+          // G  1  private bit, guaranteed never to be used by MPEG, set to 0 when encoding, ignore when decoding
+          // H  3  MPEG-4 Channel Configuration (in the case of 0, the channel configuration is sent via an inband PCE)
+          // I  1  originality, set to 0 when encoding, ignore when decoding
+          // J  1  home, set to 0 when encoding, ignore when decoding
+          // K  1  copyrighted id bit, the next bit of a centrally registered copyright identifier, set to 0 when encoding, ignore when decoding
+          // L  1  copyright id start, signals that this frame's copyright id bit is the first bit of the copyright id, set to 0 when encoding, ignore when decoding
+          // M 13  frame length, this value must include 7 or 9 bytes of header length: FrameLength = (ProtectionAbsent == 1 ? 7 : 9) + size(AACFrame)
+          // O 11  Buffer fullness
+          // P  2  Number of AAC frames (RDBs) in ADTS frame minus 1, for maximum compatibility always use 1 AAC frame per ADTS frame
+          // Q 16  CRC if protection absent is 0
 
-        // return aacFrame & size
-        framePtr = buf;
-        frameLen = size;
-        id3Tag = false;
-        return true;
+          const int sampleRates[16] = { 96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350, 0,0,0};
+
+          auto sampleRate = sampleRates [(buf[2] & 0x3c) >> 2];
+
+          // return aacFrame & size
+          framePtr = buf;
+          frameLen = (((unsigned int)buf[3] & 0x3) << 11) | (((unsigned int)buf[4]) << 3) | (buf[5] >> 5);
+          aac = true;
+          id3Tag = false;
+          return true;
+          }
+          //}}}
+        else {
+          //{{{  mp3 header
+          // AAAAAAAA AAABBCCD EEEEFFGH IIJJKLMM
+          //{{{  A 31:21  Frame sync (all bits must be set)
+          //}}}
+          //{{{  B 20:19  MPEG Audio version ID
+          //   0 - MPEG Version 2.5 (later extension of MPEG 2)
+          //   01 - reserved
+          //   10 - MPEG Version 2 (ISO/IEC 13818-3)
+          //   11 - MPEG Version 1 (ISO/IEC 11172-3)
+          //   Note: MPEG Version 2.5 was added lately to the MPEG 2 standard.
+          // It is an extension used for very low bitrate files, allowing the use of lower sampling frequencies.
+          // If your decoder does not support this extension, it is recommended for you to use 12 bits for synchronization
+          // instead of 11 bits.
+          //}}}
+          //{{{  C 18:17  Layer description
+          //   00 - reserved
+          //   01 - Layer III
+          //   10 - Layer II
+          //   11 - Layer I
+          //}}}
+          //{{{  D    16  Protection bit
+          //   0 - Protected by CRC (16bit CRC follows header)
+          //   1 - Not protected
+          //}}}
+          //{{{  E 15:12  Bitrate index
+          // V1 - MPEG Version 1
+          // V2 - MPEG Version 2 and Version 2.5
+          // L1 - Layer I
+          // L2 - Layer II
+          // L3 - Layer III
+          //   bits  V1,L1   V1,L2  V1,L3  V2,L1  V2,L2L3
+          //   0000   free    free   free   free   free
+          //   0001  32  32  32  32  8
+          //   0010  64  48  40  48  16
+          //   0011  96  56  48  56  24
+          //   0100  128 64  56  64  32
+          //   0101  160 80  64  80  40
+          //   0110  192 96  80  96  48
+          //   0111  224 112 96  112 56
+          //   1000  256 128 112 128 64
+          //   1001  288 160 128 144 80
+          //   1010  320 192 160 160 96
+          //   1011  352 224 192 176 112
+          //   1100  384 256 224 192 128
+          //   1101  416 320 256 224 144
+          //   1110  448 384 320 256 160
+          //   1111  bad bad bad bad bad
+          //   values are in kbps
+          //}}}
+          //{{{  F 11:10  Sampling rate index
+          //   bits  MPEG1     MPEG2    MPEG2.5
+          //    00  44100 Hz  22050 Hz  11025 Hz
+          //    01  48000 Hz  24000 Hz  12000 Hz
+          //    10  32000 Hz  16000 Hz  8000 Hz
+          //    11  reserv.   reserv.   reserv.
+          //}}}
+          //{{{  G     9  Padding bit
+          //   0 - frame is not padded
+          //   1 - frame is padded with one extra slot
+          //   Padding is used to exactly fit the bitrate.
+          // As an example: 128kbps 44.1kHz layer II uses a lot of 418 bytes
+          // and some of 417 bytes long frames to get the exact 128k bitrate.
+          // For Layer I slot is 32 bits long, for Layer II and Layer III slot is 8 bits long.
+          //}}}
+          //{{{  H     8  Private bit. This one is only informative.
+          //}}}
+          //{{{  I   7:6  Channel Mode
+          //   00 - Stereo
+          //   01 - Joint stereo (Stereo)
+          //   10 - Dual channel (2 mono channels)
+          //   11 - Single channel (Mono)
+          //}}}
+          //{{{  K     3  Copyright
+          //   0 - Audio is not copyrighted
+          //   1 - Audio is copyrighted
+          //}}}
+          //{{{  L     2  Original
+          //   0 - Copy of original media
+          //   1 - Original media
+          //}}}
+          //{{{  M   1:0  emphasis
+          //   00 - none
+          //   01 - 50/15 ms
+          //   10 - reserved
+          //   11 - CCIT J.17
+          //}}}
+
+          const uint32_t bitRates[16] = {     0,  32000,  40000, 48000,
+                                          56000,  64000,  80000,  96000,
+                                         112000, 128000, 160000, 192000,
+                                         224000, 256000, 320000,      0};
+
+          const uint32_t sampleRates[4] = { 44100, 48000, 32000, 0};
+
+          uint8_t version = (buf[1] & 0x08) >> 3;
+          uint8_t layer = (buf[1] & 0x06) >> 1;
+          uint8_t errp = buf[1] & 0x01;
+
+          uint8_t bitrateIndex = (buf[2] & 0xf0) >> 4;
+          uint8_t sampleRateIndex = (buf[2] & 0x0c) >> 2;
+          uint8_t pad = (buf[2] & 0x02) >> 1;
+          uint8_t priv = (buf[2] & 0x01);
+
+          uint8_t mode = (buf[3] & 0xc0) >> 6;
+          uint8_t modex = (buf[3] & 0x30) >> 4;
+          uint8_t copyright = (buf[3] & 0x08) >> 3;
+          uint8_t original = (buf[3] & 0x04) >> 2;
+          uint8_t emphasis = (buf[3] & 0x03);
+
+          uint32_t bitrate = bitRates[bitrateIndex];
+          uint32_t sampleRate = sampleRates[sampleRateIndex];
+
+          int scale = (layer == 3) ? 48 : 144;
+          int size = (bitrate * scale) / sampleRate;
+          if (pad)
+            size++;
+
+          // return mp3Frame & size
+          framePtr = buf;
+          frameLen = size;
+          aac = false;
+          id3Tag = false;
+          return true;
+          }
+          //}}}
         }
+
       else {
-        bytesSkipped++;
+        skipped++;
         buf++;
         bufLen--;
         }
@@ -846,46 +869,41 @@ private:
 
     framePtr = nullptr;
     frameLen = 0;
+    aac = false;
     id3Tag = false;
     return false;
     }
   //}}}
   //{{{
-  bool parseFrame (bool aac, uint8_t* buf, int bufLen, uint8_t*& framePtr, int& frameLen, bool& id3Tag, int& bytesSkipped) {
-
-
-    if (aac)
-      return parseAacFrame (buf, bufLen, framePtr, frameLen, id3Tag, bytesSkipped);
-    else
-      return parseMp3Frame (buf, bufLen, framePtr, frameLen, id3Tag, bytesSkipped);
-    }
-  //}}}
-  //{{{
-  int parseFrames (bool aac, uint8_t* buf, int bufLen) {
+  bool parseFrames (uint8_t* buf, int bufLen) {
+  // return true if stream is aac adts
 
     int tags = 0;
     int frames = 0;
     int lostSync = 0;
+    bool resultAac = false;
 
     uint8_t* framePtr = nullptr;
     int frameLen = 0;
+    bool frameAac = false;
     bool tag = false;
-    int bytesSkipped = 0;
-    while (parseFrame (aac, buf, bufLen, framePtr, frameLen, tag, bytesSkipped)) {
+    int skipped = 0;
+    while (parseFrame (buf, bufLen, framePtr, frameLen, frameAac, tag, skipped)) {
       if (tag)
         tags++;
-      else
+      else {
+        resultAac = frameAac;
         frames++;
-
+        }
       // onto next frame
-      buf += bytesSkipped + frameLen;
-      bufLen -= bytesSkipped + frameLen;
-      lostSync += bytesSkipped;
+      buf += skipped + frameLen;
+      bufLen -= skipped + frameLen;
+      lostSync += skipped;
       }
 
-    cLog::log (LOGINFO, "parseMp3 f:%d lost:%d tags:%d", frames, lostSync, tags);
+    cLog::log (LOGINFO, "parseFrames f:%d lost:%d aac:%d tags:%d", frames, lostSync, resultAac, tags);
 
-    return frames;
+    return resultAac;
     }
   //}}}
 
@@ -895,36 +913,39 @@ private:
     cLog::setThreadName ("anal");
 
     while (!getExit()) {
-      //{{{  open file mapping
-      auto fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-      mStreamBuf = (uint8_t*)MapViewOfFile (CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL), FILE_MAP_READ, 0, 0, 0);
-      mStreamLen = (int)GetFileSize (fileHandle, NULL);
-      //}}}
-      bool aac = mFileList->getCurFileItem().getExtension() == "aac";
-      mSong.init (mFileList->getCurFileItem().getFullName(), aac, aac ? 2048 : 1152);
-
       auto time = system_clock::now();
 
-      parseFrames (aac, mStreamBuf, mStreamLen);
+      // open file mapping
+      auto fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+      auto mapping = CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
+      mStreamBuf = (uint8_t*)MapViewOfFile (mapping, FILE_MAP_READ, 0, 0, 0);
+      mStreamLen = (int)GetFileSize (fileHandle, NULL);
+      mStreamAac = parseFrames (mStreamBuf, mStreamLen);
+      mSong.init (mFileList->getCurFileItem().getFullName(), mStreamAac, mStreamAac ? 2048 : 1152);
+
+      // replace jpeg
+      auto temp = mSong.mImage;
+      mSong.mImage = nullptr;
+      delete temp;
       parseId3Tag (mStreamBuf, mStreamLen);
 
-      auto codec = avcodec_find_decoder (aac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
+      auto codec = avcodec_find_decoder (mStreamAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
       auto context = avcodec_alloc_context3 (codec);
       avcodec_open2 (context, codec, NULL);
 
       AVPacket avPacket;
       av_init_packet (&avPacket);
-
       auto avFrame = av_frame_alloc();
       auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
       auto streamPtr = mStreamBuf;
       auto bytesLeft = mStreamLen;
 
+      bool frameAac;
       bool tag;
-      int bytesSkipped;
-      while (parseFrame (aac, streamPtr, bytesLeft, avPacket.data, avPacket.size, tag, bytesSkipped)) {
-        if (!tag) {
+      int skipped;
+      while (parseFrame (streamPtr, bytesLeft, avPacket.data, avPacket.size, frameAac, tag, skipped)) {
+        if ((frameAac == mStreamAac) && !tag) {
           auto ret = avcodec_send_packet (context, &avPacket);
           while (ret >= 0) {
             ret = avcodec_receive_frame (context, avFrame);
@@ -980,8 +1001,8 @@ private:
               }
             }
           }
-        streamPtr += bytesSkipped + avPacket.size;
-        bytesLeft -= bytesSkipped + avPacket.size;
+        streamPtr += skipped + avPacket.size;
+        bytesLeft -= skipped + avPacket.size;
         }
 
       // done
@@ -1016,13 +1037,12 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("play");
 
-    auto codec = avcodec_find_decoder (mSong.mAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
+    auto codec = avcodec_find_decoder (mStreamAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
     auto context = avcodec_alloc_context3 (codec);
     avcodec_open2 (context, codec, NULL);
 
     AVPacket avPacket;
     av_init_packet (&avPacket);
-
     auto avFrame = av_frame_alloc();
     auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
@@ -1035,9 +1055,10 @@ private:
         uint8_t* streamPtr = mStreamBuf + streamPos;
         int bytesLeft = mStreamLen - streamPos;
 
+        bool aac;
         bool tag;
-        int bytesSkipped;
-        if (parseFrame (mSong.mAac, streamPtr, bytesLeft, avPacket.data, avPacket.size, tag, bytesSkipped) && !tag) {
+        int skipped;
+        if (parseFrame (streamPtr, bytesLeft, avPacket.data, avPacket.size, aac, tag, skipped) && (mStreamAac == mStreamAac) && !tag) {
           auto ret = avcodec_send_packet (context, &avPacket);
           while (ret >= 0) {
             ret = avcodec_receive_frame (context, avFrame);
@@ -1106,6 +1127,8 @@ private:
 
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;
+  bool mStreamAac = false;
+
   cJpegImageView* mJpegImageView = nullptr;
 
   bool mChanged = false;
