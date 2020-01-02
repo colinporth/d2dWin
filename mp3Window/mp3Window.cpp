@@ -760,7 +760,7 @@ private:
     }
   //}}}
   //{{{
-  void parseMp3 (uint8_t* buf, int bufLen) {
+  int parseMp3Frames (uint8_t* buf, int bufLen) {
 
     int tags = 0;
     int frames = 0;
@@ -780,6 +780,8 @@ private:
       }
 
     cLog::log (LOGINFO, "parseMp3 f:%d lost:%d tags:%d", frames, lostSync, tags);
+
+    return frames;
     }
   //}}}
   //{{{
@@ -893,7 +895,7 @@ private:
       if (aac)
         parseAdtsAac (mStreamBuf, mStreamLen);
       else
-        parseMp3 (mStreamBuf, mStreamLen);
+        parseMp3Frames (mStreamBuf, mStreamLen);
 
       auto time = system_clock::now();
 
