@@ -54,8 +54,8 @@ public:
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
+    add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
-    add (new cSongBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
 
     mFileList = new cFileList (fileName, "*.aac;*.mp3");
@@ -88,8 +88,8 @@ public:
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
+    add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
-    add (new cSongBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
 
     mVolumeBox = new cVolumeBox (this, 12.f,0.f, nullptr);
@@ -309,15 +309,15 @@ private:
   //}}}
 
   //{{{
-  class cSongBox : public cBox {
+  class cSongWaveBox : public cBox {
   public:
     //{{{
-    cSongBox (cD2dWindow* window, float width, float height, cSong& frameSet) :
+    cSongWaveBox (cD2dWindow* window, float width, float height, cSong& frameSet) :
         cBox ("frameSet", window, width, height), mSong(frameSet) {
       mPin = true;
       }
     //}}}
-    virtual ~cSongBox() {}
+    virtual ~cSongWaveBox() {}
 
     //{{{
     bool onMove (bool right, cPoint pos, cPoint inc) {
@@ -398,11 +398,11 @@ private:
     };
   //}}}
   //{{{
-  class cSongLensBox : public cSongBox {
+  class cSongLensBox : public cSongWaveBox {
   public:
     //{{{
     cSongLensBox (cD2dWindow* window, float width, float height, cSong& frameSet)
-      : cSongBox (window, width, height, frameSet) {}
+      : cSongWaveBox(window, width, height, frameSet) {}
     //}}}
     //{{{
     virtual ~cSongLensBox() {
@@ -413,7 +413,7 @@ private:
     //{{{
     void layout() {
       mSummedFrame = -1;
-      cSongBox::layout();
+      cSongWaveBox::layout();
       }
     //}}}
 
@@ -438,7 +438,7 @@ private:
     //{{{
     bool onUp (bool right, bool mouseMoved, cPoint pos) {
       mOn = false;
-      return cSongBox::onUp (right, mouseMoved, pos);
+      return cSongWaveBox::onUp (right, mouseMoved, pos);
       }
     //}}}
     //{{{
@@ -480,7 +480,7 @@ private:
       else
         draw (dc, rightLensX, getWidthInt());
 
-      cSongBox::draw (dc, mSong.mPlayFrame - mLens, mSong.mPlayFrame + mLens-2, leftLensX+1, 1);
+      cSongWaveBox::draw (dc, mSong.mPlayFrame - mLens, mSong.mPlayFrame + mLens-2, leftLensX+1, 1);
 
       dc->DrawRectangle (cRect(mRect.left + leftLensX, mRect.top + 1.f,
                                mRect.left + rightLensX, mRect.top + getHeight() - 1.f),
