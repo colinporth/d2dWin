@@ -150,9 +150,9 @@ protected:
 
 private:
   //{{{
-  class cDecoderFrame {
+  class cFrame {
   public:
-    cDecoderFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels]) : mStreamPos(streamPos), mFrameLen(frameLen) {
+    cFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels]) : mStreamPos(streamPos), mFrameLen(frameLen) {
       for (auto i = 0; i < kMaxChannels; i++)
         mValues[i] = values[i];
       mSilent = isSilentThreshold();
@@ -174,14 +174,14 @@ private:
   public:
     //{{{
     virtual ~cSong() {
-      mDecoderFrames.clear();
+      mFrames.clear();
       }
     //}}}
 
     //{{{
     void init (string fileName, bool aac, uint16_t samplesPerFrame) {
 
-      mDecoderFrames.clear();
+      mFrames.clear();
 
       mPlayFrame = 0;
       mMaxValue = 0;
@@ -195,27 +195,27 @@ private:
       }
     //}}}
     //{{{
-    bool addDecoderFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels], uint32_t streamLen) {
+    bool addFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels], uint32_t streamLen) {
     // return true if enough frames added to start playing
 
-      mDecoderFrames.push_back (cDecoderFrame (streamPos, frameLen, values));
+      mFrames.push_back (cFrame (streamPos, frameLen, values));
 
       mMaxValue = max (mMaxValue, values[0]);
       mMaxValue = max (mMaxValue, values[1]);
 
       // estimate numFrames
-      mNumFrames = int (uint64_t(streamLen - mDecoderFrames[0].mStreamPos) * (uint64_t)mDecoderFrames.size() /
-                        uint64_t(streamPos + frameLen - mDecoderFrames[0].mStreamPos));
+      mNumFrames = int (uint64_t(streamLen - mFrames[0].mStreamPos) * (uint64_t)mFrames.size() /
+                        uint64_t(streamPos + frameLen - mFrames[0].mStreamPos));
 
       // calc silent window
       auto frame = getNumLoadedFrames()-1;
-      if (mDecoderFrames[frame].isSilent()) {
+      if (mFrames[frame].isSilent()) {
         auto window = kSilentWindow;
         auto windowFrame = frame - 1;
         while ((window >= 0) && (windowFrame >= 0)) {
           // walk backwards looking for no silence
-          if (!mDecoderFrames[windowFrame].isSilentThreshold()) {
-            mDecoderFrames[frame].mSilent = false;
+          if (!mFrames[windowFrame].isSilentThreshold()) {
+            mFrames[frame].mSilent = false;
             break;
             }
           windowFrame--;
@@ -229,16 +229,16 @@ private:
 
     // gets
     int getNumdFrames() { return mNumFrames; }
-    int getNumLoadedFrames() { return (int)mDecoderFrames.size(); }
+    int getNumLoadedFrames() { return (int)mFrames.size(); }
     //{{{
     uint32_t getPlayFrameStreamPos() {
 
-      if (mDecoderFrames.empty())
+      if (mFrames.empty())
         return 0;
-      else if (mPlayFrame < mDecoderFrames.size())
-        return mDecoderFrames[mPlayFrame].mStreamPos;
+      else if (mPlayFrame < mFrames.size())
+        return mFrames[mPlayFrame].mStreamPos;
       else
-        return mDecoderFrames[0].mStreamPos;
+        return mFrames[0].mStreamPos;
       }
     //}}}
     int getSamplesSize() { return mMaxSamplesPerFrame * mChannels * mBytesPerSample; }
@@ -267,7 +267,7 @@ private:
     string mFileName;
     string mPathName;
 
-    concurrent_vector<cDecoderFrame> mDecoderFrames;
+    concurrent_vector<cFrame> mFrames;
 
     int mPlayFrame = 0;
     int mNumFrames = 0;
@@ -289,7 +289,7 @@ private:
     int skipPrev (int fromFrame, bool silent) {
 
       for (auto frame = fromFrame-1; frame >= 0; frame--)
-        if (mDecoderFrames[frame].isSilent() ^ silent)
+        if (mFrames[frame].isSilent() ^ silent)
           return frame;
 
       return fromFrame;
@@ -299,7 +299,7 @@ private:
     int skipNext (int fromFrame, bool silent) {
 
       for (auto frame = fromFrame; frame < getNumLoadedFrames(); frame++)
-        if (mDecoderFrames[frame].isSilent() ^ silent)
+        if (mFrames[frame].isSilent() ^ silent)
           return frame;
 
       return fromFrame;
@@ -367,12 +367,12 @@ private:
       float xl = mRect.left + firstX;
       for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
         float xr = xl + 1.f;
-        if (mSong.mDecoderFrames[frame].isSilent())
+        if (mSong.mFrames[frame].isSilent())
           dc->FillRectangle (cRect (xl, yCentre-kSilentThreshold, xr, yCentre+kSilentThreshold), mWindow->getRedBrush());
 
         if (!centre && (frame >= mSong.mPlayFrame)) {
-          auto yLeft = mSong.mDecoderFrames[frame].mValues[0] * valueScale;
-          auto yRight = mSong.mDecoderFrames[frame].mValues[1] * valueScale;
+          auto yLeft = mSong.mFrames[frame].mValues[0] * valueScale;
+          auto yRight = mSong.mFrames[frame].mValues[1] * valueScale;
           dc->FillRectangle (cRect (xl, yCentre - yLeft, xr, yCentre + yRight), mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
           centre = true;
@@ -381,8 +381,8 @@ private:
           float yLeft = 0;
           float yRight = 0;
           for (auto i = 0; i < zoom; i++) {
-            yLeft += mSong.mDecoderFrames[frame+i].mValues[0];
-            yRight += mSong.mDecoderFrames[frame+i].mValues[1];
+            yLeft += mSong.mFrames[frame+i].mValues[0];
+            yRight += mSong.mFrames[frame+i].mValues[1];
             }
           yLeft = (yLeft / zoom) * valueScale;
           yRight = (yRight / zoom) * valueScale;
@@ -506,13 +506,13 @@ private:
           if (frame >= mSong.getNumLoadedFrames())
             break;
 
-          int leftValue = mSong.mDecoderFrames[frame].mValues[0];
-          int rightValue = mSong.mDecoderFrames[frame].mValues[1];
+          int leftValue = mSong.mFrames[frame].mValues[0];
+          int rightValue = mSong.mFrames[frame].mValues[1];
           if (frame > startFrame) {
             int num = 1;
             for (auto i = startFrame; i < frame; i++) {
-              leftValue += mSong.mDecoderFrames[i].mValues[0];
-              rightValue += mSong.mDecoderFrames[i].mValues[1];
+              leftValue += mSong.mFrames[i].mValues[0];
+              rightValue += mSong.mFrames[i].mValues[1];
               num++;
               }
             leftValue /= num;
@@ -548,8 +548,8 @@ private:
       for (auto x = firstX; x < lastX; x++) {
         float xr = xl + 1.f;
         if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumLoadedFrames())) {
-          float leftValue = mSong.mDecoderFrames[mSong.mPlayFrame].mValues[0] * valueScale;
-          float rightValue = mSong.mDecoderFrames[mSong.mPlayFrame].mValues[1] * valueScale;
+          float leftValue = mSong.mFrames[mSong.mPlayFrame].mValues[0] * valueScale;
+          float rightValue = mSong.mFrames[mSong.mPlayFrame].mValues[1] * valueScale;
           dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
                              mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
@@ -663,10 +663,10 @@ private:
   //}}}
 
   //{{{
-  bool parseId3Tag (uint8_t* buf, uint8_t* lastBuf) {
+  bool parseId3Tag (uint8_t* stream, uint8_t* streamLast) {
   // look for ID3 Jpeg tag
 
-    auto ptr = buf;
+    auto ptr = stream;
     auto tag = (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
 
     if (tag == 0x49443303)  {
@@ -676,7 +676,7 @@ private:
                            ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5], tagSize);
       ptr += 10;
 
-      while (ptr < buf + tagSize) {
+      while (ptr < stream + tagSize) {
         auto tag = (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
         auto frameSize = (ptr[4] << 24) | (ptr[5] << 16) | (ptr[6] << 8) | ptr[7];
         if (!frameSize)
@@ -716,31 +716,31 @@ private:
     }
   //}}}
   //{{{
-  bool parseFrame (uint8_t* buf, uint8_t* lastBuf, uint8_t*& framePtr, int& frameLen, bool& aac, bool& id3Tag, int& skipped) {
+  bool parseFrame (uint8_t* stream, uint8_t* streamLast, uint8_t*& frame, int& frameLen, bool& aac, bool& id3Tag, int& skipped) {
   // start of mp3 / aac adts parser
 
     skipped = 0;
 
-    while ((lastBuf - buf) >= 6) {
-      if (buf[0] == 'I' && buf[1] == 'D' && buf[2] == '3') {
+    while ((streamLast - stream) >= 6) {
+      if (stream[0] == 'I' && stream[1] == 'D' && stream[2] == '3') {
         //{{{  id3 header
-        auto tagSize = (buf[6] << 21) | (buf[7] << 14) | (buf[8] << 7) | buf[9];
+        auto tagSize = (stream[6] << 21) | (stream[7] << 14) | (stream[8] << 7) | stream[9];
 
         // return tag & size
-        framePtr = buf;
+        frame = stream;
         frameLen = 10 + tagSize;
 
         aac = false;
         id3Tag = true;
 
         // check for enough bytes for frame body
-        return buf + frameLen < lastBuf;
+        return stream + frameLen < streamLast;
         }
         //}}}
 
-      else if ((buf[0] == 0xFF) && ((buf[1] & 0xF0) == 0xF0)) {
+      else if ((stream[0] == 0xFF) && ((stream[1] & 0xF0) == 0xF0)) {
         // syncWord found
-        if ((buf[1] & 0x06) == 0) {
+        if ((stream[1] & 0x06) == 0) {
           //{{{  aac header
           // Header consists of 7 or 9 bytes (without or with CRC).
           // AAAAAAAA AAAABCCD EEFFFFGH HHIJKLMM MMMMMMMM MMMOOOOO OOOOOOPP (QQQQQQQQ QQQQQQQQ)
@@ -758,23 +758,23 @@ private:
           // K  1  copyrighted id bit, the next bit of a centrally registered copyright identifier, set to 0 when encoding, ignore when decoding
           // L  1  copyright id start, signals that this frame's copyright id bit is the first bit of the copyright id, set to 0 when encoding, ignore when decoding
           // M 13  frame length, this value must include 7 or 9 bytes of header length: FrameLength = (ProtectionAbsent == 1 ? 7 : 9) + size(AACFrame)
-          // O 11  Buffer fullness
+          // O 11  buffer fullness
           // P  2  Number of AAC frames (RDBs) in ADTS frame minus 1, for maximum compatibility always use 1 AAC frame per ADTS frame
           // Q 16  CRC if protection absent is 0
 
           const int sampleRates[16] = { 96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350, 0,0,0};
 
-          auto sampleRate = sampleRates [(buf[2] & 0x3c) >> 2];
+          auto sampleRate = sampleRates [(stream[2] & 0x3c) >> 2];
 
           // return aacFrame & size
-          framePtr = buf;
-          frameLen = (((unsigned int)buf[3] & 0x3) << 11) | (((unsigned int)buf[4]) << 3) | (buf[5] >> 5);
+          frame = stream;
+          frameLen = (((unsigned int)stream[3] & 0x3) << 11) | (((unsigned int)stream[4]) << 3) | (stream[5] >> 5);
 
           aac = true;
           id3Tag = false;
 
           // check for enough bytes for frame body
-          return buf + frameLen < lastBuf;
+          return stream + frameLen < streamLast;
           }
           //}}}
         else {
@@ -872,20 +872,20 @@ private:
 
           const uint32_t sampleRates[4] = { 44100, 48000, 32000, 0};
 
-          uint8_t version = (buf[1] & 0x08) >> 3;
-          uint8_t layer = (buf[1] & 0x06) >> 1;
-          uint8_t errp = buf[1] & 0x01;
+          uint8_t version = (stream[1] & 0x08) >> 3;
+          uint8_t layer = (stream[1] & 0x06) >> 1;
+          uint8_t errp = stream[1] & 0x01;
 
-          uint8_t bitrateIndex = (buf[2] & 0xf0) >> 4;
-          uint8_t sampleRateIndex = (buf[2] & 0x0c) >> 2;
-          uint8_t pad = (buf[2] & 0x02) >> 1;
-          uint8_t priv = (buf[2] & 0x01);
+          uint8_t bitrateIndex = (stream[2] & 0xf0) >> 4;
+          uint8_t sampleRateIndex = (stream[2] & 0x0c) >> 2;
+          uint8_t pad = (stream[2] & 0x02) >> 1;
+          uint8_t priv = (stream[2] & 0x01);
 
-          uint8_t mode = (buf[3] & 0xc0) >> 6;
-          uint8_t modex = (buf[3] & 0x30) >> 4;
-          uint8_t copyright = (buf[3] & 0x08) >> 3;
-          uint8_t original = (buf[3] & 0x04) >> 2;
-          uint8_t emphasis = (buf[3] & 0x03);
+          uint8_t mode = (stream[3] & 0xc0) >> 6;
+          uint8_t modex = (stream[3] & 0x30) >> 4;
+          uint8_t copyright = (stream[3] & 0x08) >> 3;
+          uint8_t original = (stream[3] & 0x04) >> 2;
+          uint8_t emphasis = (stream[3] & 0x03);
 
           uint32_t bitrate = bitRates[bitrateIndex];
           uint32_t sampleRate = sampleRates[sampleRateIndex];
@@ -896,24 +896,24 @@ private:
             size++;
 
           // return mp3Frame & size
-          framePtr = buf;
+          frame = stream;
           frameLen = size;
           aac = false;
           id3Tag = false;
 
           // check for enough bytes for frame body
-          return buf + frameLen < lastBuf;
+          return stream + frameLen < streamLast;
           }
           //}}}
         }
 
       else {
         skipped++;
-        buf++;
+        stream++;
         }
       }
 
-    framePtr = nullptr;
+    frame = nullptr;
     frameLen = 0;
     aac = false;
     id3Tag = false;
@@ -922,7 +922,7 @@ private:
     }
   //}}}
   //{{{
-  bool parseFrames (uint8_t* buf, uint8_t* lastBuf) {
+  bool parseFrames (uint8_t* stream, uint8_t* streamLast) {
   // return true if stream is aac adts
 
     int tags = 0;
@@ -930,12 +930,12 @@ private:
     int lostSync = 0;
     bool resultAac = false;
 
-    uint8_t* framePtr = nullptr;
+    uint8_t* frame = nullptr;
     int frameLen = 0;
     bool frameAac = false;
     bool tag = false;
     int skipped = 0;
-    while (parseFrame (buf, lastBuf, framePtr, frameLen, frameAac, tag, skipped)) {
+    while (parseFrame (stream, streamLast, frame, frameLen, frameAac, tag, skipped)) {
       if (tag)
         tags++;
       else {
@@ -943,7 +943,7 @@ private:
         frames++;
         }
       // onto next frame
-      buf += skipped + frameLen;
+      stream += skipped + frameLen;
       lostSync += skipped;
       }
 
@@ -1046,7 +1046,7 @@ private:
                 }
               //}}}
               cLog::log (LOGINFO1, "frame size:%d", avPacket.size);
-              if (mSong.addDecoderFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, int(mStreamLast - mStreamFirst))) {
+              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, int(mStreamLast - mStreamFirst))) {
                 //{{{  launch playThread
                 auto threadHandle = thread ([=](){ playThread (false); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -1154,7 +1154,7 @@ private:
                   cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                 }
               //}}}
-              if (mSong.addDecoderFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, int(mStreamLast - mStreamFirst))) {
+              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, int(mStreamLast - mStreamFirst))) {
                 //{{{  launch playThread
                 auto threadHandle = thread ([=](){ playThread (true); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
