@@ -21,6 +21,11 @@ extern "C" {
   #include <libavformat/avformat.h>
   }
 
+#include "../../shared/utils/cBipBuffer.h"
+
+#define CURL_STATICLIB
+#include "../../curl/include/curl/curl.h"
+
 using namespace std;
 using namespace chrono;
 using namespace concurrency;
@@ -33,8 +38,6 @@ const int kSilentWindow = 12;
 
 const int kPlayFrameThreshold = 40; // about a second of analyse before playing
 //}}}
-
-string fileName = "C:/Users/colin/Music/Elton John";
 
 class cAppWindow : public cD2dWindow {
 public:
@@ -71,6 +74,45 @@ public:
 
     delete mFileList;
     delete mJpegImageView;
+    }
+  //}}}
+  //{{{
+  void run1 (const string& title, int width, int height, const string& url) {
+
+    mMaxStreamLen = 100000000;
+    mStreamBuf = (uint8_t*)malloc (mMaxStreamLen);
+    mStreamLen = 0;
+
+    mBipBuffer = new cBipBuffer;
+    mBipBuffer->allocateBuffer (8192 * 1024);
+
+    WSADATA wsaData;
+    if (WSAStartup (MAKEWORD(2,2), &wsaData))
+      exit (0);
+
+    initialise (title, width, height, false);
+    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
+    add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
+
+    add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (true);
+
+    add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
+    add (new cSongBox (this, 0,100.f, mSong), 0,-220.f);
+    add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
+
+    mVolumeBox = new cVolumeBox (this, 12.f,0.f, nullptr);
+    add (mVolumeBox, -12.f,0.f);
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
+
+    mCurl = curl_easy_init();
+    if (mCurl) {
+      thread ([=]() { httpThread (url.c_str()); }).detach();
+      thread ([=]() { readThread(); }).detach();
+
+      messagePump();
+      }
+    else
+      cLog::log (LOGERROR, "curl_easy_init error");
     }
   //}}}
 
@@ -277,7 +319,7 @@ private:
 
     //{{{
     bool onMove (bool right, cPoint pos, cPoint inc) {
-      mSong.incPlayFrame (-inc.x);
+      mSong.incPlayFrame (int(-inc.x));
       return true;
       }
     //}}}
@@ -628,7 +670,7 @@ private:
     auto tag = (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
 
     if (tag == 0x49443303)  {
-      // got ID3 tag
+      // ID3 tag
       auto tagSize = (ptr[6] << 21) | (ptr[7] << 14) | (ptr[8] << 7) | ptr[9];
       cLog::log (LOGINFO, "parseId3Tag - %c%c%c ver:%d %02x flags:%02x tagSize:%d",
                            ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5], tagSize);
@@ -642,17 +684,17 @@ private:
 
         auto frameFlags1 = ptr[8];
         auto frameFlags2 = ptr[9];
-        cLog::log (LOGINFO, "parseId3Tag - %c%c%c%c - %02x %02x - frameSize:%d",
-                             ptr[0], ptr[1], ptr[2], ptr[3], frameFlags1, frameFlags2, frameSize);
-        //for (auto i = 0; i < (tag == 0x41504943 ? 11 : frameSize); i++)
-        //  printf ("%c", *(ptr+10+i));
-        //printf ("\n");
-        //for (auto i = 0; i < (frameSize < 32 ? frameSize : 32); i++)
-        //  printf ("%02x ", *(ptr+10+i));
-        //printf ("\n");
+        string info;
+        for (auto i = 0; i < (frameSize < 40 ? frameSize : 40); i++)
+          if ((ptr[10+i] >= 0x20) && (ptr[10+i] < 0x7F))
+            info += ptr[10+i];
+
+        cLog::log (LOGINFO, "parseId3Tag - %c%c%c%c %02x %02x %d %s",
+                             ptr[0], ptr[1], ptr[2], ptr[3], frameFlags1, frameFlags2, frameSize, info.c_str());
 
         if (tag == 0x41504943) {
-          cLog::log (LOGINFO3, "parseId3Tag - jpeg tag found");
+          // APIC tag
+          cLog::log (LOGINFO3, "parseId3Tag - APIC jpeg tag found");
           auto jpegLen = frameSize - 14;
           auto jpegBuf =  (uint8_t*)malloc (jpegLen);
           memcpy (jpegBuf, ptr + 10 + 14, jpegLen);
@@ -727,9 +769,12 @@ private:
           // return aacFrame & size
           framePtr = buf;
           frameLen = (((unsigned int)buf[3] & 0x3) << 11) | (((unsigned int)buf[4]) << 3) | (buf[5] >> 5);
+
           aac = true;
           id3Tag = false;
-          return true;
+
+          // check for enough bytes for frame body
+          return bufLen - frameLen >= 0;
           }
           //}}}
         else {
@@ -855,7 +900,9 @@ private:
           frameLen = size;
           aac = false;
           id3Tag = false;
-          return true;
+
+          // check for enough bytes for frame body
+          return bufLen - frameLen >= 0;
           }
           //}}}
         }
@@ -920,6 +967,7 @@ private:
       auto mapping = CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
       mStreamBuf = (uint8_t*)MapViewOfFile (mapping, FILE_MAP_READ, 0, 0, 0);
       mStreamLen = (int)GetFileSize (fileHandle, NULL);
+
       mStreamAac = parseFrames (mStreamBuf, mStreamLen);
       mSong.init (mFileList->getCurFileItem().getFullName(), mStreamAac, mStreamAac ? 2048 : 1152);
 
@@ -1121,12 +1169,265 @@ private:
     }
   //}}}
 
-  //  vars
+  //{{{
+  static size_t header (void* ptr, size_t size, size_t nmemb, void* stream) {
+
+    if (nmemb > 2) {
+      // knock out cr lf
+      auto bytePtr = (uint8_t*)ptr;
+      bytePtr[nmemb-1] = 0;
+      bytePtr[nmemb-2] = 0;
+      cLog::log (LOGINFO, "%d %d %x %s", size, nmemb, stream, bytePtr);
+      }
+
+    return nmemb;
+    }
+  //}}}
+  //{{{
+  static size_t body (void* ptr, size_t size, size_t nmemb, void* stream) {
+
+    //cLog::log (LOGINFO, "body %d %d %x", size, nmemb, stream);
+
+    int bytesAllocated = 0;
+    auto toPtr = mBipBuffer->reserve ((int)nmemb, bytesAllocated);
+    if (bytesAllocated > 0) {
+      memcpy (toPtr, ptr, bytesAllocated);
+      mBipBuffer->commit (bytesAllocated);
+      }
+    else
+      cLog::log (LOGINFO, "mBipBuffer full");
+
+    return nmemb;
+    }
+  //}}}
+  //{{{
+  void httpThread (const char* url) {
+
+   CoInitializeEx (NULL, COINIT_MULTITHREADED);
+
+    //curl_easy_setopt (mCurl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt (mCurl, CURLOPT_URL, url);
+    curl_easy_setopt (mCurl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt (mCurl, CURLOPT_HEADERFUNCTION, header);
+    curl_easy_setopt (mCurl, CURLOPT_WRITEFUNCTION, body);
+
+    curl_easy_perform (mCurl);
+    curl_easy_cleanup (mCurl);
+
+    CoUninitialize();
+    }
+  //}}}
+  //{{{
+  void readThread() {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("read");
+
+    //char* contentType = NULL;
+    //bool ok = (curl_easy_getinfo (mCurl, CURLINFO_CONTENT_TYPE, &contentType) == 0);
+    //bool aac = ok && contentType && (strcmp (contentType, "audio/aacp") == 0);
+
+    int srcSize = 2048;
+    while (mBipBuffer->getCommittedSize() < srcSize)
+      Sleep (100);
+    memcpy (mStreamBuf, mBipBuffer->getContiguousBlock (srcSize), srcSize);
+    mBipBuffer->decommitBlock (srcSize);
+    mStreamLen = srcSize;
+    auto writePtr = mStreamBuf + srcSize;
+
+    mStreamAac = parseFrames (mStreamBuf, mStreamLen);
+    mSong.init ("stream", mStreamAac, mStreamAac ? 2048 : 1152);
+
+    AVPacket avPacket;
+    av_init_packet (&avPacket);
+    auto avFrame = av_frame_alloc();
+    auto samples = (int16_t*)malloc (mSong.getSamplesSize());
+    auto codec = avcodec_find_decoder (mStreamAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
+    auto context = avcodec_alloc_context3 (codec);
+    avcodec_open2 (context, codec, NULL);
+
+    auto streamPtr = mStreamBuf;
+    auto streamBytesLeft = mStreamLen;
+    bool frameAac;
+    bool tag;
+    int skipped;
+    while (true) {
+      while (parseFrame (streamPtr, streamBytesLeft, avPacket.data, avPacket.size, frameAac, tag, skipped)) {
+        if (!tag && (frameAac == mStreamAac)) {
+          auto ret = avcodec_send_packet (context, &avPacket);
+          while (ret >= 0) {
+            ret = avcodec_receive_frame (context, avFrame);
+            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
+              break;
+
+            if (avFrame->nb_samples > 0) {
+              uint8_t powers[kMaxChannels];
+              //{{{  calc power for each channel
+              int decimate = 2;
+
+              switch (context->sample_fmt) {
+                case AV_SAMPLE_FMT_S16P:
+                  // 16bit signed planar, copy planar to interleaved, calc channel power
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    float power = 0.f;
+                    auto srcPtr = (short*)avFrame->data[channel];
+                    for (auto i = 0; i < avFrame->nb_samples; i += decimate) {
+                      auto sample = *srcPtr;
+                      power += sample * sample;
+                      srcPtr += decimate;
+                      }
+                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples/decimate);
+                    }
+                  break;
+
+                case AV_SAMPLE_FMT_FLTP:
+                  // 32bit float planar, copy planar channel to interleaved, calc channel power
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    float power = 0.f;
+                    auto srcPtr = (float*)avFrame->data[channel];
+                    for (auto i = 0; i < avFrame->nb_samples; i += decimate) {
+                      auto sample = (short)(*srcPtr * 0x8000);
+                      power += sample * sample;
+                      srcPtr += decimate;
+                      }
+                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples/decimate);
+                    }
+                  break;
+
+                default:
+                  cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
+                }
+              //}}}
+              if (mSong.addDecoderFrame (uint32_t(avPacket.data - mStreamBuf), avPacket.size, powers, mStreamLen)) {
+                //{{{  launch playThread
+                auto threadHandle = thread ([=](){ playThread1(); });
+                SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
+                threadHandle.detach();
+                }
+                //}}}
+              changed();
+              }
+            }
+          }
+        streamPtr += skipped + avPacket.size;
+        streamBytesLeft -= skipped + avPacket.size;
+        }
+
+      int srcSize = 512;
+      while (mBipBuffer->getCommittedSize() < srcSize)
+        Sleep (100);
+      memcpy (writePtr, mBipBuffer->getContiguousBlock (srcSize), srcSize);
+      mBipBuffer->decommitBlock (srcSize);
+      writePtr += srcSize;
+
+      mStreamLen += srcSize;
+      streamBytesLeft += srcSize;
+      }
+
+    // done
+    free (samples);
+    av_frame_free (&avFrame);
+    if (context)
+      avcodec_close (context);
+
+    CoUninitialize();
+    }
+  //}}}
+  //{{{
+  void playThread1() {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("ply1");
+
+    auto codec = avcodec_find_decoder (mStreamAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
+    auto context = avcodec_alloc_context3 (codec);
+    avcodec_open2 (context, codec, NULL);
+
+    AVPacket avPacket;
+    av_init_packet (&avPacket);
+    auto avFrame = av_frame_alloc();
+    auto samples = (int16_t*)malloc (mSong.getSamplesSize());
+
+    cWinAudio audio (mSong.mChannels, mSong.mSamplesPerSec);
+    mVolumeBox->setAudio (&audio);
+
+    while (!getAbort()) {
+      if (mPlaying && (mSong.mPlayFrame < mSong.getNumLoadedFrames()-1)) {
+        auto streamPos = mSong.getPlayFrameStreamPos();
+        uint8_t* streamPtr = mStreamBuf + streamPos;
+        int bytesLeft = mStreamLen - streamPos;
+
+        bool aac;
+        bool tag;
+        int skipped;
+        if (parseFrame (streamPtr, bytesLeft, avPacket.data, avPacket.size, aac, tag, skipped) && (mStreamAac == mStreamAac) && !tag) {
+          auto ret = avcodec_send_packet (context, &avPacket);
+          while (ret >= 0) {
+            ret = avcodec_receive_frame (context, avFrame);
+            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
+              break;
+
+            if (avFrame->nb_samples > 0) {
+              switch (context->sample_fmt) {
+                case AV_SAMPLE_FMT_S16P:
+                  //{{{  16bit signed planar, copy planar to interleaved
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    auto srcPtr = (short*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      *dstPtr = *srcPtr++;
+                      dstPtr += avFrame->channels;
+                      }
+                    }
+                  break;
+                  //}}}
+                case AV_SAMPLE_FMT_FLTP:
+                  //{{{  32bit float planar, copy planar channel to interleaved
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    auto srcPtr = (float*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      *dstPtr = (short)(*srcPtr++ * 0x8000);
+                      dstPtr += avFrame->channels;
+                      }
+                    }
+                  break;
+                  //}}}
+                default:
+                  cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
+                }
+              audio.play (avFrame->channels, samples, avFrame->nb_samples, 1.f);
+              mSong.incPlayFrame (1);
+              changed();
+              }
+            }
+          }
+        }
+      else
+        audio.play (mSong.mChannels, nullptr, mSong.mSamplesPerFrame, 1.f);
+      }
+
+    // done
+    mVolumeBox->setAudio (nullptr);
+
+    free (samples);
+    av_frame_free (&avFrame);
+    if (context)
+      avcodec_close (context);
+
+    cLog::log (LOGINFO, "exit");
+
+    CoUninitialize();
+    }
+  //}}}
+
+  //{{{  vars
   cFileList* mFileList;
   cSong mSong;
 
   uint8_t* mStreamBuf = nullptr;
   uint32_t mStreamLen = 0;
+  uint32_t mMaxStreamLen = 0;
   bool mStreamAac = false;
 
   cJpegImageView* mJpegImageView = nullptr;
@@ -1136,7 +1437,13 @@ private:
   cSemaphore mPlayDoneSem;
 
   cVolumeBox* mVolumeBox = nullptr;
+
+  static CURL* mCurl;
+  static cBipBuffer* mBipBuffer;
+  //}}}
   };
+CURL* cAppWindow::mCurl = nullptr;
+cBipBuffer* cAppWindow::mBipBuffer = nullptr;
 
 //{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
@@ -1144,19 +1451,26 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO, true);
   //cLog::init (LOGINFO, false, "");
-  cLog::log (LOGNOTICE, "mp3Window");
 
   avcodec_register_all();
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-  if (numArgs > 1) {
-    wstring wstr (args[1]);
-    fileName = string (wstr.begin(), wstr.end());
-    }
 
   cAppWindow appWindow;
-  appWindow.run ("mp3Window", 800, 500, fileName);
+
+  if (numArgs == 1) {
+    string url =  "http://stream.wqxr.org/js-stream.aac";
+    cLog::log (LOGNOTICE, "curl test %s", url);
+    appWindow.run1 ("httpWindow", 800, 500, url);
+    }
+  else {
+    string fileName = "C:/Users/colin/Music/Elton John";
+    wstring wstr(args[1]);
+    fileName = string(wstr.begin(), wstr.end());
+    cLog::log (LOGNOTICE, "mp3Window" + fileName);
+    appWindow.run ("mp3Window", 800, 500, fileName);
+    }
 
   CoUninitialize();
   }

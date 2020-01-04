@@ -64,6 +64,24 @@ static size_t body (void* ptr, size_t size, size_t nmemb, void* stream) {
   return nmemb;
   }
 //}}}
+
+//{{{
+void httpThread (const char* url) {
+
+ CoInitializeEx (NULL, COINIT_MULTITHREADED);
+
+  //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt (curl, CURLOPT_URL, url);
+  curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt (curl, CURLOPT_HEADERFUNCTION, header);
+  curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, body);
+
+  curl_easy_perform (curl);
+  curl_easy_cleanup (curl);
+
+  CoUninitialize();
+  }
+//}}}
 //{{{
 void readThread() {
 
@@ -181,25 +199,20 @@ int main (int argc, char *argv[]) {
   avcodec_register_all();
   mBipBuffer.allocateBuffer (8192 * 1024);
 
-  //WSADATA wsaData;
-  //if (WSAStartup (MAKEWORD(2,2), &wsaData))
-  //  exit (0);
+  WSADATA wsaData;
+  if (WSAStartup (MAKEWORD(2,2), &wsaData))
+    exit (0);
 
   curl = curl_easy_init();
   if (curl) {
-    //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
-    curl_easy_setopt (curl, CURLOPT_URL, url);
-    curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt (curl, CURLOPT_HEADERFUNCTION, header);
-    curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, body);
-
-    thread ([=](){ readThread(); }).detach();
-    bool ok = curl_easy_perform (curl) == CURLE_OK;
-
-    curl_easy_cleanup (curl);
+    thread ([=]() { httpThread (url); }).detach();
+    thread ([=]() { readThread(); }).detach();
     }
   else
     cLog::log (LOGERROR, "curl_easy_init error");
+
+  while (true)
+    Sleep (1000);
 
   CoUninitialize();
   }
