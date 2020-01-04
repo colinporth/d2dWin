@@ -152,7 +152,7 @@ private:
   //{{{
   class cFrame {
   public:
-    cFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels]) : mStreamPos(streamPos), mFrameLen(frameLen) {
+    cFrame (uint32_t streamIndex, uint32_t len, uint8_t values[kMaxChannels]) : mStreamIndex(streamIndex), mLen(len) {
       for (auto i = 0; i < kMaxChannels; i++)
         mValues[i] = values[i];
       mSilent = isSilentThreshold();
@@ -162,8 +162,8 @@ private:
     bool isSilentThreshold() { return mValues[0] + mValues[1] <= kSilentThreshold; }
 
     // vars
-    uint32_t mStreamPos;
-    uint32_t mFrameLen;
+    uint32_t mStreamIndex;
+    uint32_t mLen;
 
     uint8_t mValues[kMaxChannels];
     bool mSilent;
@@ -204,8 +204,8 @@ private:
       mMaxValue = max (mMaxValue, values[1]);
 
       // estimate numFrames
-      mNumFrames = int (uint64_t(streamLen - mFrames[0].mStreamPos) * (uint64_t)mFrames.size() /
-                        uint64_t(streamPos + frameLen - mFrames[0].mStreamPos));
+      mNumFrames = int (uint64_t(streamLen - mFrames[0].mStreamIndex) * (uint64_t)mFrames.size() /
+                        uint64_t(streamPos + frameLen - mFrames[0].mStreamIndex));
 
       // calc silent window
       auto frame = getNumLoadedFrames()-1;
@@ -231,14 +231,14 @@ private:
     int getNumdFrames() { return mNumFrames; }
     int getNumLoadedFrames() { return (int)mFrames.size(); }
     //{{{
-    uint32_t getPlayFrameStreamPos() {
+    uint32_t getPlayFrameStreamIndex() {
 
       if (mFrames.empty())
         return 0;
       else if (mPlayFrame < mFrames.size())
-        return mFrames[mPlayFrame].mStreamPos;
+        return mFrames[mPlayFrame].mStreamIndex;
       else
-        return mFrames[0].mStreamPos;
+        return mFrames[0].mStreamIndex;
       }
     //}}}
     int getSamplesSize() { return mMaxSamplesPerFrame * mChannels * mBytesPerSample; }
@@ -1214,9 +1214,7 @@ private:
 
     while (!getExit() && !mChanged && !(stopAtEnd && (mSong.mPlayFrame >= mSong.getNumLoadedFrames()-1))) {
       if (mPlaying) {
-        auto streamPos = mSong.getPlayFrameStreamPos();
-        uint8_t* stream = mStreamFirst + streamPos;
-
+        uint8_t* stream = mStreamFirst + mSong.getPlayFrameStreamIndex();
         bool aac;
         bool tag;
         int skipped;
