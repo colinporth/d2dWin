@@ -53,6 +53,34 @@ public:
   };
 
 
+class cUInt32Box : public cD2dWindow::cBox {
+public:
+  //{{{
+  cUInt32Box (cD2dWindow* window, float width, float height, const string& title, uint32_t& value) :
+      cBox("info", window, width, height), mTitle(title), mValue(value) {}
+  //}}}
+  virtual ~cUInt32Box() {}
+
+  //{{{
+  void onDraw (ID2D1DeviceContext* dc) {
+    string str = mTitle + dec(mValue);
+
+    IDWriteTextLayout* textLayout;
+    mWindow->getDwriteFactory()->CreateTextLayout (
+      wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+      mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+    dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
+    dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+
+    textLayout->Release();
+    }
+  //}}}
+
+private:
+  string mTitle;
+  uint32_t& mValue;
+  };
+
 class cUInt64Box : public cD2dWindow::cBox {
 public:
   //{{{
