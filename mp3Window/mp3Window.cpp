@@ -16,6 +16,7 @@
 #include "../boxes/cCalendarBox.h"
 #include "../boxes/cClockBox.h"
 #include "../boxes/cIntBox.h"
+#include "../boxes/cTitleBox.h"
 
 extern "C" {
   #include <libavcodec/avcodec.h>
@@ -37,7 +38,6 @@ const int kSilentWindow = 12;
 
 const int kPlayFrameThreshold = 10; // about a second of analyse before playing
 //}}}
-
 
 class cAppWindow : public cD2dWindow {
 public:
@@ -83,10 +83,14 @@ public:
     add (new cIntBox (this, 100.f, 24.f, "frame ", mSong.mPlayFrame), 0.f, 0.f);
     add (new cIntBox (this, 100.f, 24.f, "frames ", mSong.mNumFrames), 100.f, 0.f);
 
+    add (new cTitleBox (this, 300.f, 24.f, mTitleStr), 0.f, 24.f);
+    add (new cTitleBox (this, 300.f, 24.f, mUrlStr), 0.f, 48.f);
+    add (new cTitleBox (this, 300.f, 24.f, mIcyStr), 0.f, 72.f);
+
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f, 0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
 
-    add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
+    add (new cLogBox (this, 400.f,0.f, true), 0.f,0.f)->setPin (false);
 
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
@@ -96,24 +100,14 @@ public:
     add (mVolumeBox, -12.f,0.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
-    WSADATA wsaData;
-    if (WSAStartup (MAKEWORD(2,2), &wsaData))
-      exit (0);
+    // allocate stream
+    mStreamFirst = (uint8_t*)malloc (100000000);
+    mStreamLast = mStreamFirst;
 
-    mCurl = curl_easy_init();
-    if (mCurl) {
-      mStreamFirst = (uint8_t*)malloc (100000000);
-      mStreamLast = mStreamFirst;
+    thread ([=]() { httpThread (url.c_str()); }).detach();
+    thread ([=]() { analyseStreamThread(); }).detach();
 
-      thread ([=]() { httpThread (url.c_str()); }).detach();
-      thread ([=]() { analyseStreamThread(); }).detach();
-
-      messagePump();
-
-      curl_easy_cleanup (mCurl);
-      }
-    else
-      cLog::log (LOGERROR, "curl_easy_init error");
+    messagePump();
     }
   //}}}
 
@@ -954,30 +948,69 @@ private:
   //}}}
 
   //{{{
+  void addInfo (string info) {
+
+    mIcyStr = info;
+    cLog::log (LOGINFO, mIcyInfo);
+
+    string searchStr = "StreamTitle=\'";
+    auto searchStrPos = mIcyStr.find (searchStr);
+    if (searchStrPos != std::string::npos) {
+      auto searchEndPos = mIcyStr.find ("\';", searchStrPos + searchStr.size());
+      mTitleStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+      cLog::log (LOGINFO, "title = " + mTitleStr);
+      }
+    else
+      mTitleStr = "no title";
+
+    searchStr = "StreamUrl=\'";
+    searchStrPos = mIcyStr.find (searchStr);
+    if (searchStrPos != std::string::npos) {
+      auto searchEndPos = mIcyStr.find ('\'', searchStrPos + searchStr.size());
+      mUrlStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+      cLog::log (LOGINFO, "url = " + mUrlStr);
+      }
+    else
+      mUrlStr = "no url";
+    }
+  //}}}
+
+  //{{{
   void httpThread (const char* url) {
 
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("http");
 
-    //curl_easy_setopt (mCurl, CURLOPT_VERBOSE, 1L);
-    curl_easy_setopt (mCurl, CURLOPT_URL, url);
-    curl_easy_setopt (mCurl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt (mCurl, CURLOPT_HEADERFUNCTION, header);
-    curl_easy_setopt (mCurl, CURLOPT_WRITEFUNCTION, body);
-    curl_easy_setopt (mCurl, CURLOPT_WRITEDATA, this);
+    CURL* curl = curl_easy_init();
+    if (curl) {
+      //curl_easy_setopt (curl, CURLOPT_DEBUGFUNCTION, httpTrace);
+      //curl_easy_setopt (curl, CURLOPT_DEBUGDATA, this);
+      //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
 
-    curl_easy_perform (mCurl);
+      curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+      curl_easy_setopt (curl, CURLOPT_URL, url);
+      struct curl_slist* slist = NULL;
+      slist = curl_slist_append (slist, "Icy-MetaData: 1");
+      curl_easy_setopt (curl, CURLOPT_HTTPHEADER, slist);
+
+      curl_easy_setopt (curl, CURLOPT_HEADERFUNCTION, httpHeader);
+      curl_easy_setopt (curl, CURLOPT_HEADERDATA, this);
+
+      curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, httpBody);
+      curl_easy_setopt (curl, CURLOPT_WRITEDATA, this);
+
+      curl_easy_perform (curl);
+
+      curl_slist_free_all (slist);
+      }
 
     // never gets here
-    curl_easy_cleanup (mCurl);
-
-    CoUninitialize();
+    curl_easy_cleanup (curl);
     }
   //}}}
   //{{{
   void analyseStreamThread() {
 
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("anls");
 
     // wait for a bit of stream to get codec
@@ -1045,7 +1078,7 @@ private:
                   cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                 }
               //}}}
-              cLog::log (LOGINFO1, "frame size:%d", avPacket.size);
+              cLog::log (LOGINFO2, "frame size:%d", avPacket.size);
               if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, int(mStreamLast - mStreamFirst))) {
                 //{{{  launch playThread
                 auto threadHandle = thread ([=](){ playThread (false); });
@@ -1067,11 +1100,8 @@ private:
     av_frame_free (&avFrame);
     if (context)
       avcodec_close (context);
-
-    CoUninitialize();
     }
   //}}}
-
   //{{{
   void analyseThread() {
 
@@ -1274,36 +1304,121 @@ private:
     if (context)
       avcodec_close (context);
 
-    cLog::log (LOGINFO, "exit");
-
     mPlayDoneSem.notifyAll();
 
+    cLog::log (LOGINFO, "exit");
     CoUninitialize();
     }
   //}}}
 
   //{{{
-  static size_t header (void* ptr, size_t size, size_t nmemb, void* reference) {
+  static int httpTrace (CURL* handle, curl_infotype type, char* data, size_t size, void* reference) {
+
+    auto appWindow = (cAppWindow*)reference;
+
+    switch (type) {
+      case CURLINFO_TEXT:
+        cLog::log (LOGINFO, "TEXT %s", data);
+        break;
+
+      case CURLINFO_HEADER_OUT:
+        cLog::log (LOGINFO, "HEADER_OUT %s", data);
+        break;
+
+      case CURLINFO_DATA_OUT:
+        cLog::log (LOGINFO, "DATA_OUT %s", data);
+        break;
+
+      case CURLINFO_SSL_DATA_OUT:
+        cLog::log (LOGINFO, "SSL_DATA_OUT %s", data);
+        break;
+
+      case CURLINFO_HEADER_IN:
+        cLog::log (LOGINFO, "HEADER_IN %s", data);
+        break;
+
+      case CURLINFO_DATA_IN:
+        //cLog::log (LOGINFO, "DATA_IN size:%d", size);
+        break;
+
+      case CURLINFO_SSL_DATA_IN:
+        cLog::log (LOGINFO, "SSL_DATA_IN size:%d", size);
+        break;
+
+      default:
+        return 0;
+      }
+
+    return 0;
+    }
+  //}}}
+  //{{{
+  static size_t httpHeader (void* ptr, size_t size, size_t nmemb, void* reference) {
+
+    auto appWindow = (cAppWindow*)reference;
+
+    cLog::log (LOGINFO2, "%d %d %x %s", size, nmemb, reference, ptr);
 
     if (nmemb > 2) {
-      // knock out cr lf
-      auto bytePtr = (uint8_t*)ptr;
-      bytePtr[nmemb-1] = 0;
-      bytePtr[nmemb-2] = 0;
-      cLog::log (LOGINFO, "%d %d %x %s", size, nmemb, reference, bytePtr);
+      string headerStr ((const char*)ptr, nmemb-2);
+      string searchStr ("icy-metaint:");
+      auto pos = headerStr.find (searchStr);
+      if (pos != std::string::npos) {
+        auto numStr = headerStr.substr (pos + searchStr.size(), headerStr.size());
+        auto num = std::stoi (numStr);
+        cLog::log (LOGINFO, "found header %s in  %s value:%d", searchStr.c_str(), headerStr.c_str(), num);
+        appWindow->mIcySkipLength = num;
+        }
+
       }
 
     return nmemb;
     }
   //}}}
   //{{{
-  static size_t body (void* ptr, size_t size, size_t nmemb, void* reference) {
+  static size_t httpBody (void* ptr, size_t size, size_t nmemb, void* reference) {
 
-    cLog::log (LOGINFO2, "body size:%d", nmemb);
+    auto appWindow = (cAppWindow*)reference;
+    auto bytes = (uint8_t*)ptr;
 
-    cAppWindow* appWindow = (cAppWindow*)reference;
-    memcpy (appWindow->mStreamLast, ptr, nmemb);
-    appWindow->mStreamLast += nmemb;
+    if ((appWindow->mIcyInfoCount >= appWindow->mIcyInfoLength)  &&
+        (appWindow->mIcySkipCount + nmemb <= appWindow->mIcySkipLength)) {
+
+      cLog::log (LOGINFO1, "body simple copy len:%d", nmemb);
+
+      // simple copy of whole body, no metaInfo
+      memcpy (appWindow->mStreamLast, ptr, nmemb);
+      appWindow->mStreamLast += nmemb;
+      appWindow->mIcySkipCount += (int)nmemb;
+      }
+
+    else {
+      cLog::log (LOGINFO1, "body split copy len:%d info:%d:%d skip:%d:%d ",
+                            nmemb,
+                            appWindow->mIcyInfoCount, appWindow->mIcyInfoLength,
+                            appWindow->mIcySkipCount, appWindow->mIcySkipLength);
+
+      // dumb copy for metaInfo straddling body, could be much better
+      for (int i = 0; i < nmemb; i++) {
+        if (appWindow->mIcyInfoCount < appWindow->mIcyInfoLength) {
+          appWindow->mIcyInfo [appWindow->mIcyInfoCount] = bytes[i];
+          appWindow->mIcyInfoCount++;
+          if (appWindow->mIcyInfoCount >= appWindow->mIcyInfoLength)
+            appWindow->addInfo (appWindow->mIcyInfo);
+          }
+        else if (appWindow->mIcySkipCount >= appWindow->mIcySkipLength) {
+          appWindow->mIcyInfoLength = bytes[i] * 16;
+          appWindow->mIcyInfoCount = 0;
+          appWindow->mIcySkipCount = 0;
+          cLog::log (LOGINFO1, "body icyInfo len:", bytes[i] * 16);
+          }
+        else {
+          appWindow->mIcySkipCount++;
+          *appWindow->mStreamLast = bytes[i];
+          appWindow->mStreamLast++;
+          }
+        }
+      }
 
     return nmemb;
     }
@@ -1317,6 +1432,16 @@ private:
   uint8_t* mStreamLast = nullptr;
   bool mStreamAac = false;
 
+  int mIcySkipCount = 0;
+  int mIcySkipLength = 0;
+  int mIcyInfoCount = 0;
+  int mIcyInfoLength = 0;
+  char mIcyInfo[255] = {0};
+
+  string mIcyStr;
+  string mTitleStr;
+  string mUrlStr;
+
   cJpegImageView* mJpegImageView = nullptr;
 
   bool mChanged = false;
@@ -1324,8 +1449,6 @@ private:
   cSemaphore mPlayDoneSem;
 
   cVolumeBox* mVolumeBox = nullptr;
-
-  CURL* mCurl = nullptr;
   //}}}
   };
 
@@ -1344,16 +1467,16 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cAppWindow appWindow;
 
   if (numArgs == 1) {
-    string url = "http://stream.wqxr.org/js-stream.aac";
-    //string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
-    cLog::log (LOGNOTICE, "curl test" + url);
-    appWindow.runStream ("httpWindow", 800, 500, url);
+    //string url = "http://stream.wqxr.org/js-stream.aac";
+    string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
+    cLog::log (LOGNOTICE, "mp3Window - http - " + url);
+    appWindow.runStream ("httpWindow", 800, 800, url);
     }
   else {
     string fileName = "C:/Users/colin/Music/Elton John";
     wstring wstr(args[1]);
     fileName = string(wstr.begin(), wstr.end());
-    cLog::log (LOGNOTICE, "mp3Window" + fileName);
+    cLog::log (LOGNOTICE, "mp3Window - " + fileName);
     appWindow.run ("mp3Window", 800, 500, fileName);
     }
 
