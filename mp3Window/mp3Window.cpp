@@ -1233,8 +1233,6 @@ private:
     cLog::setThreadName ("anal");
 
     while (!getExit()) {
-      auto time = system_clock::now();
-
       // open file mapping
       auto fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
       auto mapping = CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
@@ -1328,10 +1326,6 @@ private:
       av_frame_free (&avFrame);
       if (context)
         avcodec_close (context);
-
-      // report analyse time
-      auto doneTime = (float)duration_cast<milliseconds>(system_clock::now() - time).count();
-      cLog::log (LOGINFO, "last took " + dec(doneTime) + "ms");
 
       // wait for play to end or abort
       mPlayDoneSem.wait();
