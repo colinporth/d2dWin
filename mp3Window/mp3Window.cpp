@@ -82,6 +82,8 @@ public:
     initialise (title, width, height, false);
     add (new cIntBox (this, 100.f, 24.f, "frame ", mSong.mPlayFrame), 0.f, 0.f);
     add (new cIntBox (this, 100.f, 24.f, "frames ", mSong.mNumFrames), 100.f, 0.f);
+    add (new cIntBox (this, 100.f, 24.f, "meta ", mIcySkipCount), 200.f, 0.f);
+    add (new cIntBox (this, 100.f, 24.f, "of ", mIcySkipLen), 300.f, 0.f);
 
     add (new cTitleBox (this, 300.f, 24.f, mTitleStr), 0.f, 24.f);
     add (new cTitleBox (this, 300.f, 24.f, mUrlStr), 0.f, 48.f);
@@ -101,7 +103,7 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     // allocate stream
-    mStreamFirst = (uint8_t*)malloc (100000000);
+    mStreamFirst = (uint8_t*)malloc (200000000);
     mStreamLast = mStreamFirst;
 
     thread ([=]() { httpThread (url.c_str()); }).detach();
@@ -315,8 +317,9 @@ private:
   class cSongWaveBox : public cBox {
   public:
     //{{{
-    cSongWaveBox (cD2dWindow* window, float width, float height, cSong& frameSet) :
-        cBox ("frameSet", window, width, height), mSong(frameSet) {
+    cSongWaveBox (cD2dWindow* window, float width, float height, cSong& song) :
+        cBox ("songWaveBox", window, width, height), mSong(song) {
+
       mPin = true;
       }
     //}}}
@@ -353,6 +356,7 @@ private:
 
   protected:
     int getMaxValue() { return mSong.mMaxValue > 0 ? mSong.mMaxValue : 1; }
+
     //{{{
     void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
 
@@ -370,8 +374,19 @@ private:
       float xl = mRect.left + firstX;
       for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
         float xr = xl + 1.f;
-        if (mSong.mFrames[frame].hasTitle())
-          dc->FillRectangle (cRect (xl-1, yCentre-(getHeight()/2), xr+1, yCentre+(getHeight()/2)), mWindow->getYellowBrush());
+        if (mSong.mFrames[frame].hasTitle()) {
+          dc->FillRectangle (cRect (xl, yCentre-(getHeight()/2), xr+2, yCentre+(getHeight()/2)), mWindow->getYellowBrush());
+
+          string str = mSong.mFrames[frame].mTitle;
+          IDWriteTextLayout* textLayout;
+          mWindow->getDwriteFactory()->CreateTextLayout (
+            wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+            mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+
+          dc->DrawTextLayout (cPoint (xl, getTL().y-20.f), textLayout, mWindow->getWhiteBrush());
+          textLayout->Release();
+          }
+
         if (mSong.mFrames[frame].isSilent())
           dc->FillRectangle (cRect (xl, yCentre-kSilentThreshold, xr, yCentre+kSilentThreshold), mWindow->getRedBrush());
 
@@ -586,8 +601,8 @@ private:
   class cSongTimeBox : public cBox {
   public:
     //{{{
-    cSongTimeBox (cAppWindow* window, float width, float height, cSong& frameSet) :
-        cBox("frameSetTime", window, width, height), mSong(frameSet) {
+    cSongTimeBox (cAppWindow* window, float width, float height, cSong& song) :
+        cBox("frameSetTime", window, width, height), mSong(song) {
 
       mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
         DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
@@ -963,16 +978,19 @@ private:
   // called by httpThread
 
     mIcyStr = icyInfo;
-    cLog::log (LOGINFO, "addIcyInfo " + mIcyStr);
+    cLog::log (LOGINFO1, "addIcyInfo " + mIcyStr);
 
-    mTitleStr = "no title";
     string searchStr = "StreamTitle=\'";
     auto searchStrPos = mIcyStr.find (searchStr);
     if (searchStrPos != string::npos) {
       auto searchEndPos = mIcyStr.find ("\';", searchStrPos + searchStr.size());
       if (searchEndPos != string::npos) {
-        mTitleStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-        cLog::log (LOGINFO, "addIcyInfo found title = " + mTitleStr);
+        string titleStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+        if (titleStr != mTitleStr) {
+          cLog::log (LOGINFO1, "addIcyInfo found title = " + titleStr);
+          mSong.setTitle (titleStr);
+          mTitleStr = titleStr;
+          }
         }
       }
 
@@ -983,11 +1001,9 @@ private:
       auto searchEndPos = mIcyStr.find ('\'', searchStrPos + searchStr.size());
       if (searchEndPos != string::npos) {
         mUrlStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-        cLog::log (LOGINFO, "addIcyInfo found url = " + mUrlStr);
+        cLog::log (LOGINFO1, "addIcyInfo found url = " + mUrlStr);
         }
       }
-
-    mSong.setTitle (mTitleStr);
     }
   //}}}
   //{{{
@@ -1044,7 +1060,7 @@ private:
       auto num = stoi (numStr);
       cLog::log (LOGINFO, "httpHeader - found %s value:%d", searchStr.c_str(), num);
 
-      appWindow->mIcySkipLength = num;
+      appWindow->mIcySkipLen = num;
       }
 
     return len;
@@ -1055,8 +1071,8 @@ private:
 
     auto len = numItems * size;
 
-    if ((appWindow->mIcyInfoCount >= appWindow->mIcyInfoLength)  &&
-        (appWindow->mIcySkipCount + len <= appWindow->mIcySkipLength)) {
+    if ((appWindow->mIcyInfoCount >= appWindow->mIcyInfoLen)  &&
+        (appWindow->mIcySkipCount + len <= appWindow->mIcySkipLen)) {
 
       cLog::log (LOGINFO1, "body simple copy len:%d", len);
 
@@ -1069,19 +1085,19 @@ private:
     else {
       cLog::log (LOGINFO1, "body split copy len:%d info:%d:%d skip:%d:%d ",
                             len,
-                            appWindow->mIcyInfoCount, appWindow->mIcyInfoLength,
-                            appWindow->mIcySkipCount, appWindow->mIcySkipLength);
+                            appWindow->mIcyInfoCount, appWindow->mIcyInfoLen,
+                            appWindow->mIcySkipCount, appWindow->mIcySkipLen);
 
       // dumb copy for metaInfo straddling body, could be much better
       for (int i = 0; i < len; i++) {
-        if (appWindow->mIcyInfoCount < appWindow->mIcyInfoLength) {
+        if (appWindow->mIcyInfoCount < appWindow->mIcyInfoLen) {
           appWindow->mIcyInfo [appWindow->mIcyInfoCount] = ptr[i];
           appWindow->mIcyInfoCount++;
-          if (appWindow->mIcyInfoCount >= appWindow->mIcyInfoLength)
+          if (appWindow->mIcyInfoCount >= appWindow->mIcyInfoLen)
             appWindow->addIcyInfo (appWindow->mIcyInfo);
           }
-        else if (appWindow->mIcySkipCount >= appWindow->mIcySkipLength) {
-          appWindow->mIcyInfoLength = ptr[i] * 16;
+        else if (appWindow->mIcySkipCount >= appWindow->mIcySkipLen) {
+          appWindow->mIcyInfoLen = ptr[i] * 16;
           appWindow->mIcyInfoCount = 0;
           appWindow->mIcySkipCount = 0;
           cLog::log (LOGINFO1, "body icyInfo len:", ptr[i] * 16);
@@ -1454,9 +1470,9 @@ private:
 
   // httpBody callback data
   int mIcySkipCount = 0;
-  int mIcySkipLength = 0;
+  int mIcySkipLen = 0;
   int mIcyInfoCount = 0;
-  int mIcyInfoLength = 0;
+  int mIcyInfoLen = 0;
   char mIcyInfo[255] = {0};
   //}}}
   };
@@ -1476,8 +1492,14 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cAppWindow appWindow;
 
   if (numArgs == 1) {
+    //string url = "http://stream.wqxr.org/wqxr.aac";
     string url = "http://stream.wqxr.org/js-stream.aac";
     //string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
+    //string url = "http://us4.internet-radio.com:8266/";
+    //string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";
+    //string url = "http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac";
+    //string url = "http://media-ice.musicradio.com:80/SmoothCountry";
+
     cLog::log (LOGNOTICE, "mp3Window - http - " + url);
     appWindow.runStream ("httpWindow", 800, 800, url);
     }
