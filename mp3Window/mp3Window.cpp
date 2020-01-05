@@ -155,12 +155,17 @@ private:
     bool isSilent() { return mSilent; }
     bool isSilentThreshold() { return mValues[0] + mValues[1] <= kSilentThreshold; }
 
+    bool hasTitle() { return !mTitle.empty(); }
+    void setTitle (string title) { mTitle = title; }
+
     // vars
     uint32_t mStreamIndex;
     uint32_t mLen;
 
     uint8_t mValues[kMaxChannels];
     bool mSilent;
+
+    string mTitle;
     };
   //}}}
   //{{{
@@ -221,6 +226,11 @@ private:
       }
     //}}}
 
+    void setTitle (string title) {
+      if (!mFrames.empty())
+        mFrames.back().setTitle (title);
+      }
+
     // gets
     int getNumdFrames() { return mNumFrames; }
     int getNumLoadedFrames() { return (int)mFrames.size(); }
@@ -261,6 +271,14 @@ private:
     string mFileName;
     string mPathName;
 
+    bool mAac = false;
+    uint16_t mChannels = 2;
+    uint16_t mBytesPerSample = 2;
+    uint16_t mBitsPerSample = 16;
+    uint16_t mSamplesPerFrame = 1152;
+    uint16_t mMaxSamplesPerFrame = 2048;
+    uint16_t mSamplesPerSec = 44100;
+
     concurrent_vector<cFrame> mFrames;
 
     int mPlayFrame = 0;
@@ -268,15 +286,6 @@ private:
     uint8_t mMaxValue = 0;
 
     cJpegImage* mImage = nullptr;
-
-    bool mAac = false;
-
-    uint16_t mChannels = 2;
-    uint16_t mBytesPerSample = 2;
-    uint16_t mBitsPerSample = 16;
-    uint16_t mSamplesPerFrame = 1152;
-    uint16_t mMaxSamplesPerFrame = 2048;
-    uint16_t mSamplesPerSec = 44100;
 
   private:
     //{{{
@@ -361,6 +370,8 @@ private:
       float xl = mRect.left + firstX;
       for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
         float xr = xl + 1.f;
+        if (mSong.mFrames[frame].hasTitle())
+          dc->FillRectangle (cRect (xl, yCentre-(getHeight()/2), xr, yCentre+(getHeight()/2)), mWindow->getWhiteBrush());
         if (mSong.mFrames[frame].isSilent())
           dc->FillRectangle (cRect (xl, yCentre-kSilentThreshold, xr, yCentre+kSilentThreshold), mWindow->getRedBrush());
 
@@ -948,30 +959,34 @@ private:
   //}}}
 
   //{{{
-  void addInfo (string info) {
+  void addIcyInfo (string icyInfo) {
 
-    mIcyStr = info;
-    cLog::log (LOGINFO, mIcyInfo);
+    mIcyStr = icyInfo;
+    cLog::log (LOGINFO, "addIcyInfo " + mIcyStr);
 
+    mTitleStr = "no title";
     string searchStr = "StreamTitle=\'";
     auto searchStrPos = mIcyStr.find (searchStr);
-    if (searchStrPos != std::string::npos) {
+    if (searchStrPos != string::npos) {
       auto searchEndPos = mIcyStr.find ("\';", searchStrPos + searchStr.size());
-      mTitleStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-      cLog::log (LOGINFO, "title = " + mTitleStr);
+      if (searchEndPos != string::npos) {
+        mTitleStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+        cLog::log (LOGINFO, "addIcyInfo found title = " + mTitleStr);
+        }
       }
-    else
-      mTitleStr = "no title";
 
+    mUrlStr = "no url";
     searchStr = "StreamUrl=\'";
     searchStrPos = mIcyStr.find (searchStr);
-    if (searchStrPos != std::string::npos) {
+    if (searchStrPos != string::npos) {
       auto searchEndPos = mIcyStr.find ('\'', searchStrPos + searchStr.size());
-      mUrlStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-      cLog::log (LOGINFO, "url = " + mUrlStr);
+      if (searchEndPos != string::npos) {
+        mUrlStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+        cLog::log (LOGINFO, "addIcyInfo found url = " + mUrlStr);
+        }
       }
-    else
-      mUrlStr = "no url";
+
+    mSong.setTitle (mTitleStr);
     }
   //}}}
 
@@ -1092,7 +1107,7 @@ private:
           }
         stream += skipped + avPacket.size;
         }
-      Sleep (10);
+      Sleep (1);
       }
 
     // done
@@ -1404,7 +1419,7 @@ private:
           appWindow->mIcyInfo [appWindow->mIcyInfoCount] = bytes[i];
           appWindow->mIcyInfoCount++;
           if (appWindow->mIcyInfoCount >= appWindow->mIcyInfoLength)
-            appWindow->addInfo (appWindow->mIcyInfo);
+            appWindow->addIcyInfo (appWindow->mIcyInfo);
           }
         else if (appWindow->mIcySkipCount >= appWindow->mIcySkipLength) {
           appWindow->mIcyInfoLength = bytes[i] * 16;
@@ -1432,12 +1447,7 @@ private:
   uint8_t* mStreamLast = nullptr;
   bool mStreamAac = false;
 
-  int mIcySkipCount = 0;
-  int mIcySkipLength = 0;
-  int mIcyInfoCount = 0;
-  int mIcyInfoLength = 0;
-  char mIcyInfo[255] = {0};
-
+  // icyMeta parsed into
   string mIcyStr;
   string mTitleStr;
   string mUrlStr;
@@ -1449,6 +1459,13 @@ private:
   cSemaphore mPlayDoneSem;
 
   cVolumeBox* mVolumeBox = nullptr;
+
+  // httpBody callback data
+  int mIcySkipCount = 0;
+  int mIcySkipLength = 0;
+  int mIcyInfoCount = 0;
+  int mIcyInfoLength = 0;
+  char mIcyInfo[255] = {0};
   //}}}
   };
 
@@ -1467,8 +1484,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cAppWindow appWindow;
 
   if (numArgs == 1) {
-    //string url = "http://stream.wqxr.org/js-stream.aac";
-    string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
+    string url = "http://stream.wqxr.org/js-stream.aac";
+    //string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
     cLog::log (LOGNOTICE, "mp3Window - http - " + url);
     appWindow.runStream ("httpWindow", 800, 800, url);
     }
