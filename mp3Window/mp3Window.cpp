@@ -371,7 +371,7 @@ private:
       for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
         float xr = xl + 1.f;
         if (mSong.mFrames[frame].hasTitle())
-          dc->FillRectangle (cRect (xl, yCentre-(getHeight()/2), xr, yCentre+(getHeight()/2)), mWindow->getWhiteBrush());
+          dc->FillRectangle (cRect (xl-1, yCentre-(getHeight()/2), xr+1, yCentre+(getHeight()/2)), mWindow->getYellowBrush());
         if (mSong.mFrames[frame].isSilent())
           dc->FillRectangle (cRect (xl, yCentre-kSilentThreshold, xr, yCentre+kSilentThreshold), mWindow->getRedBrush());
 
@@ -960,6 +960,7 @@ private:
 
   //{{{
   void addIcyInfo (string icyInfo) {
+  // called by httpThread
 
     mIcyStr = icyInfo;
     cLog::log (LOGINFO, "addIcyInfo " + mIcyStr);
@@ -989,21 +990,129 @@ private:
     mSong.setTitle (mTitleStr);
     }
   //}}}
+  //{{{
+  static int httpTrace (CURL* handle, curl_infotype type, char* ptr, size_t size, cAppWindow* appWindow) {
+
+    switch (type) {
+      case CURLINFO_TEXT:
+        cLog::log (LOGINFO, "TEXT %s", ptr);
+        break;
+
+      case CURLINFO_HEADER_OUT:
+        cLog::log (LOGINFO, "HEADER_OUT %s", ptr);
+        break;
+
+      case CURLINFO_DATA_OUT:
+        cLog::log (LOGINFO, "DATA_OUT %s", ptr);
+        break;
+
+      case CURLINFO_SSL_DATA_OUT:
+        cLog::log (LOGINFO, "SSL_DATA_OUT %s", ptr);
+        break;
+
+      case CURLINFO_HEADER_IN:
+        cLog::log (LOGINFO, "HEADER_IN %s", ptr);
+        break;
+
+      case CURLINFO_DATA_IN:
+        //cLog::log (LOGINFO, "DATA_IN size:%d", ptr);
+        break;
+
+      case CURLINFO_SSL_DATA_IN:
+        cLog::log (LOGINFO, "SSL_DATA_IN size:%d", ptr);
+        break;
+
+      default:
+        return 0;
+      }
+
+    return 0;
+    }
+  //}}}
+  //{{{
+  static size_t httpHeader (const char* ptr, size_t size, size_t numItems, cAppWindow* appWindow) {
+
+    auto len = numItems * size;
+    cLog::log (LOGINFO2, "len:%d  %s", len, ptr);
+
+    string str (ptr);
+    string searchStr ("icy-metaint:");
+
+    auto searchStrPos = str.find (searchStr);
+    if (searchStrPos != string::npos) {
+      auto numStr = str.substr (searchStrPos + searchStr.size(), str.size() - searchStrPos - searchStr.size());
+      auto num = stoi (numStr);
+      cLog::log (LOGINFO, "httpHeader - found %s value:%d", searchStr.c_str(), num);
+
+      appWindow->mIcySkipLength = num;
+      }
+
+    return len;
+    }
+  //}}}
+  //{{{
+  static size_t httpBody (uint8_t* ptr, size_t size, size_t numItems, cAppWindow* appWindow) {
+
+    auto len = numItems * size;
+
+    if ((appWindow->mIcyInfoCount >= appWindow->mIcyInfoLength)  &&
+        (appWindow->mIcySkipCount + len <= appWindow->mIcySkipLength)) {
+
+      cLog::log (LOGINFO1, "body simple copy len:%d", len);
+
+      // simple copy of whole body, no metaInfo
+      memcpy (appWindow->mStreamLast, ptr, len);
+      appWindow->mStreamLast += len;
+      appWindow->mIcySkipCount += (int)len;
+      }
+
+    else {
+      cLog::log (LOGINFO1, "body split copy len:%d info:%d:%d skip:%d:%d ",
+                            len,
+                            appWindow->mIcyInfoCount, appWindow->mIcyInfoLength,
+                            appWindow->mIcySkipCount, appWindow->mIcySkipLength);
+
+      // dumb copy for metaInfo straddling body, could be much better
+      for (int i = 0; i < len; i++) {
+        if (appWindow->mIcyInfoCount < appWindow->mIcyInfoLength) {
+          appWindow->mIcyInfo [appWindow->mIcyInfoCount] = ptr[i];
+          appWindow->mIcyInfoCount++;
+          if (appWindow->mIcyInfoCount >= appWindow->mIcyInfoLength)
+            appWindow->addIcyInfo (appWindow->mIcyInfo);
+          }
+        else if (appWindow->mIcySkipCount >= appWindow->mIcySkipLength) {
+          appWindow->mIcyInfoLength = ptr[i] * 16;
+          appWindow->mIcyInfoCount = 0;
+          appWindow->mIcySkipCount = 0;
+          cLog::log (LOGINFO1, "body icyInfo len:", ptr[i] * 16);
+          }
+        else {
+          appWindow->mIcySkipCount++;
+          *appWindow->mStreamLast = ptr[i];
+          appWindow->mStreamLast++;
+          }
+        }
+      }
+
+    appWindow->mStreamSem.notifyAll();
+    return len;
+    }
+  //}}}
 
   //{{{
   void httpThread (const char* url) {
 
     cLog::setThreadName ("http");
 
-    CURL* curl = curl_easy_init();
+    auto curl = curl_easy_init();
     if (curl) {
       //curl_easy_setopt (curl, CURLOPT_DEBUGFUNCTION, httpTrace);
       //curl_easy_setopt (curl, CURLOPT_DEBUGDATA, this);
       //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
 
       curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
-
       curl_easy_setopt (curl, CURLOPT_URL, url);
+
       struct curl_slist* slist = NULL;
       slist = curl_slist_append (slist, "Icy-MetaData: 1");
       curl_easy_setopt (curl, CURLOPT_HTTPHEADER, slist);
@@ -1030,7 +1139,7 @@ private:
 
     // wait for a bit of stream to get codec
     while ((mStreamLast - mStreamFirst) < 1440)
-      Sleep (10);
+      mStreamSem.wait();
 
     mStreamAac = parseFrames (mStreamFirst, mStreamLast);
     mSong.init ("stream", mStreamAac, mStreamAac ? 2048 : 1152);
@@ -1107,7 +1216,8 @@ private:
           }
         stream += skipped + avPacket.size;
         }
-      Sleep (1);
+
+      mStreamSem.wait();
       }
 
     // done
@@ -1326,119 +1436,6 @@ private:
     }
   //}}}
 
-  //{{{
-  static int httpTrace (CURL* handle, curl_infotype type, char* data, size_t size, void* reference) {
-
-    auto appWindow = (cAppWindow*)reference;
-
-    switch (type) {
-      case CURLINFO_TEXT:
-        cLog::log (LOGINFO, "TEXT %s", data);
-        break;
-
-      case CURLINFO_HEADER_OUT:
-        cLog::log (LOGINFO, "HEADER_OUT %s", data);
-        break;
-
-      case CURLINFO_DATA_OUT:
-        cLog::log (LOGINFO, "DATA_OUT %s", data);
-        break;
-
-      case CURLINFO_SSL_DATA_OUT:
-        cLog::log (LOGINFO, "SSL_DATA_OUT %s", data);
-        break;
-
-      case CURLINFO_HEADER_IN:
-        cLog::log (LOGINFO, "HEADER_IN %s", data);
-        break;
-
-      case CURLINFO_DATA_IN:
-        //cLog::log (LOGINFO, "DATA_IN size:%d", size);
-        break;
-
-      case CURLINFO_SSL_DATA_IN:
-        cLog::log (LOGINFO, "SSL_DATA_IN size:%d", size);
-        break;
-
-      default:
-        return 0;
-      }
-
-    return 0;
-    }
-  //}}}
-  //{{{
-  static size_t httpHeader (void* ptr, size_t size, size_t nmemb, void* reference) {
-
-    auto appWindow = (cAppWindow*)reference;
-
-    cLog::log (LOGINFO2, "%d %d %x %s", size, nmemb, reference, ptr);
-
-    if (nmemb > 2) {
-      string headerStr ((const char*)ptr, nmemb-2);
-      string searchStr ("icy-metaint:");
-      auto pos = headerStr.find (searchStr);
-      if (pos != std::string::npos) {
-        auto numStr = headerStr.substr (pos + searchStr.size(), headerStr.size());
-        auto num = std::stoi (numStr);
-        cLog::log (LOGINFO, "found header %s in  %s value:%d", searchStr.c_str(), headerStr.c_str(), num);
-        appWindow->mIcySkipLength = num;
-        }
-
-      }
-
-    return nmemb;
-    }
-  //}}}
-  //{{{
-  static size_t httpBody (void* ptr, size_t size, size_t nmemb, void* reference) {
-
-    auto appWindow = (cAppWindow*)reference;
-    auto bytes = (uint8_t*)ptr;
-
-    if ((appWindow->mIcyInfoCount >= appWindow->mIcyInfoLength)  &&
-        (appWindow->mIcySkipCount + nmemb <= appWindow->mIcySkipLength)) {
-
-      cLog::log (LOGINFO1, "body simple copy len:%d", nmemb);
-
-      // simple copy of whole body, no metaInfo
-      memcpy (appWindow->mStreamLast, ptr, nmemb);
-      appWindow->mStreamLast += nmemb;
-      appWindow->mIcySkipCount += (int)nmemb;
-      }
-
-    else {
-      cLog::log (LOGINFO1, "body split copy len:%d info:%d:%d skip:%d:%d ",
-                            nmemb,
-                            appWindow->mIcyInfoCount, appWindow->mIcyInfoLength,
-                            appWindow->mIcySkipCount, appWindow->mIcySkipLength);
-
-      // dumb copy for metaInfo straddling body, could be much better
-      for (int i = 0; i < nmemb; i++) {
-        if (appWindow->mIcyInfoCount < appWindow->mIcyInfoLength) {
-          appWindow->mIcyInfo [appWindow->mIcyInfoCount] = bytes[i];
-          appWindow->mIcyInfoCount++;
-          if (appWindow->mIcyInfoCount >= appWindow->mIcyInfoLength)
-            appWindow->addIcyInfo (appWindow->mIcyInfo);
-          }
-        else if (appWindow->mIcySkipCount >= appWindow->mIcySkipLength) {
-          appWindow->mIcyInfoLength = bytes[i] * 16;
-          appWindow->mIcyInfoCount = 0;
-          appWindow->mIcySkipCount = 0;
-          cLog::log (LOGINFO1, "body icyInfo len:", bytes[i] * 16);
-          }
-        else {
-          appWindow->mIcySkipCount++;
-          *appWindow->mStreamLast = bytes[i];
-          appWindow->mStreamLast++;
-          }
-        }
-      }
-
-    return nmemb;
-    }
-  //}}}
-
   //{{{  vars
   cFileList* mFileList;
   cSong mSong;
@@ -1446,6 +1443,7 @@ private:
   uint8_t* mStreamFirst = nullptr;
   uint8_t* mStreamLast = nullptr;
   bool mStreamAac = false;
+  cSemaphore mStreamSem;
 
   // icyMeta parsed into
   string mIcyStr;
