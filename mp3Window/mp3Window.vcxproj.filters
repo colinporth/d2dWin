@@ -73,6 +73,15 @@
     <ClInclude Include="..\..\shared\teensyAac\huffman.h">
       <Filter>teensyAac\h</Filter>
     </ClInclude>
+    <ClInclude Include="_kiss_fft_guts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kiss_fft.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kiss_fftr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="mp3Window.cpp" />
@@ -86,5 +95,7 @@
     <ClCompile Include="..\..\shared\teensyAac\huffman.cpp">
       <Filter>teensyAac</Filter>
     </ClCompile>
+    <ClCompile Include="kiss_fft.c" />
+    <ClCompile Include="kiss_fftr.c" />
   </ItemGroup>
 </Project>

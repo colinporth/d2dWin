@@ -182,7 +182,10 @@
     <ClInclude Include="..\boxes\cWindowBox.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cJpegImage.h" />
+    <ClInclude Include="kiss_fft.h" />
+    <ClInclude Include="kiss_fftr.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="_kiss_fft_guts.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\shared\teensyAac\cAacDecoder.cpp">
@@ -203,6 +206,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="kiss_fft.c" />
+    <ClCompile Include="kiss_fftr.c" />
     <ClCompile Include="mp3Window.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

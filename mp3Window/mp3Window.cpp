@@ -2,7 +2,6 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "../../shared/utils/resolve.h"
 #include "../../shared/utils/cFileList.h"
 #include "../../shared/utils/cWinAudio.h"
 
@@ -25,6 +24,9 @@ extern "C" {
 
 #define CURL_STATICLIB
 #include "../../curl/include/curl/curl.h"
+
+#include "kiss_fft.h"
+#include "kiss_fftr.h"
 
 using namespace std;
 using namespace chrono;
@@ -736,10 +738,10 @@ private:
     }
   //}}}
   //{{{
-  bool parseFrame (uint8_t* stream, uint8_t* streamLast, uint8_t*& frame, int& frameLen, bool& aac, bool& id3Tag, int& skipped) {
+  bool parseFrame (uint8_t* stream, uint8_t* streamLast, uint8_t*& frame, int& frameLen, bool& aac, bool& id3Tag, int& skip) {
   // start of mp3 / aac adts parser
 
-    skipped = 0;
+    skip = 0;
 
     while ((streamLast - stream) >= 6) {
       if (stream[0] == 'I' && stream[1] == 'D' && stream[2] == '3') {
@@ -928,7 +930,7 @@ private:
         }
 
       else {
-        skipped++;
+        skip++;
         stream++;
         }
       }
@@ -954,8 +956,8 @@ private:
     int frameLen = 0;
     bool frameAac = false;
     bool tag = false;
-    int skipped = 0;
-    while (parseFrame (stream, streamLast, frame, frameLen, frameAac, tag, skipped)) {
+    int skip = 0;
+    while (parseFrame (stream, streamLast, frame, frameLen, frameAac, tag, skip)) {
       if (tag)
         tags++;
       else {
@@ -963,8 +965,8 @@ private:
         frames++;
         }
       // onto next frame
-      stream += skipped + frameLen;
-      lostSync += skipped;
+      stream += skip + frameLen;
+      lostSync += skip;
       }
 
     cLog::log (LOGINFO, "parseFrames f:%d lost:%d aac:%d tags:%d", frames, lostSync, resultAac, tags);
@@ -1172,8 +1174,8 @@ private:
     while (!getExit()) {
       bool frameAac;
       bool tag;
-      int skipped;
-      while (parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameAac, tag, skipped)) {
+      int skip;
+      while (parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameAac, tag, skip)) {
         if (!tag && (frameAac == mStreamAac)) {
           auto ret = avcodec_send_packet (context, &avPacket);
           while (ret >= 0) {
@@ -1230,7 +1232,7 @@ private:
               }
             }
           }
-        stream += skipped + avPacket.size;
+        stream += skip + avPacket.size;
         }
 
       mStreamSem.wait();
@@ -1276,9 +1278,9 @@ private:
       auto stream = mStreamFirst;
       bool frameAac;
       bool tag;
-      int skipped;
+      int skip;
       while (!getExit() && !mChanged &&
-             parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameAac, tag, skipped)) {
+             parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameAac, tag, skip)) {
         if ((frameAac == mStreamAac) && !tag) {
           auto ret = avcodec_send_packet (context, &avPacket);
           while (ret >= 0) {
@@ -1334,7 +1336,7 @@ private:
               }
             }
           }
-        stream += skipped + avPacket.size;
+        stream += skip + avPacket.size;
         }
 
       // done
@@ -1382,8 +1384,8 @@ private:
         uint8_t* stream = mStreamFirst + mSong.getPlayFrameStreamIndex();
         bool aac;
         bool tag;
-        int skipped;
-        if (parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, aac, tag, skipped)) {
+        int skip;
+        if (parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, aac, tag, skip)) {
           if (!tag && (mStreamAac == mStreamAac)) {
             auto ret = avcodec_send_packet (context, &avPacket);
             while (ret >= 0) {
