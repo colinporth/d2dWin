@@ -2,13 +2,11 @@
 /*
  *  Copyright (c) 2003-2004, Mark Borgerding. All rights reserved.
  *  This file is part of KISS FFT - https://github.com/mborgerding/kissfft
- *
  *  SPDX-License-Identifier: BSD-3-Clause
  *  See COPYING file for more information.
  */
 //}}}
-#ifndef KISS_FTR_H
-#define KISS_FTR_H
+#pragma once
 
 #include "kiss_fft.h"
 //{{{
@@ -38,4 +36,3 @@ void kiss_fftri (kiss_fftr_cfg cfg, const kiss_fft_cpx* freqdata, kiss_fft_scala
 }
 #endif
 //}}}
-#endif

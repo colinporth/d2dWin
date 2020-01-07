@@ -95,7 +95,7 @@
     <ClCompile Include="..\..\shared\teensyAac\huffman.cpp">
       <Filter>teensyAac</Filter>
     </ClCompile>
-    <ClCompile Include="kiss_fft.c" />
     <ClCompile Include="kiss_fftr.c" />
+    <ClCompile Include="kiss_fft.c" />
   </ItemGroup>
 </Project>

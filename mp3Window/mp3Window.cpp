@@ -15,6 +15,7 @@
 #include "../boxes/cCalendarBox.h"
 #include "../boxes/cClockBox.h"
 #include "../boxes/cIntBox.h"
+#include "../boxes/cFloatBox.h"
 #include "../boxes/cTitleBox.h"
 
 extern "C" {
@@ -25,6 +26,7 @@ extern "C" {
 #define CURL_STATICLIB
 #include "../../curl/include/curl/curl.h"
 
+//#define USE_SIMD
 #include "kiss_fft.h"
 #include "kiss_fftr.h"
 
@@ -43,7 +45,24 @@ const int kPlayFrameThreshold = 10; // about a second of analyse before playing
 
 class cAppWindow : public cD2dWindow {
 public:
-  cAppWindow() : mPlayDoneSem("playDone") {}
+  //{{{
+  cAppWindow() : mPlayDoneSem("playDone") {
+    nfft = 2048;
+    nfreqs = nfft / 2 + 1;
+    cfg = kiss_fftr_alloc (nfft, 0, 0, 0);
+    tbuf = (kiss_fft_scalar*)malloc (nfft * sizeof(kiss_fft_scalar));
+    fbuf = (kiss_fft_cpx*)malloc (nfreqs * sizeof(kiss_fft_cpx));
+    values = (float*)malloc (nfreqs*sizeof(float));
+    }
+  //}}}
+  //{{{
+  virtual ~cAppWindow() {
+    free (values);
+    free (fbuf);
+    free (tbuf);
+    free (cfg);
+    }
+  //}}}
   //{{{
   void run (const string& title, int width, int height, const string& fileName) {
 
@@ -56,6 +75,7 @@ public:
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
+    add (new cSongFreqBox (this, 0,200.f, this), 0,-440.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
@@ -91,11 +111,14 @@ public:
     add (new cTitleBox (this, 300.f, 24.f, mUrlStr), 0.f, 48.f);
     add (new cTitleBox (this, 300.f, 24.f, mIcyStr), 0.f, 72.f);
 
+    add (new cFloatBox (this, 100.f, 24.f, mMaxValue, 6, 2), 0.0f, 120.f);
+
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f, 0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
 
     add (new cLogBox (this, 400.f,0.f, true), 0.f,0.f)->setPin (false);
 
+    add (new cSongFreqBox (this, 0,200.f, this), 0,-440.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
@@ -315,6 +338,30 @@ private:
     };
   //}}}
 
+  //{{{
+  class cSongFreqBox : public cBox {
+  public:
+    //{{{
+    cSongFreqBox (cD2dWindow* window, float width, float height, cAppWindow* appWindow) :
+        cBox ("songWaveBox", window, width, height), mAppWindow(appWindow) {
+
+      mPin = true;
+      }
+    //}}}
+    virtual ~cSongFreqBox() {}
+
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      for (int i = 0; i < getWidth(); i++) {
+        float value = (mAppWindow->values[i] / mAppWindow->mMaxValue) * getHeight();
+        dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - value, mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
+        }
+      }
+
+  protected:
+    cAppWindow* mAppWindow;
+    };
+  //}}}
   //{{{
   class cSongWaveBox : public cBox {
   public:
@@ -1421,6 +1468,20 @@ private:
                   default:
                     cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                   }
+
+                auto ptr = samples;
+                for (int i = 0; i < nfft; i++)
+                  tbuf[i] = *ptr++ + *ptr++;
+
+                kiss_fftr (cfg, tbuf, fbuf);
+
+                for (int i = 0; i < nfreqs; i++) {
+                  float value = sqrt ((fbuf[i].r * fbuf[i].r) + (fbuf[i].i * fbuf[i].i));
+                  if (value > mMaxValue)
+                    mMaxValue = value;
+                  values[i] = value;
+                  }
+
                 audio.play (avFrame->channels, samples, avFrame->nb_samples, 1.f);
                 mSong.incPlayFrame (1);
                 changed();
@@ -1476,6 +1537,14 @@ private:
   int mIcyInfoCount = 0;
   int mIcyInfoLen = 0;
   char mIcyInfo[255] = {0};
+
+  int nfft;
+  int nfreqs;
+  kiss_fftr_cfg cfg = nullptr;
+  kiss_fft_scalar* tbuf = nullptr;
+  kiss_fft_cpx* fbuf = nullptr;
+  float* values = nullptr;
+  float mMaxValue = 0.f;
   //}}}
   };
 
@@ -1494,8 +1563,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cAppWindow appWindow;
 
   if (numArgs == 1) {
-    //string url = "http://stream.wqxr.org/wqxr.aac";
-    string url = "http://stream.wqxr.org/js-stream.aac";
+    string url = "http://stream.wqxr.org/wqxr.aac";
+    //string url = "http://stream.wqxr.org/js-stream.aac";
     //string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
     //string url = "http://us4.internet-radio.com:8266/";
     //string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";

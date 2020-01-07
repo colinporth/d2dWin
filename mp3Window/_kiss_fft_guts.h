@@ -12,13 +12,11 @@
 	 and defines
 	 typedef struct { kiss_fft_scalar r; kiss_fft_scalar i; }kiss_fft_cpx; */
 //}}}
+#pragma once
 #include "kiss_fft.h"
 #include <limits.h>
 
-/* e.g. an fft of length 128 has 4 factors
- as far as kissfft is concerned
- 4*4*4*2
- */
+// e.g. an fft of length 128 has 4 factors as far as kissfft is concerned 4*4*4*2
 #define MAXFACTORS 32
 //{{{
 struct kiss_fft_state {
@@ -29,14 +27,12 @@ struct kiss_fft_state {
 	};
 //}}}
 
-/*
-	Explanation of macros dealing with complex math:
-	 C_MUL(m,a,b)         : m = a*b
-	 C_FIXDIV( c , div )  : if a fixed point impl., c /= div. noop otherwise
-	 C_SUB( res, a,b)     : res = a - b
-	 C_SUBFROM( res , a)  : res -= a
-	 C_ADDTO( res , a)    : res += a
- * */
+// Explanation of macros dealing with complex math:
+//   C_MUL (m,a,b)      : m = a*b
+//   C_FIXDIV (c, div)  : if a fixed point impl., c /= div. noop otherwise
+//   C_SUB (res, a, b)  : res = a - b
+//   C_SUBFROM (res, a) : res -= a
+//   C_ADDTO (res, a)   : res += a
 #ifdef FIXED_POINT
 	#include <stdint.h>
 	#if (FIXED_POINT==32)
@@ -74,8 +70,8 @@ struct kiss_fft_state {
 				 DIVSCALAR( (c).i  , div); } while (0)
 
 	#define C_MULBYSCALAR( c, s ) \
-			do { (c).r =  sround( smul( (c).r , s ) ) ;\
-					 (c).i =  sround( smul( (c).i , s ) ) ; } while(0)
+			do { (c).r = sround( smul( (c).r , s ) ) ;\
+					 (c).i = sround( smul( (c).i , s ) ) ; } while(0)
 
 #else  /* not FIXED_POINT*/
 	#define S_MUL(a,b) ( (a)*(b) )
