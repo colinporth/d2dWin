@@ -60,11 +60,11 @@ public:
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
-    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-540.f);
-    add (new cSongSpectrumBox (this, 0,200.f, mSong), 0,-440.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
+    add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
+    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
 
     mFileList = new cFileList (fileName, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -102,11 +102,11 @@ public:
 
     add (new cLogBox (this, 400.f,0.f, true), 0.f,0.f)->setPin (false);
 
-    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-540.f);
-    add (new cSongSpectrumBox (this, 0,200.f, mSong), 0,-440.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
+    add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
+    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
 
     mVolumeBox = new cVolumeBox (this, 12.f,0.f, nullptr);
     add (mVolumeBox, -12.f,0.f);
@@ -212,7 +212,10 @@ private:
       mSamplesPerFrame = samplesPerFrame;
 
       mMaxPowerValue = 0;
+
       mMaxFreqValue = 0.f;
+      for (int i = 0; i < 1025; i++)
+        mMaxFreqValues[i] = 0.f;
 
       fftrConfig = kiss_fftr_alloc (2048, 0, 0, 0);
       }
@@ -241,13 +244,13 @@ private:
       for (int i = 0; i < 1025; i++) {
         freqValues[i] = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
         mMaxFreqValue = max (mMaxFreqValue, freqValues[i]);
+        mMaxFreqValues[i] = max (mMaxFreqValues[i], freqValues[i]);
         }
 
       uint8_t luma[1025];
       for (int i = 0; i < 1025; i++) {
         float value = uint8_t((freqValues[i] / mMaxFreqValue) * 1024.f);
         luma[i] = value > 255 ? 255 : uint8_t(value);
-        //mBrush->SetColor (ColorF ((val << 16) | (val << 8) | (val), 1.0f));
         }
 
       mFrames.push_back (cFrame (streamIndex, frameLen, powerValues, freqValues, luma));
@@ -355,7 +358,9 @@ private:
     kiss_fftr_cfg fftrConfig;
     kiss_fft_scalar timeBuf[2048];
     kiss_fft_cpx freqBuf[1025];
+
     float mMaxFreqValue = 0.f;
+    float mMaxFreqValues[1025];
 
     cJpegImage* mImage = nullptr;
 
@@ -436,8 +441,6 @@ private:
     //}}}
 
   protected:
-    float getMaxFreqValue() { return mSong.mMaxFreqValue > 0 ? mSong.mMaxFreqValue : 1; }
-
     //{{{
     void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
 
@@ -446,26 +449,28 @@ private:
         rightFrame = mSong.getNumLoadedFrames();
 
       float xl = mRect.left + firstX;
+
+      cRect r;
+      r.left = xl;
+      r.right = xl+1;
+
       for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
-        float xr = xl + 1.f;
-
-        cRect r;
-        r.left = xl;
-        r.right = r.left+1;
-
         r.top = mRect.top;
         r.bottom = r.top+1;
         int freq = int(getHeight());
         for (int y = 0; y < getHeight(); y++) {
           uint8_t val = mSong.mFrames[frame].mFreqLuma[freq];
-          mBrush->SetColor (ColorF ((val << 16) | (val << 8) | (val), 1.0f));
-          dc->FillRectangle (r, mBrush);
+          if (val > 8) {
+            mBrush->SetColor (ColorF ((val << 16) | (val << 8) | (val), 1.0f));
+            dc->FillRectangle (r, mBrush);
+            }
           r.top++;
           r.bottom++;
           freq--;
           }
 
-        xl = xr;
+        r.left++;
+        r.right++;
         }
       }
     //}}}
