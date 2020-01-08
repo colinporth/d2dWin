@@ -60,7 +60,8 @@ public:
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
-    add (new cSongFreqBox (this, 0,200.f, mSong), 0,-440.f);
+    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-540.f);
+    add (new cSongSpectrumBox (this, 0,200.f, mSong), 0,-440.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
@@ -96,14 +97,13 @@ public:
     add (new cTitleBox (this, 300.f, 24.f, mUrlStr), 0.f, 48.f);
     add (new cTitleBox (this, 300.f, 24.f, mIcyStr), 0.f, 72.f);
 
-    add (new cFloatBox (this, 100.f, 24.f, mMaxValue, 6, 2), 0.0f, 120.f);
-
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f, 0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
 
     add (new cLogBox (this, 400.f,0.f, true), 0.f,0.f)->setPin (false);
 
-    add (new cSongFreqBox (this, 0,200.f, mSong), 0,-440.f);
+    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-540.f);
+    add (new cSongSpectrumBox (this, 0,200.f, mSong), 0,-440.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
@@ -158,10 +158,11 @@ private:
   //{{{
   class cFrame {
   public:
-    cFrame (uint32_t streamIndex, uint32_t len, uint8_t* power, float* freq) : mStreamIndex(streamIndex), mLen(len) {
+    cFrame (uint32_t streamIndex, uint32_t len, uint8_t* power, float* freq, uint8_t* luma) : mStreamIndex(streamIndex), mLen(len) {
       memcpy (mPower, power, kMaxChannels);
-      mFreqValues = (float*)malloc (1025*4);
       memcpy (mFreqValues, freq, 1025*4);
+      memcpy (mFreqLuma, luma, 1025);
+
       mSilent = isSilentThreshold();
       }
 
@@ -177,7 +178,8 @@ private:
 
     bool mSilent;
     uint8_t mPower[kMaxChannels];
-    float* mFreqValues;
+    float mFreqValues[1025];
+    uint8_t mFreqLuma[1025];
 
     string mTitle;
     };
@@ -185,6 +187,10 @@ private:
   //{{{
   class cSong {
   public:
+    //{{{
+    cSong() {
+      }
+    //}}}
     //{{{
     virtual ~cSong() {
       mFrames.clear();
@@ -197,7 +203,6 @@ private:
       mFrames.clear();
 
       mPlayFrame = 0;
-      mMaxValue = 0;
       mNumFrames = 0;
 
       mFileName = fileName;
@@ -205,20 +210,51 @@ private:
 
       mAac = aac;
       mSamplesPerFrame = samplesPerFrame;
+
+      mMaxPowerValue = 0;
+      mMaxFreqValue = 0.f;
+
+      fftrConfig = kiss_fftr_alloc (2048, 0, 0, 0);
       }
     //}}}
+
     //{{{
-    bool addFrame (uint32_t streamPos, uint32_t frameLen, uint8_t* values, float* freq, uint32_t streamLen) {
+    bool addFrame (uint32_t streamIndex, uint32_t frameLen, int numSamples, int16_t* samples, uint32_t streamLen) {
     // return true if enough frames added to start playing
 
-      mFrames.push_back (cFrame (streamPos, frameLen, values, freq));
+     float power[kMaxChannels] = {0};
+     for (int i = 0; i < numSamples; i++) {
+        timeBuf[i] = (float)samples[i * 2] + (float)samples[(i * 2) + 1];
+        power[0] += samples[i*2] * samples[i*2];
+        power[1] += samples[(i*2) + 1] * samples[(i*2) + 1];
+        }
 
-      mMaxValue = max (mMaxValue, values[0]);
-      mMaxValue = max (mMaxValue, values[1]);
+      uint8_t powerValues[kMaxChannels];
+      powerValues[0] = uint8_t(sqrtf (power[0]) / numSamples);
+      powerValues[1] = uint8_t(sqrtf (power[1]) / numSamples);
+      mMaxPowerValue = max (mMaxPowerValue, powerValues[0]);
+      mMaxPowerValue = max (mMaxPowerValue, powerValues[1]);
+
+      kiss_fftr (fftrConfig, timeBuf, freqBuf);
+
+      float freqValues[1025];
+      for (int i = 0; i < 1025; i++) {
+        freqValues[i] = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
+        mMaxFreqValue = max (mMaxFreqValue, freqValues[i]);
+        }
+
+      uint8_t luma[1025];
+      for (int i = 0; i < 1025; i++) {
+        float value = uint8_t((freqValues[i] / mMaxFreqValue) * 1024.f);
+        luma[i] = value > 255 ? 255 : uint8_t(value);
+        //mBrush->SetColor (ColorF ((val << 16) | (val << 8) | (val), 1.0f));
+        }
+
+      mFrames.push_back (cFrame (streamIndex, frameLen, powerValues, freqValues, luma));
 
       // estimate numFrames
       mNumFrames = int (uint64_t(streamLen - mFrames[0].mStreamIndex) * (uint64_t)mFrames.size() /
-                        uint64_t(streamPos + frameLen - mFrames[0].mStreamIndex));
+                        uint64_t(streamIndex + frameLen - mFrames[0].mStreamIndex));
 
       // calc silent window
       auto frame = getNumLoadedFrames()-1;
@@ -240,13 +276,14 @@ private:
       }
     //}}}
 
+    //{{{
     void setTitle (string title) {
       if (!mFrames.empty())
         mFrames.back().setTitle (title);
       }
+    //}}}
 
     // gets
-    int getNumdFrames() { return mNumFrames; }
     int getNumLoadedFrames() { return (int)mFrames.size(); }
     //{{{
     uint32_t getPlayFrame() {
@@ -256,7 +293,7 @@ private:
       else if (mPlayFrame < mFrames.size())
         return mPlayFrame;
       else
-        return mFrames.size() - 1;
+        return (uint32_t)mFrames.size() - 1;
       }
     //}}}
     //{{{
@@ -312,7 +349,13 @@ private:
 
     int mPlayFrame = 0;
     int mNumFrames = 0;
-    uint8_t mMaxValue = 0;
+
+    uint8_t mMaxPowerValue = 0;
+
+    kiss_fftr_cfg fftrConfig;
+    kiss_fft_scalar timeBuf[2048];
+    kiss_fft_cpx freqBuf[1025];
+    float mMaxFreqValue = 0.f;
 
     cJpegImage* mImage = nullptr;
 
@@ -354,18 +397,82 @@ private:
 
     void onDraw (ID2D1DeviceContext* dc) {
 
-      int frame = mSong.mPlayFrame;
-      if (frame > mSong.getNumLoadedFrames())
-        frame = mSong.getNumLoadedFrames();
-
-      //for (int i = 0; (i < getWidth()) && (i < 1025); i++) {
-      //  float value = mSong.mFrames[frame].mFreqValues[i] * getHeight();
-      //  dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - value, mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
-      //  }
+      int frame = mSong.getPlayFrame();
+      if (frame > 0) {
+        float* freq = (mSong.mFrames[frame].mFreqValues);
+        for (int i = 0; (i < getWidth()) && (i < 1025); i++)
+          dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - ((freq[i] / mSong.mMaxFreqValue) * getHeight()),
+                                    mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
+        }
       }
 
   protected:
     cSong& mSong;
+    };
+  //}}}
+  //{{{
+  class cSongSpectrumBox : public cBox {
+  public:
+    //{{{
+    cSongSpectrumBox (cD2dWindow* window, float width, float height, cSong& song) :
+        cBox ("songWaveBox", window, width, height), mSong(song) {
+
+      mPin = true;
+
+      window->getDc()->CreateSolidColorBrush (ColorF(ColorF::CornflowerBlue), &mBrush);
+      }
+    //}}}
+    virtual ~cSongSpectrumBox() {}
+
+    //{{{
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      auto leftFrame = mSong.mPlayFrame - (mZoom * getWidthInt()/2);
+      auto rightFrame = mSong.mPlayFrame + (mZoom * getWidthInt()/2);
+      auto firstX = (leftFrame < 0) ? (-leftFrame) / mZoom : 0;
+
+      draw (dc, leftFrame, rightFrame, firstX, mZoom);
+      }
+    //}}}
+
+  protected:
+    float getMaxFreqValue() { return mSong.mMaxFreqValue > 0 ? mSong.mMaxFreqValue : 1; }
+
+    //{{{
+    void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
+
+      leftFrame = (leftFrame < 0) ? 0 : leftFrame;
+      if (rightFrame > mSong.getNumLoadedFrames())
+        rightFrame = mSong.getNumLoadedFrames();
+
+      float xl = mRect.left + firstX;
+      for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
+        float xr = xl + 1.f;
+
+        cRect r;
+        r.left = xl;
+        r.right = r.left+1;
+
+        r.top = mRect.top;
+        r.bottom = r.top+1;
+        int freq = int(getHeight());
+        for (int y = 0; y < getHeight(); y++) {
+          uint8_t val = mSong.mFrames[frame].mFreqLuma[freq];
+          mBrush->SetColor (ColorF ((val << 16) | (val << 8) | (val), 1.0f));
+          dc->FillRectangle (r, mBrush);
+          r.top++;
+          r.bottom++;
+          freq--;
+          }
+
+        xl = xr;
+        }
+      }
+    //}}}
+
+    cSong& mSong;
+    int mZoom = 1;
+    ID2D1SolidColorBrush* mBrush = nullptr;
     };
   //}}}
   //{{{
@@ -410,7 +517,7 @@ private:
     //}}}
 
   protected:
-    int getMaxValue() { return mSong.mMaxValue > 0 ? mSong.mMaxValue : 1; }
+    int getMaxPowerValue() { return mSong.mMaxPowerValue > 0 ? mSong.mMaxPowerValue : 1; }
 
     //{{{
     void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
@@ -423,7 +530,7 @@ private:
       auto colour = mWindow->getBlueBrush();
 
       float yCentre = getCentreY();
-      float valueScale = getHeight() / 2 / getMaxValue();
+      float valueScale = getHeight() / 2 / getMaxPowerValue();
 
       bool centre = false;
       float xl = mRect.left + firstX;
@@ -611,7 +718,7 @@ private:
       auto colour = mWindow->getBlueBrush();
 
       auto centreY = getCentreY();
-      float valueScale = getHeight() / 2 / getMaxValue();
+      float valueScale = getHeight() / 2 / getMaxPowerValue();
 
       float curFrameX = mRect.left;
       if (mSong.mNumFrames > 0)
@@ -1223,10 +1330,6 @@ private:
     auto avFrame = av_frame_alloc();
     auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
-    kiss_fftr_cfg fftrConfig = kiss_fftr_alloc (nfft, 0, 0, 0);
-    kiss_fft_scalar timeBuf[2048];
-    kiss_fft_cpx freqBuf[1025];
-
     auto stream = mStreamFirst;
     while (!getExit()) {
       bool frameAac;
@@ -1242,57 +1345,39 @@ private:
             cLog::log (LOGINFO2, "frame size:%d", avPacket.size);
 
             if (avFrame->nb_samples > 0) {
-              uint8_t powers[kMaxChannels];
-              //{{{  calc power for each channel
+              //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
-                  // 16bit signed planar, copy planar to interleaved, calc channel power
+                  //{{{  16bit signed planar, copy planar to interleaved
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    float power = 0.f;
                     auto srcPtr = (short*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
                     for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = *srcPtr++;
-                      timeBuf[i] = channel ? timeBuf[i] + sample : sample;
-                      power += sample * sample;
+                      *dstPtr = *srcPtr++;
+                      dstPtr += avFrame->channels;
                       }
-                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples);
                     }
                   break;
-
+                  //}}}
                 case AV_SAMPLE_FMT_FLTP:
-                  // 32bit float planar, copy planar channel to interleaved, calc channel power
+                  //{{{  32bit float planar, copy planar to interleaved
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    float power = 0.f;
                     auto srcPtr = (float*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
                     for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = (short)(*srcPtr++ * 0x8000);
-                      timeBuf[i] = channel ? timeBuf[i] + sample : sample;
-                      power += sample * sample;
+                      auto int16 = (short)(*srcPtr++ * 0x8000);
+                      *dstPtr = int16;
+                      dstPtr += avFrame->channels;
                       }
-                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples);
                     }
                   break;
-
+                  //}}}
                 default:
-                  cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
+                  cLog::log (LOGERROR, "analyseStreamThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                 }
               //}}}
-
-              kiss_fftr (fftrConfig, timeBuf, freqBuf);
-
-              float maxValue = 0.f;
-              float values[1025];
-              for (int i = 0; i < nfreqs; i++) {
-                float value = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
-                if (value > maxValue)
-                  maxValue = value;
-                values[i] = value;
-                }
-              for (int i = 0; i < nfreqs; i++)
-                values[i] /= maxValue;
-
-              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, values,
-                                  int(mStreamLast - mStreamFirst))) {
+              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size,
+                                  avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst))) {
                 //{{{  launch playThread
                 auto threadHandle = thread ([=](){ playThread (false); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -1346,10 +1431,6 @@ private:
       auto avFrame = av_frame_alloc();
       auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
-      kiss_fftr_cfg fftrConfig = kiss_fftr_alloc (nfft, 0, 0, 0);
-      kiss_fft_scalar timeBuf[2048];
-      kiss_fft_cpx freqBuf[1025];
-
       auto stream = mStreamFirst;
       bool frameAac;
       bool tag;
@@ -1363,58 +1444,39 @@ private:
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
               break;
             if (avFrame->nb_samples > 0) {
-              uint8_t powers[kMaxChannels];
-              //{{{  calc power for each channel
+              //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
-                  // 16bit signed planar, copy planar to interleaved, calc channel power
+                  //{{{  16bit signed planar, copy planar to interleaved
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    float power = 0.f;
                     auto srcPtr = (short*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
                     for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = *srcPtr;
-                      timeBuf[i] = channel ? timeBuf[i] + sample : sample;
-                      power += sample * sample;
-                      srcPtr++;
+                      *dstPtr = *srcPtr++;
+                      dstPtr += avFrame->channels;
                       }
-                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples);
                     }
                   break;
-
+                  //}}}
                 case AV_SAMPLE_FMT_FLTP:
-                  // 32bit float planar, copy planar channel to interleaved, calc channel power
+                  //{{{  32bit float planar, copy planar to interleaved
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    float power = 0.f;
                     auto srcPtr = (float*)avFrame->data[channel];
+                    auto dstPtr = (short*)(samples) + channel;
                     for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = (short)(*srcPtr * 0x8000);
-                      timeBuf[i] = channel ? timeBuf[i] + sample : sample;
-                      power += sample * sample;
-                      srcPtr++;
+                      auto int16 = (short)(*srcPtr++ * 0x8000);
+                      *dstPtr = int16;
+                      dstPtr += avFrame->channels;
                       }
-                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples);
                     }
                   break;
-
+                  //}}}
                 default:
                   cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                 }
               //}}}
-
-              kiss_fftr (fftrConfig, timeBuf, freqBuf);
-
-              float maxValue = 0.f;
-              float values[1025];
-              for (int i = 0; i < nfreqs; i++) {
-                float value = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
-                if (value > maxValue)
-                  maxValue = value;
-                values[i] = value;
-                }
-              for (int i = 0; i < nfreqs; i++)
-                values[i] /= maxValue;
-
-              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, values, int(mStreamLast - mStreamFirst))) {
+              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size,
+                                  avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst))) {
                 //{{{  launch playThread
                 auto threadHandle = thread ([=](){ playThread (true); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -1482,9 +1544,10 @@ private:
               if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
                 break;
               if (avFrame->nb_samples > 0) {
+                //{{{  covert planar avFrame->data to interleaved int16_t samples
                 switch (context->sample_fmt) {
                   case AV_SAMPLE_FMT_S16P:
-                    //{{{  16bit signed planar, copy planar to interleaved
+                    // 16bit signed planar, copy planar to interleaved
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
                       auto srcPtr = (short*)avFrame->data[channel];
                       auto dstPtr = (short*)(samples) + channel;
@@ -1494,9 +1557,9 @@ private:
                         }
                       }
                     break;
-                    //}}}
+
                   case AV_SAMPLE_FMT_FLTP:
-                    //{{{  32bit float planar, copy planar channel to interleaved
+                    // 32bit float planar, copy planar to interleaved
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
                       auto srcPtr = (float*)avFrame->data[channel];
                       auto dstPtr = (short*)(samples) + channel;
@@ -1507,11 +1570,11 @@ private:
                         }
                       }
                     break;
-                    //}}}
+
                   default:
                     cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                   }
-
+                //}}}
                 audio.play (avFrame->channels, samples, avFrame->nb_samples, 1.f);
                 mSong.incPlayFrame (1);
                 changed();
@@ -1567,12 +1630,6 @@ private:
   int mIcyInfoCount = 0;
   int mIcyInfoLen = 0;
   char mIcyInfo[255] = {0};
-
-  const int nfft = 2048;
-  const int nfreqs = nfft / 2 + 1;
-
-  float values[1025];
-  float mMaxValue = 0.f;
   //}}}
   };
 
@@ -1591,8 +1648,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cAppWindow appWindow;
 
   if (numArgs == 1) {
-    string url = "http://stream.wqxr.org/wqxr.aac";
-    //string url = "http://stream.wqxr.org/js-stream.aac";
+    //string url = "http://stream.wqxr.org/wqxr.aac";
+    string url = "http://stream.wqxr.org/js-stream.aac";
     //string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
     //string url = "http://us4.internet-radio.com:8266/";
     //string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";
@@ -1607,7 +1664,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     wstring wstr(args[1]);
     fileName = string(wstr.begin(), wstr.end());
     cLog::log (LOGNOTICE, "mp3Window - " + fileName);
-    appWindow.run ("mp3Window", 800, 500, fileName);
+    appWindow.run ("mp3Window", 800, 800, fileName);
     }
 
   CoUninitialize();
