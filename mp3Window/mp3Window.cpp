@@ -45,24 +45,9 @@ const int kPlayFrameThreshold = 10; // about a second of analyse before playing
 
 class cAppWindow : public cD2dWindow {
 public:
-  //{{{
-  cAppWindow() : mPlayDoneSem("playDone") {
-    nfft = 2048;
-    nfreqs = nfft / 2 + 1;
-    cfg = kiss_fftr_alloc (nfft, 0, 0, 0);
-    tbuf = (kiss_fft_scalar*)malloc (nfft * sizeof(kiss_fft_scalar));
-    fbuf = (kiss_fft_cpx*)malloc (nfreqs * sizeof(kiss_fft_cpx));
-    values = (float*)malloc (nfreqs*sizeof(float));
-    }
-  //}}}
-  //{{{
-  virtual ~cAppWindow() {
-    free (values);
-    free (fbuf);
-    free (tbuf);
-    free (cfg);
-    }
-  //}}}
+  cAppWindow() : mPlayDoneSem("playDone") {}
+  virtual ~cAppWindow() {}
+
   //{{{
   void run (const string& title, int width, int height, const string& fileName) {
 
@@ -75,7 +60,7 @@ public:
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
-    add (new cSongFreqBox (this, 0,200.f, this), 0,-440.f);
+    add (new cSongFreqBox (this, 0,200.f, mSong), 0,-440.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
@@ -118,7 +103,7 @@ public:
 
     add (new cLogBox (this, 400.f,0.f, true), 0.f,0.f)->setPin (false);
 
-    add (new cSongFreqBox (this, 0,200.f, this), 0,-440.f);
+    add (new cSongFreqBox (this, 0,200.f, mSong), 0,-440.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
@@ -173,14 +158,15 @@ private:
   //{{{
   class cFrame {
   public:
-    cFrame (uint32_t streamIndex, uint32_t len, uint8_t values[kMaxChannels]) : mStreamIndex(streamIndex), mLen(len) {
-      for (auto i = 0; i < kMaxChannels; i++)
-        mValues[i] = values[i];
+    cFrame (uint32_t streamIndex, uint32_t len, uint8_t* power, float* freq) : mStreamIndex(streamIndex), mLen(len) {
+      memcpy (mPower, power, kMaxChannels);
+      mFreqValues = (float*)malloc (1025*4);
+      memcpy (mFreqValues, freq, 1025*4);
       mSilent = isSilentThreshold();
       }
 
     bool isSilent() { return mSilent; }
-    bool isSilentThreshold() { return mValues[0] + mValues[1] <= kSilentThreshold; }
+    bool isSilentThreshold() { return mPower[0] + mPower[1] <= kSilentThreshold; }
 
     bool hasTitle() { return !mTitle.empty(); }
     void setTitle (string title) { mTitle = title; }
@@ -189,8 +175,9 @@ private:
     uint32_t mStreamIndex;
     uint32_t mLen;
 
-    uint8_t mValues[kMaxChannels];
     bool mSilent;
+    uint8_t mPower[kMaxChannels];
+    float* mFreqValues;
 
     string mTitle;
     };
@@ -221,10 +208,10 @@ private:
       }
     //}}}
     //{{{
-    bool addFrame (uint32_t streamPos, uint32_t frameLen, uint8_t values[kMaxChannels], uint32_t streamLen) {
+    bool addFrame (uint32_t streamPos, uint32_t frameLen, uint8_t* values, float* freq, uint32_t streamLen) {
     // return true if enough frames added to start playing
 
-      mFrames.push_back (cFrame (streamPos, frameLen, values));
+      mFrames.push_back (cFrame (streamPos, frameLen, values, freq));
 
       mMaxValue = max (mMaxValue, values[0]);
       mMaxValue = max (mMaxValue, values[1]);
@@ -262,6 +249,17 @@ private:
     int getNumdFrames() { return mNumFrames; }
     int getNumLoadedFrames() { return (int)mFrames.size(); }
     //{{{
+    uint32_t getPlayFrame() {
+
+      if (mFrames.empty())
+        return 0;
+      else if (mPlayFrame < mFrames.size())
+        return mPlayFrame;
+      else
+        return mFrames.size() - 1;
+      }
+    //}}}
+    //{{{
     uint32_t getPlayFrameStreamIndex() {
 
       if (mFrames.empty())
@@ -275,7 +273,11 @@ private:
     int getSamplesSize() { return mMaxSamplesPerFrame * mChannels * mBytesPerSample; }
 
     // sets
-    void setPlayFrame (int frame) { mPlayFrame = min (max (frame, 0), mNumFrames-1); }
+    //{{{
+    void setPlayFrame (int frame) {
+      mPlayFrame = min (max (frame, 0), mNumFrames-1);
+      }
+    //}}}
     void incPlayFrame (int frames) { setPlayFrame (mPlayFrame + frames); }
     void incPlaySec (int secs) { incPlayFrame (secs * mSamplesPerSec / mSamplesPerFrame); }
 
@@ -342,8 +344,8 @@ private:
   class cSongFreqBox : public cBox {
   public:
     //{{{
-    cSongFreqBox (cD2dWindow* window, float width, float height, cAppWindow* appWindow) :
-        cBox ("songWaveBox", window, width, height), mAppWindow(appWindow) {
+    cSongFreqBox (cD2dWindow* window, float width, float height, cSong& song) :
+        cBox ("songWaveBox", window, width, height), mSong(song) {
 
       mPin = true;
       }
@@ -352,14 +354,18 @@ private:
 
     void onDraw (ID2D1DeviceContext* dc) {
 
-      for (int i = 0; i < getWidth(); i++) {
-        float value = (mAppWindow->values[i] / mAppWindow->mMaxValue) * getHeight();
-        dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - value, mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
-        }
+      int frame = mSong.mPlayFrame;
+      if (frame > mSong.getNumLoadedFrames())
+        frame = mSong.getNumLoadedFrames();
+
+      //for (int i = 0; (i < getWidth()) && (i < 1025); i++) {
+      //  float value = mSong.mFrames[frame].mFreqValues[i] * getHeight();
+      //  dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - value, mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
+      //  }
       }
 
   protected:
-    cAppWindow* mAppWindow;
+    cSong& mSong;
     };
   //}}}
   //{{{
@@ -440,8 +446,8 @@ private:
           dc->FillRectangle (cRect (xl, yCentre-kSilentThreshold, xr, yCentre+kSilentThreshold), mWindow->getRedBrush());
 
         if (!centre && (frame >= mSong.mPlayFrame)) {
-          auto yLeft = mSong.mFrames[frame].mValues[0] * valueScale;
-          auto yRight = mSong.mFrames[frame].mValues[1] * valueScale;
+          auto yLeft = mSong.mFrames[frame].mPower[0] * valueScale;
+          auto yRight = mSong.mFrames[frame].mPower[1] * valueScale;
           dc->FillRectangle (cRect (xl, yCentre - yLeft, xr, yCentre + yRight), mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
           centre = true;
@@ -450,8 +456,8 @@ private:
           float yLeft = 0;
           float yRight = 0;
           for (auto i = 0; i < zoom; i++) {
-            yLeft += mSong.mFrames[frame+i].mValues[0];
-            yRight += mSong.mFrames[frame+i].mValues[1];
+            yLeft += mSong.mFrames[frame+i].mPower[0];
+            yRight += mSong.mFrames[frame+i].mPower[1];
             }
           yLeft = (yLeft / zoom) * valueScale;
           yRight = (yRight / zoom) * valueScale;
@@ -575,20 +581,20 @@ private:
           if (frame >= mSong.getNumLoadedFrames())
             break;
 
-          int leftValue = mSong.mFrames[frame].mValues[0];
-          int rightValue = mSong.mFrames[frame].mValues[1];
+          int lValue = mSong.mFrames[frame].mPower[0];
+          int rValue = mSong.mFrames[frame].mPower[1];
           if (frame > startFrame) {
             int num = 1;
             for (auto i = startFrame; i < frame; i++) {
-              leftValue += mSong.mFrames[i].mValues[0];
-              rightValue += mSong.mFrames[i].mValues[1];
+              lValue += mSong.mFrames[i].mPower[0];
+              rValue += mSong.mFrames[i].mPower[1];
               num++;
               }
-            leftValue /= num;
-            rightValue /= num;
+            lValue /= num;
+            rValue /= num;
             }
-          *summedValuesPtr++ = leftValue;
-          *summedValuesPtr++ = rightValue;
+          *summedValuesPtr++ = lValue;
+          *summedValuesPtr++ = rValue;
 
           mMaxSummedX = x;
           startFrame = frame + 1;
@@ -617,8 +623,8 @@ private:
       for (auto x = firstX; x < lastX; x++) {
         float xr = xl + 1.f;
         if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumLoadedFrames())) {
-          float leftValue = mSong.mFrames[mSong.mPlayFrame].mValues[0] * valueScale;
-          float rightValue = mSong.mFrames[mSong.mPlayFrame].mValues[1] * valueScale;
+          float leftValue = mSong.mFrames[mSong.mPlayFrame].mPower[0] * valueScale;
+          float rightValue = mSong.mFrames[mSong.mPlayFrame].mPower[1] * valueScale;
           dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
                              mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
@@ -1217,6 +1223,10 @@ private:
     auto avFrame = av_frame_alloc();
     auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
+    kiss_fftr_cfg fftrConfig = kiss_fftr_alloc (nfft, 0, 0, 0);
+    kiss_fft_scalar timeBuf[2048];
+    kiss_fft_cpx freqBuf[1025];
+
     auto stream = mStreamFirst;
     while (!getExit()) {
       bool frameAac;
@@ -1229,23 +1239,23 @@ private:
             ret = avcodec_receive_frame (context, avFrame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
               break;
+            cLog::log (LOGINFO2, "frame size:%d", avPacket.size);
+
             if (avFrame->nb_samples > 0) {
               uint8_t powers[kMaxChannels];
               //{{{  calc power for each channel
-              int decimate = 2;
-
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
                   // 16bit signed planar, copy planar to interleaved, calc channel power
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
                     float power = 0.f;
                     auto srcPtr = (short*)avFrame->data[channel];
-                    for (auto i = 0; i < avFrame->nb_samples; i += decimate) {
-                      auto sample = *srcPtr;
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      auto sample = *srcPtr++;
+                      timeBuf[i] = channel ? timeBuf[i] + sample : sample;
                       power += sample * sample;
-                      srcPtr += decimate;
                       }
-                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples/decimate);
+                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples);
                     }
                   break;
 
@@ -1254,12 +1264,12 @@ private:
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
                     float power = 0.f;
                     auto srcPtr = (float*)avFrame->data[channel];
-                    for (auto i = 0; i < avFrame->nb_samples; i += decimate) {
-                      auto sample = (short)(*srcPtr * 0x8000);
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
+                      auto sample = (short)(*srcPtr++ * 0x8000);
+                      timeBuf[i] = channel ? timeBuf[i] + sample : sample;
                       power += sample * sample;
-                      srcPtr += decimate;
                       }
-                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples/decimate);
+                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples);
                     }
                   break;
 
@@ -1267,8 +1277,22 @@ private:
                   cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                 }
               //}}}
-              cLog::log (LOGINFO2, "frame size:%d", avPacket.size);
-              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, int(mStreamLast - mStreamFirst))) {
+
+              kiss_fftr (fftrConfig, timeBuf, freqBuf);
+
+              float maxValue = 0.f;
+              float values[1025];
+              for (int i = 0; i < nfreqs; i++) {
+                float value = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
+                if (value > maxValue)
+                  maxValue = value;
+                values[i] = value;
+                }
+              for (int i = 0; i < nfreqs; i++)
+                values[i] /= maxValue;
+
+              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, values,
+                                  int(mStreamLast - mStreamFirst))) {
                 //{{{  launch playThread
                 auto threadHandle = thread ([=](){ playThread (false); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -1322,6 +1346,10 @@ private:
       auto avFrame = av_frame_alloc();
       auto samples = (int16_t*)malloc (mSong.getSamplesSize());
 
+      kiss_fftr_cfg fftrConfig = kiss_fftr_alloc (nfft, 0, 0, 0);
+      kiss_fft_scalar timeBuf[2048];
+      kiss_fft_cpx freqBuf[1025];
+
       auto stream = mStreamFirst;
       bool frameAac;
       bool tag;
@@ -1337,20 +1365,19 @@ private:
             if (avFrame->nb_samples > 0) {
               uint8_t powers[kMaxChannels];
               //{{{  calc power for each channel
-              int decimate = 2;
-
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
                   // 16bit signed planar, copy planar to interleaved, calc channel power
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
                     float power = 0.f;
                     auto srcPtr = (short*)avFrame->data[channel];
-                    for (auto i = 0; i < avFrame->nb_samples; i += decimate) {
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
                       auto sample = *srcPtr;
+                      timeBuf[i] = channel ? timeBuf[i] + sample : sample;
                       power += sample * sample;
-                      srcPtr += decimate;
+                      srcPtr++;
                       }
-                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples/decimate);
+                    powers[channel] = uint8_t(sqrtf (power) / avFrame->nb_samples);
                     }
                   break;
 
@@ -1359,12 +1386,13 @@ private:
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
                     float power = 0.f;
                     auto srcPtr = (float*)avFrame->data[channel];
-                    for (auto i = 0; i < avFrame->nb_samples; i += decimate) {
+                    for (auto i = 0; i < avFrame->nb_samples; i++) {
                       auto sample = (short)(*srcPtr * 0x8000);
+                      timeBuf[i] = channel ? timeBuf[i] + sample : sample;
                       power += sample * sample;
-                      srcPtr += decimate;
+                      srcPtr++;
                       }
-                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples/decimate);
+                    powers[channel] = uint8_t (sqrtf (power) / avFrame->nb_samples);
                     }
                   break;
 
@@ -1372,7 +1400,21 @@ private:
                   cLog::log (LOGERROR, "analyseThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                 }
               //}}}
-              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, int(mStreamLast - mStreamFirst))) {
+
+              kiss_fftr (fftrConfig, timeBuf, freqBuf);
+
+              float maxValue = 0.f;
+              float values[1025];
+              for (int i = 0; i < nfreqs; i++) {
+                float value = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
+                if (value > maxValue)
+                  maxValue = value;
+                values[i] = value;
+                }
+              for (int i = 0; i < nfreqs; i++)
+                values[i] /= maxValue;
+
+              if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, powers, values, int(mStreamLast - mStreamFirst))) {
                 //{{{  launch playThread
                 auto threadHandle = thread ([=](){ playThread (true); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -1459,7 +1501,8 @@ private:
                       auto srcPtr = (float*)avFrame->data[channel];
                       auto dstPtr = (short*)(samples) + channel;
                       for (auto i = 0; i < avFrame->nb_samples; i++) {
-                        *dstPtr = (short)(*srcPtr++ * 0x8000);
+                        auto int16 = (short)(*srcPtr++ * 0x8000);
+                        *dstPtr = int16;
                         dstPtr += avFrame->channels;
                         }
                       }
@@ -1467,19 +1510,6 @@ private:
                     //}}}
                   default:
                     cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
-                  }
-
-                auto ptr = samples;
-                for (int i = 0; i < nfft; i++)
-                  tbuf[i] = *ptr++ + *ptr++;
-
-                kiss_fftr (cfg, tbuf, fbuf);
-
-                for (int i = 0; i < nfreqs; i++) {
-                  float value = sqrt ((fbuf[i].r * fbuf[i].r) + (fbuf[i].i * fbuf[i].i));
-                  if (value > mMaxValue)
-                    mMaxValue = value;
-                  values[i] = value;
                   }
 
                 audio.play (avFrame->channels, samples, avFrame->nb_samples, 1.f);
@@ -1538,12 +1568,10 @@ private:
   int mIcyInfoLen = 0;
   char mIcyInfo[255] = {0};
 
-  int nfft;
-  int nfreqs;
-  kiss_fftr_cfg cfg = nullptr;
-  kiss_fft_scalar* tbuf = nullptr;
-  kiss_fft_cpx* fbuf = nullptr;
-  float* values = nullptr;
+  const int nfft = 2048;
+  const int nfreqs = nfft / 2 + 1;
+
+  float values[1025];
   float mMaxValue = 0.f;
   //}}}
   };

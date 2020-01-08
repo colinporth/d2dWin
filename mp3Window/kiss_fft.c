@@ -200,7 +200,7 @@ static void kf_bfly_generic (kiss_fft_cpx * Fout, const size_t fstride, const ki
       Fout[ k ] = scratch[0];
       for (q = 1; q < p; ++q ) {
         twidx += fstride * k;
-        if (twidx >= Norig) 
+        if (twidx >= Norig)
           twidx -= Norig;
         C_MUL(t,scratch[q] , twiddles[twidx] );
         C_ADDTO( Fout[ k ] ,t);
@@ -256,7 +256,7 @@ static void kf_work (kiss_fft_cpx* Fout, const kiss_fft_cpx* f, const size_t fst
       // p instances of smaller DFTs of size m,
       // each one takes a decimated version of the input
       kf_work (Fout, f, fstride * p, in_stride, factors, st);
-        f += fstride*in_stride;
+      f += fstride*in_stride;
       } while( (Fout += m) != Fout_end );
     }
 
@@ -294,7 +294,9 @@ static void kf_factor (int n, int* facbuf) {
       if (p > floor_sqrt)
         p = n;          /* no more factors, skip to end */
       }
+
     n /= p;
+
     *facbuf++ = p;
     *facbuf++ = n;
     } while (n > 1);
