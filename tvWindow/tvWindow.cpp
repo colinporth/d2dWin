@@ -140,8 +140,11 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   string rootOrFrequency;
   if (numArgs > 1) {
     // get fileName from commandLine
-    wstring wstr (args[1]);
-    rootOrFrequency = string (wstr.begin(), wstr.end());
+    const wstring wstr (args[1]);
+    #pragma warning(push)
+      #pragma warning(disable: 4244)
+      const string rootOrFrequency = string (wstr.begin(), wstr.end());
+    #pragma warning(pop)
     }
 
   cAppWindow appWindow;

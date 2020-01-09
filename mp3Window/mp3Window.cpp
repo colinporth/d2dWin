@@ -41,6 +41,10 @@ const int kSilentThreshold = 3;
 const int kSilentWindow = 12;
 
 const int kPlayFrameThreshold = 10; // about a second of analyse before playing
+
+const int kMaxSamples = 2048;
+const int kMaxFreq = 1025;
+const int kMaxSpectrum = 512;
 //}}}
 
 class cAppWindow : public cD2dWindow {
@@ -103,7 +107,7 @@ public:
     add (new cLogBox (this, 400.f,0.f, true), 0.f,0.f)->setPin (false);
 
     add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
-    add (new cSongSpectrumView (this, 0,300.f, mSong), 0,-540.f);
+    add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
@@ -158,12 +162,12 @@ private:
   //{{{
   class cFrame {
   public:
-    cFrame (uint32_t streamIndex, uint32_t len, uint8_t* power, float* freq, uint8_t* luma, uint32_t* bgra)
+    cFrame (uint32_t streamIndex, uint32_t len, uint8_t* power, float* freq, uint8_t* luma)
         : mStreamIndex(streamIndex), mLen(len) {
+
       memcpy (mPower, power, kMaxChannels);
-      memcpy (mFreqValues, freq, 1025*4);
-      memcpy (mFreqLuma, luma, 1025);
-      memcpy (mFreqBgra, bgra, 1025);
+      memcpy (mFreqValues, freq, kMaxFreq*4);
+      memcpy (mFreqLuma, luma, kMaxSpectrum);
 
       mSilent = isSilentThreshold();
       }
@@ -180,9 +184,8 @@ private:
 
     bool mSilent;
     uint8_t mPower[kMaxChannels];
-    float mFreqValues[1025];
-    uint8_t mFreqLuma[1025];
-    uint32_t mFreqBgra[1025];
+    float mFreqValues[kMaxFreq];
+    uint8_t mFreqLuma[kMaxSpectrum];
 
     string mTitle;
     };
@@ -217,10 +220,10 @@ private:
       mMaxPowerValue = 0;
 
       mMaxFreqValue = 0.f;
-      for (int i = 0; i < 1025; i++)
+      for (int i = 0; i < kMaxFreq; i++)
         mMaxFreqValues[i] = 0.f;
 
-      fftrConfig = kiss_fftr_alloc (2048, 0, 0, 0);
+      fftrConfig = kiss_fftr_alloc (kMaxSamples, 0, 0, 0);
       }
     //}}}
 
@@ -243,23 +246,20 @@ private:
 
       kiss_fftr (fftrConfig, timeBuf, freqBuf);
 
-      float freqValues[1025];
-      for (int i = 0; i < 1025; i++) {
+      float freqValues[kMaxFreq];
+      for (int i = 0; i < kMaxFreq; i++) {
         freqValues[i] = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
         mMaxFreqValue = max (mMaxFreqValue, freqValues[i]);
         mMaxFreqValues[i] = max (mMaxFreqValues[i], freqValues[i]);
         }
 
-      uint8_t luma[1025];
-      uint32_t bgra[1025];
-      for (int i = 0; i < 1025; i++) {
+      uint8_t luma[kMaxFreq];
+      for (int i = 0; i < kMaxSpectrum; i++) {
         float value = uint8_t((freqValues[i] / mMaxFreqValue) * 1024.f);
-        uint8_t val =  value > 255 ? 255 : uint8_t(value);
-        luma[i] = val;
-        bgra[i] = (val << 16) | (val << 8) | val;
+        luma[i] = value > 255 ? 255 : uint8_t(value);;
         }
 
-      mFrames.push_back (cFrame (streamIndex, frameLen, powerValues, freqValues, luma, bgra));
+      mFrames.push_back (cFrame (streamIndex, frameLen, powerValues, freqValues, luma));
 
       // estimate numFrames
       mNumFrames = int (uint64_t(streamLen - mFrames[0].mStreamIndex) * (uint64_t)mFrames.size() /
@@ -351,7 +351,7 @@ private:
     uint16_t mBytesPerSample = 2;
     uint16_t mBitsPerSample = 16;
     uint16_t mSamplesPerFrame = 1152;
-    uint16_t mMaxSamplesPerFrame = 2048;
+    uint16_t mMaxSamplesPerFrame = kMaxSamples;
     uint16_t mSamplesPerSec = 44100;
 
     concurrent_vector<cFrame> mFrames;
@@ -362,11 +362,11 @@ private:
     uint8_t mMaxPowerValue = 0;
 
     kiss_fftr_cfg fftrConfig;
-    kiss_fft_scalar timeBuf[2048];
-    kiss_fft_cpx freqBuf[1025];
+    kiss_fft_scalar timeBuf[kMaxSamples];
+    kiss_fft_cpx freqBuf[kMaxFreq];
 
     float mMaxFreqValue = 0.f;
-    float mMaxFreqValues[1025];
+    float mMaxFreqValues[kMaxFreq];
 
     cJpegImage* mImage = nullptr;
 
@@ -411,7 +411,7 @@ private:
       int frame = mSong.getPlayFrame();
       if (frame > 0) {
         float* freq = (mSong.mFrames[frame].mFreqValues);
-        for (int i = 0; (i < getWidth()) && (i < 1025); i++)
+        for (int i = 0; (i < getWidth()) && (i < kMaxFreq); i++)
           dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - ((freq[i] / mSong.mMaxFreqValue) * getHeight()),
                                     mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
         }
@@ -419,6 +419,75 @@ private:
 
   protected:
     cSong& mSong;
+    };
+  //}}}
+  //{{{
+  class cSongSpectrumBox : public cBox {
+  public:
+    //{{{
+    cSongSpectrumBox (cD2dWindow* window, float width, float height, cSong& song) :
+        cBox("songSpectrumBox", window, width, height), mSong(song) {
+
+      mPin = true;
+      }
+    //}}}
+    //{{{
+    virtual ~cSongSpectrumBox() {
+      if (mBitmap)
+        mBitmap->Release();
+      free (mBitmapBuf);
+      }
+    //}}}
+
+    //{{{
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      if (!mBitmap) {
+        mBitmapWidth = getWidthInt();
+        mBitmapHeight = getHeightInt();
+
+        mBitmapBuf = (uint8_t*)malloc (mBitmapWidth * mBitmapHeight);
+
+        dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
+                          { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 }, &mBitmap);
+        }
+
+      auto leftFrame = mSong.mPlayFrame - (getWidthInt()/2);
+      auto rightFrame = mSong.mPlayFrame + (getWidthInt()/2);
+
+      auto firstFrame = max (leftFrame, 0);
+      auto lastFrame = min (rightFrame, mSong.getNumLoadedFrames());
+
+      if ((firstFrame > leftFrame) || (lastFrame < rightFrame)) // just clear the lot
+        memset (mBitmapBuf, 0, mBitmapWidth * mBitmapHeight);
+
+      auto frame = firstFrame;
+      while (frame < lastFrame) {
+        auto srcPtr = mSong.mFrames[frame].mFreqLuma;
+        auto dstPtr = mBitmapBuf + ((mBitmapHeight-1) * mBitmapWidth) + (frame-leftFrame);
+        for (int y = 0; y < mBitmapHeight; y++) {
+          *dstPtr = *srcPtr++;
+          dstPtr -= mBitmapWidth;
+          }
+        frame++;
+        }
+
+      mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBitmapBuf, mBitmapWidth);
+
+      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
+      dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(), &mRect);
+      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+      }
+    //}}}
+
+  private:
+    cSong& mSong;
+
+    int mBitmapWidth = 0;
+    int mBitmapHeight = 0;
+
+    uint8_t* mBitmapBuf = nullptr;
+    ID2D1Bitmap* mBitmap = nullptr;
     };
   //}}}
   //{{{
@@ -448,10 +517,10 @@ private:
         mBitmapWidth = getHeightInt();
         mBitmapHeight = getWidthInt();
 
-        mBitmapBuf = (uint32_t*)malloc (mBitmapWidth * mBitmapHeight * 4);
+        mBitmapBuf = (uint8_t*)malloc (mBitmapWidth * mBitmapHeight);
 
         dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
-                          { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 }, &mBitmap);
+                          { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 }, &mBitmap);
 
         // !!!!! fix the view2d stuff !!!!!!!
         mView2d.multiplyBy (Matrix3x2F::Rotation (-90.f, getSize()/2.f));
@@ -466,23 +535,26 @@ private:
 
       auto ptr = mBitmapBuf;
       if (firstFrame > leftFrame) {
-        memset (ptr, 0, (firstFrame - leftFrame) * mBitmapWidth * 4);
+        memset (ptr, 0, (firstFrame - leftFrame) * mBitmapWidth);
         ptr += (firstFrame - leftFrame) * mBitmapWidth;
         }
 
       auto frame = firstFrame;
       while (frame < lastFrame) {
-        memcpy (ptr, mSong.mFrames[frame++].mFreqBgra, mBitmapWidth*4);
+        memcpy (ptr, mSong.mFrames[frame++].mFreqLuma, mBitmapWidth);
         ptr += mBitmapWidth;
         }
 
       if (lastFrame < rightFrame)
-        memset (ptr, 0, (rightFrame - lastFrame) * mBitmapWidth * 4);
+        memset (ptr, 0, (rightFrame - lastFrame) * mBitmapWidth);
 
-      mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBitmapBuf, mBitmapWidth * 4);
+      mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBitmapBuf, mBitmapWidth);
 
       dc->SetTransform (mView2d.mTransform);
-      dc->DrawBitmap (mBitmap, cRect(mRect.left, mRect.top, mRect.left+getHeight(), mRect.top+getWidth()), 1.f);
+      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
+      dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
+                           &cRect(mRect.left, mRect.top, mRect.left+getHeight(), mRect.top+getWidth()));
+      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
       dc->SetTransform (Matrix3x2F::Identity());
       }
     //}}}
@@ -493,7 +565,7 @@ private:
     int mBitmapWidth = 0;
     int mBitmapHeight = 0;
 
-    uint32_t* mBitmapBuf = nullptr;
+    uint8_t* mBitmapBuf = nullptr;
     ID2D1Bitmap* mBitmap = nullptr;
     };
   //}}}
