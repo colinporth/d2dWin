@@ -60,11 +60,11 @@ public:
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
-    add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
+    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
     add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
+    add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
-    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
 
     mFileList = new cFileList (fileName, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -102,11 +102,11 @@ public:
 
     add (new cLogBox (this, 400.f,0.f, true), 0.f,0.f)->setPin (false);
 
-    add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
+    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
     add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
+    add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
-    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
 
     mVolumeBox = new cVolumeBox (this, 12.f,0.f, nullptr);
     add (mVolumeBox, -12.f,0.f);
@@ -158,10 +158,12 @@ private:
   //{{{
   class cFrame {
   public:
-    cFrame (uint32_t streamIndex, uint32_t len, uint8_t* power, float* freq, uint8_t* luma) : mStreamIndex(streamIndex), mLen(len) {
+    cFrame (uint32_t streamIndex, uint32_t len, uint8_t* power, float* freq, uint8_t* luma, uint32_t* bgra)
+        : mStreamIndex(streamIndex), mLen(len) {
       memcpy (mPower, power, kMaxChannels);
       memcpy (mFreqValues, freq, 1025*4);
       memcpy (mFreqLuma, luma, 1025);
+      memcpy (mFreqBgra, bgra, 1025);
 
       mSilent = isSilentThreshold();
       }
@@ -180,6 +182,7 @@ private:
     uint8_t mPower[kMaxChannels];
     float mFreqValues[1025];
     uint8_t mFreqLuma[1025];
+    uint32_t mFreqBgra[1025];
 
     string mTitle;
     };
@@ -248,12 +251,15 @@ private:
         }
 
       uint8_t luma[1025];
+      uint32_t bgra[1025];
       for (int i = 0; i < 1025; i++) {
         float value = uint8_t((freqValues[i] / mMaxFreqValue) * 1024.f);
-        luma[i] = value > 255 ? 255 : uint8_t(value);
+        uint8_t val =  value > 255 ? 255 : uint8_t(value);
+        luma[i] = val;
+        bgra[i] = (val << 16) | (val << 8) | val;
         }
 
-      mFrames.push_back (cFrame (streamIndex, frameLen, powerValues, freqValues, luma));
+      mFrames.push_back (cFrame (streamIndex, frameLen, powerValues, freqValues, luma, bgra));
 
       // estimate numFrames
       mNumFrames = int (uint64_t(streamLen - mFrames[0].mStreamIndex) * (uint64_t)mFrames.size() /
@@ -416,11 +422,12 @@ private:
     };
   //}}}
   //{{{
-  class cSongSpectrumBox : public cBox {
+  class cSongSpectrumBox : public cView {
   public:
     //{{{
     cSongSpectrumBox (cD2dWindow* window, float width, float height, cSong& song) :
-        cBox ("songWaveBox", window, width, height), mSong(song) {
+        cView("songWaveBox", window, width, height), mSong(song) {
+        //cBox ("songWaveBox", window, width, height), mSong(song) {
 
       mPin = true;
       }
@@ -444,9 +451,10 @@ private:
       if (!mBitmap) {
         mBitmapWidth = getWidthInt();
         mBitmapHeight = getHeightInt();
+
         mBgraBuf = (uint32_t*)malloc (mBitmapWidth * mBitmapHeight * 4);
+
         dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
-        //                  { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 }, &mBitmap);
                           { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 }, &mBitmap);
         }
 
@@ -456,8 +464,12 @@ private:
         auto firstX = (leftFrame < 0) ? (-leftFrame) / mZoom : 0;
 
         draw (dc, leftFrame, rightFrame, firstX, mZoom);
+
         mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBgraBuf, mBitmapWidth * 4);
+
+        dc->SetTransform (mView2d.mTransform);
         dc->DrawBitmap (mBitmap, mRect, 1.f);
+        dc->SetTransform (Matrix3x2F::Identity());
         }
       }
     //}}}
@@ -471,10 +483,9 @@ private:
 
       int x = firstX;
       for (int frame = leftFrame; frame < rightFrame; frame++) {
-        uint32_t* ptr = mBgraBuf + ((mBitmapHeight-1) * mBitmapWidth) + x;
+        auto ptr = mBgraBuf + ((mBitmapHeight-1) * mBitmapWidth) + x;
         for (int y = 0; y < mBitmapHeight; y++) {
-          uint8_t val = mSong.mFrames[frame].mFreqLuma[y];
-          *ptr = (val << 16) | (val << 8) | val;
+          *ptr = mSong.mFrames[frame].mFreqBgra[y];
           ptr -= mBitmapWidth;
           }
         x++;
