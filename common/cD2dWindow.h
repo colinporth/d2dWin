@@ -286,11 +286,14 @@ public:
     //{{{
     bool onWheel (int delta, cPoint pos) {
 
-      float ratio = mWindow->getShift() ? 2.f : mWindow->getControl() ? 1.25f : 1.1f;
-      if (delta < 0)
-        ratio = 1.f / ratio;
-      mView2d.multiplyBy (Matrix3x2F::Scale (Size(ratio, ratio), pos));
-
+      if (mWindow->getShift()) 
+        mView2d.multiplyBy (Matrix3x2F::Rotation (45.f * (delta / 120.f), getCentre()));
+      else {
+        float ratio = mWindow->getControl() ? 1.5f : 1.1f;
+        if (delta < 0)
+          ratio = 1.f / ratio;
+        mView2d.multiplyBy (Matrix3x2F::Scale (Size(ratio, ratio), pos));
+        }
       return true;
       }
     //}}}

@@ -449,50 +449,50 @@ private:
     void onDraw (ID2D1DeviceContext* dc) {
 
       if (!mBitmap) {
-        mBitmapWidth = getWidthInt();
-        mBitmapHeight = getHeightInt();
+        mBitmapWidth = getHeightInt();
+        mBitmapHeight = getWidthInt();
 
         mBgraBuf = (uint32_t*)malloc (mBitmapWidth * mBitmapHeight * 4);
 
         dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
                           { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 }, &mBitmap);
+
+        mView2d.multiplyBy (Matrix3x2F::Rotation (-90.f, getSize()/2.f));
+        mView2d.multiplyBy (Matrix3x2F::Translation (-getWidth()/2.f - 104.f,10.f));
         }
 
       if (mBitmap) {
-        auto leftFrame = mSong.mPlayFrame - (mZoom * getWidthInt()/2);
-        auto rightFrame = mSong.mPlayFrame + (mZoom * getWidthInt()/2);
-        auto firstX = (leftFrame < 0) ? (-leftFrame) / mZoom : 0;
+        auto leftFrame = mSong.mPlayFrame - (getWidthInt()/2);
+        auto rightFrame = mSong.mPlayFrame + (getWidthInt()/2);
 
-        draw (dc, leftFrame, rightFrame, firstX, mZoom);
+        int firstFrame = max (leftFrame, 0);
+        int lastFrame = min (rightFrame, mSong.getNumLoadedFrames());
+
+        auto ptr = mBgraBuf;
+        if (firstFrame > leftFrame) {
+          memset (ptr, 0, (firstFrame - leftFrame) * mBitmapWidth * 4);
+          ptr += (firstFrame - leftFrame) * mBitmapWidth;
+          }
+
+        int frame = firstFrame;
+        while (frame < lastFrame) {
+          memcpy (ptr, mSong.mFrames[frame++].mFreqBgra, mBitmapWidth*4);
+          ptr += mBitmapWidth;
+          }
+
+        if (lastFrame < rightFrame)
+          memset (ptr, 0, (rightFrame - lastFrame) * mBitmapWidth * 4);
 
         mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBgraBuf, mBitmapWidth * 4);
 
         dc->SetTransform (mView2d.mTransform);
-        dc->DrawBitmap (mBitmap, mRect, 1.f);
+        dc->DrawBitmap (mBitmap, cRect(mRect.left, mRect.top, mRect.left+getHeight(), mRect.top+getWidth()), 1.f);
         dc->SetTransform (Matrix3x2F::Identity());
         }
       }
     //}}}
 
   protected:
-    //{{{
-    void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
-
-      leftFrame = max (leftFrame, 0);
-      rightFrame = min (rightFrame, mSong.getNumLoadedFrames());
-
-      int x = firstX;
-      for (int frame = leftFrame; frame < rightFrame; frame++) {
-        auto ptr = mBgraBuf + ((mBitmapHeight-1) * mBitmapWidth) + x;
-        for (int y = 0; y < mBitmapHeight; y++) {
-          *ptr = mSong.mFrames[frame].mFreqBgra[y];
-          ptr -= mBitmapWidth;
-          }
-        x++;
-        }
-      }
-    //}}}
-
     cSong& mSong;
     int mZoom = 1;
 
