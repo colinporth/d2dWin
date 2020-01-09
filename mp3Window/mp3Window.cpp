@@ -423,20 +423,42 @@ private:
         cBox ("songWaveBox", window, width, height), mSong(song) {
 
       mPin = true;
-
-      window->getDc()->CreateSolidColorBrush (ColorF(ColorF::CornflowerBlue), &mBrush);
       }
     //}}}
-    virtual ~cSongSpectrumBox() {}
+    //{{{
+    virtual ~cSongSpectrumBox() {
+
+      if (mBitmap) {
+        mBitmap->Release();
+        mBitmap = nullptr;
+        }
+
+      free (mBgraBuf);
+      mBgraBuf = nullptr;
+      }
+    //}}}
 
     //{{{
     void onDraw (ID2D1DeviceContext* dc) {
 
-      auto leftFrame = mSong.mPlayFrame - (mZoom * getWidthInt()/2);
-      auto rightFrame = mSong.mPlayFrame + (mZoom * getWidthInt()/2);
-      auto firstX = (leftFrame < 0) ? (-leftFrame) / mZoom : 0;
+      if (!mBitmap) {
+        mBitmapWidth = getWidthInt();
+        mBitmapHeight = getHeightInt();
+        mBgraBuf = (uint32_t*)malloc (mBitmapWidth * mBitmapHeight * 4);
+        dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
+        //                  { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 }, &mBitmap);
+                          { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 }, &mBitmap);
+        }
 
-      draw (dc, leftFrame, rightFrame, firstX, mZoom);
+      if (mBitmap) {
+        auto leftFrame = mSong.mPlayFrame - (mZoom * getWidthInt()/2);
+        auto rightFrame = mSong.mPlayFrame + (mZoom * getWidthInt()/2);
+        auto firstX = (leftFrame < 0) ? (-leftFrame) / mZoom : 0;
+
+        draw (dc, leftFrame, rightFrame, firstX, mZoom);
+        mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBgraBuf, mBitmapWidth * 4);
+        dc->DrawBitmap (mBitmap, mRect, 1.f);
+        }
       }
     //}}}
 
@@ -444,40 +466,30 @@ private:
     //{{{
     void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
 
-      leftFrame = (leftFrame < 0) ? 0 : leftFrame;
-      if (rightFrame > mSong.getNumLoadedFrames())
-        rightFrame = mSong.getNumLoadedFrames();
+      leftFrame = max (leftFrame, 0);
+      rightFrame = min (rightFrame, mSong.getNumLoadedFrames());
 
-      float xl = mRect.left + firstX;
-
-      cRect r;
-      r.left = xl;
-      r.right = xl+1;
-
-      for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
-        r.top = mRect.top;
-        r.bottom = r.top+1;
-        int freq = int(getHeight());
-        for (int y = 0; y < getHeight(); y++) {
-          uint8_t val = mSong.mFrames[frame].mFreqLuma[freq];
-          if (val > 8) {
-            mBrush->SetColor (ColorF ((val << 16) | (val << 8) | (val), 1.0f));
-            dc->FillRectangle (r, mBrush);
-            }
-          r.top++;
-          r.bottom++;
-          freq--;
+      int x = firstX;
+      for (int frame = leftFrame; frame < rightFrame; frame++) {
+        uint32_t* ptr = mBgraBuf + ((mBitmapHeight-1) * mBitmapWidth) + x;
+        for (int y = 0; y < mBitmapHeight; y++) {
+          uint8_t val = mSong.mFrames[frame].mFreqLuma[y];
+          *ptr = (val << 16) | (val << 8) | val;
+          ptr -= mBitmapWidth;
           }
-
-        r.left++;
-        r.right++;
+        x++;
         }
       }
     //}}}
 
     cSong& mSong;
     int mZoom = 1;
-    ID2D1SolidColorBrush* mBrush = nullptr;
+
+    ID2D1Bitmap* mBitmap = nullptr;
+    uint32_t* mBgraBuf = nullptr;
+
+    int mBitmapWidth = 0;
+    int mBitmapHeight = 0;
     };
   //}}}
   //{{{
