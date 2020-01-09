@@ -61,7 +61,7 @@ public:
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
     add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
-    add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
+    add (new cSongSpectrumView (this, 0,300.f, mSong), 0,-540.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
@@ -103,7 +103,7 @@ public:
     add (new cLogBox (this, 400.f,0.f, true), 0.f,0.f)->setPin (false);
 
     add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
-    add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
+    add (new cSongSpectrumView (this, 0,300.f, mSong), 0,-540.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
@@ -422,26 +422,22 @@ private:
     };
   //}}}
   //{{{
-  class cSongSpectrumBox : public cView {
+  class cSongSpectrumView : public cView {
   public:
     //{{{
-    cSongSpectrumBox (cD2dWindow* window, float width, float height, cSong& song) :
-        cView("songWaveBox", window, width, height), mSong(song) {
-        //cBox ("songWaveBox", window, width, height), mSong(song) {
+    cSongSpectrumView (cD2dWindow* window, float width, float height, cSong& song) :
+        cView("songSpectrumView", window, width, height), mSong(song) {
 
       mPin = true;
       }
     //}}}
     //{{{
-    virtual ~cSongSpectrumBox() {
+    virtual ~cSongSpectrumView() {
 
-      if (mBitmap) {
+      if (mBitmap)
         mBitmap->Release();
-        mBitmap = nullptr;
-        }
 
-      free (mBgraBuf);
-      mBgraBuf = nullptr;
+      free (mBitmapBuf);
       }
     //}}}
 
@@ -452,11 +448,12 @@ private:
         mBitmapWidth = getHeightInt();
         mBitmapHeight = getWidthInt();
 
-        mBgraBuf = (uint32_t*)malloc (mBitmapWidth * mBitmapHeight * 4);
+        mBitmapBuf = (uint32_t*)malloc (mBitmapWidth * mBitmapHeight * 4);
 
         dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
                           { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 }, &mBitmap);
 
+        // !!!!! fix the view2d stuff !!!!!!!
         mView2d.multiplyBy (Matrix3x2F::Rotation (-90.f, getSize()/2.f));
         mView2d.multiplyBy (Matrix3x2F::Translation (-getWidth()/2.f - 104.f,10.f));
         }
@@ -468,7 +465,7 @@ private:
         int firstFrame = max (leftFrame, 0);
         int lastFrame = min (rightFrame, mSong.getNumLoadedFrames());
 
-        auto ptr = mBgraBuf;
+        auto ptr = mBitmapBuf;
         if (firstFrame > leftFrame) {
           memset (ptr, 0, (firstFrame - leftFrame) * mBitmapWidth * 4);
           ptr += (firstFrame - leftFrame) * mBitmapWidth;
@@ -483,7 +480,7 @@ private:
         if (lastFrame < rightFrame)
           memset (ptr, 0, (rightFrame - lastFrame) * mBitmapWidth * 4);
 
-        mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBgraBuf, mBitmapWidth * 4);
+        mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBitmapBuf, mBitmapWidth * 4);
 
         dc->SetTransform (mView2d.mTransform);
         dc->DrawBitmap (mBitmap, cRect(mRect.left, mRect.top, mRect.left+getHeight(), mRect.top+getWidth()), 1.f);
@@ -492,15 +489,90 @@ private:
       }
     //}}}
 
-  protected:
+  private:
     cSong& mSong;
-    int mZoom = 1;
-
-    ID2D1Bitmap* mBitmap = nullptr;
-    uint32_t* mBgraBuf = nullptr;
 
     int mBitmapWidth = 0;
     int mBitmapHeight = 0;
+    uint32_t* mBitmapBuf = nullptr;
+    ID2D1Bitmap* mBitmap = nullptr;
+    };
+  //}}}
+  //{{{
+  class cSongSpectrumView1 : public cView {
+  public:
+    //{{{
+    cSongSpectrumView1 (cD2dWindow* window, float width, float height, cSong& song) :
+        cView("songSpectrumView", window, width, height), mSong(song) {
+
+      mPin = true;
+      }
+    //}}}
+    //{{{
+    virtual ~cSongSpectrumView1() {
+
+      if (mBitmap)
+        mBitmap->Release();
+
+      free (mBitmapBuf);
+      }
+    //}}}
+
+    //{{{
+    void onDraw (ID2D1DeviceContext* dc) {
+
+      if (!mBitmap) {
+        mBitmapWidth = getHeightInt();
+        mBitmapHeight = getWidthInt();
+
+        mBitmapBuf = (uint32_t*)malloc (mBitmapWidth * mBitmapHeight * 4);
+
+        dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
+                          { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 }, &mBitmap);
+
+        // !!!!! fix the view2d stuff !!!!!!!
+        mView2d.multiplyBy (Matrix3x2F::Rotation (-90.f, getSize()/2.f));
+        mView2d.multiplyBy (Matrix3x2F::Translation (-getWidth()/2.f - 104.f,10.f));
+        }
+
+      if (mBitmap) {
+        auto leftFrame = mSong.mPlayFrame - (getWidthInt()/2);
+        auto rightFrame = mSong.mPlayFrame + (getWidthInt()/2);
+
+        int firstFrame = max (leftFrame, 0);
+        int lastFrame = min (rightFrame, mSong.getNumLoadedFrames());
+
+        auto ptr = mBitmapBuf;
+        if (firstFrame > leftFrame) {
+          memset (ptr, 0, (firstFrame - leftFrame) * mBitmapWidth * 4);
+          ptr += (firstFrame - leftFrame) * mBitmapWidth;
+          }
+
+        int frame = firstFrame;
+        while (frame < lastFrame) {
+          memcpy (ptr, mSong.mFrames[frame++].mFreqBgra, mBitmapWidth*4);
+          ptr += mBitmapWidth;
+          }
+
+        if (lastFrame < rightFrame)
+          memset (ptr, 0, (rightFrame - lastFrame) * mBitmapWidth * 4);
+
+        mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBitmapBuf, mBitmapWidth * 4);
+
+        dc->SetTransform (mView2d.mTransform);
+        dc->DrawBitmap (mBitmap, cRect(mRect.left, mRect.top, mRect.left+getHeight(), mRect.top+getWidth()), 1.f);
+        dc->SetTransform (Matrix3x2F::Identity());
+        }
+      }
+    //}}}
+
+  private:
+    cSong& mSong;
+
+    int mBitmapWidth = 0;
+    int mBitmapHeight = 0;
+    uint32_t* mBitmapBuf = nullptr;
+    ID2D1Bitmap* mBitmap = nullptr;
     };
   //}}}
   //{{{
@@ -1688,9 +1760,14 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     appWindow.runStream ("httpWindow", 800, 800, url);
     }
   else {
-    string fileName = "C:/Users/colin/Music/Elton John";
-    wstring wstr(args[1]);
-    fileName = string(wstr.begin(), wstr.end());
+    const wstring wstr(args[1]);
+
+    #pragma warning(push)
+      #pragma warning(disable: 4244)
+      const string fileName = string (wstr.begin(), wstr.end());
+    #pragma warning(pop)
+
+    //string fileName = "C:/Users/colin/Music/Elton John";
     cLog::log (LOGNOTICE, "mp3Window - " + fileName);
     appWindow.run ("mp3Window", 800, 800, fileName);
     }
