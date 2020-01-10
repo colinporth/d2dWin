@@ -385,13 +385,16 @@ private:
     //}}}
 
     void onDraw (ID2D1DeviceContext* dc) {
-      if (!mBitmap) {
+      if (!mBitmap || (mBitmapWidth != getWidthInt()) || (mBitmapHeight = getHeightInt())) {
         //{{{  create bitmapBuf and ID2D1Bitmap matching box size
         mBitmapWidth = getWidthInt();
         mBitmapHeight = getHeightInt();
 
+        free (mBitmapBuf);
         mBitmapBuf = (uint8_t*)malloc (mBitmapWidth * mBitmapHeight);
 
+        if (mBitmap)
+          mBitmap->Release();
         dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
                           { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 },
                           &mBitmap);
