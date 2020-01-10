@@ -163,8 +163,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\shared\decoders\cMp3Decoder.h" />
-    <ClInclude Include="..\..\shared\decoders\miniMp3.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
     <ClInclude Include="..\..\shared\utils\cWinAudio.h" />

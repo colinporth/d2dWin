@@ -31,9 +31,6 @@
     <ClInclude Include="..\common\cJpegImage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\cMp3Decoder.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\utils\date.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -44,9 +41,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\boxes\cWindowBox.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\miniMp3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="kiss_fft.h">

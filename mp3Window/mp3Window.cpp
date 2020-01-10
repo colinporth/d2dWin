@@ -374,6 +374,7 @@ private:
         cBox("songSpectrumBox", window, width, height), mSong(song) {
 
       mPin = true;
+      //mTransform = D2D1::Matrix3x2F::Scale ({2.0f, 2.0f}, {0.f, 0.f});
       }
     //}}}
     //{{{
@@ -423,16 +424,18 @@ private:
         dstPtr += (mBitmapWidth * mBitmapHeight) + 1;
         }
 
-      // bitmapBuf to ID2D1Bitmap
+      // copy bitmapBuf to ID2D1Bitmap
       mBitmap->CopyFromMemory (&D2D1::RectU (0, 0, lastFrame - firstFrame, mBitmapHeight), mBitmapBuf, mBitmapWidth);
 
       // stamp colour through ID2D1Bitmap alpha using offset and width
       float dstLeft = (firstFrame > leftFrame) ? float(firstFrame - leftFrame) : 0.f;
+      //dc->SetTransform (mTransform);
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
       dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
                            &D2D1::RectF (dstLeft, mRect.top, dstLeft + lastFrame - firstFrame, mRect.bottom), // dstRect
                            &D2D1::RectF (0.f,0.f, float(lastFrame - firstFrame), (float)mBitmapHeight));      // srcRect
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+      //dc->SetTransform (D2D1::Matrix3x2F::Identity());
       }
 
   private:
@@ -443,85 +446,8 @@ private:
 
     uint8_t* mBitmapBuf = nullptr;
     ID2D1Bitmap* mBitmap = nullptr;
-    };
-  //}}}
-  //{{{
-  class cSongSpectrumView : public cView {
-  public:
-    //{{{
-    cSongSpectrumView (cD2dWindow* window, float width, float height, cSong& song) :
-        cView("songSpectrumView", window, width, height), mSong(song) {
 
-      mPin = true;
-      }
-    //}}}
-    //{{{
-    virtual ~cSongSpectrumView() {
-
-      if (mBitmap)
-        mBitmap->Release();
-
-      free (mBitmapBuf);
-      }
-    //}}}
-
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      if (!mBitmap) {
-        mBitmapWidth = getHeightInt();
-        mBitmapHeight = getWidthInt();
-
-        mBitmapBuf = (uint8_t*)malloc (mBitmapWidth * mBitmapHeight);
-
-        dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
-                          { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 }, &mBitmap);
-
-        // !!!!! fix the view2d stuff !!!!!!!
-        mView2d.multiplyBy (D2D1::Matrix3x2F::Rotation (-90.f, getSize()/2.f));
-        mView2d.multiplyBy (D2D1::Matrix3x2F::Translation (-getWidth()/2.f - 104.f,10.f));
-        }
-
-      auto leftFrame = mSong.mPlayFrame - (getWidthInt()/2);
-      auto rightFrame = mSong.mPlayFrame + (getWidthInt()/2);
-
-      auto firstFrame = max (leftFrame, 0);
-      auto lastFrame = min (rightFrame, mSong.getNumLoadedFrames());
-
-      auto ptr = mBitmapBuf;
-      if (firstFrame > leftFrame) {
-        memset (ptr, 0, (firstFrame - leftFrame) * mBitmapWidth);
-        ptr += (firstFrame - leftFrame) * mBitmapWidth;
-        }
-
-      auto frame = firstFrame;
-      while (frame < lastFrame) {
-        memcpy (ptr, mSong.mFrames[frame++].mFreqLuma, mBitmapWidth);
-        ptr += mBitmapWidth;
-        }
-
-      if (lastFrame < rightFrame)
-        memset (ptr, 0, (rightFrame - lastFrame) * mBitmapWidth);
-
-      mBitmap->CopyFromMemory (&D2D1::RectU(0, 0, mBitmapWidth, mBitmapHeight), mBitmapBuf, mBitmapWidth);
-
-      dc->SetTransform (mView2d.mTransform);
-      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
-      dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
-                           &cRect(mRect.left, mRect.top, mRect.left+getHeight(), mRect.top+getWidth()));
-      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-      dc->SetTransform (D2D1::Matrix3x2F::Identity());
-      }
-    //}}}
-
-  private:
-    cSong& mSong;
-
-    int mBitmapWidth = 0;
-    int mBitmapHeight = 0;
-
-    uint8_t* mBitmapBuf = nullptr;
-    ID2D1Bitmap* mBitmap = nullptr;
+    D2D1::Matrix3x2F mTransform = D2D1::Matrix3x2F::Identity();
     };
   //}}}
   //{{{
