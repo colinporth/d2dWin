@@ -13,6 +13,7 @@
 
 #include "cPlayView.h"
 //}}}
+const string kTvRoot = "/tv";
 
 class cAppWindow : public cD2dWindow {
 public:
@@ -119,7 +120,6 @@ private:
       }
     }
   //}}}
-  const string kTvRoot = "/tv";
   //{{{  vars
   cFileList* mFileList = nullptr;
   cDvb* mDvb = nullptr;
@@ -143,7 +143,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     const wstring wstr (args[1]);
     #pragma warning(push)
       #pragma warning(disable: 4244)
-      const string rootOrFrequency = string (wstr.begin(), wstr.end());
+      rootOrFrequency = string (wstr.begin(), wstr.end());
     #pragma warning(pop)
     }
 

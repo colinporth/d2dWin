@@ -16,7 +16,7 @@ public:
 
     const float kRoundWidth = 5.f;
     auto datePoint = date::floor<date::days>(mTimePoint);
-    dc->FillRoundedRectangle (RoundedRect (mRect, kRoundWidth,kRoundWidth), mWindow->getBlackBrush());
+    dc->FillRoundedRectangle (D2D1::RoundedRect (mRect, kRoundWidth,kRoundWidth), mWindow->getBlackBrush());
     auto r = cRect (mRect.left+kRoundWidth, mRect.top+kRoundWidth,
                     mRect.right-2.f*kRoundWidth, mRect.bottom-2.f*kRoundWidth);
 

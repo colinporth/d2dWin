@@ -18,7 +18,7 @@ public:
       20.f, L"en-us",
       &mTextFormat);
 
-    window->getDc()->CreateSolidColorBrush (ColorF (ColorF::CornflowerBlue), &mBrush);
+    window->getDc()->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::CornflowerBlue), &mBrush);
     layout();
     }
   //}}}
@@ -82,10 +82,10 @@ public:
       //{{{  draw timeElapsed interLine bar
       auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(lastTimePoint - logLine.mTimePoint).count();
       if (timeDiff < 20)
-        dc->FillRectangle (RectF(0, y+1.f, timeDiff*10.f, y+2.f), mBrush);
+        dc->FillRectangle (D2D1::RectF(0, y+1.f, timeDiff*10.f, y+2.f), mBrush);
       else {
         timeDiff = std::min (timeDiff, 4000ll);
-        dc->FillRectangle (RectF(0, y+3.f, timeDiff/10.f, y+4.f), mWindow->getWhiteBrush());
+        dc->FillRectangle (D2D1::RectF(0, y+3.f, timeDiff/10.f, y+4.f), mWindow->getWhiteBrush());
         y -= 1.f;
         }
 
@@ -110,9 +110,9 @@ public:
       textLayout->GetMetrics (&textMetrics);
       y -= textHeight;
       if (mPin)
-        dc->FillRectangle (RectF(0, y+4.f, textMetrics.width+2.f, y+4.f + textHeight),
+        dc->FillRectangle (D2D1::RectF(0, y+4.f, textMetrics.width+2.f, y+4.f + textHeight),
                            mWindow->getTransparentBgndBrush());
-      dc->DrawTextLayout (Point2F(0,y), textLayout, mBrush);
+      dc->DrawTextLayout (D2D1::Point2F(0,y), textLayout, mBrush);
       textLayout->Release();
 
       logWidth = std::max (logWidth, textMetrics.width);
@@ -139,7 +139,7 @@ private:
     };
   //}}}
   //{{{
-  const ColorF kColours[LOGMAX] = {
+  const D2D1::ColorF kColours[LOGMAX] = {
     {1.f, 1.f, 0.f, 1.f }, // LOGTITLE
     {1.f, 1.f, 1.f, 1.f }, // LOGNOTICE
     {1.f, 0.5f, 0.5f, 1.f }, // LOGERROR

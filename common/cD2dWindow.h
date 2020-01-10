@@ -287,12 +287,12 @@ public:
     bool onWheel (int delta, cPoint pos) {
 
       if (mWindow->getShift()) 
-        mView2d.multiplyBy (Matrix3x2F::Rotation (45.f * (delta / 120.f), getCentre()));
+        mView2d.multiplyBy (D2D1::Matrix3x2F::Rotation (45.f * (delta / 120.f), getCentre()));
       else {
         float ratio = mWindow->getControl() ? 1.5f : 1.1f;
         if (delta < 0)
           ratio = 1.f / ratio;
-        mView2d.multiplyBy (Matrix3x2F::Scale (Size(ratio, ratio), pos));
+        mView2d.multiplyBy (D2D1::Matrix3x2F::Scale (ratio, ratio, pos));
         }
       return true;
       }
@@ -431,40 +431,40 @@ private:
   bool mExit = false;
   //{{{  resources
   // device independent resources
-  ComPtr<ID2D1Factory1> mD2D1Factory;
-  ComPtr<IDWriteFactory> mDWriteFactory;
+  Microsoft::WRL::ComPtr<ID2D1Factory1> mD2D1Factory;
+  Microsoft::WRL::ComPtr<IDWriteFactory> mDWriteFactory;
 
   // device resources
-  ComPtr<ID3D11Device> mD3device;
-  ComPtr<ID3D11Device1> mD3dDevice1;
+  Microsoft::WRL::ComPtr<ID3D11Device> mD3device;
+  Microsoft::WRL::ComPtr<ID3D11Device1> mD3dDevice1;
 
-  ComPtr<IDXGIDevice> mDxgiDevice;
-  ComPtr<IDXGIDevice1> mDxgiDevice1;
+  Microsoft::WRL::ComPtr<IDXGIDevice> mDxgiDevice;
+  Microsoft::WRL::ComPtr<IDXGIDevice1> mDxgiDevice1;
 
-  ComPtr<ID3D11DeviceContext1> mD3dContext1;
-  ComPtr<ID2D1DeviceContext> mDeviceContext;
+  Microsoft::WRL::ComPtr<ID3D11DeviceContext1> mD3dContext1;
+  Microsoft::WRL::ComPtr<ID2D1DeviceContext> mDeviceContext;
 
   // sized resources
-  ComPtr<IDXGISwapChain1> mSwapChain;
-  ComPtr<ID2D1Bitmap1> mD2dTargetBitmap;
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> mSwapChain;
+  Microsoft::WRL::ComPtr<ID2D1Bitmap1> mD2dTargetBitmap;
 
   D2D1_SIZE_U mClient;
   cPoint mClientF;
 
   // useful resources
-  ComPtr<IDWriteTextFormat> mTextFormat;
+  Microsoft::WRL::ComPtr<IDWriteTextFormat> mTextFormat;
 
-  ComPtr<ID2D1SolidColorBrush> mBlackBrush;
-  ComPtr<ID2D1SolidColorBrush> mDarkGreyBrush;
-  ComPtr<ID2D1SolidColorBrush> mGreyBrush;
-  ComPtr<ID2D1SolidColorBrush> mLightGreyBrush;
-  ComPtr<ID2D1SolidColorBrush> mWhiteBrush;
-  ComPtr<ID2D1SolidColorBrush> mBlueBrush;
-  ComPtr<ID2D1SolidColorBrush> mGreenBrush;
-  ComPtr<ID2D1SolidColorBrush> mYellowBrush;
-  ComPtr<ID2D1SolidColorBrush> mRedBrush;
-  ComPtr<ID2D1SolidColorBrush> mOrangeBrush;
-  ComPtr<ID2D1SolidColorBrush> mTransparentBgndBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mBlackBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDarkGreyBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mGreyBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mLightGreyBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mWhiteBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mBlueBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mGreenBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mYellowBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mRedBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mOrangeBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mTransparentBgndBrush;
   //}}}
   //{{{  boxes
   cBox* mProxBox = nullptr;

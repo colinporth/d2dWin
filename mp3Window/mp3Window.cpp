@@ -3,36 +3,15 @@
 #include "stdafx.h"
 
 #include "../../shared/utils/cFileList.h"
-#include "../../shared/utils/cWinAudio.h"
-
-#include "../common/cJpegImage.h"
-#include "../common/cJpegImageView.h"
-
-#include "../boxes/cLogBox.h"
 #include "../boxes/cFileListBox.h"
-#include "../boxes/cWindowBox.h"
-#include "../boxes/cVolumeBox.h"
-#include "../boxes/cCalendarBox.h"
-#include "../boxes/cClockBox.h"
-#include "../boxes/cIntBox.h"
-#include "../boxes/cFloatBox.h"
-#include "../boxes/cTitleBox.h"
-
-extern "C" {
-  #include <libavcodec/avcodec.h>
-  #include <libavformat/avformat.h>
-  }
-
-#define CURL_STATICLIB
-#include "../../curl/include/curl/curl.h"
-
-//#define USE_SIMD
-#include "kiss_fft.h"
-#include "kiss_fftr.h"
 
 using namespace std;
 using namespace chrono;
 using namespace concurrency;
+
+using namespace Microsoft::WRL;
+using namespace D2D1;
+
 //}}}
 //{{{  const
 const int kMaxChannels = 2;
@@ -53,7 +32,7 @@ public:
   virtual ~cAppWindow() {}
 
   //{{{
-  void run (const string& title, int width, int height, const string& fileName) {
+  void run (bool stream, const string& title, int width, int height, const string& name) {
 
     initialise (title, width, height, false);
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
@@ -65,12 +44,12 @@ public:
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
     add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
-    add (new cSongSpectrumView (this, 0,300.f, mSong), 0,-540.f);
+    add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
 
-    mFileList = new cFileList (fileName, "*.aac;*.mp3");
+    mFileList = new cFileList (name, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
     add (new cAppFileListBox (this, 0.f,-220.f, mFileList))->setPin (true);
 
@@ -78,7 +57,15 @@ public:
     add (mVolumeBox, -12.f,0.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
-    if (!mFileList->empty())
+    if (stream) {
+      // allocate stream
+      mStreamFirst = (uint8_t*)malloc (200000000);
+      mStreamLast = mStreamFirst;
+
+      thread ([=]() { httpThread (name.c_str()); }).detach();
+      thread ([=]() { analyseStreamThread(); }).detach();
+      }
+    else if (!mFileList->empty())
       thread ([=](){ analyseThread(); }).detach();
 
     // loop till quit
@@ -86,44 +73,6 @@ public:
 
     delete mFileList;
     delete mJpegImageView;
-    }
-  //}}}
-  //{{{
-  void runStream (const string& title, int width, int height, const string& url) {
-
-    initialise (title, width, height, false);
-    add (new cIntBox (this, 100.f, 24.f, "frame ", mSong.mPlayFrame), 0.f, 0.f);
-    add (new cIntBox (this, 100.f, 24.f, "frames ", mSong.mNumFrames), 100.f, 0.f);
-    add (new cIntBox (this, 100.f, 24.f, "meta ", mIcySkipCount), 200.f, 0.f);
-    add (new cIntBox (this, 100.f, 24.f, "of ", mIcySkipLen), 300.f, 0.f);
-
-    add (new cTitleBox (this, 300.f, 24.f, mTitleStr), 0.f, 24.f);
-    add (new cTitleBox (this, 300.f, 24.f, mUrlStr), 0.f, 48.f);
-    add (new cTitleBox (this, 300.f, 24.f, mIcyStr), 0.f, 72.f);
-
-    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f, 0.f);
-    add (new cClockBox (this, 40.f, mTimePoint), -82.f,150.f);
-
-    add (new cLogBox (this, 400.f,0.f, true), 0.f,0.f)->setPin (false);
-
-    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
-    add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
-    add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
-    add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
-    add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
-
-    mVolumeBox = new cVolumeBox (this, 12.f,0.f, nullptr);
-    add (mVolumeBox, -12.f,0.f);
-    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
-
-    // allocate stream
-    mStreamFirst = (uint8_t*)malloc (200000000);
-    mStreamLast = mStreamFirst;
-
-    thread ([=]() { httpThread (url.c_str()); }).detach();
-    thread ([=]() { analyseStreamThread(); }).detach();
-
-    messagePump();
     }
   //}}}
 
@@ -162,28 +111,28 @@ private:
   //{{{
   class cFrame {
   public:
-    cFrame (uint32_t streamIndex, uint32_t len, uint8_t* power, float* freq, uint8_t* luma)
+    cFrame (uint32_t streamIndex, uint32_t len, uint8_t* powerValues, float* freqValues, uint8_t* lumaValues)
         : mStreamIndex(streamIndex), mLen(len) {
 
-      memcpy (mPower, power, kMaxChannels);
-      memcpy (mFreqValues, freq, kMaxFreq*4);
-      memcpy (mFreqLuma, luma, kMaxSpectrum);
+      memcpy (mPowerValues, powerValues, kMaxChannels);
+      memcpy (mFreqValues, freqValues, kMaxFreq*4);
+      memcpy (mFreqLuma, lumaValues, kMaxSpectrum);
 
       mSilent = isSilentThreshold();
       }
 
     bool isSilent() { return mSilent; }
-    bool isSilentThreshold() { return mPower[0] + mPower[1] <= kSilentThreshold; }
+    bool isSilentThreshold() { return mPowerValues[0] + mPowerValues[1] <= kSilentThreshold; }
 
     bool hasTitle() { return !mTitle.empty(); }
-    void setTitle (string title) { mTitle = title; }
+    void setTitle (const string& title) { mTitle = title; }
 
     // vars
     uint32_t mStreamIndex;
     uint32_t mLen;
 
     bool mSilent;
-    uint8_t mPower[kMaxChannels];
+    uint8_t mPowerValues[kMaxChannels];
     float mFreqValues[kMaxFreq];
     uint8_t mFreqLuma[kMaxSpectrum];
 
@@ -226,40 +175,41 @@ private:
       fftrConfig = kiss_fftr_alloc (kMaxSamples, 0, 0, 0);
       }
     //}}}
-
     //{{{
-    bool addFrame (uint32_t streamIndex, uint32_t frameLen, int numSamples, int16_t* samples, uint32_t streamLen) {
+    int addFrame (uint32_t streamIndex, uint32_t frameLen, int numSamples, int16_t* samples, uint32_t streamLen) {
     // return true if enough frames added to start playing
 
-     float power[kMaxChannels] = {0};
-     for (int i = 0; i < numSamples; i++) {
+     // sum of squares of channel power
+     float powerSum[kMaxChannels] = {0};
+     for (auto i = 0; i < numSamples; i++) {
         timeBuf[i] = (float)samples[i * 2] + (float)samples[(i * 2) + 1];
-        power[0] += samples[i*2] * samples[i*2];
-        power[1] += samples[(i*2) + 1] * samples[(i*2) + 1];
+        powerSum[0] += samples[i*2] * samples[i*2];
+        powerSum[1] += samples[(i*2) + 1] * samples[(i*2) + 1];
         }
 
+      // uint8_t channel powerValues
       uint8_t powerValues[kMaxChannels];
-      powerValues[0] = uint8_t(sqrtf (power[0]) / numSamples);
-      powerValues[1] = uint8_t(sqrtf (power[1]) / numSamples);
+      powerValues[0] = uint8_t(sqrtf (powerSum[0]) / numSamples);
+      powerValues[1] = uint8_t(sqrtf (powerSum[1]) / numSamples);
       mMaxPowerValue = max (mMaxPowerValue, powerValues[0]);
       mMaxPowerValue = max (mMaxPowerValue, powerValues[1]);
 
       kiss_fftr (fftrConfig, timeBuf, freqBuf);
 
       float freqValues[kMaxFreq];
-      for (int i = 0; i < kMaxFreq; i++) {
+      for (auto i = 0; i < kMaxFreq; i++) {
         freqValues[i] = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
         mMaxFreqValue = max (mMaxFreqValue, freqValues[i]);
         mMaxFreqValues[i] = max (mMaxFreqValues[i], freqValues[i]);
         }
 
-      uint8_t luma[kMaxFreq];
-      for (int i = 0; i < kMaxSpectrum; i++) {
-        float value = uint8_t((freqValues[i] / mMaxFreqValue) * 1024.f);
-        luma[i] = value > 255 ? 255 : uint8_t(value);;
+      uint8_t lumaValues[kMaxFreq];
+      for (auto i = 0; i < kMaxSpectrum; i++) {
+        auto value = uint8_t((freqValues[i] / mMaxFreqValue) * 1024.f);
+        lumaValues[i] = value > 255 ? 255 : value;
         }
 
-      mFrames.push_back (cFrame (streamIndex, frameLen, powerValues, freqValues, luma));
+      mFrames.push_back (cFrame (streamIndex, frameLen, powerValues, freqValues, lumaValues));
 
       // estimate numFrames
       mNumFrames = int (uint64_t(streamLen - mFrames[0].mStreamIndex) * (uint64_t)mFrames.size() /
@@ -281,10 +231,9 @@ private:
           }
         }
 
-      return frame == kPlayFrameThreshold;
+      return frame;
       }
     //}}}
-
     //{{{
     void setTitle (string title) {
       if (!mFrames.empty())
@@ -439,46 +388,53 @@ private:
       }
     //}}}
 
-    //{{{
     void onDraw (ID2D1DeviceContext* dc) {
-
       if (!mBitmap) {
+        //{{{  create bitmapBuf and ID2D1Bitmap matching box size
         mBitmapWidth = getWidthInt();
         mBitmapHeight = getHeightInt();
 
         mBitmapBuf = (uint8_t*)malloc (mBitmapWidth * mBitmapHeight);
 
         dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
-                          { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 }, &mBitmap);
+                          { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 },
+                          &mBitmap);
         }
+        //}}}
 
+      // left and right edge frames, may be outside known frames
       auto leftFrame = mSong.mPlayFrame - (getWidthInt()/2);
       auto rightFrame = mSong.mPlayFrame + (getWidthInt()/2);
 
+      // first and last known frames
       auto firstFrame = max (leftFrame, 0);
       auto lastFrame = min (rightFrame, mSong.getNumLoadedFrames());
 
-      if ((firstFrame > leftFrame) || (lastFrame < rightFrame)) // just clear the lot
-        memset (mBitmapBuf, 0, mBitmapWidth * mBitmapHeight);
-
-      auto frame = firstFrame;
-      while (frame < lastFrame) {
+      // bottom of first bitmapBuf column
+      auto dstPtr = mBitmapBuf + ((mBitmapHeight-1) * mBitmapWidth);
+      for (int frame = firstFrame; frame < lastFrame; frame++) {
+        // copy freqLuma to bitmapBuf column
         auto srcPtr = mSong.mFrames[frame].mFreqLuma;
-        auto dstPtr = mBitmapBuf + ((mBitmapHeight-1) * mBitmapWidth) + (frame-leftFrame);
         for (int y = 0; y < mBitmapHeight; y++) {
           *dstPtr = *srcPtr++;
           dstPtr -= mBitmapWidth;
           }
-        frame++;
+
+        // bottom of next bitmapBuf column
+        dstPtr += (mBitmapWidth * mBitmapHeight) + 1;
         }
 
-      mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBitmapBuf, mBitmapWidth);
+      // bitmapBuf to ID2D1Bitmap
+      mBitmap->CopyFromMemory (&RectU (0, 0, lastFrame - firstFrame, mBitmapHeight), mBitmapBuf, mBitmapWidth);
 
+      // stamp colour through ID2D1Bitmap alpha using offset and width
+      float dstLeft = (firstFrame > leftFrame) ? float(firstFrame - leftFrame) : 0.f;
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
-      dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(), &mRect);
+      dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
+                           &RectF (dstLeft, mRect.top, dstLeft + lastFrame - firstFrame, mRect.bottom), // dstRect
+                           &RectF (0.f,0.f, float(lastFrame - firstFrame), (float)mBitmapHeight));      // srcRect
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
       }
-    //}}}
 
   private:
     cSong& mSong;
@@ -647,8 +603,8 @@ private:
           dc->FillRectangle (cRect (xl, yCentre-kSilentThreshold, xr, yCentre+kSilentThreshold), mWindow->getRedBrush());
 
         if (!centre && (frame >= mSong.mPlayFrame)) {
-          auto yLeft = mSong.mFrames[frame].mPower[0] * valueScale;
-          auto yRight = mSong.mFrames[frame].mPower[1] * valueScale;
+          auto yLeft = mSong.mFrames[frame].mPowerValues[0] * valueScale;
+          auto yRight = mSong.mFrames[frame].mPowerValues[1] * valueScale;
           dc->FillRectangle (cRect (xl, yCentre - yLeft, xr, yCentre + yRight), mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
           centre = true;
@@ -657,8 +613,8 @@ private:
           float yLeft = 0;
           float yRight = 0;
           for (auto i = 0; i < zoom; i++) {
-            yLeft += mSong.mFrames[frame+i].mPower[0];
-            yRight += mSong.mFrames[frame+i].mPower[1];
+            yLeft += mSong.mFrames[frame+i].mPowerValues[0];
+            yRight += mSong.mFrames[frame+i].mPowerValues[1];
             }
           yLeft = (yLeft / zoom) * valueScale;
           yRight = (yRight / zoom) * valueScale;
@@ -782,13 +738,13 @@ private:
           if (frame >= mSong.getNumLoadedFrames())
             break;
 
-          int lValue = mSong.mFrames[frame].mPower[0];
-          int rValue = mSong.mFrames[frame].mPower[1];
+          int lValue = mSong.mFrames[frame].mPowerValues[0];
+          int rValue = mSong.mFrames[frame].mPowerValues[1];
           if (frame > startFrame) {
             int num = 1;
             for (auto i = startFrame; i < frame; i++) {
-              lValue += mSong.mFrames[i].mPower[0];
-              rValue += mSong.mFrames[i].mPower[1];
+              lValue += mSong.mFrames[i].mPowerValues[0];
+              rValue += mSong.mFrames[i].mPowerValues[1];
               num++;
               }
             lValue /= num;
@@ -824,8 +780,8 @@ private:
       for (auto x = firstX; x < lastX; x++) {
         float xr = xl + 1.f;
         if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumLoadedFrames())) {
-          float leftValue = mSong.mFrames[mSong.mPlayFrame].mPower[0] * valueScale;
-          float rightValue = mSong.mFrames[mSong.mPlayFrame].mPower[1] * valueScale;
+          float leftValue = mSong.mFrames[mSong.mPlayFrame].mPowerValues[0] * valueScale;
+          float rightValue = mSong.mFrames[mSong.mPlayFrame].mPowerValues[1] * valueScale;
           dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
                              mWindow->getWhiteBrush());
           colour = mWindow->getGreyBrush();
@@ -1471,7 +1427,7 @@ private:
                 }
               //}}}
               if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size,
-                                  avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst))) {
+                                  avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst)) == kPlayFrameThreshold) {
                 //{{{  launch playThread
                 auto threadHandle = thread ([=](){ playThread (false); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -1570,7 +1526,7 @@ private:
                 }
               //}}}
               if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size,
-                                  avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst))) {
+                                  avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst)) == kPlayFrameThreshold) {
                 //{{{  launch playThread
                 auto threadHandle = thread ([=](){ playThread (true); });
                 SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -1718,7 +1674,6 @@ private:
 
   cVolumeBox* mVolumeBox = nullptr;
 
-  // httpBody callback data
   int mIcySkipCount = 0;
   int mIcySkipLen = 0;
   int mIcyInfoCount = 0;
@@ -1742,16 +1697,16 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cAppWindow appWindow;
 
   if (numArgs == 1) {
-    //string url = "http://stream.wqxr.org/wqxr.aac";
-    string url = "http://stream.wqxr.org/js-stream.aac";
-    //string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
-    //string url = "http://us4.internet-radio.com:8266/";
-    //string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";
-    //string url = "http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac";
-    //string url = "http://media-ice.musicradio.com:80/SmoothCountry";
+    //const string url = "http://stream.wqxr.org/wqxr.aac";
+    const string url = "http://stream.wqxr.org/js-stream.aac";
+    //const string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
+    //const string url = "http://us4.internet-radio.com:8266/";
+    //const string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";
+    //const string url = "http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac";
+    //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
 
-    cLog::log (LOGNOTICE, "mp3Window - http - " + url);
-    appWindow.runStream ("httpWindow", 800, 800, url);
+    cLog::log (LOGNOTICE, "mp3Window stream " + url);
+    appWindow.run (true, "mp3Window " + url, 800, 800, url);
     }
   else {
     const wstring wstr(args[1]);
@@ -1763,7 +1718,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
     //string fileName = "C:/Users/colin/Music/Elton John";
     cLog::log (LOGNOTICE, "mp3Window - " + fileName);
-    appWindow.run ("mp3Window", 800, 800, fileName);
+    appWindow.run (false, "mp3Window", 800, 800, fileName);
     }
 
   CoUninitialize();

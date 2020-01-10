@@ -8,7 +8,7 @@ public:
       : cView("image", window, width, height), mImage(image), mTab(true), mSideBar(true) {
 
     mPin = true;
-    window->getDc()->CreateSolidColorBrush (ColorF (ColorF::Black), &mBrush);
+    window->getDc()->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::Black), &mBrush);
 
     if (image && image->isOk())
       image->loadInfo();
@@ -19,7 +19,7 @@ public:
       : cView("image", window, width, height), mImage(image), mTab(tab), mSideBar(sideBar) {
 
     mPin = true;
-    window->getDc()->CreateSolidColorBrush (ColorF (ColorF::Black), &mBrush);
+    window->getDc()->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::Black), &mBrush);
 
     if (image && image->isOk())
       image->loadInfo();
@@ -87,7 +87,7 @@ public:
         dc->SetTransform (mView2d.mTransform);
         dc->DrawBitmap (mImage->getBitmap(), cRect (mImage->getSize()));
         dc->DrawRectangle (cRect (mImage->getSize()), mWindow->getWhiteBrush());
-        dc->SetTransform (Matrix3x2F::Identity());
+        dc->SetTransform (D2D1::Matrix3x2F::Identity());
         }
         //}}}
 
@@ -162,7 +162,7 @@ public:
           int red = mImage->getRed (mSamplePos);
           int green = mImage->getGreen (mSamplePos);
           int blue = mImage->getBlue (mSamplePos);
-          mBrush->SetColor (ColorF(red /255.f, green /255.f, blue /255.f, 1.f));
+          mBrush->SetColor (D2D1::ColorF(red /255.f, green /255.f, blue /255.f, 1.f));
           drawDebug (dc, "r"+dec(red) + " g" + dec(green) + " b" + dec(blue), mBrush, r);
           }
           //}}}

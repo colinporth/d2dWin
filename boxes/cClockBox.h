@@ -20,7 +20,7 @@ public:
 
     float radius = getWidth() / 2.f;
 
-    dc->DrawEllipse (Ellipse (getCentre(), radius,radius), mWindow->getWhiteBrush(), 2.f);
+    dc->DrawEllipse (D2D1::Ellipse (getCentre(), radius,radius), mWindow->getWhiteBrush(), 2.f);
 
     //auto timePointTz = date::make_zoned (date::current_zone(), mTimePoint);
     auto timePoint = mTimePoint;
