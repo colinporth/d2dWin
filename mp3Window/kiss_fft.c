@@ -10,7 +10,7 @@
 #include "kiss_fft_guts.h"
 
 //{{{
-static void kf_bfly2 (kiss_fft_cpx * Fout, const size_t fstride, const kiss_fft_cfg st, int m ) {
+static void kf_bfly2 (kiss_fft_cpx* Fout, const size_t fstride, const kiss_fft_cfg st, int m ) {
 
   kiss_fft_cpx * Fout2;
   kiss_fft_cpx * tw1 = st->twiddles;
@@ -29,7 +29,7 @@ static void kf_bfly2 (kiss_fft_cpx * Fout, const size_t fstride, const kiss_fft_
   }
 //}}}
 //{{{
-static void kf_bfly4 (kiss_fft_cpx * Fout, const size_t fstride, const kiss_fft_cfg st, const size_t m) {
+static void kf_bfly4 (kiss_fft_cpx* Fout, const size_t fstride, const kiss_fft_cfg st, const size_t m) {
 
   kiss_fft_cpx *tw1,*tw2,*tw3;
   kiss_fft_cpx scratch[6];
@@ -132,7 +132,7 @@ static void kf_bfly5 (kiss_fft_cpx* Fout, const size_t fstride, const kiss_fft_c
   }
 //}}}
 //{{{
-static void kf_bfly3 (kiss_fft_cpx * Fout, const size_t fstride, const kiss_fft_cfg st, size_t m) {
+static void kf_bfly3 (kiss_fft_cpx* Fout, const size_t fstride, const kiss_fft_cfg st, size_t m) {
 
    size_t k=m;
    const size_t m2 = 2*m;
@@ -174,7 +174,7 @@ static void kf_bfly3 (kiss_fft_cpx * Fout, const size_t fstride, const kiss_fft_
 
 //{{{
 /* perform the butterfly for one stage of a mixed radix FFT */
-static void kf_bfly_generic (kiss_fft_cpx * Fout, const size_t fstride, const kiss_fft_cfg st, int m, int p) {
+static void kf_bfly_generic (kiss_fft_cpx* Fout, const size_t fstride, const kiss_fft_cfg st, int m, int p) {
 
   int u,k,q1,q;
   kiss_fft_cpx * twiddles = st->twiddles;
@@ -355,6 +355,7 @@ void kiss_fft_stride (kiss_fft_cfg st, const kiss_fft_cpx* fin, kiss_fft_cpx* fo
     }
   }
 //}}}
+
 //{{{
 void kiss_fft (kiss_fft_cfg cfg, const kiss_fft_cpx* fin, kiss_fft_cpx* fout) {
 

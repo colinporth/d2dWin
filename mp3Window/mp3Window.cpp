@@ -7,19 +7,15 @@
 
 using namespace std;
 using namespace chrono;
-using namespace concurrency;
-
-using namespace Microsoft::WRL;
-using namespace D2D1;
-
 //}}}
 //{{{  const
 const int kMaxChannels = 2;
 
 const int kSilentThreshold = 3;
-const int kSilentWindow = 12;
 
-const int kPlayFrameThreshold = 10; // about a second of analyse before playing
+const int kSilentWindow = 10;       // about a half second analyse silence
+
+const int kPlayFrameThreshold = 10; // about a half second analyse before play
 
 const int kMaxSamples = 2048;
 const int kMaxFreq = 1025;
@@ -303,7 +299,7 @@ private:
     uint16_t mMaxSamplesPerFrame = kMaxSamples;
     uint16_t mSamplesPerSec = 44100;
 
-    concurrent_vector<cFrame> mFrames;
+    concurrency::concurrent_vector<cFrame> mFrames;
 
     int mPlayFrame = 0;
     int mNumFrames = 0;
@@ -425,14 +421,14 @@ private:
         }
 
       // bitmapBuf to ID2D1Bitmap
-      mBitmap->CopyFromMemory (&RectU (0, 0, lastFrame - firstFrame, mBitmapHeight), mBitmapBuf, mBitmapWidth);
+      mBitmap->CopyFromMemory (&D2D1::RectU (0, 0, lastFrame - firstFrame, mBitmapHeight), mBitmapBuf, mBitmapWidth);
 
       // stamp colour through ID2D1Bitmap alpha using offset and width
       float dstLeft = (firstFrame > leftFrame) ? float(firstFrame - leftFrame) : 0.f;
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
       dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
-                           &RectF (dstLeft, mRect.top, dstLeft + lastFrame - firstFrame, mRect.bottom), // dstRect
-                           &RectF (0.f,0.f, float(lastFrame - firstFrame), (float)mBitmapHeight));      // srcRect
+                           &D2D1::RectF (dstLeft, mRect.top, dstLeft + lastFrame - firstFrame, mRect.bottom), // dstRect
+                           &D2D1::RectF (0.f,0.f, float(lastFrame - firstFrame), (float)mBitmapHeight));      // srcRect
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
       }
 
@@ -479,8 +475,8 @@ private:
                           { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 }, &mBitmap);
 
         // !!!!! fix the view2d stuff !!!!!!!
-        mView2d.multiplyBy (Matrix3x2F::Rotation (-90.f, getSize()/2.f));
-        mView2d.multiplyBy (Matrix3x2F::Translation (-getWidth()/2.f - 104.f,10.f));
+        mView2d.multiplyBy (D2D1::Matrix3x2F::Rotation (-90.f, getSize()/2.f));
+        mView2d.multiplyBy (D2D1::Matrix3x2F::Translation (-getWidth()/2.f - 104.f,10.f));
         }
 
       auto leftFrame = mSong.mPlayFrame - (getWidthInt()/2);
@@ -504,14 +500,14 @@ private:
       if (lastFrame < rightFrame)
         memset (ptr, 0, (rightFrame - lastFrame) * mBitmapWidth);
 
-      mBitmap->CopyFromMemory (&RectU(0, 0, mBitmapWidth, mBitmapHeight), mBitmapBuf, mBitmapWidth);
+      mBitmap->CopyFromMemory (&D2D1::RectU(0, 0, mBitmapWidth, mBitmapHeight), mBitmapBuf, mBitmapWidth);
 
       dc->SetTransform (mView2d.mTransform);
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
       dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
                            &cRect(mRect.left, mRect.top, mRect.left+getHeight(), mRect.top+getWidth()));
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-      dc->SetTransform (Matrix3x2F::Identity());
+      dc->SetTransform (D2D1::Matrix3x2F::Identity());
       }
     //}}}
 
