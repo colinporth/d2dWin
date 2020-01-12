@@ -1614,8 +1614,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cLog::init (LOGINFO, true);
   //cLog::init (LOGINFO, false, "");
 
-  avcodec_register_all();
-
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
 

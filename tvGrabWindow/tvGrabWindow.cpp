@@ -10,12 +10,14 @@
 
 #include "../boxes/cLogBox.h"
 #include "../boxes/cWindowBox.h"
+
+using namespace std;
 //}}}
 
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (const std::string& title, int width, int height, const std::string& param, const std::string& rootName) {
+  void run (const string& title, int width, int height, const string& param, const string& rootName) {
 
     initialise (title, width, height, false);
     setChangeCountDown (4);
@@ -30,14 +32,14 @@ public:
       add (new cTitleBox (this, 60.f,24.f, mDvb->mErrorStr), -200.f,0.f);
       add (new cTitleBox (this, 60.f,24.f, mDvb->mSignalStr), -130.f,0.f);
 
-      std::thread ([=]() {
+      thread ([=]() {
         //{{{  grabthread
         CoInitializeEx (NULL, COINIT_MULTITHREADED);
         mDvb->grabThread();
         CoUninitialize();
         //}}}
         }).detach();
-        std::thread ([=]() {
+        thread ([=]() {
         //{{{  signalThread
         CoInitializeEx (NULL, COINIT_MULTITHREADED);
         mDvb->signalThread();
@@ -50,7 +52,7 @@ public:
       mDumpTs = new cDumpTransportStream (rootName, false);
       add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDumpTs), 0.f,0.f);
       add (new cTsPidBox (this, -getHeight()/2.f, 0.f, mDumpTs), getHeight()/2.f,0.f);
-      std::thread ([=]() { fileThread (param, mDumpTs); }).detach();
+      thread ([=]() { fileThread (param, mDumpTs); }).detach();
       }
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
@@ -78,7 +80,7 @@ protected:
 
 private:
   //{{{
-  void fileThread (const std::string& fileName, cDumpTransportStream* ts) {
+  void fileThread (const string& fileName, cDumpTransportStream* ts) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("file");
@@ -130,17 +132,20 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   cLog::init (LOGINFO, true);
 
-  std::string param;
+  string param;
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
   if (numArgs > 1) {
     // get fileName from commandLine
-    std::wstring wstr (args[1]);
-    param = std::string (wstr.begin(), wstr.end());
+    wstring wstr (args[1]);
+    #pragma warning(push)
+      #pragma warning(disable: 4244)
+    param = string (wstr.begin(), wstr.end());
+    #pragma warning(pop)
     }
 
   cAppWindow appWindow;
-  std::string rootName = "/tv";
+  string rootName = "/tv";
   appWindow.run ("tvGrabWindow", 1050, 900, param, rootName);
 
   CoUninitialize();

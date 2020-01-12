@@ -372,7 +372,6 @@ void cPlayView::audThread() {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::setThreadName ("aud ");
-  av_register_all();
 
   const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
   mFirstVidPtsSem.wait();
