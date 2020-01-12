@@ -41,7 +41,6 @@ using namespace std;
 int main (int argc, char *argv[]) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  avcodec_register_all();
 
   cLog::init (LOGINFO, false, "");
   cLog::log (LOGNOTICE, "aac test");
