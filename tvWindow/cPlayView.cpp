@@ -4,6 +4,7 @@
 
 #include "cPlayView.h"
 
+#include "../../shared/utils/cWinAudio32.h"
 #include "../boxes/cAudFrameBox.h"
 
 #pragma comment (lib,"avutil.lib")
@@ -32,7 +33,7 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const std::
     cView("playerView", window, width, height),
     mFileName(fileName), mFirstVidPtsSem("firstVidPts") {
 
-  mAudio = new cWinAudio(2, 48000);
+  mAudio = new cWinAudio32 (2, 48000);
 
   // create transportStreams
   mAnalTs = new cAnalTransportStream();

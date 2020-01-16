@@ -1331,15 +1331,15 @@ private:
             cLog::log (LOGINFO2, "frame size:%d", avPacket.size);
 
             if (avFrame->nb_samples > 0) {
-              //{{{  covert planar avFrame->data to interleaved float samples
+              //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
                   // 16bit signed planar, copy planar to interleaved
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    auto srcPtr = (float*)avFrame->data[channel];
-                    auto dstPtr = (short*)(samples) + channel;
+                    auto srcPtr = (short*)avFrame->data[channel];
+                    auto dstPtr = (float*)(samples) + channel;
                     for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                      *dstPtr = int16_t(*srcPtr++ * 0x8000);
+                      *dstPtr = *srcPtr++ / float(0x8000);
                       dstPtr += avFrame->channels;
                       }
                     }
@@ -1430,15 +1430,15 @@ private:
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
               break;
             if (avFrame->nb_samples > 0) {
-              //{{{  covert planar avFrame->data to interleaved float samples
+              //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
                   // 16bit signed planar, copy planar to interleaved
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    auto srcPtr = (float*)avFrame->data[channel];
-                    auto dstPtr = (short*)(samples) + channel;
+                    auto srcPtr = (short*)avFrame->data[channel];
+                    auto dstPtr = (float*)(samples) + channel;
                     for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                      *dstPtr = int16_t(*srcPtr++ * 0x8000);
+                      *dstPtr = *srcPtr++ / float(0x8000);
                       dstPtr += avFrame->channels;
                       }
                     }
@@ -1527,7 +1527,7 @@ private:
             auto ret = avcodec_send_packet (context, &avPacket);
             while (ret >= 0) {
               ret = avcodec_receive_frame (context, avFrame);
-              if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
+              if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF) || (ret < 0))
                 break;
               if (avFrame->nb_samples > 0) {
                 //{{{  covert planar avFrame->data to interleaved int16_t samples
@@ -1535,10 +1535,10 @@ private:
                   case AV_SAMPLE_FMT_S16P:
                     // 16bit signed planar, copy planar to interleaved
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
-                      auto srcPtr = (float*)avFrame->data[channel];
-                      auto dstPtr = (short*)(samples) + channel;
+                      auto srcPtr = (short*)avFrame->data[channel];
+                      auto dstPtr = (float*)(samples) + channel;
                       for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                        *dstPtr = int16_t(*srcPtr++ * 0x8000);
+                        *dstPtr = *srcPtr++ / float(0x8000);
                         dstPtr += avFrame->channels;
                         }
                       }

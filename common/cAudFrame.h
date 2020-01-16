@@ -4,6 +4,8 @@
 
 class cAudFrame : public iFrame {
 public:
+  static const int kMaxChannels = 6;
+
   cAudFrame() {}
   virtual ~cAudFrame() { free (mSamples); }
 
@@ -18,14 +20,14 @@ public:
     mPts = pts;
     mPtsEnd = pts + ptsWidth;
 
-    if (channels > 6) {
+    if (channels > kMaxChannels) {
       cLog::log (LOGERROR, "cAudFrame::set - too many channels " + dec(channels));
-      channels = 6;
+      channels = kMaxChannels;
       }
 
-    auto numSampleBytes = channels * numSamples * 2;
+    auto numSampleBytes = channels * numSamples * 4;
     if (!mSamples || (numSampleBytes != mNumSampleBytes)) {
-      mSamples = (int16_t*)realloc (mSamples, numSampleBytes);
+      mSamples = (float*)realloc (mSamples, numSampleBytes);
       mNumSampleBytes = numSampleBytes;
       cLog::log (LOGINFO1, "cAudFrame::set - alloc samples " + dec(numSampleBytes));
       }
@@ -53,8 +55,8 @@ public:
   int mNumSamples = 0;
 
   int mNumSampleBytes = 0;
-  int16_t* mSamples = nullptr;
+  float* mSamples = nullptr;
 
   // simple static allocation of channels power, max 6
-  float mPower[6] = { 0,0,0,0,0,0 };
+  float mPower[kMaxChannels] = { 0.f };
   };

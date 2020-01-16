@@ -456,52 +456,49 @@ private:
               if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
                 break;
 
-              auto frame = (cAudFrame*)mFrames[mLoadFrame];
-              frame->set (interpolatedPts, avFrame->nb_samples*90/48, pidInfo->mPts, avFrame->channels, avFrame->nb_samples);
-              switch (mAudContext->sample_fmt) {
-                case AV_SAMPLE_FMT_S16P:
-                  //{{{  16bit signed planar, copy planar to interleaved, calc channel power
-                  for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    float power = 0.f;
-                    auto srcPtr = (short*)avFrame->data[channel];
-                    auto dstPtr = (short*)(frame->mSamples) + channel;
-                    for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = *srcPtr++;
-                      power += sample * sample;
-                      *dstPtr = sample;
-                      dstPtr += avFrame->channels;
+              if (avFrame->nb_samples > 0) {
+                auto frame = (cAudFrame*)mFrames[mLoadFrame];
+                frame->set (interpolatedPts, avFrame->nb_samples*90/48, pidInfo->mPts, avFrame->channels, avFrame->nb_samples);
+                //{{{  covert planar avFrame->data to interleaved float samples
+                switch (mAudContext->sample_fmt) {
+                  case AV_SAMPLE_FMT_S16P:
+                    // 16bit signed planar, copy planar to interleaved
+                    for (auto channel = 0; channel < avFrame->channels; channel++) {
+                      float power = 0.f;
+                      auto srcPtr = (short*)avFrame->data[channel];
+                      auto dstPtr = (float*)(frame->mSamples) + channel;
+                      for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+                        float value = *srcPtr++ / (float)0x8000;
+                        power += value * value;
+                        *dstPtr = value;
+                        dstPtr += avFrame->channels;
+                        }
                       }
-                    frame->mPower[channel] = sqrtf (power) / avFrame->nb_samples;
-                    }
+                    break;
 
-                  cLog::log (LOGINFO3, "-> audFrame::set 16bit" + getPtsString(interpolatedPts));
-                  break;
-                  //}}}
-                case AV_SAMPLE_FMT_FLTP:
-                  //{{{  32bit float planar, copy planar channel to interleaved, calc channel power
-                  for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    float power = 0.f;
-                    auto srcPtr = (float*)avFrame->data[channel];
-                    auto dstPtr = (short*)(frame->mSamples) + channel;
-                    for (auto i = 0; i < avFrame->nb_samples; i++) {
-                      auto sample = (short)(*srcPtr++ * 0x8000);
-                      power += sample * sample;
-                      *dstPtr = sample;
-                      dstPtr += avFrame->channels;
+                  case AV_SAMPLE_FMT_FLTP:
+                    // 32bit float planar, copy planar to interleaved
+                    for (auto channel = 0; channel < avFrame->channels; channel++) {
+                      float power = 0.f;
+                      auto srcPtr = (float*)avFrame->data[channel];
+                      auto dstPtr = (float*)(frame->mSamples) + channel;
+                      for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+                        power += *srcPtr * *srcPtr;
+                        *dstPtr = *srcPtr++;
+                        dstPtr += avFrame->channels;
+                        }
                       }
-                    frame->mPower[channel] = sqrtf (power) / avFrame->nb_samples;
-                    }
+                    break;
 
-                  cLog::log (LOGINFO3, "-> audFrame::set float " + getPtsString(interpolatedPts));
-                  break;
-                  //}}}
-                default:
-                 cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
+                  default:
+                   cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
+                  }
+                //}}}
+                mLoadFrame = (mLoadFrame + 1) % mFrames.size();
+
+                mLastLoadedPts = interpolatedPts;
+                interpolatedPts += (avFrame->nb_samples * 90) / 48;
                 }
-              mLoadFrame = (mLoadFrame + 1) % mFrames.size();
-
-              mLastLoadedPts = interpolatedPts;
-              interpolatedPts += (avFrame->nb_samples * 90) / 48;
               }
             decoded = true;
             }
@@ -974,6 +971,6 @@ private:
   bool mAudAborted = false;
   bool mPlayAborted = false;
 
-  cWinAudio* mAudio = nullptr;
+  iAudio* mAudio = nullptr;
   //}}}
   };
