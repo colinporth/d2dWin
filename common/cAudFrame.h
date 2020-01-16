@@ -43,9 +43,14 @@ public:
   void invalidate() {
 
     mOk = false;
+
     mPts = 0;
+
     mChannels = 0;
     mNumSamples = 0;
+
+    for (auto chan = 0; chan < kMaxChannels; chan++)
+      mPower[chan] =  0.f;
     }
   //}}}
 
@@ -57,6 +62,5 @@ public:
   int mNumSampleBytes = 0;
   float* mSamples = nullptr;
 
-  // simple static allocation of channels power, max 6
   float mPower[kMaxChannels] = { 0.f };
   };

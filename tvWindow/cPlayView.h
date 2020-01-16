@@ -440,10 +440,11 @@ private:
         avPacket.data = pidInfo->mBuffer;
         avPacket.size = 0;
         //}}}
+        auto avFrame = av_frame_alloc();
+
         auto interpolatedPts = pidInfo->mPts;
         auto pesPtr = pidInfo->mBuffer;
         auto pesSize = pidInfo->mBufPtr - pidInfo->mBuffer;
-        auto avFrame = av_frame_alloc();
         while (pesSize) {
           auto bytesUsed = av_parser_parse2 (mAudParser, mAudContext, &avPacket.data, &avPacket.size,
                                              pesPtr, (int)pesSize, 0, 0, AV_NOPTS_VALUE);
@@ -455,7 +456,6 @@ private:
               ret = avcodec_receive_frame (mAudContext, avFrame);
               if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
                 break;
-
               if (avFrame->nb_samples > 0) {
                 auto frame = (cAudFrame*)mFrames[mLoadFrame];
                 frame->set (interpolatedPts, avFrame->nb_samples*90/48, pidInfo->mPts, avFrame->channels, avFrame->nb_samples);

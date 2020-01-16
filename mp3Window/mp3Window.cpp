@@ -11,7 +11,7 @@ using namespace chrono;
 //{{{  const
 const int kMaxChannels = 2;
 
-const float kSilentThreshold = 0.05;
+const float kSilentThreshold = 0.05f;
 
 const int kSilentWindow = 10;       // about a half second analyse silence
 
@@ -788,7 +788,7 @@ private:
     //{{{
     string getFrameStr (uint32_t frame) {
 
-      uint32_t frameHs = frame * mSong.mSamplesPerFrame / (mSong.mSampleRate / 100);
+      uint32_t frameHs = (frame * mSong.mSamplesPerFrame) / (mSong.mSampleRate / 100);
 
       uint32_t hs = frameHs % 100;
 
@@ -1331,13 +1331,17 @@ private:
             ret = avcodec_receive_frame (context, avFrame);
             if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF) || (ret < 0))
               break;
-            if (avFrame->sample_rate > mStreamSampleRate) {
-              //{{{  fixup aac sbr sample rate
-              mStreamSampleRate = avFrame->sample_rate;
-              mSong.mSampleRate = mStreamSampleRate;
-              }
-              //}}}
             if (avFrame->nb_samples > 0) {
+              if (avFrame->nb_samples != mSong.mSamplesPerFrame)
+                //{{{  update mSamplesPerFrame
+                mSong.mSamplesPerFrame = avFrame->nb_samples;
+                //}}}
+              if (avFrame->sample_rate > mStreamSampleRate) {
+                //{{{  update aac sbr sample rate
+                mStreamSampleRate = avFrame->sample_rate;
+                mSong.mSampleRate = mStreamSampleRate;
+                }
+                //}}}
               //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
@@ -1407,7 +1411,7 @@ private:
 
       // sampleRate for aac sbr wrong in header, fixup later
       mStreamAac = parseFrames (mStreamFirst, mStreamLast, mStreamSampleRate);
-      mSong.init (mFileList->getCurFileItem().getFullName(), mStreamAac, mStreamAac ? 2048 : 1152, mStreamSampleRate);
+      mSong.init ("stream", mStreamAac, mStreamAac ? 2048 : 1152, mStreamSampleRate);
 
       // replace jpeg
       auto temp = mSong.mImage;
@@ -1418,6 +1422,8 @@ private:
       auto codec = avcodec_find_decoder (mStreamAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
       auto context = avcodec_alloc_context3 (codec);
       avcodec_open2 (context, codec, NULL);
+
+      mSong.init (mFileList->getCurFileItem().getFullName(), mStreamAac, context->frame_size, mStreamSampleRate);
 
       AVPacket avPacket;
       av_init_packet (&avPacket);
@@ -1437,13 +1443,17 @@ private:
             ret = avcodec_receive_frame (context, avFrame);
             if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF) || (ret < 0))
               break;
-            if (avFrame->sample_rate > mStreamSampleRate) {
-              //{{{  fixup aac sbr sample rate
-              mStreamSampleRate = avFrame->sample_rate;
-              mSong.mSampleRate = mStreamSampleRate;
-              }
-              //}}}
             if (avFrame->nb_samples > 0) {
+              if (avFrame->nb_samples != mSong.mSamplesPerFrame)
+                //{{{  update mSamplesPerFrame
+                mSong.mSamplesPerFrame = avFrame->nb_samples;
+                //}}}
+              if (avFrame->sample_rate > mStreamSampleRate) {
+                //{{{  update aac sbr sample rate
+                mStreamSampleRate = avFrame->sample_rate;
+                mSong.mSampleRate = mStreamSampleRate;
+                }
+                //}}}
               //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
