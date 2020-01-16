@@ -46,6 +46,9 @@
     <ClInclude Include="..\..\shared\utils\cWinAudio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cWinAudio32.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cD2dWindow.cpp" />
@@ -54,5 +57,6 @@
     <ClCompile Include="..\..\shared\utils\format.cpp" />
     <ClCompile Include="cJpegImage.cpp" />
     <ClCompile Include="..\..\shared\utils\cWinAudio.cpp" />
+    <ClCompile Include="..\..\shared\utils\cWinAudio32.cpp" />
   </ItemGroup>
 </Project>

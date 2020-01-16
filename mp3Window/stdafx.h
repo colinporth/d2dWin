@@ -49,7 +49,7 @@
 
 #include "concurrent_vector.h"
 
-#include "../../shared/utils/cWinAudio.h"
+#include "../../shared/utils/cWinAudio32.h"
 
 #include "../common/cJpegImage.h"
 #include "../common/cJpegImageView.h"
@@ -72,5 +72,5 @@ extern "C" {
 #include "../../curl/include/curl/curl.h"
 
 //#define USE_SIMD
-#include "kiss_fft.h"
-#include "kiss_fftr.h"
+#include "../../shared/kissFft/kiss_fft.h"
+#include "../../shared/kissFft/kiss_fftr.h"

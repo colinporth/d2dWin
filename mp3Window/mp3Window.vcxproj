@@ -163,9 +163,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\shared\kissFft\kiss_fft.h" />
+    <ClInclude Include="..\..\shared\kissFft\kiss_fftr.h" />
+    <ClInclude Include="..\..\shared\kissFft\kiss_fft_guts.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
-    <ClInclude Include="..\..\shared\utils\cWinAudio.h" />
+    <ClInclude Include="..\..\shared\utils\cWinAudio32.h" />
     <ClInclude Include="..\..\shared\utils\date.h" />
     <ClInclude Include="..\..\shared\utils\iAudio.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
@@ -174,14 +177,11 @@
     <ClInclude Include="..\boxes\cWindowBox.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cJpegImage.h" />
-    <ClInclude Include="kiss_fft.h" />
-    <ClInclude Include="kiss_fftr.h" />
-    <ClInclude Include="kiss_fft_guts.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="kiss_fft.c" />
-    <ClCompile Include="kiss_fftr.c" />
+    <ClCompile Include="..\..\shared\kissFft\kiss_fft.c" />
+    <ClCompile Include="..\..\shared\kissFft\kiss_fftr.c" />
     <ClCompile Include="mp3Window.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
