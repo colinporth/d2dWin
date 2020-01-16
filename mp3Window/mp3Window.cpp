@@ -149,7 +149,7 @@ private:
     //}}}
 
     //{{{
-    void init (string fileName, bool aac, uint16_t samplesPerFrame, uint16_t sampleRate) {
+    void init (string fileName, bool aac, uint16_t samplesPerFrame, int sampleRate) {
 
       mFrames.clear();
 
@@ -265,7 +265,7 @@ private:
         return mFrames[0].mStreamIndex;
       }
     //}}}
-    int getSamplesSize() { return mMaxSamplesPerFrame * mChannels * mBytesPerSample; }
+    int getSamplesSize() { return mMaxSamplesPerFrame * mChannels * (mBitsPerSample/8); }
 
     // sets
     //{{{
@@ -298,11 +298,8 @@ private:
     // defaults
     bool mAac = false;
     uint16_t mChannels = 2;
-    uint16_t mBytesPerSample = 2;
-    uint16_t mBitsPerSample = 16;
+    int mSampleRate = 44100;
     uint16_t mSamplesPerFrame = 1152;
-    uint16_t mMaxSamplesPerFrame = kMaxSamples;
-    uint16_t mSampleRate = 44100;
 
     concurrency::concurrent_vector<cFrame> mFrames;
 
@@ -340,6 +337,9 @@ private:
       return fromFrame;
       }
     //}}}
+
+    uint16_t mBitsPerSample = 32;
+    uint16_t mMaxSamplesPerFrame = kMaxSamples;
     };
   //}}}
 
@@ -878,7 +878,7 @@ private:
   //}}}
   //{{{
   bool parseFrame (uint8_t* stream, uint8_t* streamLast, uint8_t*& frame, int& frameLen,
-                   bool& aac, bool& id3Tag, int& skip, uint16_t& sampleRate) {
+                   bool& aac, bool& id3Tag, int& skip, int& sampleRate) {
   // start of mp3 / aac adts parser
 
     skip = 0;
@@ -1033,7 +1033,7 @@ private:
                                          112000, 128000, 160000, 192000,
                                          224000, 256000, 320000,      0};
 
-          const uint32_t sampleRates[4] = { 44100, 48000, 32000, 0};
+          const int sampleRates[4] = { 44100, 48000, 32000, 0};
 
           uint8_t version = (stream[1] & 0x08) >> 3;
           uint8_t layer = (stream[1] & 0x06) >> 1;
@@ -1085,8 +1085,10 @@ private:
     }
   //}}}
   //{{{
-  bool parseFrames (uint8_t* stream, uint8_t* streamLast, uint16_t& sampleRate) {
+  bool parseFrames (uint8_t* stream, uint8_t* streamLast, int& sampleRate) {
   // return true if stream is aac adts
+
+    sampleRate = 0;
 
     int tags = 0;
     int frames = 0;
@@ -1098,20 +1100,19 @@ private:
     bool frameAac = false;
     bool tag = false;
     int skip = 0;
-    uint16_t frameSampleRate = 0;
+    int frameSampleRate = 0;
     while (parseFrame (stream, streamLast, frame, frameLen, frameAac, tag, skip, frameSampleRate)) {
       if (tag)
         tags++;
       else {
         resultAac = frameAac;
+        sampleRate = frameSampleRate;
         frames++;
         }
       // onto next frame
       stream += skip + frameLen;
       lostSync += skip;
       }
-
-    sampleRate = frameSampleRate;
 
     cLog::log (LOGINFO, "parseFrames f:%d lost:%d aac:%d tags:%d sampleRate:%d",
                frames, lostSync, resultAac, tags, sampleRate);
@@ -1304,6 +1305,7 @@ private:
     while ((mStreamLast - mStreamFirst) < 1440)
       mStreamSem.wait();
 
+    // sampleRate for aac sbr wrong in header, fixup later
     mStreamAac = parseFrames (mStreamFirst, mStreamLast, mStreamSampleRate);
     mSong.init ("stream", mStreamAac, mStreamAac ? 2048 : 1152, mStreamSampleRate);
 
@@ -1317,26 +1319,30 @@ private:
 
     auto stream = mStreamFirst;
     while (!getExit()) {
-      bool frameAac;
+      bool aac;
       bool tag;
       int skip;
-      uint16_t sampleRate;
-      while (parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameAac, tag, skip, sampleRate)) {
-        if (!tag && (frameAac == mStreamAac)) {
+      int sampleRate;
+      while (parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, aac, tag, skip, sampleRate)) {
+        if (!tag && (aac == mStreamAac)) {
           auto ret = avcodec_send_packet (context, &avPacket);
           while (ret >= 0) {
             ret = avcodec_receive_frame (context, avFrame);
-            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
+            if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF) || (ret < 0))
               break;
-            cLog::log (LOGINFO2, "frame size:%d", avPacket.size);
-
+            if (avFrame->sample_rate > mStreamSampleRate) {
+              //{{{  fixup aac sbr sample rate
+              mStreamSampleRate = avFrame->sample_rate;
+              mSong.mSampleRate = mStreamSampleRate;
+              }
+              //}}}
             if (avFrame->nb_samples > 0) {
               //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
                   // 16bit signed planar, copy planar to interleaved
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    auto srcPtr = (short*)avFrame->data[channel];
+                    auto srcPtr = (int16_t*)avFrame->data[channel];
                     auto dstPtr = (float*)(samples) + channel;
                     for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
                       *dstPtr = *srcPtr++ / float(0x8000);
@@ -1398,6 +1404,7 @@ private:
       mStreamFirst = (uint8_t*)MapViewOfFile (mapping, FILE_MAP_READ, 0, 0, 0);
       mStreamLast = mStreamFirst + GetFileSize (fileHandle, NULL);
 
+      // sampleRate for aac sbr wrong in header, fixup later
       mStreamAac = parseFrames (mStreamFirst, mStreamLast, mStreamSampleRate);
       mSong.init (mFileList->getCurFileItem().getFullName(), mStreamAac, mStreamAac ? 2048 : 1152, mStreamSampleRate);
 
@@ -1417,25 +1424,31 @@ private:
       auto samples = (float*)malloc (mSong.getSamplesSize());
 
       auto stream = mStreamFirst;
-      bool frameAac;
+      bool aac;
       bool tag;
       int skip;
-      uint16_t sampleRate;
+      int sampleRate;
       while (!getExit() && !mChanged &&
-             parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameAac, tag, skip, sampleRate)) {
-        if ((frameAac == mStreamAac) && !tag) {
+             parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, aac, tag, skip, sampleRate)) {
+        if (!tag && (aac == mStreamAac)) {
           auto ret = avcodec_send_packet (context, &avPacket);
           while (ret >= 0) {
             ret = avcodec_receive_frame (context, avFrame);
-            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
+            if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF) || (ret < 0))
               break;
+            if (avFrame->sample_rate > mStreamSampleRate) {
+              //{{{  fixup aac sbr sample rate
+              mStreamSampleRate = avFrame->sample_rate;
+              mSong.mSampleRate = mStreamSampleRate;
+              }
+              //}}}
             if (avFrame->nb_samples > 0) {
               //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
                 case AV_SAMPLE_FMT_S16P:
                   // 16bit signed planar, copy planar to interleaved
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    auto srcPtr = (short*)avFrame->data[channel];
+                    auto srcPtr = (int16_t*)avFrame->data[channel];
                     auto dstPtr = (float*)(samples) + channel;
                     for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
                       *dstPtr = *srcPtr++ / float(0x8000);
@@ -1521,9 +1534,9 @@ private:
         bool aac;
         bool tag;
         int skip;
-        uint16_t sampleRate;
-        if (parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, aac, tag, skip, sampleRate)) {
-          if (!tag && (mStreamAac == mStreamAac)) {
+        int sampleRate;
+        if (parseFrame (stream, mStreamLast, avPacket.data, avPacket.size, aac, tag, skip, sampleRate)) { // sampleRate/2 for aac sbr
+          if (!tag && (aac == mStreamAac)) {
             auto ret = avcodec_send_packet (context, &avPacket);
             while (ret >= 0) {
               ret = avcodec_receive_frame (context, avFrame);
@@ -1535,7 +1548,7 @@ private:
                   case AV_SAMPLE_FMT_S16P:
                     // 16bit signed planar, copy planar to interleaved
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
-                      auto srcPtr = (short*)avFrame->data[channel];
+                      auto srcPtr = (int16_t*)avFrame->data[channel];
                       auto dstPtr = (float*)(samples) + channel;
                       for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
                         *dstPtr = *srcPtr++ / float(0x8000);
@@ -1595,7 +1608,7 @@ private:
   uint8_t* mStreamLast = nullptr;
 
   bool mStreamAac = false;
-  uint16_t mStreamSampleRate = 44100;
+  int mStreamSampleRate = 0;
 
   cSemaphore mStreamSem;
 
