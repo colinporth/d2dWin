@@ -473,6 +473,7 @@ private:
                         *dstPtr = value;
                         dstPtr += avFrame->channels;
                         }
+                      frame->mPower[channel] = sqrtf (power) / avFrame->nb_samples;
                       }
                     break;
 
@@ -487,11 +488,12 @@ private:
                         *dstPtr = *srcPtr++;
                         dstPtr += avFrame->channels;
                         }
+                      frame->mPower[channel] = sqrtf (power) / avFrame->nb_samples;
                       }
                     break;
 
                   default:
-                   cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
+                    cLog::log (LOGERROR, "audDecodePes - unrecognised sample_fmt " + dec (mAudContext->sample_fmt));
                   }
                 //}}}
                 mLoadFrame = (mLoadFrame + 1) % mFrames.size();

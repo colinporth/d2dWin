@@ -11,7 +11,7 @@ using namespace chrono;
 //{{{  const
 const int kMaxChannels = 2;
 
-const float kSilentThreshold = 0.1f;
+const float kSilentThreshold = 0.05;
 
 const int kSilentWindow = 10;       // about a half second analyse silence
 
@@ -1312,6 +1312,7 @@ private:
     auto codec = avcodec_find_decoder (mStreamAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
     auto context = avcodec_alloc_context3 (codec);
     avcodec_open2 (context, codec, NULL);
+
     AVPacket avPacket;
     av_init_packet (&avPacket);
     auto avFrame = av_frame_alloc();

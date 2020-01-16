@@ -7,8 +7,6 @@
 #include "../../shared/utils/iAudio.h"
 //}}}
 
-const float kBarsScale = 3.0f;  // need to work out power scaling derivation
-
 class cAudFrameBox : public cD2dWindow::cBox {
 public:
   //{{{
@@ -160,14 +158,14 @@ private:
   //{{{
   void drawChanBar (ID2D1DeviceContext* dc, cRect& r, bool selected, float value) {
 
-    r.top = r.bottom - value / kBarsScale;
+    r.top = r.bottom - (value * getHeight());
     selected ? dc->FillRectangle (r, mWindow->getGreenBrush()) : dc->DrawRectangle (r, mWindow->getGreenBrush());
     }
   //}}}
   //{{{
   void drawWooferBar (ID2D1DeviceContext* dc, cRect& r, bool selected, float value) {
 
-    r.top = r.bottom - value / kBarsScale;
+    r.top = r.bottom - (value * getHeight());
     dc->FillRectangle (r, selected ? mBrush : mWindow->getGreyBrush());
     }
   //}}}
