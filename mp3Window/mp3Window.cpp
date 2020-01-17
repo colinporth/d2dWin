@@ -669,7 +669,6 @@ void avLogCallback (void* ptr, int level, const char* fmt, va_list vargs) {
     }
   }
 //}}}
-
 //{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
@@ -695,11 +694,11 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     appWindow.run (true, "mp3Window " + url, 800, 800, url);
     }
   else {
-    const wstring wstr(args[1]);
+    wstring wstr (args[1]);
 
     #pragma warning(push)
       #pragma warning(disable: 4244)
-      const string fileName = string (wstr.begin(), wstr.end());
+      string fileName = string (wstr.begin(), wstr.end());
     #pragma warning(pop)
 
     //string fileName = "C:/Users/colin/Music/Elton John";
