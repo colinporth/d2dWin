@@ -52,6 +52,12 @@
     <ClInclude Include="..\..\shared\utils\cWinAudio32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="cSong.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cSongBoxes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="mp3Window.cpp" />

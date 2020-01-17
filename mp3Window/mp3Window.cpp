@@ -5,22 +5,12 @@
 #include "../../shared/utils/cFileList.h"
 #include "../boxes/cFileListBox.h"
 
+#include "cSong.h"
+#include "cSongBoxes.h"
+
 using namespace std;
-using namespace chrono;
 //}}}
-//{{{  const
-const int kMaxChannels = 2;
-
-const float kSilentThreshold = 0.05f;
-
-const int kSilentWindow = 10;       // about a half second analyse silence
-
 const int kPlayFrameThreshold = 10; // about a half second analyse before play
-
-const int kMaxSamples = 2048;
-const int kMaxFreq = 1025;
-const int kMaxSpectrum = 512;
-//}}}
 
 class cAppWindow : public cD2dWindow {
 public:
@@ -43,7 +33,7 @@ public:
     add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
-    add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
+    add (new cSongTimeCodeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
 
     mFileList = new cFileList (name, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -104,713 +94,6 @@ protected:
   //}}}
 
 private:
-  //{{{
-  class cFrame {
-  public:
-    cFrame (uint32_t streamIndex, uint32_t len, float* powerValues, float* freqValues, uint8_t* lumaValues)
-        : mStreamIndex(streamIndex), mLen(len) {
-
-      memcpy (mPowerValues, powerValues, kMaxChannels * 4);
-      memcpy (mFreqValues, freqValues, kMaxFreq * 4);
-      memcpy (mFreqLuma, lumaValues, kMaxSpectrum);
-
-      mSilent = isSilentThreshold();
-      }
-
-    bool isSilent() { return mSilent; }
-    bool isSilentThreshold() { return mPowerValues[0] + mPowerValues[1] < kSilentThreshold; }
-
-    bool hasTitle() { return !mTitle.empty(); }
-    void setTitle (const string& title) { mTitle = title; }
-
-    // vars
-    uint32_t mStreamIndex;
-    uint32_t mLen;
-
-    bool mSilent;
-    float mPowerValues[kMaxChannels];
-    float mFreqValues[kMaxFreq];
-    uint8_t mFreqLuma[kMaxSpectrum];
-
-    string mTitle;
-    };
-  //}}}
-  //{{{
-  class cSong {
-  public:
-    //{{{
-    cSong() {
-      }
-    //}}}
-    //{{{
-    virtual ~cSong() {
-      mFrames.clear();
-      }
-    //}}}
-
-    //{{{
-    void init (string fileName, bool aac, uint16_t samplesPerFrame, int sampleRate) {
-
-      mFrames.clear();
-
-      mPlayFrame = 0;
-      mNumFrames = 0;
-
-      mFileName = fileName;
-      mPathName = "";
-
-      mAac = aac;
-      mSamplesPerFrame = samplesPerFrame;
-      mSampleRate = sampleRate;
-
-      mMaxPowerValue = 0;
-
-      mMaxFreqValue = 0.f;
-      for (int i = 0; i < kMaxFreq; i++)
-        mMaxFreqValues[i] = 0.f;
-
-      fftrConfig = kiss_fftr_alloc (kMaxSamples, 0, 0, 0);
-      }
-    //}}}
-    //{{{
-    int addFrame (uint32_t streamIndex, uint32_t frameLen, int numSamples, float* samples, uint32_t streamLen) {
-    // return true if enough frames added to start playing
-
-      // sum of squares of channel power
-      float powerSum[kMaxChannels] = { 0.f };
-      for (auto sample = 0; sample < numSamples; sample++) {
-        timeBuf[sample] = 0;
-        for (auto chan = 0; chan < mChannels; chan++) {
-          auto value = samples[(sample * mChannels) + chan];
-          timeBuf[sample] += value;
-          powerSum[chan] += value * value;
-          }
-        }
-
-      // channel powerValues
-      float powerValues[kMaxChannels];
-      for (auto chan = 0; chan < mChannels; chan++) {
-        powerValues[chan] = sqrtf (powerSum[chan]) / numSamples;
-        mMaxPowerValue = max (mMaxPowerValue, powerValues[chan]);
-        }
-
-      kiss_fftr (fftrConfig, timeBuf, freqBuf);
-
-      float freqValues[kMaxFreq];
-      for (auto freq = 0; freq < kMaxFreq; freq++) {
-        freqValues[freq] = sqrt ((freqBuf[freq].r * freqBuf[freq].r) + (freqBuf[freq].i * freqBuf[freq].i));
-        mMaxFreqValue = max (mMaxFreqValue, freqValues[freq]);
-        mMaxFreqValues[freq] = max (mMaxFreqValues[freq], freqValues[freq]);
-        }
-
-      uint8_t lumaValues[kMaxFreq];
-      for (auto freq = 0; freq < kMaxSpectrum; freq++) {
-        auto value = uint8_t((freqValues[freq] / mMaxFreqValue) * 1024.f);
-        lumaValues[freq] = value > 255 ? 255 : value;
-        }
-
-      mFrames.push_back (cFrame (streamIndex, frameLen, powerValues, freqValues, lumaValues));
-
-      // estimate numFrames
-      mNumFrames = int (uint64_t(streamLen - mFrames[0].mStreamIndex) * (uint64_t)mFrames.size() /
-                        uint64_t(streamIndex + frameLen - mFrames[0].mStreamIndex));
-
-      // calc silent window
-      auto frame = getNumLoadedFrames()-1;
-      if (mFrames[frame].isSilent()) {
-        auto window = kSilentWindow;
-        auto windowFrame = frame - 1;
-        while ((window >= 0) && (windowFrame >= 0)) {
-          // walk backwards looking for no silence
-          if (!mFrames[windowFrame].isSilentThreshold()) {
-            mFrames[frame].mSilent = false;
-            break;
-            }
-          windowFrame--;
-          window--;
-          }
-        }
-
-      return frame;
-      }
-    //}}}
-    //{{{
-    void setTitle (string title) {
-      if (!mFrames.empty())
-        mFrames.back().setTitle (title);
-      }
-    //}}}
-
-    // gets
-    int getNumLoadedFrames() { return (int)mFrames.size(); }
-    //{{{
-    uint32_t getPlayFrame() {
-
-      if (mFrames.empty())
-        return 0;
-      else if (mPlayFrame < mFrames.size())
-        return mPlayFrame;
-      else
-        return (uint32_t)mFrames.size() - 1;
-      }
-    //}}}
-    //{{{
-    uint32_t getPlayFrameStreamIndex() {
-
-      if (mFrames.empty())
-        return 0;
-      else if (mPlayFrame < mFrames.size())
-        return mFrames[mPlayFrame].mStreamIndex;
-      else
-        return mFrames[0].mStreamIndex;
-      }
-    //}}}
-    int getSamplesSize() { return mMaxSamplesPerFrame * mChannels * (mBitsPerSample/8); }
-
-    // sets
-    //{{{
-    void setPlayFrame (int frame) {
-      mPlayFrame = min (max (frame, 0), mNumFrames-1);
-      }
-    //}}}
-    void incPlayFrame (int frames) { setPlayFrame (mPlayFrame + frames); }
-    void incPlaySec (int secs) { incPlayFrame (secs * mSampleRate / mSamplesPerFrame); }
-
-    //{{{
-    void prevSilence() {
-      mPlayFrame = skipPrev (mPlayFrame, false);
-      mPlayFrame = skipPrev (mPlayFrame, true);
-      mPlayFrame = skipPrev (mPlayFrame, false);
-      }
-    //}}}
-    //{{{
-    void nextSilence() {
-      mPlayFrame = skipNext (mPlayFrame, true);
-      mPlayFrame = skipNext (mPlayFrame, false);
-      mPlayFrame = skipNext (mPlayFrame, true);
-      }
-    //}}}
-
-    // vars
-    string mFileName;
-    string mPathName;
-
-    // defaults
-    bool mAac = false;
-    uint16_t mChannels = 2;
-    int mSampleRate = 44100;
-    uint16_t mSamplesPerFrame = 1152;
-
-    concurrency::concurrent_vector<cFrame> mFrames;
-
-    int mPlayFrame = 0;
-    int mNumFrames = 0;
-
-    kiss_fftr_cfg fftrConfig;
-    kiss_fft_scalar timeBuf[kMaxSamples];
-    kiss_fft_cpx freqBuf[kMaxFreq];
-
-    float mMaxPowerValue = 0.f;
-    float mMaxFreqValue = 0.f;
-    float mMaxFreqValues[kMaxFreq];
-
-    cJpegImage* mImage = nullptr;
-
-  private:
-    //{{{
-    int skipPrev (int fromFrame, bool silent) {
-
-      for (auto frame = fromFrame-1; frame >= 0; frame--)
-        if (mFrames[frame].isSilent() ^ silent)
-          return frame;
-
-      return fromFrame;
-      }
-    //}}}
-    //{{{
-    int skipNext (int fromFrame, bool silent) {
-
-      for (auto frame = fromFrame; frame < getNumLoadedFrames(); frame++)
-        if (mFrames[frame].isSilent() ^ silent)
-          return frame;
-
-      return fromFrame;
-      }
-    //}}}
-
-    uint16_t mBitsPerSample = 32;
-    uint16_t mMaxSamplesPerFrame = kMaxSamples;
-    };
-  //}}}
-
-  //{{{
-  class cSongFreqBox : public cBox {
-  public:
-    //{{{
-    cSongFreqBox (cD2dWindow* window, float width, float height, cSong& song) :
-        cBox ("songWaveBox", window, width, height), mSong(song) {
-
-      mPin = true;
-      }
-    //}}}
-    virtual ~cSongFreqBox() {}
-
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      int frame = mSong.getPlayFrame();
-      if (frame > 0) {
-        float* freq = (mSong.mFrames[frame].mFreqValues);
-        for (int i = 0; (i < getWidth()) && (i < kMaxFreq); i++)
-          dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - ((freq[i] / mSong.mMaxFreqValue) * getHeight()),
-                                    mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
-        }
-      }
-
-  protected:
-    cSong& mSong;
-    };
-  //}}}
-  //{{{
-  class cSongSpectrumBox : public cBox {
-  public:
-    //{{{
-    cSongSpectrumBox (cD2dWindow* window, float width, float height, cSong& song) :
-        cBox("songSpectrumBox", window, width, height), mSong(song) {
-
-      mPin = true;
-      //mTransform = D2D1::Matrix3x2F::Scale ({2.0f, 2.0f}, {0.f, 0.f});
-      }
-    //}}}
-    //{{{
-    virtual ~cSongSpectrumBox() {
-      if (mBitmap)
-        mBitmap->Release();
-      free (mBitmapBuf);
-      }
-    //}}}
-
-    void onDraw (ID2D1DeviceContext* dc) {
-      if (!mBitmap || (mBitmapWidth != getWidthInt()) || (mBitmapHeight = getHeightInt())) {
-        //{{{  create bitmapBuf and ID2D1Bitmap matching box size
-        mBitmapWidth = getWidthInt();
-        mBitmapHeight = getHeightInt();
-
-        free (mBitmapBuf);
-        mBitmapBuf = (uint8_t*)malloc (mBitmapWidth * mBitmapHeight);
-
-        if (mBitmap)
-          mBitmap->Release();
-        dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
-                          { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 },
-                          &mBitmap);
-        }
-        //}}}
-
-      // left and right edge frames, may be outside known frames
-      auto leftFrame = mSong.mPlayFrame - (getWidthInt()/2);
-      auto rightFrame = mSong.mPlayFrame + (getWidthInt()/2);
-
-      // first and last known frames
-      auto firstFrame = max (leftFrame, 0);
-      auto lastFrame = min (rightFrame, mSong.getNumLoadedFrames());
-
-      // bottom of first bitmapBuf column
-      auto dstPtr = mBitmapBuf + ((mBitmapHeight-1) * mBitmapWidth);
-      for (int frame = firstFrame; frame < lastFrame; frame++) {
-        // copy freqLuma to bitmapBuf column
-        auto srcPtr = mSong.mFrames[frame].mFreqLuma;
-        for (int y = 0; y < mBitmapHeight; y++) {
-          *dstPtr = *srcPtr++;
-          dstPtr -= mBitmapWidth;
-          }
-
-        // bottom of next bitmapBuf column
-        dstPtr += (mBitmapWidth * mBitmapHeight) + 1;
-        }
-
-      // copy bitmapBuf to ID2D1Bitmap
-      mBitmap->CopyFromMemory (&D2D1::RectU (0, 0, lastFrame - firstFrame, mBitmapHeight), mBitmapBuf, mBitmapWidth);
-
-      // stamp colour through ID2D1Bitmap alpha using offset and width
-      float dstLeft = (firstFrame > leftFrame) ? float(firstFrame - leftFrame) : 0.f;
-      //dc->SetTransform (mTransform);
-      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
-      dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
-                           &D2D1::RectF (dstLeft, mRect.top, dstLeft + lastFrame - firstFrame, mRect.bottom), // dstRect
-                           &D2D1::RectF (0.f,0.f, float(lastFrame - firstFrame), (float)mBitmapHeight));      // srcRect
-      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-      //dc->SetTransform (D2D1::Matrix3x2F::Identity());
-      }
-
-  private:
-    cSong& mSong;
-
-    int mBitmapWidth = 0;
-    int mBitmapHeight = 0;
-
-    uint8_t* mBitmapBuf = nullptr;
-    ID2D1Bitmap* mBitmap = nullptr;
-
-    D2D1::Matrix3x2F mTransform = D2D1::Matrix3x2F::Identity();
-    };
-  //}}}
-  //{{{
-  class cSongWaveBox : public cBox {
-  public:
-    //{{{
-    cSongWaveBox (cD2dWindow* window, float width, float height, cSong& song) :
-        cBox ("songWaveBox", window, width, height), mSong(song) {
-
-      mPin = true;
-      }
-    //}}}
-    virtual ~cSongWaveBox() {}
-
-    //{{{
-    bool onMove (bool right, cPoint pos, cPoint inc) {
-      mSong.incPlayFrame (int(-inc.x));
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onWheel (int delta, cPoint pos)  {
-
-      if (getShow()) {
-        mZoom -= delta/120;
-        mZoom = min (max(mZoom, 1), 2 * (1 + mSong.mNumFrames / getWidthInt()));
-        return true;
-        }
-
-      return false;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      auto leftFrame = mSong.mPlayFrame - (mZoom * getWidthInt()/2);
-      auto rightFrame = mSong.mPlayFrame + (mZoom * getWidthInt()/2);
-      auto firstX = (leftFrame < 0) ? (-leftFrame) / mZoom : 0;
-
-      draw (dc, leftFrame, rightFrame, firstX, mZoom);
-      }
-    //}}}
-
-  protected:
-    float getMaxPowerValue() { return mSong.mMaxPowerValue > 0.f ? mSong.mMaxPowerValue : 1.f; }
-
-    //{{{
-    void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
-
-      leftFrame = (leftFrame < 0) ? 0 : leftFrame;
-      if (rightFrame > mSong.getNumLoadedFrames())
-        rightFrame = mSong.getNumLoadedFrames();
-
-      // draw frames
-      auto colour = mWindow->getBlueBrush();
-
-      float yCentre = getCentreY();
-      float valueScale = (getHeight()/2.f) / getMaxPowerValue();
-
-      bool centre = false;
-      float xl = mRect.left + firstX;
-      for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
-        float xr = xl + 1.f;
-        if (mSong.mFrames[frame].hasTitle()) {
-          dc->FillRectangle (cRect (xl, yCentre-(getHeight()/2.f), xr+2.f, yCentre+(getHeight()/2.f)), mWindow->getYellowBrush());
-
-          string str = mSong.mFrames[frame].mTitle;
-          IDWriteTextLayout* textLayout;
-          mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-                                                         mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-          dc->DrawTextLayout (cPoint (xl, getTL().y-20.f), textLayout, mWindow->getWhiteBrush());
-          textLayout->Release();
-          }
-
-        if (mSong.mFrames[frame].isSilent()) {
-          float silenceHeight = 2.f;
-          dc->FillRectangle (cRect (xl, yCentre - silenceHeight, xr, yCentre + silenceHeight), mWindow->getRedBrush());
-          }
-
-        if (!centre && (frame >= mSong.mPlayFrame)) {
-          auto yL = mSong.mFrames[frame].mPowerValues[0] * valueScale;
-          auto yR = mSong.mFrames[frame].mPowerValues[1] * valueScale;
-          dc->FillRectangle (cRect (xl, yCentre - yL, xr, yCentre + yR), mWindow->getWhiteBrush());
-          colour = mWindow->getGreyBrush();
-          centre = true;
-          }
-        else {
-          float yL = 0.f;
-          float yR = 0.f;
-          for (auto i = 0; i < zoom; i++) {
-            yL += mSong.mFrames[frame+i].mPowerValues[0];
-            yR += mSong.mFrames[frame+i].mPowerValues[1];
-            }
-          yL = (yL / zoom) * valueScale;
-          yR = (yR / zoom) * valueScale;
-          dc->FillRectangle (cRect (xl, yCentre - yL, xr, yCentre + yR), colour);
-          }
-        xl = xr;
-        }
-      }
-    //}}}
-
-    cSong& mSong;
-    int mZoom = 1;
-    };
-  //}}}
-  //{{{
-  class cSongLensBox : public cSongWaveBox {
-  public:
-    //{{{
-    cSongLensBox (cD2dWindow* window, float width, float height, cSong& frameSet)
-      : cSongWaveBox(window, width, height, frameSet) {}
-    //}}}
-    //{{{
-    virtual ~cSongLensBox() {
-      bigFree (mSummedValues);
-      }
-    //}}}
-
-    //{{{
-    void layout() {
-      mSummedFrame = -1;
-      cSongWaveBox::layout();
-      }
-    //}}}
-
-    //{{{
-    bool onDown (bool right, cPoint pos)  {
-
-      mOn = true;
-
-      auto frame = int((pos.x * mSong.mNumFrames) / getWidth());
-      mSong.setPlayFrame (frame);
-
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onMove (bool right, cPoint pos, cPoint inc) {
-      auto frame = int((pos.x * mSong.mNumFrames) / getWidth());
-      mSong.setPlayFrame (frame);
-      return true;
-      }
-    //}}}
-    //{{{
-    bool onUp (bool right, bool mouseMoved, cPoint pos) {
-      mOn = false;
-      return cSongWaveBox::onUp (right, mouseMoved, pos);
-      }
-    //}}}
-    //{{{
-    bool onWheel (int delta, cPoint pos)  {
-      return false;
-      }
-    //}}}
-
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      if (mOn) {
-        if (mLens < getWidthInt() / 16)
-          // animate on
-          mLens += (getWidthInt() / 16) / 6;
-        }
-      else if (mLens <= 0) {
-        mLens = 0;
-        draw (dc, 0, mMaxSummedX);
-        return;
-        }
-      else // animate off
-        mLens /= 2;
-
-      int curFrameX = (mSong.mNumFrames > 0) ? (mSong.mPlayFrame * getWidthInt()) / mSong.mNumFrames : 0;
-      int leftLensX = curFrameX - mLens;
-      int rightLensX = curFrameX + mLens;
-      if (leftLensX < 0) {
-        rightLensX -= leftLensX;
-        leftLensX = 0;
-        }
-      else
-        draw (dc, 0, leftLensX);
-
-      if (rightLensX > getWidthInt()) {
-        leftLensX -= rightLensX - getWidthInt();
-        rightLensX = getWidthInt();
-        }
-      else
-        draw (dc, rightLensX, getWidthInt());
-
-      cSongWaveBox::draw (dc, mSong.mPlayFrame - mLens, mSong.mPlayFrame + mLens-2, leftLensX+1, 1);
-
-      dc->DrawRectangle (cRect(mRect.left + leftLensX, mRect.top + 1.f,
-                               mRect.left + rightLensX, mRect.top + getHeight() - 1.f),
-                         mWindow->getYellowBrush(), 1.f);
-      }
-    //}}}
-
-  private:
-    //{{{
-    void makeSummedWave() {
-
-      if (mSummedFrame != mSong.getNumLoadedFrames()) {
-        // frameSet changed, cache values summed to width, scaled to height
-        mSummedFrame = mSong.getNumLoadedFrames();
-
-        mSummedValues = (float*)realloc (mSummedValues, getWidthInt() * 2 * sizeof(float));
-        auto summedValuesPtr = mSummedValues;
-
-        mMaxSummedX = 0;
-        auto startFrame = 0;
-        for (auto x = 0; x < getWidthInt(); x++) {
-          int frame = x * mSong.mNumFrames / getWidthInt();
-          if (frame >= mSong.getNumLoadedFrames())
-            break;
-
-          float lValue = mSong.mFrames[frame].mPowerValues[0];
-          float rValue = mSong.mFrames[frame].mPowerValues[1];
-          if (frame > startFrame) {
-            int num = 1;
-            for (auto i = startFrame; i < frame; i++) {
-              lValue += mSong.mFrames[i].mPowerValues[0];
-              rValue += mSong.mFrames[i].mPowerValues[1];
-              num++;
-              }
-            lValue /= num;
-            rValue /= num;
-            }
-          *summedValuesPtr++ = lValue;
-          *summedValuesPtr++ = rValue;
-
-          mMaxSummedX = x;
-          startFrame = frame + 1;
-          }
-        }
-      }
-    //}}}
-    //{{{
-    void draw (ID2D1DeviceContext* dc, int firstX, int lastX) {
-
-      makeSummedWave();
-
-      // draw cached graphic
-      auto colour = mWindow->getBlueBrush();
-
-      auto centreY = getCentreY();
-      float valueScale = getHeight() / 2 / getMaxPowerValue();
-
-      float curFrameX = mRect.left;
-      if (mSong.mNumFrames > 0)
-        curFrameX += mSong.mPlayFrame * getWidth() / mSong.mNumFrames;
-
-      bool centre = false;
-      float xl = mRect.left + firstX;
-      auto summedValuesPtr = mSummedValues + (firstX * 2);
-      for (auto x = firstX; x < lastX; x++) {
-        float xr = xl + 1.f;
-        if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumLoadedFrames())) {
-          float leftValue = mSong.mFrames[mSong.mPlayFrame].mPowerValues[0] * valueScale;
-          float rightValue = mSong.mFrames[mSong.mPlayFrame].mPowerValues[1] * valueScale;
-          dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
-                             mWindow->getWhiteBrush());
-          colour = mWindow->getGreyBrush();
-          centre = true;
-          }
-
-        else if (x < mMaxSummedX) {
-          auto leftValue = *summedValuesPtr++ * valueScale;
-          auto rightValue = *summedValuesPtr++ * valueScale;
-          dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
-                             colour);
-          }
-        else
-          break;
-        xl = xr;
-        }
-      }
-    //}}}
-
-    float* mSummedValues;
-    int mSummedFrame = -1;
-    int mMaxSummedX = 0;
-
-    bool mOn = false;
-    int mLens = 0;
-    };
-  //}}}
-  //{{{
-  class cSongTimeBox : public cBox {
-  public:
-    //{{{
-    cSongTimeBox (cAppWindow* window, float width, float height, cSong& song) :
-        cBox("frameSetTime", window, width, height), mSong(song) {
-
-      mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-        DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
-        &mTextFormat);
-      mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
-
-      mPin = true;
-      }
-    //}}}
-    //{{{
-    virtual ~cSongTimeBox() {
-      mTextFormat->Release();
-      }
-    //}}}
-
-    //{{{
-    bool onDown (bool right, cPoint pos)  {
-
-      auto appWindow = dynamic_cast<cAppWindow*>(mWindow);
-      appWindow->mPlaying = !appWindow->mPlaying;
-      return true;
-      }
-    //}}}
-    //{{{
-    void onDraw (ID2D1DeviceContext* dc) {
-
-      string str = getFrameStr (mSong.mPlayFrame) + " " + getFrameStr (mSong.mNumFrames);
-
-      IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (
-        wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-        mTextFormat, getWidth(), getHeight(), &textLayout);
-
-      dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
-      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-
-      textLayout->Release();
-      }
-    //}}}
-
-  private:
-    //{{{
-    string getFrameStr (uint32_t frame) {
-
-      uint32_t frameHs = (frame * mSong.mSamplesPerFrame) / (mSong.mSampleRate / 100);
-
-      uint32_t hs = frameHs % 100;
-
-      frameHs /= 100;
-      uint32_t secs = frameHs % 60;
-
-      frameHs /= 60;
-      uint32_t mins = frameHs % 60;
-
-      frameHs /= 60;
-      uint32_t hours = frameHs % 60;
-
-      string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
-      return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
-      }
-    //}}}
-
-    cSong& mSong;
-
-    IDWriteTextFormat* mTextFormat = nullptr;
-    };
-  //}}}
   //{{{
   class cAppFileListBox : public cFileListBox {
   public:
@@ -1645,17 +928,60 @@ private:
   };
 
 //{{{
+void avLogCallback (void* ptr, int level, const char* fmt, va_list vargs) {
+
+  char str[100];
+  vsnprintf (str, 100, fmt, vargs);
+
+  // trim trailing return
+  auto len = strlen (str);
+  if (len > 0)
+    str[len-1] = 0;
+
+  switch (level) {
+    case AV_LOG_PANIC:
+      cLog::log (LOGERROR,   "ffmpeg Panic - %s", str);
+      break;
+    case AV_LOG_FATAL:
+      cLog::log (LOGERROR,   "ffmpeg Fatal - %s ", str);
+      break;
+    case AV_LOG_ERROR:
+      cLog::log (LOGERROR,   "ffmpeg Error - %s ", str);
+      break;
+    case AV_LOG_WARNING:
+      cLog::log (LOGNOTICE,  "ffmpeg Warn  - %s ", str);
+      break;
+    case AV_LOG_INFO:
+      cLog::log (LOGINFO,    "ffmpeg Info  - %s ", str);
+      break;
+    case AV_LOG_VERBOSE:
+      cLog::log (LOGINFO,    "ffmpeg Verbo - %s ", str);
+      break;
+    case AV_LOG_DEBUG:
+      cLog::log (LOGINFO,    "ffmpeg Debug - %s ", str);
+      break;
+    case AV_LOG_TRACE:
+      cLog::log (LOGINFO,    "ffmpeg Trace - %s ", str);
+      break;
+    default :
+      cLog::log (LOGERROR,   "ffmpeg ????? - %s ", str);
+      break;
+    }
+  }
+//}}}
+
+//{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO, true);
-  //cLog::init (LOGINFO, false, "");
+  av_log_set_level (AV_LOG_VERBOSE);
+  av_log_set_callback (avLogCallback);
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
 
   cAppWindow appWindow;
-
   if (numArgs == 1) {
     //const string url = "http://stream.wqxr.org/wqxr.aac";
     const string url = "http://stream.wqxr.org/js-stream.aac";

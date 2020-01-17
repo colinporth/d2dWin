@@ -47,8 +47,6 @@
 
 #include "../common/cD2dWindow.h"
 
-#include "concurrent_vector.h"
-
 #include "../../shared/utils/cWinAudio32.h"
 
 #include "../common/cJpegImage.h"
@@ -70,7 +68,3 @@ extern "C" {
 
 #define CURL_STATICLIB
 #include "../../curl/include/curl/curl.h"
-
-//#define USE_SIMD
-#include "../../shared/kissFft/kiss_fft.h"
-#include "../../shared/kissFft/kiss_fftr.h"

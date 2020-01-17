@@ -177,6 +177,8 @@
     <ClInclude Include="..\boxes\cWindowBox.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cJpegImage.h" />
+    <ClInclude Include="cSong.h" />
+    <ClInclude Include="cSongBoxes.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
