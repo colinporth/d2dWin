@@ -60,7 +60,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="mp3Window.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="playWindow.cpp" />
   </ItemGroup>
 </Project>
