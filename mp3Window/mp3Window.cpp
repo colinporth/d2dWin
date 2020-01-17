@@ -292,8 +292,9 @@ private:
       mStreamSem.wait();
 
     // sampleRate for aac sbr wrong in header, fixup later
-    auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, mStreamSampleRate);
-    mSong.init ("stream", audioFrameType, audioFrameType == eAac ? 2048 : 1152, mStreamSampleRate);
+    int streamSampleRate;
+    auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, streamSampleRate);
+    mSong.init ("stream", audioFrameType, audioFrameType == eAac ? 2048 : 1152, streamSampleRate);
 
     auto codec = avcodec_find_decoder (mSong.mAudioFrameType == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
     auto context = avcodec_alloc_context3 (codec);
@@ -321,11 +322,9 @@ private:
                 //{{{  update mSamplesPerFrame
                 mSong.mSamplesPerFrame = avFrame->nb_samples;
                 //}}}
-              if (avFrame->sample_rate > mStreamSampleRate) {
+              if (avFrame->sample_rate != mSong.mSampleRate)
                 //{{{  update aac sbr sample rate
-                mStreamSampleRate = avFrame->sample_rate;
-                mSong.mSampleRate = mStreamSampleRate;
-                }
+                mSong.mSampleRate = avFrame->sample_rate;
                 //}}}
               //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
@@ -395,8 +394,9 @@ private:
       mStreamLast = mStreamFirst + GetFileSize (fileHandle, NULL);
 
       // sampleRate for aac sbr wrong in header, fixup later
-      auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, mStreamSampleRate);
-      mSong.init ("stream", audioFrameType, audioFrameType == eAac ? 2048 : 1152, mStreamSampleRate);
+      int streamSampleRate;
+      auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, streamSampleRate);
+      mSong.init ("stream", audioFrameType, audioFrameType == eAac ? 2048 : 1152, streamSampleRate);
       //{{{  replace jpeg if available
       auto temp = mSong.mImage;
       mSong.mImage = nullptr;
@@ -437,11 +437,9 @@ private:
                 //{{{  update mSamplesPerFrame
                 mSong.mSamplesPerFrame = avFrame->nb_samples;
                 //}}}
-              if (avFrame->sample_rate > mStreamSampleRate) {
+              if (avFrame->sample_rate > mSong.mSampleRate)
                 //{{{  update aac sbr sample rate
-                mStreamSampleRate = avFrame->sample_rate;
-                mSong.mSampleRate = mStreamSampleRate;
-                }
+                mSong.mSampleRate = avFrame->sample_rate;
                 //}}}
               //{{{  covert planar avFrame->data to interleaved int16_t samples
               switch (context->sample_fmt) {
@@ -605,8 +603,6 @@ private:
 
   uint8_t* mStreamFirst = nullptr;
   uint8_t* mStreamLast = nullptr;
-
-  int mStreamSampleRate = 0;
 
   cSemaphore mStreamSem;
 
