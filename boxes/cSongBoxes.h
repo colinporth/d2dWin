@@ -82,8 +82,8 @@ protected:
   void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
 
     leftFrame = (leftFrame < 0) ? 0 : leftFrame;
-    if (rightFrame > mSong.getNumLoadedFrames())
-      rightFrame = mSong.getNumLoadedFrames();
+    if (rightFrame > mSong.getNumParsedFrames())
+      rightFrame = mSong.getNumParsedFrames();
 
     // draw frames
     auto colour = mWindow->getBlueBrush();
@@ -235,9 +235,9 @@ private:
   //{{{
   void makeSummedWave() {
 
-    if (mSummedFrame != mSong.getNumLoadedFrames()) {
+    if (mSummedFrame != mSong.getNumParsedFrames()) {
       // frameSet changed, cache values summed to width, scaled to height
-      mSummedFrame = mSong.getNumLoadedFrames();
+      mSummedFrame = mSong.getNumParsedFrames();
 
       mSummedValues = (float*)realloc (mSummedValues, getWidthInt() * 2 * sizeof(float));
       auto summedValuesPtr = mSummedValues;
@@ -246,7 +246,7 @@ private:
       auto startFrame = 0;
       for (auto x = 0; x < getWidthInt(); x++) {
         int frame = x * mSong.mNumFrames / getWidthInt();
-        if (frame >= mSong.getNumLoadedFrames())
+        if (frame >= mSong.getNumParsedFrames())
           break;
 
         float lValue = mSong.mFrames[frame].mPowerValues[0];
@@ -290,7 +290,7 @@ private:
     auto summedValuesPtr = mSummedValues + (firstX * 2);
     for (auto x = firstX; x < lastX; x++) {
       float xr = xl + 1.f;
-      if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumLoadedFrames())) {
+      if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumParsedFrames())) {
         float leftValue = mSong.mFrames[mSong.mPlayFrame].mPowerValues[0] * valueScale;
         float rightValue = mSong.mFrames[mSong.mPlayFrame].mPowerValues[1] * valueScale;
         dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
@@ -427,7 +427,7 @@ public:
 
     // first and last known frames
     auto firstFrame = max (leftFrame, 0);
-    auto lastFrame = min (rightFrame, mSong.getNumLoadedFrames());
+    auto lastFrame = min (rightFrame, mSong.getNumParsedFrames());
 
     // bottom of first bitmapBuf column
     auto dstPtr = mBitmapBuf + ((mBitmapHeight-1) * mBitmapWidth);

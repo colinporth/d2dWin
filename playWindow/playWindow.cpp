@@ -308,10 +308,6 @@ private:
       auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, streamSampleRate);
       mSong.init ("stream", audioFrameType, audioFrameType == eAac ? 2048 : 1152, streamSampleRate);
       //{{{  replace jpeg if available
-      auto temp = mSong.mImage;
-      mSong.mImage = nullptr;
-      delete temp;
-
       int jpegLen = 0;
       auto jpegBuf = parseId3Tag (mStreamFirst, mStreamLast, jpegLen);
       if (jpegBuf) {
@@ -441,7 +437,7 @@ private:
     cWinAudio32 audio (mSong.mChannels, mSong.mSampleRate);
     mVolumeBox->setAudio (&audio);
 
-    while (!getExit() && !mChanged && (streaming || (mSong.mPlayFrame < mSong.getNumLoadedFrames())))
+    while (!getExit() && !mChanged && (streaming || (mSong.mPlayFrame < mSong.getNumParsedFrames()-1)))
       if (!mPlaying)
         audio.play (mSong.mChannels, nullptr, mSong.mSamplesPerFrame, 1.f);
       else {
