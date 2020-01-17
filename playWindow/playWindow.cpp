@@ -1,4 +1,4 @@
-// mp3Window.cpp
+// playWindow.cpp
 //{{{  includes
 #include "stdafx.h"
 
@@ -19,7 +19,7 @@ public:
   virtual ~cAppWindow() {}
 
   //{{{
-  void run (bool stream, const string& title, int width, int height, const string& name) {
+  void run (bool streaming, const string& title, int width, int height, const string& name) {
 
     initialise (title, width, height, false);
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
@@ -44,16 +44,15 @@ public:
     add (mVolumeBox, -12.f,0.f);
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
-    if (stream) {
-      // allocate stream
+    if (streaming) {
+      // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-
       thread ([=]() { httpThread (name.c_str()); }).detach();
-      thread ([=]() { analyseThread (true); }).detach();
       }
-    else if (!mFileList->empty())
-      thread ([=](){ analyseThread (false); }).detach();
+
+    if (streaming || !mFileList->empty())
+      thread ([=](){ analyseThread (streaming); }).detach();
 
     // loop till quit
     messagePump();
@@ -565,8 +564,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
     //}}}
     const string url = "http://stream.wqxr.org/js-stream.aac";
-    cLog::log (LOGNOTICE, "mp3Window stream " + url);
-    appWindow.run (true, "mp3Window " + url, 800, 800, url);
+    cLog::log (LOGNOTICE, "playWindow stream " + url);
+    appWindow.run (true, "playWindow " + url, 800, 800, url);
     }
   else {
     wstring wstr (args[1]);
@@ -577,8 +576,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     #pragma warning(pop)
 
     //string fileName = "C:/Users/colin/Music/Elton John";
-    cLog::log (LOGNOTICE, "mp3Window - " + fileName);
-    appWindow.run (false, "mp3Window", 800, 800, fileName);
+    cLog::log (LOGNOTICE, "playWindow - " + fileName);
+    appWindow.run (false, "playWindow", 800, 800, fileName);
     }
 
   CoUninitialize();
