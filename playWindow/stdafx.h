@@ -50,7 +50,6 @@
 #include "../../shared/utils/cWinAudio32.h"
 
 #include "../common/cJpegImage.h"
-#include "../common/cJpegImageView.h"
 
 #include "../boxes/cLogBox.h"
 #include "../boxes/cWindowBox.h"
@@ -60,6 +59,7 @@
 #include "../boxes/cIntBox.h"
 #include "../boxes/cFloatBox.h"
 #include "../boxes/cTitleBox.h"
+#include "../common/cJpegImageView.h"
 
 extern "C" {
   #include <libavcodec/avcodec.h>

@@ -2,39 +2,11 @@
 #pragma once
 
 #include <windows.h>
-#include <d3d11.h>
-#include <d3d11_1.h>
 #include <d2d1.h>
-#include <d2d1_1.h>
-#include <d2d1helper.h>
-#include <DXGI1_2.h>
 #include <dwrite.h>
 
 #include "../../shared/utils/cSong.h"
 
-//{{{
-class cSongFreqBox : public cD2dWindow::cBox {
-public:
-  cSongFreqBox (cD2dWindow* window, float width, float height, cSong& song) :
-      cBox ("songWaveBox", window, width, height), mSong(song) {
-    mPin = true;
-    }
-  virtual ~cSongFreqBox() {}
-
-  void onDraw (ID2D1DeviceContext* dc) {
-    auto frame = mSong.getPlayFrame();
-    if (frame > 0) {
-      float* freq = (mSong.mFrames[frame].mFreqValues);
-      for (int i = 0; (i < getWidth()) && (i < mSong.getMaxFreq()); i++)
-        dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - ((freq[i] / mSong.mMaxFreqValue) * getHeight()),
-                                  mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
-      }
-    }
-
-protected:
-  cSong& mSong;
-  };
-//}}}
 //{{{
 class cSongWaveBox : public cD2dWindow::cBox {
 public:
@@ -57,7 +29,7 @@ public:
 
     if (getShow()) {
       mZoom -= delta/120;
-      mZoom = min (max(mZoom, 1), 2 * (1 + mSong.mNumFrames / getWidthInt()));
+      mZoom = std::min (std::max(mZoom, 1), 2 * (1 + mSong.mNumFrames / getWidthInt()));
       return true;
       }
 
@@ -98,14 +70,14 @@ protected:
       if (mSong.mFrames[frame].hasTitle()) {
         dc->FillRectangle (cRect (xl, yCentre-(getHeight()/2.f), xr+2.f, yCentre+(getHeight()/2.f)), mWindow->getYellowBrush());
 
-        string str = mSong.mFrames[frame].mTitle;
+        std::string str = mSong.mFrames[frame].mTitle;
         IDWriteTextLayout* textLayout;
-        mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+        mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
                                                       mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
         if (textLayout) {
           dc->DrawTextLayout (cPoint (xl, getTL().y-20.f), textLayout, mWindow->getWhiteBrush());
           textLayout->Release();
-          }         
+          }
         }
 
       if (mSong.mFrames[frame].isSilent()) {
@@ -320,76 +292,35 @@ private:
   int mLens = 0;
   };
 //}}}
+
 //{{{
-class cSongTimeCodeBox : public cD2dWindow::cBox {
+class cSongFreqBox : public cD2dWindow::cBox {
 public:
-  //{{{
-  cSongTimeCodeBox (cD2dWindow* window, float width, float height, cSong& song) :
-      cBox("songTimeBox", window, width, height), mSong(song) {
-
-    mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
-      &mTextFormat);
-    mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
-
+  cSongFreqBox (cD2dWindow* window, float width, float height, cSong& song) :
+      cBox ("songWaveBox", window, width, height), mSong(song) {
     mPin = true;
     }
-  //}}}
-  //{{{
-  virtual ~cSongTimeCodeBox() {
-    mTextFormat->Release();
-    }
-  //}}}
+  virtual ~cSongFreqBox() {}
 
-  //{{{
   void onDraw (ID2D1DeviceContext* dc) {
-
-    std::string str = getFrameStr (mSong.mPlayFrame) + " " + getFrameStr (mSong.mNumFrames);
-
-    IDWriteTextLayout* textLayout;
-    mWindow->getDwriteFactory()->CreateTextLayout (
-      wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-      mTextFormat, getWidth(), getHeight(), &textLayout);
-    if (textLayout) {
-      dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
-      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-      } 
-    textLayout->Release();
+    auto frame = mSong.getPlayFrame();
+    if (frame > 0) {
+      float* freq = (mSong.mFrames[frame].mFreqValues);
+      for (int i = 0; (i < getWidth()) && (i < mSong.getMaxFreq()); i++)
+        dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - ((freq[i] / mSong.mMaxFreqValue) * getHeight()),
+                                  mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
+      }
     }
-  //}}}
 
-private:
-  //{{{
-  std::string getFrameStr (uint32_t frame) {
-
-    uint32_t frameHs = (frame * mSong.mSamplesPerFrame) / (mSong.mSampleRate / 100);
-
-    uint32_t hs = frameHs % 100;
-
-    frameHs /= 100;
-    uint32_t secs = frameHs % 60;
-
-    frameHs /= 60;
-    uint32_t mins = frameHs % 60;
-
-    frameHs /= 60;
-    uint32_t hours = frameHs % 60;
-
-    std::string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
-    return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
-    }
-  //}}}
-
+protected:
   cSong& mSong;
-
-  IDWriteTextFormat* mTextFormat = nullptr;
   };
 //}}}
 //{{{
-class cSongSpectrumBox : public cD2dWindow::cBox {
+class cSongSpecBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cSongSpectrumBox (cD2dWindow* window, float width, float height, cSong& song) :
+  cSongSpecBox (cD2dWindow* window, float width, float height, cSong& song) :
       cBox("songSpectrumBox", window, width, height), mSong(song) {
 
     mPin = true;
@@ -397,7 +328,7 @@ public:
     }
   //}}}
   //{{{
-  virtual ~cSongSpectrumBox() {
+  virtual ~cSongSpecBox() {
     if (mBitmap)
       mBitmap->Release();
     free (mBitmapBuf);
@@ -426,8 +357,8 @@ public:
     auto rightFrame = mSong.mPlayFrame + (getWidthInt()/2);
 
     // first and last known frames
-    auto firstFrame = max (leftFrame, 0);
-    auto lastFrame = min (rightFrame, mSong.getNumParsedFrames());
+    auto firstFrame = std::max (leftFrame, 0);
+    auto lastFrame = std::min (rightFrame, mSong.getNumParsedFrames());
 
     // bottom of first bitmapBuf column
     auto dstPtr = mBitmapBuf + ((mBitmapHeight-1) * mBitmapWidth);
@@ -462,10 +393,72 @@ private:
 
   int mBitmapWidth = 0;
   int mBitmapHeight = 0;
-
   uint8_t* mBitmapBuf = nullptr;
   ID2D1Bitmap* mBitmap = nullptr;
 
-  D2D1::Matrix3x2F mTransform = D2D1::Matrix3x2F::Identity();
+  //D2D1::Matrix3x2F mTransform = D2D1::Matrix3x2F::Identity();
+  };
+//}}}
+
+//{{{
+class cSongTimeBox : public cD2dWindow::cBox {
+public:
+  //{{{
+  cSongTimeBox (cD2dWindow* window, float width, float height, cSong& song) :
+      cBox("songTimeBox", window, width, height), mSong(song) {
+
+    mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
+      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
+      &mTextFormat);
+    mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+
+    mPin = true;
+    }
+  //}}}
+  //{{{
+  virtual ~cSongTimeBox() {
+    mTextFormat->Release();
+    }
+  //}}}
+
+  void onDraw (ID2D1DeviceContext* dc) {
+    std::string str = getFrameStr (mSong.mPlayFrame) + " " + getFrameStr (mSong.mNumFrames);
+
+    IDWriteTextLayout* textLayout;
+    mWindow->getDwriteFactory()->CreateTextLayout (
+      std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+      mTextFormat, getWidth(), getHeight(), &textLayout);
+    if (textLayout) {
+      dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+      }
+    textLayout->Release();
+    }
+
+private:
+  //{{{
+  std::string getFrameStr (uint32_t frame) {
+
+    uint32_t frameHs = (frame * mSong.mSamplesPerFrame) / (mSong.mSampleRate / 100);
+
+    uint32_t hs = frameHs % 100;
+
+    frameHs /= 100;
+    uint32_t secs = frameHs % 60;
+
+    frameHs /= 60;
+    uint32_t mins = frameHs % 60;
+
+    frameHs /= 60;
+    uint32_t hours = frameHs % 60;
+
+    std::string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
+    return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
+    }
+  //}}}
+
+  cSong& mSong;
+
+  IDWriteTextFormat* mTextFormat = nullptr;
   };
 //}}}

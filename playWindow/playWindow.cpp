@@ -2,11 +2,12 @@
 //{{{  includes
 #include "stdafx.h"
 
+// should be in stdafx.h
 #include "../../shared/utils/cFileList.h"
-#include "../../shared/utils/cSong.h"
-#include "../../shared/decoders/audioParser.h"
-
 #include "../boxes/cFileListBox.h"
+
+#include "../../shared/decoders/audioParser.h"
+#include "../../shared/utils/cSong.h"
 #include "../boxes/cSongBoxes.h"
 
 using namespace std;
@@ -22,6 +23,7 @@ public:
   void run (bool streaming, const string& title, int width, int height, const string& name) {
 
     initialise (title, width, height, false);
+
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -135.f,35.f);
 
@@ -31,10 +33,10 @@ public:
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
     add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
-    add (new cSongSpectrumBox (this, 0,300.f, mSong), 0,-540.f);
+    add (new cSongSpecBox (this, 0,300.f, mSong), 0,-540.f);
     add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
-    add (new cSongTimeCodeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
+    add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
 
     mFileList = new cFileList (name, "*.aac;*.mp3");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -42,6 +44,8 @@ public:
 
     mVolumeBox = new cVolumeBox (this, 12.f,0.f, nullptr);
     add (mVolumeBox, -12.f,0.f);
+
+    // last box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (streaming) {
@@ -307,7 +311,7 @@ private:
       int streamSampleRate;
       auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, streamSampleRate);
       mSong.init ("stream", audioFrameType, audioFrameType == eAac ? 2048 : 1152, streamSampleRate);
-      //{{{  replace jpeg if available
+      //{{{  addd jpeg if available
       int jpegLen = 0;
       auto jpegBuf = parseId3Tag (mStreamFirst, mStreamLast, jpegLen);
       if (jpegBuf) {
@@ -349,8 +353,7 @@ private:
                   //}}}
                 //{{{  covert planar avFrame->data to interleaved int16_t samples
                 switch (context->sample_fmt) {
-                  case AV_SAMPLE_FMT_S16P:
-                    // 16bit signed planar, copy planar to interleaved
+                  case AV_SAMPLE_FMT_S16P: // 16bit signed planar
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
                       auto srcPtr = (int16_t*)avFrame->data[channel];
                       auto dstPtr = (float*)(samples) + channel;
@@ -361,8 +364,7 @@ private:
                       }
                     break;
 
-                  case AV_SAMPLE_FMT_FLTP:
-                    // 32bit float planar, copy planar to interleaved
+                  case AV_SAMPLE_FMT_FLTP: // 32bit float planar
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
                       auto srcPtr = (float*)avFrame->data[channel];
                       auto dstPtr = (float*)(samples) + channel;
@@ -455,8 +457,7 @@ private:
               if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
                 //{{{  covert planar avFrame->data to interleaved int16_t samples
                 switch (context->sample_fmt) {
-                  case AV_SAMPLE_FMT_S16P:
-                    // 16bit signed planar, copy planar to interleaved
+                  case AV_SAMPLE_FMT_S16P: // 16bit signed planar
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
                       auto srcPtr = (int16_t*)avFrame->data[channel];
                       auto dstPtr = (float*)(samples) + channel;
@@ -467,8 +468,7 @@ private:
                       }
                     break;
 
-                  case AV_SAMPLE_FMT_FLTP:
-                    // 32bit float planar, copy planar to interleaved
+                  case AV_SAMPLE_FMT_FLTP: // 32bit float planar
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
                       auto srcPtr = (float*)avFrame->data[channel];
                       auto dstPtr = (float*)(samples) + channel;
@@ -573,7 +573,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
     //string fileName = "C:/Users/colin/Music/Elton John";
     cLog::log (LOGNOTICE, "playWindow - " + fileName);
-    appWindow.run (false, "playWindow", 800, 800, fileName);
+    appWindow.run (false, "playWindow" + fileName, 800, 800, fileName);
     }
 
   CoUninitialize();

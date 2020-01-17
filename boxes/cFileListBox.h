@@ -192,7 +192,7 @@ private:
   const float kMinLineHeight = 16.f;
   const float kMaxLineHeight = 24.f;
 
-  float getLineHeight() { return min (max (getHeight() / mFileList->size(), kMinLineHeight), kMaxLineHeight); }
+  float getLineHeight() { return std::min (std::max (getHeight() / mFileList->size(), kMinLineHeight), kMaxLineHeight); }
   //{{{
   void incScroll (float inc) {
 
