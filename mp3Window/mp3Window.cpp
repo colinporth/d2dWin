@@ -512,7 +512,7 @@ private:
     }
   //}}}
 
-  const int kPlayFrameThreshold = 10; // about a half second analyse before play
+  const int kPlayFrameThreshold = 10; // 10 frames analyse before play, about half second
   //{{{  vars
   cFileList* mFileList;
 
