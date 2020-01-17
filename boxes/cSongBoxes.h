@@ -9,7 +9,8 @@
 #include <d2d1helper.h>
 #include <DXGI1_2.h>
 #include <dwrite.h>
-#include "cSong.h"
+
+#include "../../shared/utils/cSong.h"
 
 //{{{
 class cSongFreqBox : public cD2dWindow::cBox {

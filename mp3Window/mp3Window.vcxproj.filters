@@ -52,10 +52,13 @@
     <ClInclude Include="..\..\shared\utils\cWinAudio32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cSong.h">
+    <ClInclude Include="..\boxes\cSongBoxes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cSongBoxes.h">
+    <ClInclude Include="..\..\shared\utils\cSong.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\audioParser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
