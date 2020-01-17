@@ -33,10 +33,11 @@ public:
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (wstr.data(), (uint32_t)wstr.size(), mTextFormat,
                                                    getWidth(), getHeight(), &textLayout);
-
-    dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
-    dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-    textLayout->Release();
+    if (textLayout) {
+      dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+      textLayout->Release();
+      }
     }
   //{{{
   void onResize (ID2D1DeviceContext* dc) {

@@ -237,11 +237,12 @@ public:
       mWindow->getDwriteFactory()->CreateTextLayout (
         strToWstr(str).data(), (uint32_t)str.size(),
         mWindow->getTextFormat(), r.getWidth(), r.getHeight(), &textLayout);
-
-      dc->DrawTextLayout (r.getTL(2.f), textLayout, mWindow->getBlackBrush());
-      dc->DrawTextLayout (r.getTL(), textLayout, mWindow->getWhiteBrush());
-      textLayout->Release();
-
+      if (textLayout) {
+        dc->DrawTextLayout (r.getTL(2.f), textLayout, mWindow->getBlackBrush());
+        dc->DrawTextLayout (r.getTL(), textLayout, mWindow->getWhiteBrush());
+        textLayout->Release();
+        }
+ 
       r.top = r.bottom;
       r.bottom += kLineHeight;
       }

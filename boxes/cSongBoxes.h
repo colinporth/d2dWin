@@ -101,9 +101,11 @@ protected:
         string str = mSong.mFrames[frame].mTitle;
         IDWriteTextLayout* textLayout;
         mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-                                                       mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-        dc->DrawTextLayout (cPoint (xl, getTL().y-20.f), textLayout, mWindow->getWhiteBrush());
-        textLayout->Release();
+                                                      mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+        if (textLayout) {
+          dc->DrawTextLayout (cPoint (xl, getTL().y-20.f), textLayout, mWindow->getWhiteBrush());
+          textLayout->Release();
+          }         
         }
 
       if (mSong.mFrames[frame].isSilent()) {
@@ -348,10 +350,10 @@ public:
     mWindow->getDwriteFactory()->CreateTextLayout (
       wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
       mTextFormat, getWidth(), getHeight(), &textLayout);
-
-    dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
-    dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-
+    if (textLayout) {
+      dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+      } 
     textLayout->Release();
     }
   //}}}

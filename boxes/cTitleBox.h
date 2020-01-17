@@ -18,9 +18,11 @@ public:
     mWindow->getDwriteFactory()->CreateTextLayout (
       std::wstring (mTitle.begin(), mTitle.end()).data(), (uint32_t)mTitle.size(), mWindow->getTextFormat(),
                mWindow->getSize().x, mWindow->getSize().y, &textLayout);
-    dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
-    dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-    textLayout->Release();
+    if (textLayout) {
+      dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+      textLayout->Release();
+      } 
     }
   //}}}
 

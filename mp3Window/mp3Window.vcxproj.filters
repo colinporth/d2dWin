@@ -43,9 +43,6 @@
     <ClInclude Include="..\..\shared\kissFft\kiss_fft.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\kissFft\kiss_fft_guts.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\kissFft\kiss_fftr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -65,7 +62,5 @@
   <ItemGroup>
     <ClCompile Include="mp3Window.cpp" />
     <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="..\..\shared\kissFft\kiss_fft.c" />
-    <ClCompile Include="..\..\shared\kissFft\kiss_fftr.c" />
   </ItemGroup>
 </Project>

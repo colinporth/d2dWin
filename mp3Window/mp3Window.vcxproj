@@ -166,7 +166,6 @@
     <ClInclude Include="..\..\shared\decoders\audioParser.h" />
     <ClInclude Include="..\..\shared\kissFft\kiss_fft.h" />
     <ClInclude Include="..\..\shared\kissFft\kiss_fftr.h" />
-    <ClInclude Include="..\..\shared\kissFft\kiss_fft_guts.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
     <ClInclude Include="..\..\shared\utils\cSong.h" />
@@ -183,8 +182,6 @@
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\shared\kissFft\kiss_fft.c" />
-    <ClCompile Include="..\..\shared\kissFft\kiss_fftr.c" />
     <ClCompile Include="mp3Window.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
