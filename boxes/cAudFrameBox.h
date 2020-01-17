@@ -158,17 +158,19 @@ private:
   //{{{
   void drawChanBar (ID2D1DeviceContext* dc, cRect& r, bool selected, float value) {
 
-    r.top = r.bottom - (value * getHeight());
+    r.top = r.bottom - (value * getHeight() * kVolScale);
     selected ? dc->FillRectangle (r, mWindow->getGreenBrush()) : dc->DrawRectangle (r, mWindow->getGreenBrush());
     }
   //}}}
   //{{{
   void drawWooferBar (ID2D1DeviceContext* dc, cRect& r, bool selected, float value) {
 
-    r.top = r.bottom - (value * getHeight());
+    r.top = r.bottom - (value * getHeight() * kVolScale);
     dc->FillRectangle (r, selected ? mBrush : mWindow->getGreyBrush());
     }
   //}}}
+
+  const float kVolScale = 2.f; // arbitary power to height scale
 
   cAudFrame*& mAudFrame;
   iAudio* mAudio;

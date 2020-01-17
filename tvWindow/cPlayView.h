@@ -473,7 +473,7 @@ private:
                         *dstPtr = value;
                         dstPtr += avFrame->channels;
                         }
-                      frame->mPower[channel] = sqrtf (power) / avFrame->nb_samples;
+                      frame->mPower[channel] = sqrtf (power / avFrame->nb_samples);
                       }
                     break;
 
@@ -488,7 +488,7 @@ private:
                         *dstPtr = *srcPtr++;
                         dstPtr += avFrame->channels;
                         }
-                      frame->mPower[channel] = sqrtf (power) / avFrame->nb_samples;
+                      frame->mPower[channel] = sqrtf (power / avFrame->nb_samples);
                       }
                     break;
 
