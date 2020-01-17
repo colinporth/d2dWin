@@ -13,12 +13,12 @@
 
 #include "cPlayView.h"
 //}}}
-const string kTvRoot = "/tv";
+const std::string kTvRoot = "/tv";
 
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (string title, int width, int height, const string& rootOrFrequency) {
+  void run (std::string title, int width, int height, const std::string& rootOrFrequency) {
 
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
@@ -27,14 +27,14 @@ public:
     int frequency = atoi (rootOrFrequency.c_str());
     if (frequency) {
       mDvb = new cDvb (frequency * 1000, kTvRoot, false);
-      thread ([=]() {
+      std::thread ([=]() {
         //{{{  grabthread
         CoInitializeEx (NULL, COINIT_MULTITHREADED);
         mDvb->grabThread();
         CoUninitialize();
         //}}}
         }).detach();
-      thread ([=]() {
+        std::thread ([=]() {
         //{{{  signalThread
         CoInitializeEx (NULL, COINIT_MULTITHREADED);
         mDvb->signalThread();
@@ -45,7 +45,7 @@ public:
 
     // fileList
     mFileList = new cFileList (frequency || rootOrFrequency.empty() ? kTvRoot : rootOrFrequency, "*.ts");
-    thread([=]() { mFileList->watchThread(); }).detach();
+    std::thread([=]() { mFileList->watchThread(); }).detach();
     auto boxWidth = frequency ? 480.f : 0.f;
     add (new cAppFileListBox (this, -boxWidth,0.f, mFileList), frequency ? boxWidth : 0.f, 0.f);
 
@@ -137,13 +137,13 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
 
-  string rootOrFrequency;
+  std::string rootOrFrequency;
   if (numArgs > 1) {
     // get fileName from commandLine
-    const wstring wstr (args[1]);
+    const std::wstring wstr (args[1]);
     #pragma warning(push)
       #pragma warning(disable: 4244)
-      rootOrFrequency = string (wstr.begin(), wstr.end());
+      rootOrFrequency = std::string (wstr.begin(), wstr.end());
     #pragma warning(pop)
     }
 

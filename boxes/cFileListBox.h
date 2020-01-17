@@ -15,7 +15,7 @@ public:
   //{{{
   bool pick (bool inClient, cPoint pos, bool& change) {
 
-    lock_guard<mutex> lockGuard (mMutex);
+    std::lock_guard<std::mutex> lockGuard (mMutex);
 
     bool lastPick = mPick;
     mPick = inClient && mBgndRect.inside (pos);
@@ -29,7 +29,7 @@ public:
   bool onProx (bool inClient, cPoint pos) {
 
     if (mWindow->getTimedMenuOn()) {
-      lock_guard<mutex> lockGuard (mMutex);
+      std::lock_guard<std::mutex> lockGuard (mMutex);
       unsigned rowIndex = 0;
       for (auto& row : mRowVec) {
         if (row.mRect.inside (pos)) {
@@ -132,7 +132,7 @@ public:
       float maxColumnWidth[cFileItem::kFields] = { 0.f };
 
       // layout visible rows
-      lock_guard<mutex> lockGuard (mMutex);
+      std::lock_guard<std::mutex> lockGuard (mMutex);
       mRowVec.clear();
       auto index = mFirstRowIndex;
       auto point = cPoint (0.f, 1.f - (mScroll - (mFirstRowIndex * mLineHeight)));
@@ -143,11 +143,11 @@ public:
         for (auto field = 0u; field < cFileItem::kFields; field++) {
           auto str = fileItem.getFieldString (field);
           mWindow->getDwriteFactory()->CreateTextLayout (
-            wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
+            std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
             mRect.getWidth(), mLineHeight, &row.mTextLayout[field]);
           row.mTextLayout[field]->SetFontSize (textHeight, {0, (uint32_t)str.size()});
           row.mTextLayout[field]->GetMetrics (&row.mTextMetrics[field]);
-          maxColumnWidth[field] = max (row.mTextMetrics[field].width, maxColumnWidth[field]);
+          maxColumnWidth[field] = std::max (row.mTextMetrics[field].width, maxColumnWidth[field]);
           }
         row.mRect = cRect(point, point + cPoint(row.mTextMetrics[0].width, mLineHeight));
         row.mBrush = (mProxed && !mMoved && (index == mProxIndex)) ?
@@ -211,7 +211,7 @@ private:
   // vars
   cFileList* mFileList;
 
-  mutex mMutex; // guard mRowVec - pick,prox,down against draw
+  std::mutex mMutex; // guard mRowVec - pick,prox,down against draw
   //{{{
   class cRow {
   public:
