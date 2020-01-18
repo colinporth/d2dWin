@@ -62,5 +62,6 @@
   <ItemGroup>
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="playWindow.cpp" />
+    <ClCompile Include="WASAPIRenderer.cpp" />
   </ItemGroup>
 </Project>

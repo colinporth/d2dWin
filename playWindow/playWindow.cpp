@@ -10,7 +10,130 @@
 #include "../../shared/utils/cSong.h"
 #include "../boxes/cSongBoxes.h"
 
+#include "WASAPIRenderer.h"
+
 using namespace std;
+//}}}
+
+#include <functiondiscoverykeys.h>
+RenderBuffer* renderQueue = NULL;
+bool UseConsoleDevice;
+bool UseCommunicationsDevice;
+bool UseMultimediaDevice;
+wchar_t* OutputEndpoint;
+//{{{
+template <class T> void SafeRelease(T **ppT) {
+  if (*ppT) {
+    (*ppT)->Release();
+    *ppT = NULL;
+    }
+  }
+//}}}
+//{{{
+LPWSTR GetDeviceName (IMMDeviceCollection *DeviceCollection, UINT DeviceIndex) {
+
+  IMMDevice* device;
+  LPWSTR deviceId;
+  HRESULT hr = DeviceCollection->Item (DeviceIndex, &device);
+  if (FAILED (hr)) {
+    //{{{
+    printf("Unable to get device %d: %x\n", DeviceIndex, hr);
+    return NULL;
+    }
+    //}}}
+
+  hr = device->GetId (&deviceId);
+  if (FAILED (hr)) {
+    //{{{
+    printf("Unable to get device %d id: %x\n", DeviceIndex, hr);
+    return NULL;
+    }
+    //}}}
+
+  IPropertyStore* propertyStore;
+  hr = device->OpenPropertyStore (STGM_READ, &propertyStore);
+  SafeRelease (&device);
+  if (FAILED (hr)) {
+    //{{{
+    printf("Unable to open device %d property store: %x\n", DeviceIndex, hr);
+    return NULL;
+    }
+    //}}}
+
+  PROPVARIANT friendlyName;
+  PropVariantInit (&friendlyName);
+  hr = propertyStore->GetValue (PKEY_Device_FriendlyName, &friendlyName);
+  SafeRelease (&propertyStore);
+
+  if (FAILED (hr)) {
+    //{{{
+    printf("Unable to retrieve friendly name for device %d : %x\n", DeviceIndex, hr);
+    return NULL;
+    }
+    //}}}
+
+  wchar_t deviceName[128];
+  //hr = StringCbPrintf (deviceName, sizeof(deviceName), "%s (%s)", friendlyName.vt != VT_LPWSTR ? "Unknown" : friendlyName.pwszVal, deviceId);
+  //if (FAILED (hr)) {
+    //{{{
+    //printf("Unable to format friendly name for device %d : %x\n", DeviceIndex, hr);
+    //return NULL;
+    // }
+    //}}}
+
+  PropVariantClear (&friendlyName);
+  CoTaskMemFree (deviceId);
+
+  wchar_t* returnValue = _wcsdup (deviceName);
+  if (returnValue == NULL) {
+    //{{{
+    printf ("Unable to allocate buffer for return\n");
+    return NULL;
+    }
+    //}}}
+
+  return returnValue;
+  }
+//}}}
+//{{{
+bool PickDevice (IMMDevice** DeviceToUse, bool* IsDefaultDevice, ERole* DefaultDeviceRole) {
+
+  HRESULT hr;
+  bool retValue = true;
+  IMMDeviceEnumerator *deviceEnumerator = NULL;
+  IMMDeviceCollection *deviceCollection = NULL;
+
+  *IsDefaultDevice = false;   // Assume we're not using the default device.
+
+  hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&deviceEnumerator));
+  if (FAILED(hr)) {
+    printf("Unable to instantiate device enumerator: %x\n", hr);
+    retValue = false;
+    goto Exit;
+    }
+
+  IMMDevice* device = NULL;
+  ERole deviceRole = eConsole;
+  deviceRole = eConsole;
+  //deviceRole = eCommunications;
+  //deviceRole = eMultimedia;
+  hr = deviceEnumerator->GetDefaultAudioEndpoint (eRender, deviceRole, &device);
+   if (FAILED(hr)) {
+    printf ("Unable to get default device for role %d: %x\n", deviceRole, hr);
+    retValue = false;
+    goto Exit;
+    }
+
+  *IsDefaultDevice = true;
+  *DefaultDeviceRole = deviceRole;
+  *DeviceToUse = device;
+  retValue = true;
+
+Exit:
+  SafeRelease (&deviceCollection);
+  SafeRelease (&deviceEnumerator);
+  return retValue;
+  }
 //}}}
 
 // main cAppWindow
@@ -540,6 +663,7 @@ private:
 // main
 //{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
 
   cLog::init (LOGINFO, true);
@@ -548,6 +672,41 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
+
+  int TargetLatency = 30;
+  int TargetFrequency = 880;
+  int TargetDurationInSec = 2;
+  IMMDevice* device = NULL;
+  bool isDefaultDevice;
+  ERole role;
+  if (PickDevice (&device, &isDefaultDevice, &role)) {
+    CWASAPIRenderer* renderer = new (std::nothrow) CWASAPIRenderer (device, isDefaultDevice, role);
+    if (renderer) {
+      if (renderer->Initialize (TargetLatency)) {
+        UINT32 renderBufferSizeInBytes = (renderer->BufferSizePerPeriod()  * renderer->getFrameSize());
+        size_t renderDataLength = (renderer->getSamplesPerSecond() * TargetDurationInSec * renderer->getFrameSize()) + (renderBufferSizeInBytes-1);
+        size_t renderBufferCount = renderDataLength / (renderBufferSizeInBytes);
+        RenderBuffer* renderBuffer = new (std::nothrow) RenderBuffer();
+        if (renderBuffer == NULL) {
+         //{{{  exit
+         printf("Unable to allocate render buffer\n");
+         return -1;
+         }
+         //}}}
+        renderBuffer->_BufferLength = renderBufferSizeInBytes;
+        renderBuffer->_Buffer = new BYTE[renderBufferSizeInBytes];
+        if (renderBuffer->_Buffer == NULL) {
+          //{{{  exit
+          printf("Unable to allocate render buffer\n");
+          return -1;
+          }
+          //}}}
+
+        if (renderer->Start (renderQueue)) {
+          }
+        }
+      }
+    }
 
   cAppWindow appWindow;
   if (numArgs == 1) {
@@ -575,6 +734,12 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     cLog::log (LOGNOTICE, "playWindow - " + fileName);
     appWindow.run (false, "playWindow" + fileName, 800, 800, fileName);
     }
+
+  //if (renderer) {
+  //  renderer->Stop();
+  //  renderer->Shutdown();
+  //  }
+  //SafeRelease (&renderer);
 
   CoUninitialize();
   }
