@@ -33,19 +33,19 @@ template <class T> void SafeRelease(T **ppT) {
 LPWSTR GetDeviceName (IMMDeviceCollection *DeviceCollection, UINT DeviceIndex) {
 
   IMMDevice* device;
-  LPWSTR deviceId;
   HRESULT hr = DeviceCollection->Item (DeviceIndex, &device);
   if (FAILED (hr)) {
     //{{{
-    printf("Unable to get device %d: %x\n", DeviceIndex, hr);
+    cLog::log (LOGINFO,"Unable to get device %d: %x\n", DeviceIndex, hr);
     return NULL;
     }
     //}}}
 
+  LPWSTR deviceId;
   hr = device->GetId (&deviceId);
   if (FAILED (hr)) {
     //{{{
-    printf("Unable to get device %d id: %x\n", DeviceIndex, hr);
+    cLog::log (LOGINFO,"Unable to get device %d id: %x\n", DeviceIndex, hr);
     return NULL;
     }
     //}}}
@@ -55,7 +55,7 @@ LPWSTR GetDeviceName (IMMDeviceCollection *DeviceCollection, UINT DeviceIndex) {
   SafeRelease (&device);
   if (FAILED (hr)) {
     //{{{
-    printf("Unable to open device %d property store: %x\n", DeviceIndex, hr);
+    cLog::log (LOGINFO,"Unable to open device %d property store: %x\n", DeviceIndex, hr);
     return NULL;
     }
     //}}}
@@ -67,16 +67,16 @@ LPWSTR GetDeviceName (IMMDeviceCollection *DeviceCollection, UINT DeviceIndex) {
 
   if (FAILED (hr)) {
     //{{{
-    printf("Unable to retrieve friendly name for device %d : %x\n", DeviceIndex, hr);
+    cLog::log (LOGINFO,"Unable to retrieve friendly name for device %d : %x\n", DeviceIndex, hr);
     return NULL;
     }
     //}}}
 
   wchar_t deviceName[128];
-  //hr = StringCbPrintf (deviceName, sizeof(deviceName), "%s (%s)", friendlyName.vt != VT_LPWSTR ? "Unknown" : friendlyName.pwszVal, deviceId);
+  //hr = StringCbprintf (deviceName, sizeof(deviceName), "%s (%s)", friendlyName.vt != VT_LPWSTR ? "Unknown" : friendlyName.pwszVal, deviceId);
   //if (FAILED (hr)) {
     //{{{
-    //printf("Unable to format friendly name for device %d : %x\n", DeviceIndex, hr);
+    //cLog::log (LOGINFO,"Unable to format friendly name for device %d : %x\n", DeviceIndex, hr);
     //return NULL;
     // }
     //}}}
@@ -87,7 +87,7 @@ LPWSTR GetDeviceName (IMMDeviceCollection *DeviceCollection, UINT DeviceIndex) {
   wchar_t* returnValue = _wcsdup (deviceName);
   if (returnValue == NULL) {
     //{{{
-    printf ("Unable to allocate buffer for return\n");
+    cLog::log (LOGINFO,"Unable to allocate buffer for return\n");
     return NULL;
     }
     //}}}
@@ -99,15 +99,16 @@ LPWSTR GetDeviceName (IMMDeviceCollection *DeviceCollection, UINT DeviceIndex) {
 bool PickDevice (IMMDevice** DeviceToUse, bool* IsDefaultDevice, ERole* DefaultDeviceRole) {
 
   HRESULT hr;
+
   bool retValue = true;
   IMMDeviceEnumerator *deviceEnumerator = NULL;
   IMMDeviceCollection *deviceCollection = NULL;
 
   *IsDefaultDevice = false;   // Assume we're not using the default device.
 
-  hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&deviceEnumerator));
+  hr = CoCreateInstance (__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&deviceEnumerator));
   if (FAILED(hr)) {
-    printf("Unable to instantiate device enumerator: %x\n", hr);
+    cLog::log (LOGINFO, "Unable to instantiate device enumerator: %x\n", hr);
     retValue = false;
     goto Exit;
     }
@@ -119,7 +120,7 @@ bool PickDevice (IMMDevice** DeviceToUse, bool* IsDefaultDevice, ERole* DefaultD
   //deviceRole = eMultimedia;
   hr = deviceEnumerator->GetDefaultAudioEndpoint (eRender, deviceRole, &device);
    if (FAILED(hr)) {
-    printf ("Unable to get default device for role %d: %x\n", deviceRole, hr);
+    cLog::log (LOGINFO, "Unable to get default device for role %d: %x\n", deviceRole, hr);
     retValue = false;
     goto Exit;
     }
@@ -666,13 +667,15 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
 
-  cLog::init (LOGINFO, true);
+  cLog::init (LOGINFO, true, "", "playWindow");
+
   av_log_set_level (AV_LOG_VERBOSE);
   av_log_set_callback (cLog::avLogCallback);
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
 
+  // WASAPI renederer test
   int TargetLatency = 30;
   int TargetFrequency = 880;
   int TargetDurationInSec = 2;
@@ -701,7 +704,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
           return -1;
           }
           //}}}
-
         if (renderer->Start (renderQueue)) {
           }
         }
@@ -719,7 +721,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
     //}}}
     const string url = "http://stream.wqxr.org/js-stream.aac";
-    cLog::log (LOGNOTICE, "playWindow stream " + url);
     appWindow.run (true, "playWindow " + url, 800, 800, url);
     }
   else {
@@ -731,7 +732,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     #pragma warning(pop)
 
     //string fileName = "C:/Users/colin/Music/Elton John";
-    cLog::log (LOGNOTICE, "playWindow - " + fileName);
     appWindow.run (false, "playWindow" + fileName, 800, 800, fileName);
     }
 

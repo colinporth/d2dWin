@@ -1,13 +1,4 @@
 //  A simple WASAPI Render client.
-//{{{
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
-// Copyright (c) Microsoft Corporation. All rights reserved
-//
-//}}}
 //{{{  includes
 #include "StdAfx.h"
 
@@ -18,7 +9,7 @@
 //}}}
 
 //{{{
-template <class T> void SafeRelease(T **ppT) {
+template <class T> void SafeRelease (T** ppT) {
   if (*ppT) {
     (*ppT)->Release();
     *ppT = NULL;
@@ -279,7 +270,7 @@ void CWASAPIRenderer::Stop() {
 
 //  IUnknown
 //{{{
-HRESULT CWASAPIRenderer::QueryInterface (REFIID Iid, void **Object) {
+HRESULT CWASAPIRenderer::QueryInterface (REFIID Iid, void** Object) {
 
   if (Object == NULL)
     return E_POINTER;
@@ -620,8 +611,8 @@ bool CWASAPIRenderer::HandleStreamSwitchEvent() {
     }
     //}}}
 
-  //  Step 4.  If we can't get the new endpoint, we need to abort the stream switch.  If there IS a new device,
-  //          we should be able to retrieve it.
+  //  Step 4.  If we can't get the new endpoint, we need to abort the stream switch.  
+  //           If there IS a new device we should be able to retrieve it.
   hr = _DeviceEnumerator->GetDefaultAudioEndpoint (eRender, _EndpointRole, &_Endpoint);
   if (FAILED(hr)) {
     //{{{

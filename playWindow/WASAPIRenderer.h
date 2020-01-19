@@ -91,8 +91,8 @@ private:
 
   //  Core Audio Rendering member variables.
   IMMDevice* _Endpoint;
-  IAudioClient*_AudioClient;
-  IAudioRenderClient*_RenderClient;
+  IAudioClient* _AudioClient;
+  IAudioRenderClient* _RenderClient;
 
   HANDLE _RenderThread;
   HANDLE _ShutdownEvent;
