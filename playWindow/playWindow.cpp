@@ -742,5 +742,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   //SafeRelease (&renderer);
 
   CoUninitialize();
+  return 0;
   }
 //}}}
