@@ -170,7 +170,7 @@ private:
     }
   //}}}
 
-  const float kVolScale = 2.f; // arbitary power to height scale
+  const float kVolScale = 3.142f/2.f; // arbitary power to height scale
 
   cAudFrame*& mAudFrame;
   iAudio* mAudio;
