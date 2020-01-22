@@ -16,6 +16,39 @@
 #include "cView2d.h"
 //}}}
 
+//{{{
+inline std::string wstringToString (const std::wstring& input) {
+
+  int required_characters = WideCharToMultiByte (CP_UTF8, 0, input.c_str(), static_cast<int>(input.size()),
+                                                 nullptr, 0, nullptr, nullptr);
+  if (required_characters <= 0)
+    return {};
+
+  std::string output;
+  output.resize (static_cast<size_t>(required_characters));
+  WideCharToMultiByte (CP_UTF8, 0, input.c_str(), static_cast<int>(input.size()),
+                       output.data(), static_cast<int>(output.size()), nullptr, nullptr);
+
+  return output;
+  }
+//}}}
+//{{{
+inline std::string wcharToString (const wchar_t* wide_string) {
+
+  int required_characters = WideCharToMultiByte (CP_UTF8, 0, wide_string,
+                                                 -1, nullptr, 0, nullptr, nullptr);
+  if (required_characters <= 0)
+    return {};
+
+  std::string output;
+  output.resize (static_cast<size_t>(required_characters));
+  WideCharToMultiByte (CP_UTF8, 0, wide_string, -1,
+                      output.data(), static_cast<int>(output.size()), nullptr, nullptr);
+
+  return output;
+  }
+//}}}
+
 const float kLineHeight = 20.f;
 
 class cD2dWindow : public iChange {
@@ -242,7 +275,7 @@ public:
         dc->DrawTextLayout (r.getTL(), textLayout, mWindow->getWhiteBrush());
         textLayout->Release();
         }
- 
+
       r.top = r.bottom;
       r.bottom += kLineHeight;
       }
@@ -287,7 +320,7 @@ public:
     //{{{
     bool onWheel (int delta, cPoint pos) {
 
-      if (mWindow->getShift()) 
+      if (mWindow->getShift())
         mView2d.multiplyBy (D2D1::Matrix3x2F::Rotation (45.f * (delta / 120.f), getCentre()));
       else {
         float ratio = mWindow->getControl() ? 1.5f : 1.1f;

@@ -711,7 +711,11 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     }
 
   cAppWindow appWindow;
-  if (numArgs == 1) {
+  if (numArgs > 1)
+    //string fileName = "C:/Users/colin/Music/Elton John";
+    appWindow.run (false, "playWindow", 800, 800, wcharToString (args[1]));
+
+  else {
     //{{{  urls
     //const string url = "http://stream.wqxr.org/wqxr.aac";
     //const string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
@@ -722,17 +726,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     //}}}
     const string url = "http://stream.wqxr.org/js-stream.aac";
     appWindow.run (true, "playWindow " + url, 800, 800, url);
-    }
-  else {
-    wstring wstr (args[1]);
-
-    #pragma warning(push)
-      #pragma warning(disable: 4244)
-      string fileName = string (wstr.begin(), wstr.end());
-    #pragma warning(pop)
-
-    //string fileName = "C:/Users/colin/Music/Elton John";
-    appWindow.run (false, "playWindow" + fileName, 800, 800, fileName);
     }
 
   //if (renderer) {

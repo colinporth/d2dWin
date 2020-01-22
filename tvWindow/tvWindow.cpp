@@ -12,13 +12,15 @@
 #include "../boxes/cWindowBox.h"
 
 #include "cPlayView.h"
+
+using namespace std;
 //}}}
-const std::string kTvRoot = "/tv";
+const string kTvRoot = "/tv";
 
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (std::string title, int width, int height, const std::string& rootOrFrequency) {
+  void run (string title, int width, int height, const string& rootOrFrequency) {
 
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
@@ -27,14 +29,14 @@ public:
     int frequency = atoi (rootOrFrequency.c_str());
     if (frequency) {
       mDvb = new cDvb (frequency * 1000, kTvRoot, false);
-      std::thread ([=]() {
+      thread ([=]() {
         //{{{  grabthread
         CoInitializeEx (NULL, COINIT_MULTITHREADED);
         mDvb->grabThread();
         CoUninitialize();
         //}}}
         }).detach();
-        std::thread ([=]() {
+        thread ([=]() {
         //{{{  signalThread
         CoInitializeEx (NULL, COINIT_MULTITHREADED);
         mDvb->signalThread();
@@ -45,7 +47,7 @@ public:
 
     // fileList
     mFileList = new cFileList (frequency || rootOrFrequency.empty() ? kTvRoot : rootOrFrequency, "*.ts");
-    std::thread([=]() { mFileList->watchThread(); }).detach();
+    thread([=]() { mFileList->watchThread(); }).detach();
     auto boxWidth = frequency ? 480.f : 0.f;
     add (new cAppFileListBox (this, -boxWidth,0.f, mFileList), frequency ? boxWidth : 0.f, 0.f);
 
@@ -128,28 +130,16 @@ private:
   //}}}
   };
 
-//{{{
+// main
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::init (LOGINFO, true); // false, "C:/Users/colin/Desktop");
+  cLog::init (LOGINFO, true, "", "tvWindow"); // false, "C:/Users/colin/Desktop");
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
 
-  std::string rootOrFrequency;
-  if (numArgs > 1) {
-    // get fileName from commandLine
-    const std::wstring wstr (args[1]);
-    #pragma warning(push)
-      #pragma warning(disable: 4244)
-      rootOrFrequency = std::string (wstr.begin(), wstr.end());
-    #pragma warning(pop)
-    }
-
   cAppWindow appWindow;
-  appWindow.run ("tvWindow", 1920/2, 1080/2, rootOrFrequency);
+  appWindow.run ("tvWindow", 1920/2, 1080/2, (numArgs > 1) ? wcharToString (args[1]) : "");
 
   CoUninitialize();
   }
-//}}}
