@@ -785,9 +785,8 @@ private:
   cSemaphore mFileScannedSem;
   };
 
-//{{{
+// main
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO1, true, "", "jpegWindow");
 
@@ -796,15 +795,9 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   string rootDirName;
   if (numArgs > 1) {
-    #pragma warning(push)
-      #pragma warning(disable: 4244)
-    wstring wstr(args[1]);
-    rootDirName = string(wstr.begin(), wstr.end());
-    #pragma warning(pop)
-
+    rootDirName = wcharToString (args[1]);
     cLog::log (LOGINFO, "JpegWindow resolved " + rootDirName);
     }
-
   else
     rootDirName = "C:/Users/colin/Pictures";
 
@@ -813,4 +806,3 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   CoUninitialize();
   }
-//}}}

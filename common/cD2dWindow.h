@@ -17,6 +17,20 @@
 //}}}
 
 //{{{
+inline std::string wcharToString (const wchar_t* input) {
+
+  int required_characters = WideCharToMultiByte (CP_UTF8, 0, input, -1, nullptr, 0, nullptr, nullptr);
+  if (required_characters <= 0)
+    return {};
+
+  std::string output;
+  output.resize (static_cast<size_t>(required_characters));
+  WideCharToMultiByte (CP_UTF8, 0, input, -1, output.data(), static_cast<int>(output.size()), nullptr, nullptr);
+
+  return output;
+  }
+//}}}
+//{{{
 inline std::string wstringToString (const std::wstring& input) {
 
   int required_characters = WideCharToMultiByte (CP_UTF8, 0, input.c_str(), static_cast<int>(input.size()),
@@ -28,22 +42,6 @@ inline std::string wstringToString (const std::wstring& input) {
   output.resize (static_cast<size_t>(required_characters));
   WideCharToMultiByte (CP_UTF8, 0, input.c_str(), static_cast<int>(input.size()),
                        output.data(), static_cast<int>(output.size()), nullptr, nullptr);
-
-  return output;
-  }
-//}}}
-//{{{
-inline std::string wcharToString (const wchar_t* wide_string) {
-
-  int required_characters = WideCharToMultiByte (CP_UTF8, 0, wide_string,
-                                                 -1, nullptr, 0, nullptr, nullptr);
-  if (required_characters <= 0)
-    return {};
-
-  std::string output;
-  output.resize (static_cast<size_t>(required_characters));
-  WideCharToMultiByte (CP_UTF8, 0, wide_string, -1,
-                      output.data(), static_cast<int>(output.size()), nullptr, nullptr);
 
   return output;
   }

@@ -132,17 +132,10 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   cLog::init (LOGINFO, true);
 
-  string param;
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-  if (numArgs > 1) {
-    // get fileName from commandLine
-    wstring wstr (args[1]);
-    #pragma warning(push)
-      #pragma warning(disable: 4244)
-    param = string (wstr.begin(), wstr.end());
-    #pragma warning(pop)
-    }
+
+  string param = (numArgs > 1) ? wcharToString (args[1]) : "";
 
   cAppWindow appWindow;
   string rootName = "/tv";
