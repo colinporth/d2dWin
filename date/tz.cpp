@@ -48,6 +48,7 @@
 #  ifndef _CRT_SECURE_NO_WARNINGS
 #    define _CRT_SECURE_NO_WARNINGS
 #  endif
+#define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS 
 
    // None of this happens with the MS SDK (at least VS14 which I tested), but:
    // Compiling with mingw, we get "error: 'KF_FLAG_DEFAULT' was not declared in this scope."

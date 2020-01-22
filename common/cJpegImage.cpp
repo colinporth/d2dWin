@@ -2,6 +2,7 @@
 //{{{  includes
 #define _CRT_SECURE_NO_WARNINGS
 #define NOMINMAX
+#define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS 
 
 #include <vector>
 
