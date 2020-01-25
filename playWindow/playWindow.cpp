@@ -504,13 +504,8 @@ private:
                   }
                 //}}}
                 if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size,
-                                    avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst)) == kPlayFrameThreshold) {
-                  //{{{  launch playThread
-                  auto threadHandle = thread ([=](){ playThread (streaming); });
-                  SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
-                  threadHandle.detach();
-                  }
-                  //}}}
+                                    avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst)) == kPlayFrameThreshold) 
+                  thread ([=](){playThread (streaming);}).detach();
                 changed();
                 }
               }
@@ -549,6 +544,8 @@ private:
   void playThread (bool streaming) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
     cLog::setThreadName ("play");
 
     auto codec = avcodec_find_decoder (mSong.mAudioFrameType == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
