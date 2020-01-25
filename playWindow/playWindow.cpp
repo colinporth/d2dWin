@@ -504,7 +504,7 @@ private:
                   }
                 //}}}
                 if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size,
-                                    avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst)) == kPlayFrameThreshold) 
+                                    avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst)))
                   thread ([=](){playThread (streaming);}).detach();
                 changed();
                 }
@@ -628,7 +628,6 @@ private:
     }
   //}}}
 
-  const int kPlayFrameThreshold = 10; // 10 frames analyse before play, about half second
   //{{{  vars
   cFileList* mFileList;
 
