@@ -36,6 +36,26 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdafx.h</PrecompiledHeaderFile>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\shared\utils\cLog.h" />
+    <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
+    <ClInclude Include="..\..\shared\utils\cSong.h" />
+    <ClInclude Include="..\..\shared\utils\cWinAudio32.h" />
+    <ClInclude Include="..\..\shared\utils\date.h" />
+    <ClInclude Include="..\boxes\cCalendarBox.h" />
+    <ClInclude Include="..\boxes\cClockBox.h" />
+    <ClInclude Include="..\boxes\cFloatBox.h" />
+    <ClInclude Include="..\boxes\cIntBox.h" />
+    <ClInclude Include="..\boxes\cLogBox.h" />
+    <ClInclude Include="..\boxes\ctitlebox.h" />
+    <ClInclude Include="..\boxes\cVolumeBox.h" />
+    <ClInclude Include="..\boxes\cWindowBox.h" />
+    <ClInclude Include="..\common\cD2dWindow.h" />
+    <ClInclude Include="..\common\cJpegImage.h" />
+    <ClInclude Include="..\common\cJpegImageView.h" />
+    <ClInclude Include="..\common\cPointRect.h" />
+    <ClInclude Include="..\common\cView2d.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{DFA05DDA-082C-40AB-8FAB-8D936C91EACA}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>

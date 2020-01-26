@@ -13,12 +13,10 @@
 using namespace std;
 //}}}
 
-// main cAppWindow
 class cAppWindow : public cD2dWindow {
 public:
   cAppWindow() : mPlayDoneSem("playDone") {}
   virtual ~cAppWindow() {}
-
   //{{{
   void run (bool streaming, const string& title, int width, int height, const string& name) {
 
@@ -65,7 +63,6 @@ public:
     delete mJpegImageView;
     }
   //}}}
-
 protected:
   //{{{
   bool onKey (int key) {
@@ -96,7 +93,6 @@ protected:
     return false;
     }
   //}}}
-
 private:
   //{{{
   class cAppFileListBox : public cFileListBox {
@@ -568,24 +564,18 @@ private:
   };
 
 // main
-//{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
-
   cLog::init (LOGINFO, true, "", "playWindow");
-
   av_log_set_level (AV_LOG_VERBOSE);
   av_log_set_callback (cLog::avLogCallback);
 
+  cAppWindow appWindow;
+
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
- 
-  cAppWindow appWindow;
   if (numArgs > 1)
-    //string fileName = "C:/Users/colin/Music/Elton John";
     appWindow.run (false, "playWindow", 800, 800, wcharToString (args[1]));
-
   else {
     //{{{  urls
     //const string url = "http://stream.wqxr.org/wqxr.aac";
@@ -599,13 +589,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     appWindow.run (true, "playWindow " + url, 800, 800, url);
     }
 
-  //if (renderer) {
-  //  renderer->Stop();
-  //  renderer->Shutdown();
-  //  }
-  //SafeRelease (&renderer);
-
   CoUninitialize();
   return 0;
   }
-//}}}

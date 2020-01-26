@@ -9,4 +9,60 @@
       <UniqueIdentifier>{29a1756e-9c12-4c27-b4c9-5126e23f3281}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\shared\utils\cLog.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cSemaphore.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cSong.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\date.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cWinAudio32.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cCalendarBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cClockBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cFloatBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cIntBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cLogBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\ctitlebox.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cVolumeBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cWindowBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cJpegImageView.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cView2d.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cPointRect.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cD2dWindow.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cJpegImage.h">
+      <Filter>h</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>
