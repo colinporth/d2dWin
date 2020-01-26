@@ -537,40 +537,9 @@ private:
           break;
         }
         //}}}
-      } 
+      }
 
     setExit();
-    }
-  //}}}
-  //{{{
-  void playThread (bool streaming) {
-
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-
-    cLog::setThreadName ("play");
-    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
-
-    cWinAudio32 audio (mSong.getNumChannels(), mSong.getSampleRate());
-    mVolumeBox->setAudio (&audio);
-
-    while (!getExit() &&
-           !mSongChanged &&
-           (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
-      if (mPlaying) {
-        audio.play (mSong.getNumChannels(), mSong.getPlayFrameSamples(), mSong.getSamplesPerFrame(), 1.f);
-        mSong.incPlayFrame (1);
-        changed();
-        }
-      else
-        audio.play (mSong.getNumChannels(), nullptr, mSong.getSamplesPerFrame(), 1.f);
-
-    // done
-    mVolumeBox->setAudio (nullptr);
-
-    mPlayDoneSem.notifyAll();
-
-    cLog::log (LOGINFO, "exit");
-    CoUninitialize();
     }
   //}}}
   //{{{
@@ -655,6 +624,37 @@ private:
     av_frame_free (&avFrame);
     if (context)
       avcodec_close (context);
+
+    mPlayDoneSem.notifyAll();
+
+    cLog::log (LOGINFO, "exit");
+    CoUninitialize();
+    }
+  //}}}
+  //{{{
+  void playThread (bool streaming) {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+
+    cLog::setThreadName ("play");
+    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
+    cWinAudio32 audio (mSong.getNumChannels(), mSong.getSampleRate());
+    mVolumeBox->setAudio (&audio);
+
+    while (!getExit() &&
+           !mSongChanged &&
+           (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
+      if (mPlaying) {
+        audio.play (mSong.getNumChannels(), mSong.getPlayFrameSamples(), mSong.getSamplesPerFrame(), 1.f);
+        mSong.incPlayFrame (1);
+        changed();
+        }
+      else
+        audio.play (mSong.getNumChannels(), nullptr, mSong.getSamplesPerFrame(), 1.f);
+
+    // done
+    mVolumeBox->setAudio (nullptr);
 
     mPlayDoneSem.notifyAll();
 
