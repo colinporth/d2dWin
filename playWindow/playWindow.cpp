@@ -208,11 +208,11 @@ protected:
       case 0x27: mSong.incPlaySec (getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
 
       case 0x24: mSong.setPlayFrame (0); changed(); break; // home
-      case 0x23: mSong.setPlayFrame (mSong.mNumFrames-1); changed(); break; // end
+      case 0x23: mSong.setPlayFrame (mSong.getTotalFrames() -1); changed(); break; // end
 
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
-      case 0x0d: mChanged = true; changed(); break; // enter - play file
+      case 0x0d: mSongChanged = true; changed(); break; // enter - play file
 
       default  : cLog::log (LOGINFO, "key %x", key);
       }
@@ -229,7 +229,7 @@ private:
       cFileListBox (window, width, height, fileList) {}
 
     void onHit() {
-      (dynamic_cast<cAppWindow*>(getWindow()))->mChanged = true;
+      (dynamic_cast<cAppWindow*>(getWindow()))->mSongChanged = true;
       }
     };
   //}}}
@@ -445,37 +445,36 @@ private:
         }
       //}}}
 
-      auto codec = avcodec_find_decoder (mSong.mAudioFrameType == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
+      auto codec = avcodec_find_decoder (mSong.getAudioFrameType() == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
       auto context = avcodec_alloc_context3 (codec);
       avcodec_open2 (context, codec, NULL);
 
       AVPacket avPacket;
       av_init_packet (&avPacket);
       auto avFrame = av_frame_alloc();
-      auto samples = (float*)malloc (mSong.getSamplesSize());
 
+      bool mSongDone = false;
       auto stream = mStreamFirst;
-      while (!getExit() && !mChanged) {
+      while (!getExit() && !mSongChanged && !mSongDone) {
         int skip;
         int sampleRate;
         eAudioFrameType frameType;
         while (parseAudioFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
-          if (frameType == mSong.mAudioFrameType) {
+          if (frameType == mSong.getAudioFrameType()) {
             auto ret = avcodec_send_packet (context, &avPacket);
             while (ret >= 0) {
               ret = avcodec_receive_frame (context, avFrame);
               if ((ret == AVERROR_EOF) || (ret < 0))
                 break;
               if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
-                if (avFrame->nb_samples != mSong.mSamplesPerFrame)
-                  //{{{  update mSamplesPerFrame
-                  mSong.mSamplesPerFrame = avFrame->nb_samples;
-                  //}}}
-                if (avFrame->sample_rate > mSong.mSampleRate)
-                  //{{{  fixup aac-sbr sample rate
-                  mSong.mSampleRate = avFrame->sample_rate;
-                  //}}}
-                //{{{  covert planar avFrame->data to interleaved int16_t samples
+                if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
+                  mSong.setSamplesPerFrame (avFrame->nb_samples);
+                if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
+                  mSong.setSampleRate (avFrame->sample_rate);
+
+                // !!! could free samples !!!
+                auto samples = (float*)malloc (avFrame->nb_samples * mSong.getNumChannels() * 4);
+                //{{{  covert planar avFrame->data to interleaved float samples
                 switch (context->sample_fmt) {
                   case AV_SAMPLE_FMT_S16P: // 16bit signed planar
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
@@ -514,10 +513,13 @@ private:
           }
         if (streaming)
           mStreamSem.wait();
+        else {
+          cLog::log (LOGINFO, "song done");
+          mSongDone = true;
+          }
         }
 
       // done
-      free (samples);
       av_frame_free (&avFrame);
       if (context)
         avcodec_close (context);
@@ -529,13 +531,13 @@ private:
         UnmapViewOfFile (mStreamFirst);
         CloseHandle (fileHandle);
 
-        if (mChanged) // use changed fileIndex
-          mChanged = false;
+        if (mSongChanged) // use changed fileIndex
+          mSongChanged = false;
         else if (!mFileList->nextIndex())
           break;
         }
         //}}}
-      }
+      } 
 
     setExit();
     }
@@ -544,39 +546,70 @@ private:
   void playThread (bool streaming) {
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
+
+    cLog::setThreadName ("play");
+    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
+    cWinAudio32 audio (mSong.getNumChannels(), mSong.getSampleRate());
+    mVolumeBox->setAudio (&audio);
+
+    while (!getExit() &&
+           !mSongChanged &&
+           (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
+      if (mPlaying) {
+        audio.play (mSong.getNumChannels(), mSong.getPlayFrameSamples(), mSong.getSamplesPerFrame(), 1.f);
+        mSong.incPlayFrame (1);
+        changed();
+        }
+      else
+        audio.play (mSong.getNumChannels(), nullptr, mSong.getSamplesPerFrame(), 1.f);
+
+    // done
+    mVolumeBox->setAudio (nullptr);
+
+    mPlayDoneSem.notifyAll();
+
+    cLog::log (LOGINFO, "exit");
+    CoUninitialize();
+    }
+  //}}}
+  //{{{
+  void playThreadDecode (bool streaming) {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
     cLog::setThreadName ("play");
 
-    auto codec = avcodec_find_decoder (mSong.mAudioFrameType == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
+    auto codec = avcodec_find_decoder (mSong.getAudioFrameType() == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
     auto context = avcodec_alloc_context3 (codec);
     avcodec_open2 (context, codec, NULL);
 
     AVPacket avPacket;
     av_init_packet (&avPacket);
     auto avFrame = av_frame_alloc();
-    auto samples = (float*)malloc (mSong.getSamplesSize());
+    auto samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumChannels() * 4);
 
-    cWinAudio32 audio (mSong.mChannels, mSong.mSampleRate);
+    cWinAudio32 audio (mSong.getNumChannels(), mSong.getSampleRate());
     mVolumeBox->setAudio (&audio);
 
-    while (!getExit() && !mChanged && (streaming || (mSong.mPlayFrame < mSong.getNumParsedFrames()-1)))
-      if (!mPlaying)
-        audio.play (mSong.mChannels, nullptr, mSong.mSamplesPerFrame, 1.f);
-      else {
+    while (!getExit() &&
+           !mSongChanged &&
+           (streaming || (mSong.getPlayFrame() <= mSong.getLastFrame())))
+      if (mPlaying) {
         int skip;
         int sampleRate;
         eAudioFrameType frameType;
         if (parseAudioFrame (mStreamFirst + mSong.getPlayFrameStreamIndex(), mStreamLast,
                              avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
-          if (frameType == mSong.mAudioFrameType) {
+          if (frameType == mSong.getAudioFrameType()) {
             auto ret = avcodec_send_packet (context, &avPacket);
             while (ret >= 0) {
               ret = avcodec_receive_frame (context, avFrame);
               if ((ret == AVERROR_EOF) || (ret < 0))
                 break;
               if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
-                //{{{  covert planar avFrame->data to interleaved int16_t samples
+                //{{{  covert planar avFrame->data to interleaved float samples
                 switch (context->sample_fmt) {
                   case AV_SAMPLE_FMT_S16P: // 16bit signed planar
                     for (auto channel = 0; channel < avFrame->channels; channel++) {
@@ -612,6 +645,8 @@ private:
             }
           }
         }
+      else
+        audio.play (mSong.getNumChannels(), nullptr, mSong.getSamplesPerFrame(), 1.f);
 
     // done
     mVolumeBox->setAudio (nullptr);
@@ -627,7 +662,6 @@ private:
     CoUninitialize();
     }
   //}}}
-
   //{{{  vars
   cFileList* mFileList;
 
@@ -638,7 +672,7 @@ private:
 
   cJpegImageView* mJpegImageView = nullptr;
 
-  bool mChanged = false;
+  bool mSongChanged = false;
   bool mPlaying = true;
   cSemaphore mPlayDoneSem;
 

@@ -29,7 +29,7 @@ public:
 
     if (getShow()) {
       mZoom -= delta/120;
-      mZoom = std::min (std::max(mZoom, 1), 2 * (1 + mSong.mNumFrames / getWidthInt()));
+      mZoom = std::min (std::max(mZoom, 1), 2 * (1 + mSong.getTotalFrames() / getWidthInt()));
       return true;
       }
 
@@ -54,8 +54,8 @@ protected:
   void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
 
     leftFrame = (leftFrame < 0) ? 0 : leftFrame;
-    if (rightFrame > mSong.getNumParsedFrames())
-      rightFrame = mSong.getNumParsedFrames();
+    if (rightFrame > (int)mSong.getNumFrames())
+      rightFrame = (int)mSong.getNumFrames();
 
     // draw frames
     auto colour = mWindow->getBlueBrush();
@@ -67,10 +67,10 @@ protected:
     auto xl = mRect.left + firstX;
     for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
       float xr = xl + 1.f;
-      if (mSong.mFrames[frame].hasTitle()) {
+      if (mSong.mFrames[frame]->hasTitle()) {
         dc->FillRectangle (cRect (xl, yCentre-(getHeight()/2.f), xr+2.f, yCentre+(getHeight()/2.f)), mWindow->getYellowBrush());
 
-        std::string str = mSong.mFrames[frame].mTitle;
+        std::string str = mSong.mFrames[frame]->getTitle();
         IDWriteTextLayout* textLayout;
         mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
                                                       mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
@@ -80,14 +80,16 @@ protected:
           }
         }
 
-      if (mSong.mFrames[frame].isSilent()) {
+      if (mSong.mFrames[frame]->isSilent()) {
         float silenceHeight = 2.f;
         dc->FillRectangle (cRect (xl, yCentre - silenceHeight, xr, yCentre + silenceHeight), mWindow->getRedBrush());
         }
 
+
+      auto powerValues = mSong.mFrames[frame]->getPowerValues();
       if (!centre && (frame >= mSong.mPlayFrame)) {
-        auto yL = mSong.mFrames[frame].mPowerValues[0] * valueScale;
-        auto yR = mSong.mFrames[frame].mPowerValues[1] * valueScale;
+        auto yL = powerValues[0] * valueScale;
+        auto yR = powerValues[1] * valueScale;
         dc->FillRectangle (cRect (xl, yCentre - yL, xr, yCentre + yR), mWindow->getWhiteBrush());
         colour = mWindow->getGreyBrush();
         centre = true;
@@ -96,8 +98,8 @@ protected:
         auto yL = 0.f;
         auto yR = 0.f;
         for (auto i = 0; i < zoom; i++) {
-          yL += mSong.mFrames[frame+i].mPowerValues[0];
-          yR += mSong.mFrames[frame+i].mPowerValues[1];
+          yL += powerValues[0];
+          yR += powerValues[1];
           }
         yL = (yL / zoom) * valueScale;
         yR = (yR / zoom) * valueScale;
@@ -137,7 +139,7 @@ public:
 
     mOn = true;
 
-    auto frame = int((pos.x * mSong.mNumFrames) / getWidth());
+    auto frame = int((pos.x * mSong.getTotalFrames()) / getWidth());
     mSong.setPlayFrame (frame);
 
     return true;
@@ -145,7 +147,7 @@ public:
   //}}}
   //{{{
   bool onMove (bool right, cPoint pos, cPoint inc) {
-    auto frame = int((pos.x * mSong.mNumFrames) / getWidth());
+    auto frame = int((pos.x * mSong.getTotalFrames()) / getWidth());
     mSong.setPlayFrame (frame);
     return true;
     }
@@ -178,7 +180,7 @@ public:
     else // animate off
       mLens /= 2;
 
-    int curFrameX = (mSong.mNumFrames > 0) ? (mSong.mPlayFrame * getWidthInt()) / mSong.mNumFrames : 0;
+    int curFrameX = (mSong.getTotalFrames() > 0) ? (mSong.mPlayFrame * getWidthInt()) / mSong.getTotalFrames() : 0;
     int leftLensX = curFrameX - mLens;
     int rightLensX = curFrameX + mLens;
     if (leftLensX < 0) {
@@ -207,27 +209,29 @@ private:
   //{{{
   void makeSummedWave() {
 
-    if (mSummedFrame != mSong.getNumParsedFrames()) {
+    if (mSummedFrame != mSong.getNumFrames()) {
       // frameSet changed, cache values summed to width, scaled to height
-      mSummedFrame = mSong.getNumParsedFrames();
+      mSummedFrame = mSong.getNumFrames();
 
       mSummedValues = (float*)realloc (mSummedValues, getWidthInt() * 2 * sizeof(float));
       auto summedValuesPtr = mSummedValues;
 
       mMaxSummedX = 0;
-      auto startFrame = 0;
-      for (auto x = 0; x < getWidthInt(); x++) {
-        int frame = x * mSong.mNumFrames / getWidthInt();
-        if (frame >= mSong.getNumParsedFrames())
+      int startFrame = 0;
+      for (int x = 0; x < getWidthInt(); x++) {
+        int frame = x * mSong.getNumFrames() / getWidthInt();
+        if (frame >= mSong.getNumFrames())
           break;
 
-        float lValue = mSong.mFrames[frame].mPowerValues[0];
-        float rValue = mSong.mFrames[frame].mPowerValues[1];
+        auto powerValues = mSong.mFrames[frame]->getPowerValues();
+        float lValue = powerValues[0];
+        float rValue = powerValues[1];
         if (frame > startFrame) {
           int num = 1;
           for (auto i = startFrame; i < frame; i++) {
-            lValue += mSong.mFrames[i].mPowerValues[0];
-            rValue += mSong.mFrames[i].mPowerValues[1];
+            auto powerValues = mSong.mFrames[i]->getPowerValues();
+            lValue += powerValues[0];
+            rValue += powerValues[1];
             num++;
             }
           lValue /= num;
@@ -254,28 +258,26 @@ private:
     float valueScale = getHeight() / 2 / getMaxPowerValue();
 
     float curFrameX = mRect.left;
-    if (mSong.mNumFrames > 0)
-      curFrameX += mSong.mPlayFrame * getWidth() / mSong.mNumFrames;
+    if (mSong.getTotalFrames() > 0)
+      curFrameX += mSong.mPlayFrame * getWidth() / mSong.getTotalFrames();
 
     bool centre = false;
     float xl = mRect.left + firstX;
     auto summedValuesPtr = mSummedValues + (firstX * 2);
     for (auto x = firstX; x < lastX; x++) {
       float xr = xl + 1.f;
-      if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumParsedFrames())) {
-        float leftValue = mSong.mFrames[mSong.mPlayFrame].mPowerValues[0] * valueScale;
-        float rightValue = mSong.mFrames[mSong.mPlayFrame].mPowerValues[1] * valueScale;
-        dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
-                           mWindow->getWhiteBrush());
+      if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumFrames())) {
+        auto powerValues = mSong.mFrames[mSong.mPlayFrame]->getPowerValues();
+        float leftValue = powerValues[0] * valueScale;
+        float rightValue = powerValues[1] * valueScale;
+        dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f), mWindow->getWhiteBrush());
         colour = mWindow->getGreyBrush();
         centre = true;
         }
-
       else if (x < mMaxSummedX) {
         auto leftValue = *summedValuesPtr++ * valueScale;
         auto rightValue = *summedValuesPtr++ * valueScale;
-        dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f),
-                           colour);
+        dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f), colour);
         }
       else
         break;
@@ -305,7 +307,7 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
     auto frame = mSong.getPlayFrame();
     if (frame > 0) {
-      float* freq = (mSong.mFrames[frame].mFreqValues);
+      float* freq = (mSong.mFrames[frame]->getFreqValues());
       for (int i = 0; (i < getWidth()) && (i < mSong.getMaxFreq()); i++)
         dc->FillRectangle (cRect (mRect.left+i*2, mRect.bottom - ((freq[i] / mSong.mMaxFreqValue) * getHeight()),
                                   mRect.left+(i*2)+2, mRect.bottom), mWindow->getYellowBrush());
@@ -358,13 +360,13 @@ public:
 
     // first and last known frames
     auto firstFrame = std::max (leftFrame, 0);
-    auto lastFrame = std::min (rightFrame, mSong.getNumParsedFrames());
+    auto lastFrame = std::min (rightFrame, mSong.getNumFrames());
 
     // bottom of first bitmapBuf column
     auto dstPtr = mBitmapBuf + ((mBitmapHeight-1) * mBitmapWidth);
     for (int frame = firstFrame; frame < lastFrame; frame++) {
       // copy freqLuma to bitmapBuf column
-      auto srcPtr = mSong.mFrames[frame].mFreqLuma;
+      auto srcPtr = mSong.mFrames[frame]->getFreqLuma();
       for (int y = 0; y < mBitmapHeight; y++) {
         *dstPtr = *srcPtr++;
         dstPtr -= mBitmapWidth;
@@ -422,7 +424,7 @@ public:
   //}}}
 
   void onDraw (ID2D1DeviceContext* dc) {
-    std::string str = getFrameStr (mSong.mPlayFrame) + " " + getFrameStr (mSong.mNumFrames);
+    std::string str = getFrameStr (mSong.mPlayFrame) + " " + getFrameStr (mSong.getTotalFrames());
 
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
@@ -439,21 +441,25 @@ private:
   //{{{
   std::string getFrameStr (uint32_t frame) {
 
-    uint32_t frameHs = (frame * mSong.mSamplesPerFrame) / (mSong.mSampleRate / 100);
+    if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
+      uint32_t frameHs = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
 
-    uint32_t hs = frameHs % 100;
+      uint32_t hs = frameHs % 100;
 
-    frameHs /= 100;
-    uint32_t secs = frameHs % 60;
+      frameHs /= 100;
+      uint32_t secs = frameHs % 60;
 
-    frameHs /= 60;
-    uint32_t mins = frameHs % 60;
+      frameHs /= 60;
+      uint32_t mins = frameHs % 60;
 
-    frameHs /= 60;
-    uint32_t hours = frameHs % 60;
+      frameHs /= 60;
+      uint32_t hours = frameHs % 60;
 
-    std::string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
-    return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
+      std::string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
+      return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
+      }
+    else
+      return ("--:--:--");
     }
   //}}}
 
