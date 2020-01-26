@@ -434,7 +434,7 @@ private:
       // sampleRate for aac-sbr wrong in header, fixup later
       int streamSampleRate;
       auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, streamSampleRate);
-      mSong.init ("stream", audioFrameType, audioFrameType == eAac ? 2048 : 1152, streamSampleRate);
+      mSong.init (audioFrameType, 2, audioFrameType == eAac ? 2048 : 1152, streamSampleRate);
       //{{{  addd jpeg if available
       int jpegLen = 0;
       auto jpegBuf = parseId3Tag (mStreamFirst, mStreamLast, jpegLen);
