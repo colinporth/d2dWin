@@ -214,12 +214,12 @@ private:
       mSummedFrame = mSong.getNumFrames();
 
       mSummedValues = (float*)realloc (mSummedValues, getWidthInt() * 2 * sizeof(float));
-      auto summedValuesPtr = mSummedValues;
 
       mMaxSummedX = 0;
       int startFrame = 0;
+      auto summedValuesPtr = mSummedValues;
       for (int x = 0; x < getWidthInt(); x++) {
-        int frame = x * mSong.getNumFrames() / getWidthInt();
+        int frame = x * mSong.getTotalFrames() / getWidthInt();
         if (frame >= mSong.getNumFrames())
           break;
 

@@ -7,17 +7,11 @@
 #include "../../shared/utils/cWinAudio32.h"
 #include "../boxes/cAudFrameBox.h"
 
-#pragma comment (lib,"avutil.lib")
-#pragma comment (lib,"avcodec.lib")
-#pragma comment (lib,"avformat.lib")
-
 #ifdef _DEBUG
   #pragma comment (lib,"libmfx_d.lib")
 #else
   #pragma comment (lib,"libmfx.lib")
 #endif
-
-#pragma comment (lib,"dxgi.lib")
 
 using namespace concurrency;
 //}}}
