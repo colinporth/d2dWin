@@ -40,7 +40,6 @@
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
     <ClInclude Include="..\..\shared\utils\cSong.h" />
-    <ClInclude Include="..\..\shared\utils\cWinAudio32.h" />
     <ClInclude Include="..\..\shared\utils\date.h" />
     <ClInclude Include="..\boxes\cCalendarBox.h" />
     <ClInclude Include="..\boxes\cClockBox.h" />

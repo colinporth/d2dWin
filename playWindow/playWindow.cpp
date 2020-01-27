@@ -10,6 +10,8 @@
 #include "../../shared/utils/cSong.h"
 #include "../boxes/cSongBoxes.h"
 
+#include "audio.h"
+
 using namespace std;
 //}}}
 
@@ -431,8 +433,8 @@ private:
     auto avFrame = av_frame_alloc();
     auto samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumChannels() * 4);
 
-    cWinAudio32 audio (mSong.getNumChannels(), mSong.getSampleRate());
-    mVolumeBox->setAudio (&audio);
+    //cWinAudio32 audio (mSong.getNumChannels(), mSong.getSampleRate());
+    //mVolumeBox->setAudio (&audio);
 
     while (!getExit() &&
            !mSongChanged &&
@@ -478,7 +480,7 @@ private:
                     cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                   }
                 //}}}
-                audio.play (avFrame->channels, samples, avFrame->nb_samples, 1.f);
+                //audio.play (avFrame->channels, samples, avFrame->nb_samples, 1.f);
                 mSong.incPlayFrame (1);
                 changed();
                 }
@@ -486,8 +488,8 @@ private:
             }
           }
         }
-      else
-        audio.play (mSong.getNumChannels(), nullptr, mSong.getSamplesPerFrame(), 1.f);
+      //else
+        //audio.play (mSong.getNumChannels(), nullptr, mSong.getSamplesPerFrame(), 1.f);
 
     // done
     mVolumeBox->setAudio (nullptr);
@@ -511,23 +513,49 @@ private:
     cLog::setThreadName ("play");
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-    cWinAudio32 audio (mSong.getNumChannels(), mSong.getSampleRate());
-    mVolumeBox->setAudio (&audio);
+    auto device = getDefaultAudioOutputDevice();
+    device->setSampleRate (mSong.getSampleRate());
+    device->start();
+
+    float* srcSamples = mSong.getPlayFrameSamples();
+    int srcSamplesLeft = mSong.getSamplesPerFrame();
 
     while (!getExit() &&
            !mSongChanged &&
-           (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
-      if (mPlaying) {
-        audio.play (mSong.getNumChannels(), mSong.getPlayFrameSamples(), mSong.getSamplesPerFrame(), 1.f);
-        mSong.incPlayFrame (1);
-        changed();
-        }
-      else
-        audio.play (mSong.getNumChannels(), nullptr, mSong.getSamplesPerFrame(), 1.f);
+           (streaming || (mSong.mPlayFrame <= mSong.getLastFrame()))) {
+      device->process ([&](cAudioDevice& device, cAudioBuffer& buffer) mutable noexcept {
+        float* dstSamples = buffer.getData();
+        if (mPlaying) {
+          int samplesToCopy = 0;
+          if (buffer.getSizeFrames() > srcSamplesLeft) {
+            // copy rest of last decodeFrame
+            if (srcSamplesLeft > 0) {
+              samplesToCopy = srcSamplesLeft;
+              memcpy (dstSamples, srcSamples, samplesToCopy * buffer.getSizeChannels() * 4);
+              srcSamples += samplesToCopy * buffer.getSizeChannels();
+              dstSamples += samplesToCopy * buffer.getSizeChannels();
+              }
 
-    // done
-    mVolumeBox->setAudio (nullptr);
+            // need more samples, point to next decodeFrame
+            mSong.incPlayFrame (1);
+            srcSamples = mSong.getPlayFrameSamples();
+            srcSamplesLeft = mSong.getSamplesPerFrame();
+            }
 
+          samplesToCopy = buffer.getSizeFrames() - samplesToCopy;
+          memcpy (dstSamples, srcSamples, samplesToCopy * buffer.getSizeChannels() * 4);
+          srcSamples += samplesToCopy * buffer.getSizeChannels();
+          srcSamplesLeft -= samplesToCopy;
+          }
+        else
+          memset (dstSamples, 0, buffer.getSizeFrames() * buffer.getSizeChannels() * 4);
+        });
+
+      device->wait();
+      changed();
+      }
+
+    device->stop();
     mPlayDoneSem.notifyAll();
 
     cLog::log (LOGINFO, "exit");

@@ -22,9 +22,6 @@
     <ClInclude Include="..\..\shared\utils\date.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\cWinAudio32.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="..\boxes\cCalendarBox.h">
       <Filter>h</Filter>
     </ClInclude>
