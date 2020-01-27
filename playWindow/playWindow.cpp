@@ -374,8 +374,8 @@ private:
                     cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                   }
                 //}}}
-                if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size,
-                                    avFrame->nb_samples, samples, int(mStreamLast - mStreamFirst)))
+                if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, int(mStreamLast - mStreamFirst),
+                                    avFrame->nb_samples, samples))
                   thread ([=](){playThread (streaming);}).detach();
                 changed();
                 }
