@@ -61,5 +61,8 @@
     <ClInclude Include="..\common\cJpegImage.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="audio.h">
+      <Filter>h</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

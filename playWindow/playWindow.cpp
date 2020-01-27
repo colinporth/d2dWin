@@ -507,6 +507,7 @@ private:
   //}}}
   //{{{
   void playThread (bool streaming) {
+  // WASAPI play thread
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
 
@@ -514,48 +515,52 @@ private:
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
     auto device = getDefaultAudioOutputDevice();
-    device->setSampleRate (mSong.getSampleRate());
-    device->start();
+    if (device) {
+      device->setSampleRate (mSong.getSampleRate());
+      device->start();
 
-    float* srcSamples = mSong.getPlayFrameSamples();
-    int srcSamplesLeft = mSong.getSamplesPerFrame();
+      float* srcSamples = nullptr;
+      int srcSamplesLeft = 0;
 
-    while (!getExit() &&
-           !mSongChanged &&
-           (streaming || (mSong.mPlayFrame <= mSong.getLastFrame()))) {
-      device->process ([&](cAudioDevice& device, cAudioBuffer& buffer) mutable noexcept {
-        float* dstSamples = buffer.getData();
-        if (mPlaying) {
-          int samplesToCopy = 0;
-          if (buffer.getSizeFrames() > srcSamplesLeft) {
-            // copy rest of last decodeFrame
-            if (srcSamplesLeft > 0) {
-              samplesToCopy = srcSamplesLeft;
-              memcpy (dstSamples, srcSamples, samplesToCopy * buffer.getSizeChannels() * 4);
-              srcSamples += samplesToCopy * buffer.getSizeChannels();
-              dstSamples += samplesToCopy * buffer.getSizeChannels();
+      while (!getExit() &&
+             !mSongChanged &&
+             (streaming || (mSong.mPlayFrame <= mSong.getLastFrame()))) {
+        device->process ([&](cAudioDevice& device, cAudioBuffer& buffer) mutable noexcept {
+          // provide buffer.getNumFrames() of samples - buffer.getNumChannels() of interleaved float
+          float* dstSamples = buffer.getData();
+          int dstSamplesLeft = buffer.getNumSamples();
+          if (mPlaying) {
+            while (dstSamplesLeft > 0) { 
+              // loop till no dst filled
+              if (srcSamplesLeft <= 0) { 
+                // load more src
+                srcSamples = mSong.getPlayFrameSamples();
+                srcSamplesLeft = mSong.getSamplesPerFrame();
+                mSong.incPlayFrame (1);
+                }
+
+              int samplesChunk = min (srcSamplesLeft, dstSamplesLeft);
+              if (srcSamples)
+                memcpy (dstSamples, srcSamples, samplesChunk * buffer.getSampleBytes());
+              else // no more src, silence
+                memset (dstSamples, 0, samplesChunk * buffer.getNumChannels() * 4);
+              dstSamples += samplesChunk * buffer.getNumChannels();
+              dstSamplesLeft -= samplesChunk;
+              srcSamples += samplesChunk * buffer.getNumChannels();
+              srcSamplesLeft -= samplesChunk;
               }
-
-            // need more samples, point to next decodeFrame
-            mSong.incPlayFrame (1);
-            srcSamples = mSong.getPlayFrameSamples();
-            srcSamplesLeft = mSong.getSamplesPerFrame();
             }
+          else // silence
+            memset (dstSamples, 0, dstSamplesLeft * buffer.getSampleBytes());
+          });
 
-          samplesToCopy = buffer.getSizeFrames() - samplesToCopy;
-          memcpy (dstSamples, srcSamples, samplesToCopy * buffer.getSizeChannels() * 4);
-          srcSamples += samplesToCopy * buffer.getSizeChannels();
-          srcSamplesLeft -= samplesToCopy;
-          }
-        else
-          memset (dstSamples, 0, buffer.getSizeFrames() * buffer.getSizeChannels() * 4);
-        });
+        device->wait();
+        changed();
+        }
 
-      device->wait();
-      changed();
+      device->stop();
       }
 
-    device->stop();
     mPlayDoneSem.notifyAll();
 
     cLog::log (LOGINFO, "exit");

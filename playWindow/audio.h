@@ -1,4 +1,4 @@
-// simple non templated contiguous interleaved float samples
+// simple non templated channel contiguous interleaved float 32bit samples
 #pragma once
 //{{{  includes
 #define NOMINMAX
@@ -34,16 +34,19 @@ class cAudioBuffer {
 public:
   cAudioBuffer() {}
 
-  cAudioBuffer (float* data, int numFrames, int numChannels)
-      : mNumFrames(numFrames), mNumChannels(numChannels), mStride(mNumChannels) {
+  cAudioBuffer (float* data, int numSamples, int numChannels)
+      : mNumSamples(numSamples), mNumChannels(numChannels), mStride(mNumChannels) {
+
     assert (numChannels <= mMaxNumChannels);
+
+    // stride and channels pointers for channel interleaved contiguous float 32bit samples
     for (auto i = 0; i < mNumChannels; ++i)
       mChannels[i] = data + i;
     }
 
-  int getSizeFrames() const noexcept { return mNumFrames; }
-  int getSizeChannels() const noexcept { return mNumChannels; }
-  int getSizeSamples() const noexcept { return mNumChannels * mNumFrames; }
+  int getNumChannels() const noexcept { return mNumChannels; }
+  int getSampleBytes() const noexcept { return mNumChannels * sizeof(float); }
+  int getNumSamples() const noexcept { return mNumSamples; }
 
   float* getData() const noexcept { return mChannels[0]; }
 
@@ -59,7 +62,7 @@ private:
   constexpr static int mMaxNumChannels = 6;
 
   int mNumChannels = 0;
-  int mNumFrames = 0;
+  int mNumSamples = 0;
   int mStride = 0;
 
   std::array <float*, mMaxNumChannels> mChannels = {};
@@ -273,8 +276,8 @@ public:
     UINT32 current_padding = 0;
     mAudioClient->GetCurrentPadding (&current_padding);
 
-    auto num_frames_available = mBufferFrameCount - current_padding;
-    return num_frames_available > 0;
+    auto numFramesAvailable = mBufferFrameCount - current_padding;
+    return numFramesAvailable > 0;
     }
   //}}}
 
