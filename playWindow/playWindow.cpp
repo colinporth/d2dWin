@@ -513,6 +513,7 @@ private:
 
                 srcSamplesLeft = mSong.getSamplesPerFrame();
                 mSong.incPlayFrame (1);
+                changed();
                 }
 
               auto samplesChunk = min (srcSamplesLeft, dstSamplesLeft);
@@ -533,7 +534,6 @@ private:
           });
           //}}}
         device->wait();
-        changed();
         }
 
       device->stop();
