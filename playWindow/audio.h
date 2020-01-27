@@ -197,7 +197,7 @@ public:
       mName(std::move(other.mName)),
       mMixFormat(other.mMixFormat),
       mProcessingThread(std::move(other.mProcessingThread)),
-      mBufferFrameCount(other.mBufferFrameCount),
+      mNumBufferSamples(other.mNumBufferSamples),
       mIsRenderDevice(other.mIsRenderDevice),
       mStopCallback(std::move(other.mStopCallback)),
       mUserCallback(std::move(other.mUserCallback)) {
@@ -224,7 +224,7 @@ public:
     mName = std::move(other.mName);
     mMixFormat = other.mMixFormat;
     mProcessingThread = std::move(other.mProcessingThread);
-    mBufferFrameCount = other.mBufferFrameCount;
+    mNumBufferSamples = other.mNumBufferSamples;
     mIsRenderDevice = other.mIsRenderDevice;
     mStopCallback = std::move (other.mStopCallback);
     mUserCallback = std::move (other.mUserCallback);
@@ -265,7 +265,7 @@ public:
   int getNumOutputChannels() const noexcept { return isOutput() ? mMixFormat.Format.nChannels : 0; }
 
   DWORD getSampleRate() const noexcept { return mMixFormat.Format.nSamplesPerSec; }
-  UINT32 getBufferSizeFrames() const noexcept { return mBufferFrameCount; }
+  UINT32 getNumBufferSamples() const noexcept { return mNumBufferSamples; }
 
   //{{{
   bool hasUnprocessedIo() const noexcept {
@@ -273,11 +273,11 @@ public:
     if (mAudioClient == nullptr)
       return false;
 
-    UINT32 current_padding = 0;
-    mAudioClient->GetCurrentPadding (&current_padding);
+    UINT32 currentPadding = 0;
+    mAudioClient->GetCurrentPadding (&currentPadding);
 
-    auto numFramesAvailable = mBufferFrameCount - current_padding;
-    return numFramesAvailable > 0;
+    auto numSamplesAvailable = mNumBufferSamples - currentPadding;
+    return numSamplesAvailable > 0;
     }
   //}}}
 
@@ -291,8 +291,8 @@ public:
     }
   //}}}
   //{{{
-  bool setBufferSizeFrames (UINT32 bufferSize) {
-    mBufferFrameCount = bufferSize;
+  bool setNumBufferSamples (int numBufferSamples) {
+    mNumBufferSamples = numBufferSamples;
     return true;
     }
   //}}}
@@ -309,7 +309,7 @@ public:
 
     REFERENCE_TIME periodicity = 0;
     const REFERENCE_TIME ref_times_per_second = 10'000'000;
-    REFERENCE_TIME buffer_duration = (ref_times_per_second * mBufferFrameCount) / mMixFormat.Format.nSamplesPerSec;
+    REFERENCE_TIME buffer_duration = (ref_times_per_second * mNumBufferSamples) / mMixFormat.Format.nSamplesPerSec;
     HRESULT hr = mAudioClient->Initialize (AUDCLNT_SHAREMODE_SHARED,
                                            AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
                                            buffer_duration, periodicity, &mMixFormat.Format, nullptr);
@@ -322,7 +322,7 @@ public:
     mAudioClient->GetService (cWaspiUtil::getIAudioCaptureClientInterfaceId(), reinterpret_cast<void**>(&mAudioCaptureClient));
 
     // TODO: Make sure to clean up more gracefully from errors
-    if (FAILED (mAudioClient->GetBufferSize (&mBufferFrameCount)))
+    if (FAILED (mAudioClient->GetBufferSize (&mNumBufferSamples)))
       return false;
     if (FAILED (mAudioClient->SetEventHandle (mEventHandle)))
       return false;
@@ -344,14 +344,14 @@ public:
     if (isOutput()) {
       UINT32 currentPadding = 0;
       mAudioClient->GetCurrentPadding (&currentPadding);
-      int numFramesAvailable = mBufferFrameCount - currentPadding;
-      if (numFramesAvailable) {
+      int numSamplesAvailable = mNumBufferSamples - currentPadding;
+      if (numSamplesAvailable) {
         BYTE* data = nullptr;
-        mAudioRenderClient->GetBuffer (numFramesAvailable, &data);
+        mAudioRenderClient->GetBuffer (numSamplesAvailable, &data);
         if (data) {
-          cAudioBuffer audioBuffer = { reinterpret_cast<float*>(data), numFramesAvailable, mMixFormat.Format.nChannels };
+          cAudioBuffer audioBuffer = { reinterpret_cast<float*>(data), numSamplesAvailable, mMixFormat.Format.nChannels };
           callback (*this, audioBuffer);
-          mAudioRenderClient->ReleaseBuffer (numFramesAvailable, 0);
+          mAudioRenderClient->ReleaseBuffer (numSamplesAvailable, 0);
           }
         }
       }
@@ -489,7 +489,7 @@ private:
 
   bool mIsRenderDevice = true;
   WAVEFORMATEXTENSIBLE mMixFormat;
-  UINT32 mBufferFrameCount = 0;
+  UINT32 mNumBufferSamples = 0;
 
   std::thread mProcessingThread;
 
