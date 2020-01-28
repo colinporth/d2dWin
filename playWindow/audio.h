@@ -3,28 +3,22 @@
 //{{{  includes
 #define NOMINMAX
 
-#include <optional>
 #include <cassert>
-#include <chrono>
 #include <cctype>
 #include <codecvt>
 
 #include <string>
-#include <iostream>
 #include <vector>
 
+#include <optional>
 #include <functional>
-#include <thread>
 #include <forward_list>
-#include <atomic>
-#include <string_view>
 
 #include <initguid.h>
 #include <audioclient.h>
 #include <mmdeviceapi.h>
 #include <Functiondiscoverykeys_devpkey.h>
 
-#include <variant>
 #include <array>
 //}}}
 
@@ -198,8 +192,7 @@ public:
       mMixFormat(other.mMixFormat),
       mNumBufferSamples(other.mNumBufferSamples),
       mIsRenderDevice(other.mIsRenderDevice),
-      mStopCallback(std::move(other.mStopCallback)),
-      mUserCallback(std::move(other.mUserCallback)) {
+      mStopCallback(std::move(other.mStopCallback)) {
 
     other.mDevice = nullptr;
     other.mAudioClient = nullptr;
@@ -225,7 +218,6 @@ public:
     mNumBufferSamples = other.mNumBufferSamples;
     mIsRenderDevice = other.mIsRenderDevice;
     mStopCallback = std::move (other.mStopCallback);
-    mUserCallback = std::move (other.mUserCallback);
 
     other.mDevice = nullptr;
     other.mAudioClient = nullptr;
@@ -542,7 +534,6 @@ private:
   int mSrcSamplesLeft = 0;
 
   std::function <void (cAudioDevice&)> mStopCallback;
-  std::variant <std::function<void (cAudioDevice&, cAudioBuffer&)>> mUserCallback;
 
   cWaspiUtil::cComInitializer mComInitializer;
   };
