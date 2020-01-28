@@ -347,8 +347,9 @@ public:
     }
   //}}}
   //{{{
-  void process (const std::function<void (float*&, int&, int)>& loadSrcCallback) {
-  // fill dst buffer, callback asks for more src samples
+  void process (const std::function<void (float*& srcSamples, int& srcSamplesLeft,
+                                          int dstSamplesLeft, int dstSamplesAvailable)>& loadSrcCallback) {
+  // process fills dst buffer, callback asks for srcSamples
 
     if (isOutput()) {
       UINT32 currentPadding = 0;
@@ -361,16 +362,16 @@ public:
           auto dstSamples = reinterpret_cast<float*>(dstBytes);
           auto dstSamplesLeft = dstSamplesAvailable;
           while (dstSamplesLeft > 0) {
-            // loop till dst filled
+            // loop till dst buffer filled
             if (mSrcSamplesLeft <= 0)
-              loadSrcCallback (mSrcSamples, mSrcSamplesLeft, dstSamplesLeft);
+              loadSrcCallback (mSrcSamples, mSrcSamplesLeft, dstSamplesLeft, dstSamplesAvailable);
 
             auto samplesChunk = std::min (mSrcSamplesLeft, dstSamplesLeft);
             if (mSrcSamples) {
               memcpy (dstSamples, mSrcSamples, samplesChunk * mMixFormat.Format.nChannels * sizeof(float));
               mSrcSamples += samplesChunk * mMixFormat.Format.nChannels;
               }
-            else // no more src, pad out with silence
+            else // no more srcSamples, pad out with silence
               memset (dstSamples, 0, samplesChunk * mMixFormat.Format.nChannels * sizeof(float));
             mSrcSamplesLeft -= samplesChunk;
 
@@ -382,11 +383,13 @@ public:
           }
         }
       }
+
+    WaitForSingleObject (mEventHandle, INFINITE); 
     }
   //}}}
   //{{{
   void process (const std::function<void (cAudioBuffer&)>& loadDstCallback) {
-  // fill dst buffer, callback asks for dst samples
+  // process fill dst buffer, callback asks for dstSamples
 
     if (isOutput()) {
       UINT32 currentPadding = 0;
@@ -417,10 +420,10 @@ public:
           }
         }
       }
+
+    WaitForSingleObject (mEventHandle, INFINITE);
     }
   //}}}
-
-  void wait() const { WaitForSingleObject (mEventHandle, INFINITE); }
   //{{{
   bool stop() {
 
@@ -449,13 +452,13 @@ private:
                                    reinterpret_cast<void**>(&mAudioClient))))
       return;
 
+    // getFormat
     WAVEFORMATEX* deviceMixFormat;
     if (FAILED (mAudioClient->GetMixFormat (&deviceMixFormat))) {
       cLog::log (LOGERROR, "AudioClient->deviceMixFormat failed");
       return;
       }
     auto* deviceMixFormatEx = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(deviceMixFormat);
-
     mMixFormat = *deviceMixFormatEx;
     CoTaskMemFree (deviceMixFormat);
     }
