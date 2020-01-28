@@ -347,32 +347,30 @@ public:
     }
   //}}}
   //{{{
-  void process (const std::function<void (float*&, int&)>& callback) {
-  // callback ask for src samples
+  void process (const std::function<void (float*&, int&, int)>& loadSrcCallback) {
+  // fill dst buffer, callback asks for more src samples
 
     if (isOutput()) {
       UINT32 currentPadding = 0;
       mAudioClient->GetCurrentPadding (&currentPadding);
-      int numSamplesAvailable = mNumBufferSamples - currentPadding;
-      if (numSamplesAvailable) {
-        BYTE* data = nullptr;
-        mAudioRenderClient->GetBuffer (numSamplesAvailable, &data);
-        if (data) {
-          auto dstSamples = reinterpret_cast<float*>(data);
-          auto dstSamplesLeft = numSamplesAvailable;
-          cLog::log (LOGINFO, " process %d", dstSamplesLeft);
-
+      int dstSamplesAvailable = mNumBufferSamples - currentPadding;
+      if (dstSamplesAvailable) {
+        BYTE* dstBytes = nullptr;
+        mAudioRenderClient->GetBuffer (dstSamplesAvailable, &dstBytes);
+        if (dstBytes) {
+          auto dstSamples = reinterpret_cast<float*>(dstBytes);
+          auto dstSamplesLeft = dstSamplesAvailable;
           while (dstSamplesLeft > 0) {
-            // loop till no dst filled
-            if (mSrcSamplesLeft <= 0) // load more src
-              callback (mSrcSamples, mSrcSamplesLeft);
+            // loop till dst filled
+            if (mSrcSamplesLeft <= 0)
+              loadSrcCallback (mSrcSamples, mSrcSamplesLeft, dstSamplesLeft);
 
             auto samplesChunk = std::min (mSrcSamplesLeft, dstSamplesLeft);
             if (mSrcSamples) {
               memcpy (dstSamples, mSrcSamples, samplesChunk * mMixFormat.Format.nChannels * sizeof(float));
               mSrcSamples += samplesChunk * mMixFormat.Format.nChannels;
               }
-            else // no more src, silence
+            else // no more src, pad out with silence
               memset (dstSamples, 0, samplesChunk * mMixFormat.Format.nChannels * sizeof(float));
             mSrcSamplesLeft -= samplesChunk;
 
@@ -380,15 +378,15 @@ public:
             dstSamplesLeft -= samplesChunk;
             }
 
-          mAudioRenderClient->ReleaseBuffer (numSamplesAvailable, 0);
+          mAudioRenderClient->ReleaseBuffer (dstSamplesAvailable, 0);
           }
         }
       }
     }
   //}}}
   //{{{
-  void process (const std::function<void (cAudioDevice&, cAudioBuffer&)>& callback) {
-  // callback to ask for dst samples
+  void process (const std::function<void (cAudioBuffer&)>& loadDstCallback) {
+  // fill dst buffer, callback asks for dst samples
 
     if (isOutput()) {
       UINT32 currentPadding = 0;
@@ -399,7 +397,7 @@ public:
         mAudioRenderClient->GetBuffer (numSamplesAvailable, &data);
         if (data) {
           cAudioBuffer audioBuffer = { reinterpret_cast<float*>(data), numSamplesAvailable, mMixFormat.Format.nChannels };
-          callback (*this, audioBuffer);
+          loadDstCallback(audioBuffer);
           mAudioRenderClient->ReleaseBuffer (numSamplesAvailable, 0);
           }
         }
@@ -414,7 +412,7 @@ public:
         mAudioCaptureClient->GetBuffer (&data, &nextPacketSize, &flags, nullptr, nullptr);
         if (data) {
           cAudioBuffer audioBuffer = { reinterpret_cast<float*>(data), (int)nextPacketSize, mMixFormat.Format.nChannels };
-          callback (*this, audioBuffer);
+          loadDstCallback (audioBuffer);
           mAudioCaptureClient->ReleaseBuffer (nextPacketSize);
           }
         }

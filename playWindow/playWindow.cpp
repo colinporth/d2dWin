@@ -14,7 +14,7 @@
 
 using namespace std;
 //}}}
-#define DECODE_PLAY_FRAME
+//#define DECODE_PLAY_FRAME
 #define ASK_SRC_SAMPLES
 
 class cAppWindow : public cD2dWindow {
@@ -26,11 +26,11 @@ public:
 
     initialise (title, width, height, false);
 
-    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
-    add (new cClockBox (this, 40.f, mTimePoint), -135.f,35.f);
-
     mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, mSong.mImage);
     add (mJpegImageView);
+
+    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
+    add (new cClockBox (this, 40.f, mTimePoint), -135.f,35.f);
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
@@ -450,12 +450,16 @@ private:
 
       while (!getExit() &&
              !mSongChanged &&
-             (streaming || (mSong.mPlayFrame <= mSong.getLastFrame()))) {
-        #ifdef ASK_SRC_SAMPLES
-          //{{{
-          device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
+             (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
+        if (mPlaying) {
+          cLog::log (LOGINFO1, "play buffer");
 
-            if (mPlaying) {
+          #ifdef ASK_SRC_SAMPLES
+            //{{{
+            device->process ([&](float*& srcSamples, int& numSrcSamples, int numDstSamples) mutable noexcept {
+
+              cLog::log (LOGINFO2, "process src %d dst:%d", mSong.getSamplesPerFrame(), numDstSamples);
+
               #ifdef DECODE_PLAY_FRAME
                 int skip;
                 int sampleRate;
@@ -504,24 +508,21 @@ private:
               #else
                 srcSamples = mSong.getPlayFrameSamples();
               #endif
+              numSrcSamples = mSong.getSamplesPerFrame();
 
               mSong.incPlayFrame (1);
               changed();
-              }
-            else
-              srcSamples = nullptr;
+              });
+            //}}}
+          #else // ask dst samples
+            //{{{
+            device->process ([&](cAudioBuffer& buffer) mutable noexcept {
 
-            numSrcSamples = mSong.getSamplesPerFrame();
-            });
-          //}}}
-        #else
-          //{{{
-          device->process ([&](cAudioDevice& device, cAudioBuffer& buffer) mutable noexcept {
+              cLog::log (LOGINFO2, "process dst %d", buffer.getNumSamples());
 
-            auto dstSamples = buffer.getData();
-            auto dstSamplesLeft = buffer.getNumSamples();
+              auto dstSamples = buffer.getData();
+              auto dstSamplesLeft = buffer.getNumSamples();
 
-            if (mPlaying) {
               while (dstSamplesLeft > 0) {
                 // loop till dst filled
                 if (srcSamplesLeft <= 0) {
@@ -581,24 +582,23 @@ private:
                   }
 
                 auto samplesChunk = min (srcSamplesLeft, dstSamplesLeft);
-                if (srcSamples)
+                if (srcSamples) {
                   memcpy (dstSamples, srcSamples, samplesChunk * buffer.getSampleBytes());
-                else // no src, play silence
+                  srcSamples += samplesChunk * buffer.getNumChannels();
+                  }
+                else // no more src, pad out with silence
                   memset (dstSamples, 0, samplesChunk * buffer.getSampleBytes());
-
+                srcSamplesLeft -= samplesChunk;
                 dstSamples += samplesChunk * buffer.getNumChannels();
                 dstSamplesLeft -= samplesChunk;
-                srcSamples += samplesChunk * buffer.getNumChannels();
-                srcSamplesLeft -= samplesChunk;
                 }
-              }
-            else // play silence
-              memset (dstSamples, 0, dstSamplesLeft * buffer.getSampleBytes());
-            });
-          //}}}
-        #endif
-        device->wait();
-        }
+              });
+            //}}}
+          #endif
+          device->wait();
+          }
+         else
+          Sleep (10);
 
       device->stop();
       }
