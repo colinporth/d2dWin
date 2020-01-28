@@ -420,10 +420,8 @@ private:
   //}}}
   //{{{
   void playThread (bool streaming) {
-  // WASAPI play thread
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
-
     cLog::setThreadName ("play");
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
@@ -443,11 +441,11 @@ private:
     auto device = getDefaultAudioOutputDevice();
     if (device) {
       device->setSampleRate (mSong.getSampleRate());
-      device->start();
 
       float* srcSamples = nullptr;
       int srcSamplesLeft = 0;
 
+      device->start();
       while (!getExit() &&
              !mSongChanged &&
              (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
@@ -597,7 +595,7 @@ private:
           #endif
           device->wait();
           }
-         else
+        else
           Sleep (10);
 
       device->stop();
