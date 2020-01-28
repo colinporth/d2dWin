@@ -196,7 +196,6 @@ public:
       mDeviceId(std::move(other.mDeviceId)),
       mName(std::move(other.mName)),
       mMixFormat(other.mMixFormat),
-      mProcessingThread(std::move(other.mProcessingThread)),
       mNumBufferSamples(other.mNumBufferSamples),
       mIsRenderDevice(other.mIsRenderDevice),
       mStopCallback(std::move(other.mStopCallback)),
@@ -223,7 +222,6 @@ public:
     mDeviceId = std::move(other.mDeviceId);
     mName = std::move(other.mName);
     mMixFormat = other.mMixFormat;
-    mProcessingThread = std::move(other.mProcessingThread);
     mNumBufferSamples = other.mNumBufferSamples;
     mIsRenderDevice = other.mIsRenderDevice;
     mStopCallback = std::move (other.mStopCallback);
@@ -285,7 +283,8 @@ public:
   bool setSampleRate (DWORD sampleRate) {
 
     mMixFormat.Format.nSamplesPerSec = sampleRate;
-    fixupMixFormat();
+    mMixFormat.Format.nBlockAlign = mMixFormat.Format.nChannels * mMixFormat.Format.wBitsPerSample / 8;
+    mMixFormat.Format.nAvgBytesPerSec = mMixFormat.Format.nSamplesPerSec * mMixFormat.Format.wBitsPerSample * mMixFormat.Format.nChannels / 8;
 
     return true;
     }
@@ -300,46 +299,109 @@ public:
   //{{{
   bool start() {
 
-    if (mAudioClient == nullptr)
+    if (mAudioClient == nullptr) {
+      //{{{
+      cLog::log (LOGERROR, "audioClient failed");
       return false;
+      }
+      //}}}
 
-    mEventHandle = CreateEvent (nullptr, FALSE, FALSE, nullptr);
-    if (mEventHandle == nullptr)
+    REFERENCE_TIME hnsRequestedDuration = 0;
+    if (FAILED (mAudioClient->GetDevicePeriod (NULL, &hnsRequestedDuration))) {
+      //{{{
+      cLog::log (LOGERROR, "AudioClient->GetDevicePeriod failed");
       return false;
+      }
+      //}}}
 
-    REFERENCE_TIME periodicity = 0;
-    const REFERENCE_TIME ref_times_per_second = 10'000'000;
-    REFERENCE_TIME buffer_duration = (ref_times_per_second * mNumBufferSamples) / mMixFormat.Format.nSamplesPerSec;
-    HRESULT hr = mAudioClient->Initialize (AUDCLNT_SHAREMODE_SHARED,
-                                           AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-                                           buffer_duration, periodicity, &mMixFormat.Format, nullptr);
-    // TODO: Deal with AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED return code by resetting the buffer_duration and retrying:
-    // https://docs.microsoft.com/en-us/windows/desktop/api/audioclient/nf-audioclient-iaudioclient-initialize
-    if (FAILED(hr))
+    if (FAILED (mAudioClient->Initialize (AUDCLNT_SHAREMODE_SHARED,
+                                          AUDCLNT_STREAMFLAGS_RATEADJUST | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                                          hnsRequestedDuration, hnsRequestedDuration,
+                                          &mMixFormat.Format, nullptr))) {
+      //{{{
+      cLog::log (LOGERROR, "AudioClient->Initialize failed");
       return false;
+      }
+      //}}}
 
     mAudioClient->GetService (cWaspiUtil::getIAudioRenderClientInterfaceId(), reinterpret_cast<void**>(&mAudioRenderClient));
     mAudioClient->GetService (cWaspiUtil::getIAudioCaptureClientInterfaceId(), reinterpret_cast<void**>(&mAudioCaptureClient));
 
-    // TODO: Make sure to clean up more gracefully from errors
-    if (FAILED (mAudioClient->GetBufferSize (&mNumBufferSamples)))
+    if (FAILED (mAudioClient->GetBufferSize (&mNumBufferSamples))) {
+      //{{{
+      cLog::log (LOGERROR, "AudioClient->GetBufferSize failed");
       return false;
-    if (FAILED (mAudioClient->SetEventHandle (mEventHandle)))
+      }
+      //}}}
+
+    mEventHandle = CreateEvent (nullptr, FALSE, FALSE, nullptr);
+    if (mEventHandle == nullptr) {
+      //{{{
+      cLog::log (LOGERROR, "start - createEvent failed");
       return false;
-    if (FAILED (hr = mAudioClient->Start()))
+      }
+      //}}}
+    if (FAILED (mAudioClient->SetEventHandle (mEventHandle))) {
+      //{{{
+      cLog::log (LOGERROR, "AudioClient->SetEventHandle failed");
       return false;
+      }
+      //}}}
+
+    if (FAILED (mAudioClient->Start()))  {
+      //{{{
+      cLog::log (LOGERROR, "AudioClient->Start failed");
+      return false;
+      }
+      //}}}
+
+    mSrcSamples = nullptr;
+    mSrcSamplesLeft = 0;
 
     return true;
     }
   //}}}
   //{{{
+  void process (const std::function<void (float*&, int&)>& callback) {
+
+    if (isOutput()) {
+      UINT32 currentPadding = 0;
+      mAudioClient->GetCurrentPadding (&currentPadding);
+      int numSamplesAvailable = mNumBufferSamples - currentPadding;
+      if (numSamplesAvailable) {
+        BYTE* data = nullptr;
+        mAudioRenderClient->GetBuffer (numSamplesAvailable, &data);
+        if (data) {
+          auto dstSamples = reinterpret_cast<float*>(data);
+          auto dstSamplesLeft = numSamplesAvailable;
+          cLog::log (LOGINFO, " process %d", dstSamplesLeft);
+
+          while (dstSamplesLeft > 0) {
+            // loop till no dst filled
+            if (mSrcSamplesLeft <= 0) // load more src
+              callback (mSrcSamples, mSrcSamplesLeft);
+
+            auto samplesChunk = std::min (mSrcSamplesLeft, dstSamplesLeft);
+            if (mSrcSamples)
+              memcpy (dstSamples, mSrcSamples, samplesChunk * mMixFormat.Format.nChannels * sizeof(float));
+            else // no more src, silence
+              memset (dstSamples, 0, samplesChunk * mMixFormat.Format.nChannels * sizeof(float));
+
+            dstSamples += samplesChunk * mMixFormat.Format.nChannels;
+            dstSamplesLeft -= samplesChunk;
+            if (mSrcSamples)
+              mSrcSamples += samplesChunk * mMixFormat.Format.nChannels;
+            mSrcSamplesLeft -= samplesChunk;
+            }
+
+          mAudioRenderClient->ReleaseBuffer (numSamplesAvailable, 0);
+          }
+        }
+      }
+    }
+  //}}}
+  //{{{
   void process (const std::function<void (cAudioDevice&, cAudioBuffer&)>& callback) {
-
-    if (mMixFormat.SubFormat != KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
-      throw sAudioDeviceException ("Attempting to process a callback for a sample type that does not match the configured sample type.");
-
-    if (mAudioClient == nullptr)
-      return;
 
     if (isOutput()) {
       UINT32 currentPadding = 0;
@@ -372,12 +434,11 @@ public:
       }
     }
   //}}}
+
   void wait() const { WaitForSingleObject (mEventHandle, INFINITE); }
   //{{{
   bool stop() {
 
-    if (mProcessingThread.joinable())
-      mProcessingThread.join();
     if (mAudioClient != nullptr)
       mAudioClient->Stop();
     if (mEventHandle != nullptr)
@@ -395,20 +456,27 @@ private:
 
     // TODO: Handle errors better.  Maybe by throwing exceptions?
     if (mDevice == nullptr)
-      throw sAudioDeviceException("IMMDevice is null.");
+      throw sAudioDeviceException ("IMMDevice is null.");
 
     initDeviceIdName();
     if (mDeviceId.empty())
-      throw sAudioDeviceException("Could not get device id.");
+      throw sAudioDeviceException ("Could not get device id.");
 
     if (mName.empty())
-      throw sAudioDeviceException("Could not get device name.");
+      throw sAudioDeviceException ("Could not get device name.");
 
     initAudioClient();
     if (mAudioClient == nullptr)
       return;
 
-    initMixFormat();
+    WAVEFORMATEX* deviceMixFormat;
+    if (FAILED (mAudioClient->GetMixFormat (&deviceMixFormat))) {
+      cLog::log (LOGERROR, "AudioClient->deviceMixFormat failed");
+      return;
+      }
+    auto* deviceMixFormatEx = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(deviceMixFormat);
+    mMixFormat = *deviceMixFormatEx;
+    CoTaskMemFree (deviceMixFormat);
     }
   //}}}
 
@@ -456,27 +524,6 @@ private:
       return;
     }
   //}}}
-  //{{{
-  void initMixFormat() {
-
-    WAVEFORMATEX* deviceMixFormat;
-    HRESULT hr = mAudioClient->GetMixFormat (&deviceMixFormat);
-    if (FAILED (hr))
-      return;
-
-    auto* deviceMixFormatEx = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(deviceMixFormat);
-    mMixFormat = *deviceMixFormatEx;
-
-    CoTaskMemFree (deviceMixFormat);
-    }
-  //}}}
-  //{{{
-  void fixupMixFormat() {
-
-    mMixFormat.Format.nBlockAlign = mMixFormat.Format.nChannels * mMixFormat.Format.wBitsPerSample / 8;
-    mMixFormat.Format.nAvgBytesPerSec = mMixFormat.Format.nSamplesPerSec * mMixFormat.Format.wBitsPerSample * mMixFormat.Format.nChannels / 8;
-    }
-  //}}}
 
   IMMDevice* mDevice = nullptr;
   IAudioClient* mAudioClient = nullptr;
@@ -491,7 +538,8 @@ private:
   WAVEFORMATEXTENSIBLE mMixFormat;
   UINT32 mNumBufferSamples = 0;
 
-  std::thread mProcessingThread;
+  float* mSrcSamples = nullptr;
+  int mSrcSamplesLeft = 0;
 
   std::function <void (cAudioDevice&)> mStopCallback;
   std::variant <std::function<void (cAudioDevice&, cAudioBuffer&)>> mUserCallback;

@@ -450,14 +450,84 @@ private:
              !mSongChanged &&
              (streaming || (mSong.mPlayFrame <= mSong.getLastFrame()))) {
         device->process ([&](cAudioDevice& device, cAudioBuffer& buffer) mutable noexcept {
-          //{{{  lambda - fills buffer with getNumSamples() * getNumChannels() of interleaved float 32bit samples
+        #ifdef ASK_SRC_SAMPLESE
+          //{{{  lambda - asks for src samples
+          device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
+            if (mPlaying) {
+              #ifdef DECODE_FRAME
+                //{{{  decode frame again
+                int skip;
+                int sampleRate;
+                eAudioFrameType frameType;
+                if (parseAudioFrame (mStreamFirst + mSong.getPlayFrameStreamIndex(), mStreamLast,
+                                     avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
+                  if (frameType == mSong.getAudioFrameType()) {
+                    auto ret = avcodec_send_packet (context, &avPacket);
+                    while (ret >= 0) {
+                      ret = avcodec_receive_frame (context, avFrame);
+                      if ((ret == AVERROR_EOF) || (ret < 0))
+                        break;
+                      if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
+                        //{{{  covert planar avFrame->data to interleaved float samples
+                        switch (context->sample_fmt) {
+                          case AV_SAMPLE_FMT_S16P: // 16bit signed planar
+                            for (auto channel = 0; channel < avFrame->channels; channel++) {
+                              auto srcPtr = (int16_t*)avFrame->data[channel];
+                              auto dstPtr = (float*)(samples) + channel;
+                              for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+                                *dstPtr = *srcPtr++ / float(0x8000);
+                                dstPtr += avFrame->channels;
+                                }
+                              }
+                            break;
+
+                          case AV_SAMPLE_FMT_FLTP: // 32bit float planar
+                            for (auto channel = 0; channel < avFrame->channels; channel++) {
+                              auto srcPtr = (float*)avFrame->data[channel];
+                              auto dstPtr = (float*)(samples) + channel;
+                              for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+                                *dstPtr = *srcPtr++;
+                                dstPtr += avFrame->channels;
+                                }
+                              }
+                            break;
+
+                          default:
+                            cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
+                          }
+                        //}}}
+                        }
+                      }
+                    }
+                  }
+
+                srcSamples = samples;
+                //}}}
+              #else
+                srcSamples = mSong.getPlayFrameSamples();
+              #endif
+
+              mSong.incPlayFrame (1);
+              changed();
+              }
+            else
+              srcSamples = nullptr;
+
+            numSrcSamples = mSong.getSamplesPerFrame();
+            });
+          //}}}
+        #else
+          //{{{  lambda - asks for dst samples
           auto dstSamples = buffer.getData();
           auto dstSamplesLeft = buffer.getNumSamples();
+          cLog::log (LOGINFO, " process %d", dstSamplesLeft);
 
           if (mPlaying) {
             while (dstSamplesLeft > 0) {
               // loop till no dst filled
               if (srcSamplesLeft <= 0) {
+                cLog::log (LOGINFO, "load frame %d", mSong.getPlayFrame());
+
                 // load more src
                 #ifdef DECODE_FRAME
                   //{{{  decode frame again
@@ -533,6 +603,7 @@ private:
 
           });
           //}}}
+        #endif
         device->wait();
         }
 
