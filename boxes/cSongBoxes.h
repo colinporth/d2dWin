@@ -286,7 +286,7 @@ private:
     }
   //}}}
 
-  float* mSummedValues;
+  float* mSummedValues = nullptr;
   int mSummedFrame = -1;
   int mMaxSummedX = 0;
 
