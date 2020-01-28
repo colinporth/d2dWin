@@ -380,7 +380,7 @@ private:
                 //}}}
                 if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, int(mStreamLast - mStreamFirst),
                                     avFrame->nb_samples, samples))
-                  thread ([=](){playThread (streaming);}).detach();
+                  thread ([=](){ playThread (streaming); }).detach();
                 changed();
                 }
               }

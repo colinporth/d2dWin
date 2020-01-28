@@ -291,13 +291,6 @@ public:
   //{{{
   bool start() {
 
-    if (mAudioClient == nullptr) {
-      //{{{
-      cLog::log (LOGERROR, "audioClient failed");
-      return false;
-      }
-      //}}}
-
     REFERENCE_TIME hnsRequestedDuration = 0;
     if (FAILED (mAudioClient->GetDevicePeriod (NULL, &hnsRequestedDuration))) {
       //{{{
@@ -448,19 +441,14 @@ private:
   cAudioDevice (IMMDevice* device, bool isRenderDevice)
       : mDevice(device), mIsRenderDevice(isRenderDevice) {
 
-    // TODO: Handle errors better.  Maybe by throwing exceptions?
-    if (mDevice == nullptr)
-      throw sAudioDeviceException ("IMMDevice is null.");
-
     initDeviceIdName();
     if (mDeviceId.empty())
       throw sAudioDeviceException ("Could not get device id.");
-
     if (mName.empty())
       throw sAudioDeviceException ("Could not get device name.");
 
-    initAudioClient();
-    if (mAudioClient == nullptr)
+    if (FAILED (mDevice->Activate (cWaspiUtil::getIAudioClientInterfaceId(), CLSCTX_ALL, nullptr,
+                                   reinterpret_cast<void**>(&mAudioClient))))
       return;
 
     WAVEFORMATEX* deviceMixFormat;
@@ -469,6 +457,7 @@ private:
       return;
       }
     auto* deviceMixFormatEx = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(deviceMixFormat);
+
     mMixFormat = *deviceMixFormatEx;
     CoTaskMemFree (deviceMixFormat);
     }
@@ -478,8 +467,7 @@ private:
   void initDeviceIdName() {
 
     LPWSTR deviceId = nullptr;
-    HRESULT hr = mDevice->GetId (&deviceId);
-    if (SUCCEEDED (hr)) {
+    if (SUCCEEDED (mDevice->GetId (&deviceId))) {
       mDeviceId = deviceId;
       CoTaskMemFree (deviceId);
       }
@@ -487,14 +475,12 @@ private:
     IPropertyStore* property_store = nullptr;
     cWaspiUtil::cAutoRelease auto_release_property_store { property_store };
 
-    hr = mDevice->OpenPropertyStore (STGM_READ, &property_store);
-    if (SUCCEEDED(hr)) {
+    if (SUCCEEDED (mDevice->OpenPropertyStore (STGM_READ, &property_store))) {
       PROPVARIANT property_variant;
       PropVariantInit (&property_variant);
 
       auto try_acquire_name = [&](const auto& property_name) {
-        hr = property_store->GetValue (property_name, &property_variant);
-        if (SUCCEEDED(hr)) {
+        if (SUCCEEDED (property_store->GetValue (property_name, &property_variant))) {
           mName = cWaspiUtil::convertString (property_variant.pwszVal);
           return true;
           }
@@ -508,14 +494,6 @@ private:
 
       PropVariantClear (&property_variant);
       }
-    }
-  //}}}
-  //{{{
-  void initAudioClient() {
-
-    HRESULT hr = mDevice->Activate (cWaspiUtil::getIAudioClientInterfaceId(), CLSCTX_ALL, nullptr, reinterpret_cast<void**>(&mAudioClient));
-    if (FAILED(hr))
-      return;
     }
   //}}}
 
@@ -574,9 +552,8 @@ private:
   //{{{
   cAudioDeviceMonitor() {
 
-    HRESULT hr = CoCreateInstance (__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER,
-                                   __uuidof(IMMDeviceEnumerator), (void**)&mEnumerator);
-    if (FAILED(hr))
+    if (FAILED (CoCreateInstance (__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER,
+                                  __uuidof(IMMDeviceEnumerator), (void**)&mEnumerator)))
       throw sAudioDeviceException ("Could not create device enumerator");
     }
   //}}}
@@ -730,15 +707,13 @@ private:
     IMMDeviceEnumerator* enumerator = nullptr;
     cWaspiUtil::cAutoRelease enumerator_release { enumerator };
 
-    HRESULT hr = CoCreateInstance (cWaspiUtil::getMMDeviceEnumeratorClassId(), nullptr,
+    if (FAILED (CoCreateInstance (cWaspiUtil::getMMDeviceEnumeratorClassId(), nullptr,
                                    CLSCTX_ALL, cWaspiUtil::getIMMDeviceEnumeratorInterfaceId(),
-                                   reinterpret_cast<void**>(&enumerator));
-    if (FAILED (hr))
+                                   reinterpret_cast<void**>(&enumerator))))
       return std::nullopt;
 
     IMMDevice* device = nullptr;
-    hr = enumerator->GetDefaultAudioEndpoint (outputDevice ? eRender : eCapture, eConsole, &device);
-    if (FAILED(hr))
+    if (FAILED (enumerator->GetDefaultAudioEndpoint (outputDevice ? eRender : eCapture, eConsole, &device)))
       return std::nullopt;
 
     try {
@@ -756,30 +731,26 @@ private:
 
     IMMDeviceEnumerator* enumerator = nullptr;
     cWaspiUtil::cAutoRelease enumerator_release { enumerator };
-    HRESULT hr = CoCreateInstance (cWaspiUtil::getMMDeviceEnumeratorClassId(), nullptr,
-                                   CLSCTX_ALL, cWaspiUtil::getIMMDeviceEnumeratorInterfaceId(),
-                                   reinterpret_cast<void**>(&enumerator));
-    if (FAILED(hr))
+    if (FAILED (CoCreateInstance (cWaspiUtil::getMMDeviceEnumeratorClassId(), nullptr,
+                                  CLSCTX_ALL, cWaspiUtil::getIMMDeviceEnumeratorInterfaceId(),
+                                  reinterpret_cast<void**>(&enumerator))))
       return {};
 
     IMMDeviceCollection* device_collection = nullptr;
     cWaspiUtil::cAutoRelease collection_release { device_collection };
 
     EDataFlow selected_data_flow = outputDevices ? eRender : eCapture;
-    hr = enumerator->EnumAudioEndpoints (selected_data_flow, DEVICE_STATE_ACTIVE, &device_collection);
-    if (FAILED (hr))
+    if (FAILED (enumerator->EnumAudioEndpoints (selected_data_flow, DEVICE_STATE_ACTIVE, &device_collection)))
       return {};
 
     UINT device_count = 0;
-    hr = device_collection->GetCount (&device_count);
-    if (FAILED (hr))
+    if (FAILED (device_collection->GetCount (&device_count)))
       return {};
 
     std::vector<IMMDevice*> devices;
     for (UINT i = 0; i < device_count; i++) {
       IMMDevice* device = nullptr;
-      hr = device_collection->Item (i, &device);
-      if (FAILED(hr)) {
+      if (FAILED (device_collection->Item (i, &device))) {
         if (device != nullptr)
           device->Release();
         continue;
