@@ -311,12 +311,14 @@ private:
       // sampleRate for aac-sbr wrong in header, fixup later, use a maxValue for samples alloc
       int streamSampleRate;
       auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, streamSampleRate);
-      mSong.init (audioFrameType, 2, audioFrameType == eMp3 ? 1152 : 2048, streamSampleRate);
 
       bool songDone = false;
       auto stream = mStreamFirst;
       if (audioFrameType == eWav) {
         //{{{  float 32bit interleaved wav uses mapped stream directly
+        auto frameSamples = 1024;
+        mSong.init (audioFrameType, 2, frameSamples, streamSampleRate);
+
         int skip;
         int sampleRate;
         eAudioFrameType frameType;
@@ -324,11 +326,9 @@ private:
         int dataSize = 0;
         parseAudioFrame (stream, mStreamLast, data, dataSize, frameType, skip, sampleRate);
 
-        auto frameSamples = 2048;
         auto frameSampleBytes = frameSamples * 2 * 4;
         while (!getExit() && !mSongChanged && !songDone) {
-          if (mSong.addFrame (uint32_t(data - mStreamFirst), frameSampleBytes, int(mStreamLast - mStreamFirst),
-                              frameSamples, (float*)data))
+          if (mSong.addFrame (uint32_t(data - mStreamFirst), frameSampleBytes, dataSize, frameSamples, (float*)data))
             thread ([=](){ playThread (false); }).detach();
 
           data += frameSampleBytes;
@@ -339,6 +339,8 @@ private:
         }
         //}}}
       else {
+        mSong.init (audioFrameType, 2, audioFrameType == eMp3 ? 1152 : 2048, streamSampleRate);
+
         //{{{  add jpeg if available
         int jpegLen = 0;
         auto jpegBuf = parseId3Tag (mStreamFirst, mStreamLast, jpegLen);
