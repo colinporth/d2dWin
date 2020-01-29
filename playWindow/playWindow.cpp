@@ -317,17 +317,24 @@ private:
       auto stream = mStreamFirst;
       if (audioFrameType == eWav) {
         //{{{  float 32bit interleaved wav uses mapped stream directly
+        int skip;
+        int sampleRate;
+        eAudioFrameType frameType;
+        uint8_t* data = nullptr;
+        int dataSize = 0;
+        parseAudioFrame (stream, mStreamLast, data, dataSize, frameType, skip, sampleRate);
+
         auto frameSamples = 2048;
         auto frameSampleBytes = frameSamples * 2 * 4;
         while (!getExit() && !mSongChanged && !songDone) {
-          if (mSong.addFrame (uint32_t(stream - mStreamFirst), frameSampleBytes, int(mStreamLast - mStreamFirst),
-                              frameSamples, (float*)stream))
+          if (mSong.addFrame (uint32_t(data - mStreamFirst), frameSampleBytes, int(mStreamLast - mStreamFirst),
+                              frameSamples, (float*)data))
             thread ([=](){ playThread (false); }).detach();
 
-          stream += frameSampleBytes;
+          data += frameSampleBytes;
           changed();
 
-          songDone = (stream + frameSampleBytes) > mStreamLast;
+          songDone = (data + frameSampleBytes) > mStreamLast;
           }
         }
         //}}}
