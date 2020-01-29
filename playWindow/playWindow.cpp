@@ -312,17 +312,22 @@ private:
       int streamSampleRate;
       auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, streamSampleRate);
       mSong.init (audioFrameType, 2, audioFrameType == eMp3 ? 1152 : 2048, streamSampleRate);
+
+      bool songDone = false;
+      auto stream = mStreamFirst;
       if (audioFrameType == eWav) {
-        //{{{  use mapped stream directly for float 32 bit interleaved wav
-        bool mSongDone = false;
-        auto stream = mStreamFirst;
-        while (!getExit() && !mSongChanged && ((stream + 2048 * 2 * 4) < mStreamLast)) {
-          if (mSong.addFrame (uint32_t(stream - mStreamFirst), 2048 * 2 * 4, int(mStreamLast - mStreamFirst),
-                             2048, (float*)stream))
+        //{{{  float 32bit interleaved wav uses mapped stream directly
+        auto frameSamples = 2048;
+        auto frameSampleBytes = frameSamples * 2 * 4;
+        while (!getExit() && !mSongChanged && !songDone) {
+          if (mSong.addFrame (uint32_t(stream - mStreamFirst), frameSampleBytes, int(mStreamLast - mStreamFirst),
+                              frameSamples, (float*)stream))
             thread ([=](){ playThread (false); }).detach();
 
-          stream += 2048 * 2 * 4;
+          stream += frameSampleBytes;
           changed();
+
+          songDone = (stream + frameSampleBytes) > mStreamLast;
           }
         }
         //}}}
@@ -346,9 +351,7 @@ private:
         av_init_packet (&avPacket);
         auto avFrame = av_frame_alloc();
 
-        bool mSongDone = false;
-        auto stream = mStreamFirst;
-        while (!getExit() && !mSongChanged && !mSongDone) {
+        while (!getExit() && !mSongChanged && !songDone) {
           int skip;
           int sampleRate;
           eAudioFrameType frameType;
@@ -406,7 +409,7 @@ private:
             mStreamSem.wait();
           else {
             cLog::log (LOGINFO, "song done");
-            mSongDone = true;
+            songDone = true;
             }
           }
 
@@ -448,7 +451,7 @@ private:
       device->start();
 
       if (mSong.getAudioFrameType() == eWav) {
-        //{{{  use mapped stream directly for float 32 bit interleaved wav
+        //{{{  float 32 bit interleaved wav uses mapped stream directly
         while (!getExit() && !mSongChanged && (mSong.mPlayFrame <= mSong.getLastFrame()))
           if (mPlaying) {
             cLog::log (LOGINFO1, "process for wav frame:%d", mSong.getPlayFrame());

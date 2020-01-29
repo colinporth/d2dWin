@@ -64,5 +64,8 @@
     <ClInclude Include="audioWASAPI.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\audioParser.h">
+      <Filter>h</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
