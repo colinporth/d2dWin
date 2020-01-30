@@ -105,6 +105,7 @@ public:
       }
     //}}}
     cBox* setEnable (bool enable) { mEnable = enable; return this;  }
+    cBox* setPickable (bool pickable) { mPickable = pickable;  return this; }
     cBox* setUnPick() { mPick = false;  return this; }
     cBox* setPin (bool pin) { mPin = pin; return this; }
     cBox* togglePin() { mPin = !mPin;  return this; }
@@ -136,7 +137,7 @@ public:
 
       bool lastPick = mPick;
 
-      mPick = inClient && mRect.inside (pos);
+      mPick = inClient && mRect.inside (pos) & mPickable;
       if (!change && (mPick != lastPick))
         change = true;
 
@@ -284,6 +285,7 @@ public:
 
     bool mEnable = true;
     bool mPick = false;
+    bool mPickable = true;
     bool mPin = true;
     bool mTimedOn = false;
 

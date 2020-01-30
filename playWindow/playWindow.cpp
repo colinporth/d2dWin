@@ -32,11 +32,11 @@ public:
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
-    add (new cSongFreqBox (this, 0,100.f, mSong), 0,-640.f);
-    add (new cSongSpecBox (this, 0,300.f, mSong), 0,-540.f);
-    add (new cSongWaveBox (this, 0,100.f, mSong), 0,-220.f);
-    add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-120.f);
+    add (new cSongSpecBox (this, 0,350.f, mSong), 0.f,0.f);
+    add (new cSongWaveBox (this, 0,100.f, mSong), 0.f,-250.f);
+    add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-150.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
+    add (new cSongFreqBox (this, 0,150.f, mSong), 0.f,-150.f);
 
     mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -614,7 +614,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
   if (numArgs > 1)
-    appWindow.run (false, "playWindow", 800, 800, wcharToString (args[1]));
+    appWindow.run (false, "playWindow", 800, 600, wcharToString (args[1]));
   else {
     //{{{  urls
     //const string url = "http://stream.wqxr.org/wqxr.aac";
@@ -625,7 +625,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
     //}}}
     const string url = "http://stream.wqxr.org/js-stream.aac";
-    appWindow.run (true, "playWindow " + url, 800, 800, url);
+    appWindow.run (true, "playWindow " + url, 800, 600, url);
     }
 
   CoUninitialize();
