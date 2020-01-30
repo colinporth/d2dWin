@@ -28,25 +28,8 @@ public:
   bool onWheel (int delta, cPoint pos)  {
 
     if (getShow()) {
-      int clicks = -delta / 120;
-
-      // !!! assumes clicks == 1 !!!
-      if (mZoomNumerator > 1) {
-        if (clicks > 0)
-          mZoomNumerator *= 2;
-        else
-          mZoomNumerator /= 2;
-        }
-      else if (mZoomDenominator > 1)
-        mZoomDenominator += clicks;
-      else if (clicks < 0)
-        mZoomNumerator *= 2;
-      else
-        mZoomDenominator += clicks;
-
-      mZoomNumerator =  std::min (std::max (mZoomNumerator, 1), 64);
-      mZoomDenominator = std::min (std::max (mZoomDenominator, 1),
-                                   2 * (1 + mSong.getTotalFrames() / getWidthInt()));
+      mZoomIndex -= delta / 120;
+      mZoomIndex = std::min (std::max (mZoomIndex, mSong.getMinZoomIndex()), mSong.getMaxZoomIndex());
       return true;
       }
 
@@ -57,34 +40,34 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     auto playFrame = mSong.getPlayFrame();
-    auto leftFrame = playFrame - ((mZoomDenominator * getWidthInt() / 2)) / mZoomNumerator;
-    auto rightFrame = playFrame + ((mZoomDenominator * getWidthInt() / 2)) / mZoomNumerator;
-    auto firstX = (leftFrame < 0) ? (((-leftFrame) / mZoomDenominator) * mZoomNumerator) : 0;
-
-    draw (dc, playFrame, leftFrame, rightFrame, firstX, mZoomNumerator, mZoomDenominator);
+    draw (dc, playFrame, getWidthInt() / 2, 0, mZoomIndex);
     }
   //}}}
 
 protected:
   //{{{
-  void draw (ID2D1DeviceContext* dc, int playFrame, int leftFrame, int rightFrame, int firstX,
-             int zoomNumerator, int zoomDenominator) {
+  void draw (ID2D1DeviceContext* dc, int playFrame, int width, int leftX, int zoomIndex) {
 
-    bool unity = (zoomNumerator == 1) && (zoomDenominator == 1);
-    bool zoomOut = (zoomNumerator == 1) && (zoomDenominator > 1);
-    bool zoomIn = (zoomNumerator > 1) && (zoomDenominator == 1);
+    auto lastFrame = mSong.getLastFrame();
 
-    // clip left right to valid frames
-    leftFrame = std::max (0, leftFrame);
+    int frameStep = (zoomIndex > 0) ? zoomIndex+1 : 1;
+    int frameWidth = (zoomIndex < 0) ? -zoomIndex+1 : 1;
+
+    auto rightFrame = playFrame + (width * frameStep) / frameWidth;
     rightFrame = std::min (rightFrame, (int)mSong.getNumFrames());
+
+    auto leftFrame = playFrame - (width * frameStep) / frameWidth;
+    if (!leftX) // wrong for zoom!!!
+      leftX = (leftFrame < 0) ? (((-leftFrame) / frameWidth) * frameStep) : 0;
+    leftFrame = std::max (0, leftFrame);
 
     auto colour = mWindow->getBlueBrush();
     float valueScale = getHeight() / 2.f / mSong.getMaxPowerValue();
-    cRect r (mRect.left + firstX, 0.f, 0.f, 0.f);
+    cRect r (mRect.left + leftX, 0.f, 0.f, 0.f);
 
     auto frame = leftFrame;
     while (frame < rightFrame) {
-      r.right = r.left + zoomNumerator;
+      r.right = r.left + frameWidth;
 
       if (mSong.mFrames[frame]->hasTitle()) {
         //{{{  draw song title yellow bar and text
@@ -117,8 +100,8 @@ protected:
       float leftValue = 0.f;
       float rightValue = 0.f;
 
-      if (unity) {
-        //{{{  simple
+      if (zoomIndex <= 0) {
+        //{{{  simple or expand frame
         if (frame == playFrame)
           colour = mWindow->getWhiteBrush();
 
@@ -127,14 +110,13 @@ protected:
         rightValue = *powerValues;
         }
         //}}}
-      else if (zoomOut) {
-        //{{{  sum
-        int firstSumFrame = frame - (frame % zoomDenominator);
-        int nextSumFrame = firstSumFrame + zoomDenominator;
+      else {
+        //{{{  sum frames
+        int firstSumFrame = frame - (frame % frameStep);
+        int nextSumFrame = firstSumFrame + frameStep;
 
-        for (auto i = firstSumFrame; i < firstSumFrame + zoomDenominator; i++) {
-          // !!!must clip i to valid frames !!!!
-          auto powerValues = mSong.mFrames[i]->getPowerValues();
+        for (auto i = firstSumFrame; i < firstSumFrame + frameStep; i++) {
+          auto powerValues = mSong.mFrames[std::min (i, lastFrame)]->getPowerValues();
           if (i == playFrame) {
             colour = mWindow->getWhiteBrush();
             leftValue = *powerValues++;
@@ -142,19 +124,9 @@ protected:
             break;
             }
 
-          leftValue += *powerValues++ / zoomDenominator;
-          rightValue += *powerValues / zoomDenominator;
+          leftValue += *powerValues++ / frameStep;
+          rightValue += *powerValues / frameStep;
           }
-        }
-        //}}}
-      else if (zoomIn) {
-        //{{{  expand
-        if (frame == playFrame)
-          colour = mWindow->getWhiteBrush();
-
-        auto powerValues = mSong.mFrames[frame]->getPowerValues();
-        leftValue = *powerValues++;
-        rightValue = *powerValues;
         }
         //}}}
 
@@ -163,14 +135,13 @@ protected:
       dc->FillRectangle (r, colour);
 
       r.left = r.right;
-      frame += zoomDenominator;
+      frame += frameStep;
       }
     }
   //}}}
 
   cSong& mSong;
-  int mZoomNumerator = 1;
-  int mZoomDenominator = 1;
+  int mZoomIndex = 0;
   };
 //}}}
 //{{{
@@ -257,7 +228,7 @@ public:
     else
       draw (dc, playFrame, rightLensX, getWidthInt());
 
-    cSongWaveBox::draw (dc, playFrame, playFrame - mLens, playFrame + mLens-2, leftLensX+1, 1, 1);
+    cSongWaveBox::draw (dc, playFrame, mLens, leftLensX+1, 0);
 
     dc->DrawRectangle (cRect(mRect.left + leftLensX, mRect.top + 1.f,
                              mRect.left + rightLensX, mRect.top + getHeight() - 1.f),
