@@ -28,7 +28,7 @@ public:
   bool onWheel (int delta, cPoint pos)  {
 
     if (getShow()) {
-      mZoom -= delta/120;
+      mZoom -= delta / 120;
       mZoom = std::min (std::max(mZoom, 1), 2 * (1 + mSong.getTotalFrames() / getWidthInt()));
       return true;
       }
@@ -39,73 +39,71 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    auto leftFrame = mSong.mPlayFrame - (mZoom * getWidthInt()/2);
-    auto rightFrame = mSong.mPlayFrame + (mZoom * getWidthInt()/2);
-    auto firstX = (leftFrame < 0) ? (-leftFrame) / mZoom : 0;
+    auto leftFrame = mSong.mPlayFrame - (mZoom * getWidthInt() / 2);
+    auto rightFrame = mSong.mPlayFrame + (mZoom * getWidthInt() / 2);
+    auto firstX = (leftFrame < 0) ? ((-leftFrame) / mZoom) : 0;
 
     draw (dc, leftFrame, rightFrame, firstX, mZoom);
     }
   //}}}
 
 protected:
-  float getMaxPowerValue() { return mSong.mMaxPowerValue > 0.f ? mSong.mMaxPowerValue : 1.f; }
-
   //{{{
   void draw (ID2D1DeviceContext* dc, int leftFrame, int rightFrame, int firstX, int zoom) {
 
-    leftFrame = (leftFrame < 0) ? 0 : leftFrame;
-    if (rightFrame > (int)mSong.getNumFrames())
-      rightFrame = (int)mSong.getNumFrames();
+    // clip left right to valid frames
+    leftFrame = std::max (0, leftFrame);
+    rightFrame = std::min (rightFrame, (int)mSong.getNumFrames());
 
-    // draw frames
     auto colour = mWindow->getBlueBrush();
+    float valueScale = getHeight() / 2.f / mSong.getMaxPowerValue();
 
-    auto yCentre = getCentreY();
-    auto valueScale = (getHeight()/2.f) / getMaxPowerValue();
-
-    auto centre = false;
-    auto xl = mRect.left + firstX;
-    for (auto frame = leftFrame; frame < rightFrame; frame += zoom) {
-      float xr = xl + 1.f;
+    cRect r (mRect.left + firstX, 0.f, 0.f, 0.f);
+    auto frame = leftFrame;
+    while (frame < rightFrame) {
+      r.right = r.left + 1.f;
       if (mSong.mFrames[frame]->hasTitle()) {
-        dc->FillRectangle (cRect (xl, yCentre-(getHeight()/2.f), xr+2.f, yCentre+(getHeight()/2.f)), mWindow->getYellowBrush());
+        //{{{  draw song title yellow bar and text
+        dc->FillRectangle (cRect (r.left, getCentreY() - (getHeight() / 2.f),
+                                  r.right + 2.f, getCentreY() + (getHeight() / 2.f)),
+                           mWindow->getYellowBrush());
 
-        std::string str = mSong.mFrames[frame]->getTitle();
+        auto str = mSong.mFrames[frame]->getTitle();
         IDWriteTextLayout* textLayout;
-        mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-                                                      mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+        mWindow->getDwriteFactory()->CreateTextLayout (
+          std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+          mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
         if (textLayout) {
-          dc->DrawTextLayout (cPoint (xl, getTL().y-20.f), textLayout, mWindow->getWhiteBrush());
+          dc->DrawTextLayout (cPoint (r.left, getTL().y - 20.f), textLayout, mWindow->getWhiteBrush());
           textLayout->Release();
           }
         }
-
+        //}}}
       if (mSong.mFrames[frame]->isSilent()) {
-        float silenceHeight = 2.f;
-        dc->FillRectangle (cRect (xl, yCentre - silenceHeight, xr, yCentre + silenceHeight), mWindow->getRedBrush());
+        //{{{  draw red silent frame
+        r.top = getCentreY() - 2.f;
+        r.bottom = getCentreY() + 2.f;
+        dc->FillRectangle (r, mWindow->getRedBrush());
         }
+        //}}}
 
+      colour = frame < mSong.mPlayFrame ? mWindow->getBlueBrush() : mWindow->getGreyBrush();
+      float yL = 0.f;
+      float yR = 0.f;
+      for (auto i = 0; i < zoom; i++) {
+        if (frame == mSong.mPlayFrame)
+          colour = mWindow->getWhiteBrush();
+        auto powerValues = mSong.mFrames[frame++]->getPowerValues();
+        yL += *powerValues++;
+        yR += *powerValues;
+        }
+      yL = yL / zoom;
+      yR = yR / zoom;
 
-      auto powerValues = mSong.mFrames[frame]->getPowerValues();
-      if (!centre && (frame >= mSong.mPlayFrame)) {
-        auto yL = powerValues[0] * valueScale;
-        auto yR = powerValues[1] * valueScale;
-        dc->FillRectangle (cRect (xl, yCentre - yL, xr, yCentre + yR), mWindow->getWhiteBrush());
-        colour = mWindow->getGreyBrush();
-        centre = true;
-        }
-      else {
-        auto yL = 0.f;
-        auto yR = 0.f;
-        for (auto i = 0; i < zoom; i++) {
-          yL += powerValues[0];
-          yR += powerValues[1];
-          }
-        yL = (yL / zoom) * valueScale;
-        yR = (yR / zoom) * valueScale;
-        dc->FillRectangle (cRect (xl, yCentre - yL, xr, yCentre + yR), colour);
-        }
-      xl = xr;
+      r.top = getCentreY() - (yL * valueScale);
+      r.bottom = getCentreY() + (yR * valueScale);
+      dc->FillRectangle (r, colour);
+      r.left += 1.f;
       }
     }
   //}}}
@@ -123,13 +121,13 @@ public:
   //}}}
   //{{{
   virtual ~cSongLensBox() {
-    bigFree (mSummedValues);
+    free (mSummedPowerValues);
     }
   //}}}
 
   //{{{
   void layout() {
-    mSummedFrame = -1;
+    mSummedNumFrames = -1;
     cSongWaveBox::layout();
     }
   //}}}
@@ -174,7 +172,7 @@ public:
       }
     else if (mLens <= 0) {
       mLens = 0;
-      draw (dc, 0, mMaxSummedX);
+      draw (dc, 0, mSummedMaxX);
       return;
       }
     else // animate off
@@ -207,41 +205,40 @@ public:
 
 private:
   //{{{
-  void makeSummedWave() {
+  void updateSummedPowerValues() {
 
-    if (mSummedFrame != mSong.getNumFrames()) {
-      // frameSet changed, cache values summed to width, scaled to height
-      mSummedFrame = mSong.getNumFrames();
+    if (mSummedNumFrames != mSong.getNumFrames()) {
+      // song changed, cache values summed to width, scaled to height
+      mSummedNumFrames = mSong.getNumFrames();
+      mSummedPowerValues = (float*)realloc (mSummedPowerValues, getWidthInt() * mSong.getNumChannels() * sizeof(float));
 
-      mSummedValues = (float*)realloc (mSummedValues, getWidthInt() * 2 * sizeof(float));
-
-      mMaxSummedX = 0;
-      int startFrame = 0;
-      auto summedValuesPtr = mSummedValues;
-      for (int x = 0; x < getWidthInt(); x++) {
+      mSummedMaxX = 0;
+      int startSummedFrame = 0;
+      auto summedPowerValues = mSummedPowerValues;
+      for (auto x = 0; x < getWidthInt(); x++) {
         int frame = x * mSong.getTotalFrames() / getWidthInt();
         if (frame >= mSong.getNumFrames())
           break;
 
-        auto powerValues = mSong.mFrames[frame]->getPowerValues();
+        float* powerValues = mSong.mFrames[frame]->getPowerValues();
         float lValue = powerValues[0];
         float rValue = powerValues[1];
-        if (frame > startFrame) {
-          int num = 1;
-          for (auto i = startFrame; i < frame; i++) {
+        if (frame > startSummedFrame) {
+          int numSummedPowerValues = 1;
+          for (auto i = startSummedFrame; i < frame; i++) {
             auto powerValues = mSong.mFrames[i]->getPowerValues();
             lValue += powerValues[0];
             rValue += powerValues[1];
-            num++;
+            numSummedPowerValues++;
             }
-          lValue /= num;
-          rValue /= num;
+          lValue /= numSummedPowerValues;
+          rValue /= numSummedPowerValues;
           }
-        *summedValuesPtr++ = lValue;
-        *summedValuesPtr++ = rValue;
+        *summedPowerValues++ = lValue;
+        *summedPowerValues++ = rValue;
 
-        mMaxSummedX = x;
-        startFrame = frame + 1;
+        mSummedMaxX = x;
+        startSummedFrame = frame + 1;
         }
       }
     }
@@ -249,46 +246,43 @@ private:
   //{{{
   void draw (ID2D1DeviceContext* dc, int firstX, int lastX) {
 
-    makeSummedWave();
+    updateSummedPowerValues();
 
-    // draw cached graphic
     auto colour = mWindow->getBlueBrush();
-
-    auto centreY = getCentreY();
-    float valueScale = getHeight() / 2 / getMaxPowerValue();
+    float valueScale = getHeight() / 2.0f / mSong.getMaxPowerValue();
 
     float curFrameX = mRect.left;
     if (mSong.getTotalFrames() > 0)
       curFrameX += mSong.mPlayFrame * getWidth() / mSong.getTotalFrames();
 
-    bool centre = false;
-    float xl = mRect.left + firstX;
-    auto summedValuesPtr = mSummedValues + (firstX * 2);
+    auto summedPowerValues = mSummedPowerValues + (firstX * mSong.getNumChannels());
+
+    cRect r;
     for (auto x = firstX; x < lastX; x++) {
-      float xr = xl + 1.f;
-      if (!centre && (x >= curFrameX) && (mSong.mPlayFrame < mSong.getNumFrames())) {
+      r.left = mRect.left + x;
+      r.right = r.left + 1.f;
+
+      float leftValue = *summedPowerValues++;
+      float rightValue = *summedPowerValues++;
+      if (x == curFrameX) {
         auto powerValues = mSong.mFrames[mSong.mPlayFrame]->getPowerValues();
-        float leftValue = powerValues[0] * valueScale;
-        float rightValue = powerValues[1] * valueScale;
-        dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f), mWindow->getWhiteBrush());
-        colour = mWindow->getGreyBrush();
-        centre = true;
-        }
-      else if (x < mMaxSummedX) {
-        auto leftValue = *summedValuesPtr++ * valueScale;
-        auto rightValue = *summedValuesPtr++ * valueScale;
-        dc->FillRectangle (cRect(xl, centreY - leftValue - 2.f, xr, centreY + rightValue + 2.f), colour);
+        leftValue = *powerValues++;
+        rightValue = *powerValues;
+        colour = mWindow->getWhiteBrush();
         }
       else
-        break;
-      xl = xr;
+        colour = (x < curFrameX) ? mWindow->getBlueBrush() : mWindow->getGreyBrush();
+
+      r.top = getCentreY() - (leftValue * valueScale) - 2.f;
+      r.bottom = getCentreY() + (rightValue * valueScale) + 2.f;
+      dc->FillRectangle (r, colour);
       }
     }
   //}}}
 
-  float* mSummedValues = nullptr;
-  int mSummedFrame = -1;
-  int mMaxSummedX = 0;
+  float* mSummedPowerValues = nullptr;
+  int mSummedNumFrames = -1;
+  int mSummedMaxX = 0;
 
   bool mOn = false;
   int mLens = 0;
