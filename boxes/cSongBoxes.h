@@ -30,16 +30,21 @@ public:
     if (getShow()) {
       int clicks = -delta / 120;
 
-      if (mZoomDenominator > 1)
+      // !!! assumes clicks == 1 !!!
+      if (mZoomNumerator > 1) {
+        if (clicks > 0)
+          mZoomNumerator *= 2;
+        else
+          mZoomNumerator /= 2;
+        }
+      else if (mZoomDenominator > 1)
         mZoomDenominator += clicks;
-      else if (mZoomNumerator > 1)
-        mZoomNumerator -= clicks;
-      else if (mZoomDenominator == 1)
-        mZoomNumerator -= clicks;
-      else if (mZoomNumerator == 1)
+      else if (clicks < 0)
+        mZoomNumerator *= 2;
+      else
         mZoomDenominator += clicks;
 
-      mZoomNumerator = std::max (mZoomNumerator, 1);
+      mZoomNumerator =  std::min (std::max (mZoomNumerator, 1), 64);
       mZoomDenominator = std::min (std::max (mZoomDenominator, 1),
                                    2 * (1 + mSong.getTotalFrames() / getWidthInt()));
       return true;
@@ -123,7 +128,7 @@ protected:
         }
         //}}}
       else if (zoomOut) {
-        //{{{  summed
+        //{{{  sum
         int firstSumFrame = frame - (frame % zoomDenominator);
         int nextSumFrame = firstSumFrame + zoomDenominator;
 
@@ -143,23 +148,13 @@ protected:
         }
         //}}}
       else if (zoomIn) {
-        //{{{  repeated
-        int firstSumFrame = frame - (frame % zoomDenominator);
-        int nextSumFrame = firstSumFrame + zoomDenominator;
+        //{{{  expand
+        if (frame == playFrame)
+          colour = mWindow->getWhiteBrush();
 
-        for (auto i = firstSumFrame; i < firstSumFrame + zoomDenominator; i++) {
-          // !!!must clip i to valid frames !!!!
-          auto powerValues = mSong.mFrames[i]->getPowerValues();
-          if (i == playFrame) {
-            colour = mWindow->getWhiteBrush();
-            leftValue = *powerValues++;
-            rightValue = *powerValues;
-            break;
-            }
-
-          leftValue += *powerValues++ / zoomDenominator;
-          rightValue += *powerValues / zoomDenominator;
-          }
+        auto powerValues = mSong.mFrames[frame]->getPowerValues();
+        leftValue = *powerValues++;
+        rightValue = *powerValues;
         }
         //}}}
 
