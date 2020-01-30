@@ -463,11 +463,11 @@ private:
         //{{{  float 32 bit interleaved wav uses mapped stream directly
         while (!getExit() && !mSongChanged && (mSong.mPlayFrame <= mSong.getLastFrame()))
           if (mPlaying) {
-            cLog::log (LOGINFO1, "process for wav frame:%d", mSong.getPlayFrame());
+            cLog::log (LOGINFO1, "process wav frame:%d", mSong.getPlayFrame());
             device->process ([&](float*& srcSamples, int& numSrcSamples,
                                  int numDstSamplesLeft, int numDstSamples) mutable noexcept {
               // load srcSamples callback lambda
-              cLog::log (LOGINFO2, " - callback for wav src:%d dst:%d:%d",
+              cLog::log (LOGINFO2, " - callback wav src:%d dst:%d:%d",
                          mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
               srcSamples = (float*)(mStreamFirst + mSong.getPlayFrameStreamIndex());
               numSrcSamples = mSong.getSamplesPerFrame();

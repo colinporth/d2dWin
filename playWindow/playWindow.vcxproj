@@ -56,6 +56,7 @@
     <ClInclude Include="..\common\cPointRect.h" />
     <ClInclude Include="..\common\cView2d.h" />
     <ClInclude Include="audioWASAPI.h" />
+    <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{DFA05DDA-082C-40AB-8FAB-8D936C91EACA}</ProjectGuid>

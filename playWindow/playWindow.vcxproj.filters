@@ -67,5 +67,8 @@
     <ClInclude Include="..\..\shared\decoders\audioParser.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>h</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
