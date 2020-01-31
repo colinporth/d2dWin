@@ -32,8 +32,7 @@ public:
 
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 
-    add (new cSongSpecBox (this, 0,350.f, mSong), 0.f,0.f);
-    add (new cSongWaveBox (this, 0,100.f, mSong), 0.f,-250.f);
+    add (new cSongBox (this, 0,450.f, mSong), 0.f,0.f);
     add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-150.f);
     add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
     add (new cSongFreqBox (this, 0,150.f, mSong), 0.f,-150.f);
