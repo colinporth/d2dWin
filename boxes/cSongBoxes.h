@@ -4,7 +4,6 @@
 #include <windows.h>
 #include <d2d1.h>
 #include <dwrite.h>
-
 #include "../../shared/utils/cSong.h"
 
 //{{{
@@ -38,35 +37,33 @@ public:
   //}}}
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
-
-    auto playFrame = mSong.getPlayFrame();
-    draw (dc, playFrame, getWidthInt() / 2, 0, mZoomIndex);
+    draw (dc, mSong.getPlayFrame(), getWidthInt()/2, getWidthInt()/ 2, mZoomIndex);
     }
   //}}}
 
 protected:
   //{{{
-  void draw (ID2D1DeviceContext* dc, int playFrame, int width, int leftX, int zoomIndex) {
+  void draw (ID2D1DeviceContext* dc, int playFrame, int width, int centreX, int zoomIndex) {
+  // draw frames centred at playFrame -/+ width in pixels, centred at centreX, zoomed by zoomIndex
 
-    auto lastFrame = mSong.getLastFrame();
+    int frameStep = (zoomIndex > 0) ? zoomIndex+1 : 1; // zoomOut summing frameStep frames per pix
+    int frameWidth = (zoomIndex < 0) ? -zoomIndex+1 : 1; // zoomIn expanding frame to frameWidth pix
 
-    int frameStep = (zoomIndex > 0) ? zoomIndex+1 : 1;
-    int frameWidth = (zoomIndex < 0) ? -zoomIndex+1 : 1;
-
-    auto rightFrame = playFrame + (width * frameStep) / frameWidth;
-    rightFrame = std::min (rightFrame, (int)mSong.getNumFrames());
-
+    // calc leftmost frame, clip to valid frame adjusting firstX
+    int firstX = centreX - width - (frameWidth/2) - ((width - (frameWidth/2)) % frameWidth);
     auto leftFrame = playFrame - (width * frameStep) / frameWidth;
-    if (!leftX) // wrong for zoom!!!
-      leftX = (leftFrame < 0) ? (((-leftFrame) / frameWidth) * frameStep) : 0;
-    leftFrame = std::max (0, leftFrame);
+    if (leftFrame < 0) {
+      firstX = (-leftFrame * frameWidth) / frameStep;
+      leftFrame = 0;
+      }
 
     auto colour = mWindow->getBlueBrush();
     float valueScale = getHeight() / 2.f / mSong.getMaxPowerValue();
-    cRect r (mRect.left + leftX, 0.f, 0.f, 0.f);
+    cRect r (mRect.left + firstX, 0.f, 0.f, 0.f);
 
     auto frame = leftFrame;
-    while (frame < rightFrame) {
+    auto lastFrame = mSong.getLastFrame();
+    while (r.left < mRect.right && frame <= lastFrame) {
       r.right = r.left + frameWidth;
 
       if (mSong.mFrames[frame]->hasTitle()) {
@@ -101,7 +98,7 @@ protected:
       float rightValue = 0.f;
 
       if (zoomIndex <= 0) {
-        //{{{  simple or expand frame
+        //{{{  no zoom, or zoomIn expanding frame
         if (frame == playFrame)
           colour = mWindow->getWhiteBrush();
 
@@ -111,7 +108,7 @@ protected:
         }
         //}}}
       else {
-        //{{{  sum frames
+        //{{{  zoomOut, summing frames
         int firstSumFrame = frame - (frame % frameStep);
         int nextSumFrame = firstSumFrame + frameStep;
 
@@ -198,6 +195,10 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     auto playFrame = mSong.getPlayFrame();
+    int playFrameX = (mSong.getTotalFrames() > 0) ? (playFrame * getWidthInt()) / mSong.getTotalFrames() : 0;
+
+    updateSummedPowerValues();
+
     if (mOn) {
       if (mLens < getWidthInt() / 16)
         // animate on
@@ -205,33 +206,30 @@ public:
       }
     else if (mLens <= 0) {
       mLens = 0;
-      draw (dc, playFrame, 0, mSummedMaxX);
+      draw (dc, playFrame, playFrameX, 0, mSummedMaxX);
       return;
       }
     else // animate off
       mLens /= 2;
 
-    int curFrameX = (mSong.getTotalFrames() > 0) ? (playFrame * getWidthInt()) / mSong.getTotalFrames() : 0;
-    int leftLensX = curFrameX - mLens;
-    int rightLensX = curFrameX + mLens;
-    if (leftLensX < 0) {
-      rightLensX -= leftLensX;
-      leftLensX = 0;
-      }
-    else
-      draw (dc, playFrame, 0, leftLensX);
+    // calc lensCentreX, adjust lensCentreX to show all of lens
+    int lensCentreX = playFrameX;
+    if (lensCentreX - mLens < 0)
+      lensCentreX = mLens;
+    else if (lensCentreX + mLens > getWidthInt())
+      lensCentreX = getWidthInt() - mLens;
 
-    if (rightLensX > getWidthInt()) {
-      leftLensX -= rightLensX - getWidthInt();
-      rightLensX = getWidthInt();
-      }
-    else
-      draw (dc, playFrame, rightLensX, getWidthInt());
+    if (lensCentreX > mLens) // draw left of lens
+      draw (dc, playFrame, playFrameX, 0, lensCentreX - mLens);
 
-    cSongWaveBox::draw (dc, playFrame, mLens, leftLensX+1, 0);
+    // draw lens
+    cSongWaveBox::draw (dc, playFrame, mLens-1, lensCentreX, 0);
 
-    dc->DrawRectangle (cRect(mRect.left + leftLensX, mRect.top + 1.f,
-                             mRect.left + rightLensX, mRect.top + getHeight() - 1.f),
+    if (lensCentreX < getWidthInt() - mLens) // draw right of lens
+      draw (dc, playFrame, playFrameX, lensCentreX + mLens, getWidthInt());
+
+    dc->DrawRectangle (cRect(mRect.left + lensCentreX - mLens, mRect.top + 1.f,
+                             mRect.left + lensCentreX + mLens, mRect.top + getHeight() - 1.f),
                        mWindow->getYellowBrush(), 1.f);
     }
   //}}}
@@ -277,13 +275,7 @@ private:
     }
   //}}}
   //{{{
-  void draw (ID2D1DeviceContext* dc, int playFrame, int firstX, int lastX) {
-
-    updateSummedPowerValues();
-
-    float curFrameX = mRect.left;
-    if (mSong.getTotalFrames() > 0)
-      curFrameX += (playFrame * getWidth()) / mSong.getTotalFrames();
+  void draw (ID2D1DeviceContext* dc, int playFrame, int playFrameX, int firstX, int lastX) {
 
     auto colour = mWindow->getBlueBrush();
     float valueScale = getHeight() / 2.0f / mSong.getMaxPowerValue();
@@ -295,8 +287,8 @@ private:
 
       float leftValue = *summedPowerValues++;
       float rightValue = *summedPowerValues++;
-      if (x >= curFrameX) {
-        if (x == curFrameX) {
+      if (x >= playFrameX) {
+        if (x == playFrameX) {
           // override with playFrame in white
           auto powerValues = mSong.mFrames[playFrame]->getPowerValues();
           leftValue = *powerValues++;
