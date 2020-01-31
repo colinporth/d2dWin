@@ -14,7 +14,6 @@ public:
       cBox("songBox", window, width, height), mSong(song), mWaveHeight(waveHeight) {
 
     mPin = true;
-    //mTransform = D2D1::Matrix3x2F::Scale ({2.0f, 2.0f}, {0.f, 0.f});
     }
   //}}}
   //{{{
@@ -50,11 +49,12 @@ public:
 
     auto playFrame = mSong.getPlayFrame();
 
+    bool drawWaveform = mWaveHeight > 0.f;
+    bool drawSpectrum = mWaveHeight < getHeight();
     int frameStep = (mZoomIndex > 0) ? mZoomIndex+1 : 1; // zoomOut summing frameStep frames per pix
     int frameWidth = (mZoomIndex < 0) ? -mZoomIndex+1 : 1; // zoomIn expanding frame to frameWidth pix
 
-    if (!mBitmap || (getWidthInt() > (int)mBitmapAllocated.width) || (getHeightInt() > (int)mBitmapAllocated.height))
-      resizeBitmap (dc);
+    resizeBitmap (dc);
 
     // calc leftFrame, clip to valid frame, adjust firstX which may overlap left up to frameWidth
     auto leftFrame = playFrame - (((getWidthInt() + frameWidth) / 2) * frameStep) / frameWidth;
@@ -82,108 +82,111 @@ public:
     while ((r.left < mRect.right) && (frame <= lastFrame)) {
       r.right = r.left + frameWidth;
 
-      if (mSong.mFrames[frame]->hasTitle()) {
-        //{{{  draw song title yellow bar and text
-        dc->FillRectangle (cRect (r.left, waveCentreY - (getHeight() / 2.f),
-                                  r.right + 2.f, waveCentreY + (getHeight() / 2.f)),
-                           mWindow->getYellowBrush());
+      if (drawWaveform) {
+        //{{{  draw frame waveform
+        if (mSong.mFrames[frame]->hasTitle()) {
+          //{{{  draw song title yellow bar and text
+          dc->FillRectangle (cRect (r.left, waveCentreY - (getHeight() / 2.f),
+                                    r.right + 2.f, waveCentreY + (getHeight() / 2.f)),
+                             mWindow->getYellowBrush());
 
-        auto str = mSong.mFrames[frame]->getTitle();
-        IDWriteTextLayout* textLayout;
-        mWindow->getDwriteFactory()->CreateTextLayout (
-          std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-          mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-        if (textLayout) {
-          dc->DrawTextLayout (cPoint (r.left, getBL().y - 120.f), textLayout, mWindow->getWhiteBrush());
-          textLayout->Release();
+          auto str = mSong.mFrames[frame]->getTitle();
+          IDWriteTextLayout* textLayout;
+          mWindow->getDwriteFactory()->CreateTextLayout (
+            std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+            mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+          if (textLayout) {
+            dc->DrawTextLayout (cPoint (r.left, getBL().y - 120.f), textLayout, mWindow->getWhiteBrush());
+            textLayout->Release();
+            }
           }
-        }
-        //}}}
-      if (mSong.mFrames[frame]->isSilent()) {
-        //{{{  draw red silent frame
-        r.top = waveCentreY - 2.f;
-        r.bottom = waveCentreY + 2.f;
-        dc->FillRectangle (r, mWindow->getRedBrush());
-        }
-        //}}}
+          //}}}
+        if (mSong.mFrames[frame]->isSilent()) {
+          //{{{  draw red silent frame
+          r.top = waveCentreY - 2.f;
+          r.bottom = waveCentreY + 2.f;
+          dc->FillRectangle (r, mWindow->getRedBrush());
+          }
+          //}}}
 
-      if (frame > playFrame)
-        colour = mWindow->getGreyBrush();
+        if (frame > playFrame)
+          colour = mWindow->getGreyBrush();
 
-      float leftValue = 0.f;
-      float rightValue = 0.f;
-      if (mZoomIndex <= 0) {
-        //{{{  no zoom, or zoomIn expanding frame
-        if (frame == playFrame)
-          colour = mWindow->getWhiteBrush();
+        float leftValue = 0.f;
+        float rightValue = 0.f;
 
-        auto powerValues = mSong.mFrames[frame]->getPowerValues();
-        leftValue = *powerValues++;
-        rightValue = *powerValues;
-        }
-        //}}}
-      else {
-        //{{{  zoomOut, summing frames
-        int firstSumFrame = frame - (frame % frameStep);
-        int nextSumFrame = firstSumFrame + frameStep;
-
-        for (auto i = firstSumFrame; i < firstSumFrame + frameStep; i++) {
-          auto powerValues = mSong.mFrames[std::min (i, lastFrame)]->getPowerValues();
-          if (i == playFrame) {
+        if (mZoomIndex <= 0) {
+          // no zoom, or zoomIn expanding frame
+          if (frame == playFrame)
             colour = mWindow->getWhiteBrush();
-            leftValue = *powerValues++;
-            rightValue = *powerValues;
-            break;
+          auto powerValues = mSong.mFrames[frame]->getPowerValues();
+          leftValue = *powerValues++;
+          rightValue = *powerValues;
+          }
+        else {
+          // zoomOut, summing frames
+          int firstSumFrame = frame - (frame % frameStep);
+          int nextSumFrame = firstSumFrame + frameStep;
+          for (auto i = firstSumFrame; i < firstSumFrame + frameStep; i++) {
+            auto powerValues = mSong.mFrames[std::min (i, lastFrame)]->getPowerValues();
+            if (i == playFrame) {
+              colour = mWindow->getWhiteBrush();
+              leftValue = *powerValues++;
+              rightValue = *powerValues;
+              break;
+              }
+            leftValue += *powerValues++ / frameStep;
+            rightValue += *powerValues / frameStep;
+            }
+          }
+
+        r.top = waveCentreY - (leftValue * valueScale);
+        r.bottom = waveCentreY + (rightValue * valueScale);
+        dc->FillRectangle (r, colour);
+        }
+        //}}}
+      if (drawSpectrum) {
+        //{{{  draw frame bitmap column
+        for (int i = 0; i < frameWidth; i++) {
+          //if (dstWidth > mBitmapWidth)
+          //  break;
+          auto srcPtr = mSong.mFrames[frame]->getFreqLuma();
+          for (UINT32 y = 0; y < mSpectrumHeight; y++) {
+            *dstPtr = *srcPtr++;
+            dstPtr -= mBitmapAllocated.width;
             }
 
-          leftValue += *powerValues++ / frameStep;
-          rightValue += *powerValues / frameStep;
+          // bottom of next bitmapBuf column
+          dstPtr += (mBitmapAllocated.width * mSpectrumHeight) + 1;
+          dstWidth++;
           }
         }
         //}}}
-
-      //{{{  copy freqLuma to bitmap column
-      for (int i = 0; i < frameWidth; i++) {
-        //if (dstWidth > mBitmapWidth)
-        //  break;
-        auto srcPtr = mSong.mFrames[frame]->getFreqLuma();
-        for (UINT32 y = 0; y < mSpectrumHeight; y++) {
-          *dstPtr = *srcPtr++;
-          dstPtr -= mBitmapAllocated.width;
-          }
-
-        // bottom of next bitmapBuf column
-        dstPtr += (mBitmapAllocated.width * mSpectrumHeight) + 1;
-        dstWidth++;
-        }
-      //}}}
-
-      r.top = waveCentreY - (leftValue * valueScale);
-      r.bottom = waveCentreY + (rightValue * valueScale);
-      dc->FillRectangle (r, colour);
 
       r.left = r.right;
       frame += frameStep;
       }
 
-    //{{{  stamp bitmap
-    // copy spectrum part of bitmapBuf to ID2D1Bitmap
-    mBitmap->CopyFromMemory (&D2D1::RectU (0, 0, dstWidth, mSpectrumHeight), mBitmapBuf, mBitmapAllocated.width);
+    if (mWaveHeight < getHeight()) {
+      //{{{  stamp bitmap
+      // copy spectrum part of bitmapBuf to ID2D1Bitmap
+      mBitmap->CopyFromMemory (&D2D1::RectU (0, 0, dstWidth, mSpectrumHeight), mBitmapBuf, mBitmapAllocated.width);
 
-    // stamp colour through spectrum part of ID2D1Bitmap alpha
-    float dstLeft = (firstFrame > leftFrame) ? float(firstFrame - leftFrame) : 0.f;
-    dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
+      // stamp colour through spectrum part of ID2D1Bitmap alpha
+      float dstLeft = (firstFrame > leftFrame) ? float(firstFrame - leftFrame) : 0.f;
+      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
 
-    dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
-      &D2D1::RectF (dstLeft, mRect.top,
-                    dstLeft + (float)dstWidth,
-                    mRect.top + (float)mSpectrumHeight), // dstRect
-      &D2D1::RectF (0.f,0.f,
-                   (float)dstWidth,
-                   (float)mSpectrumHeight));  // srcRect
+      dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
+        &D2D1::RectF (dstLeft, mRect.top,
+                      dstLeft + (float)dstWidth,
+                      mRect.top + (float)mSpectrumHeight), // dstRect
+        &D2D1::RectF (0.f,0.f,
+                     (float)dstWidth,
+                     (float)mSpectrumHeight));  // srcRect
 
-    dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-    //}}}
+      dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+      }
+      //}}}
     }
   //}}}
 
@@ -192,21 +195,28 @@ private:
   void resizeBitmap (ID2D1DeviceContext* dc) {
   //  create bitmapBuf and ID2D1Bitmap matching box size
 
-    free (mBitmapBuf);
-    mBitmapBuf = (uint8_t*)calloc (1, getWidthInt() * getHeightInt());
+    if (mWaveHeight < getHeight()) {
+      // want spectrum
+      if (!mBitmap ||
+          (getWidthInt() > (int)mBitmapAllocated.width) ||
+          (getHeightInt() > (int)mBitmapAllocated.height)) {
+        // allocate or reallocate heap:mBitmapBuf and D2D:mBitmap
+        free (mBitmapBuf);
+        mBitmapBuf = (uint8_t*)calloc (1, getWidthInt() * getHeightInt());
 
-    if (mBitmap)
-      mBitmap->Release();
+        if (mBitmap)
+          mBitmap->Release();
 
-    mBitmapAllocated = { (UINT32)getWidthInt(), (UINT32)getHeightInt() };
-    mSpectrumHeight = (UINT32)getHeightInt() - UINT32(mWaveHeight);
+        mBitmapAllocated = { (UINT32)getWidthInt(), (UINT32)getHeightInt() };
+        mSpectrumHeight = (UINT32)getHeightInt() - UINT32(mWaveHeight);
 
-    dc->CreateBitmap (mBitmapAllocated,
-                      { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 },
-                      &mBitmap);
+        dc->CreateBitmap (mBitmapAllocated,
+                          { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 },
+                          &mBitmap);
+        }
+      }
     }
   //}}}
-
 
   cSong& mSong;
   int mZoomIndex = 0;
@@ -244,8 +254,7 @@ public:
   //}}}
   //{{{
   bool onMove (bool right, cPoint pos, cPoint inc) {
-    auto frame = int((pos.x * mSong.getTotalFrames()) / getWidth());
-    mSong.setPlayFrame (frame);
+    mSong.setPlayFrame (int((pos.x * mSong.getTotalFrames()) / getWidth()));
     return true;
     }
   //}}}
