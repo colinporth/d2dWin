@@ -46,38 +46,21 @@ public:
 
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
+  // draw frames centred at playFrame -/+ width in pixels, centred at centreX, zoomed by mZoomIndex
 
-    if (!mBitmap || (mBitmapWidth != getWidthInt()) || (mBitmapHeight = getHeightInt())) {
-      //{{{  create bitmapBuf and ID2D1Bitmap matching box size
-      mBitmapWidth = getWidthInt();
-      mBitmapHeight = getHeightInt() - kWaveHeight;
-
-      free (mBitmapBuf);
-      mBitmapBuf = (uint8_t*)malloc (mBitmapWidth * mBitmapHeight);
-
-      if (mBitmap)
-        mBitmap->Release();
-      dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
-                        { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 },
-                        &mBitmap);
-      }
-      //}}}
-
-    // left and right edge frames, may be outside known frames
     auto playFrame = mSong.getPlayFrame();
-
-    // draw frames centred at playFrame -/+ width in pixels, centred at centreX, zoomed by mZoomIndex
-    int width = getWidthInt()/2;
-    int centreX = getWidthInt()/2;
     float centreY = mRect.bottom - kWaveHeight/2;
 
     int frameStep = (mZoomIndex > 0) ? mZoomIndex+1 : 1; // zoomOut summing frameStep frames per pix
     int frameWidth = (mZoomIndex < 0) ? -mZoomIndex+1 : 1; // zoomIn expanding frame to frameWidth pix
 
+    if (!mBitmap || (mBitmapWidth != getWidthInt()) || (mBitmapHeight != (getHeightInt() - kWaveHeight)))
+      resizeBitmap (dc);
+
     // calc leftmost frame, clip to valid frame, adjust firstX which may overlap left up to frameWidth
-    auto leftFrame = playFrame - (((width + (frameWidth/2)) * frameStep) / frameWidth);
+    auto leftFrame = playFrame - ((((getWidthInt()/2) + (frameWidth/2)) * frameStep) / frameWidth);
     auto firstFrame = leftFrame;
-    int firstX = centreX - (((playFrame - leftFrame) * frameWidth) / frameStep) - (frameWidth/2);
+    int firstX = (getWidthInt()/2) - (((playFrame - leftFrame) * frameWidth) / frameStep) - (frameWidth/2);
     if (firstFrame < 0) {
       firstX += (-firstFrame * frameWidth) / frameStep;
       firstFrame = 0;
@@ -92,7 +75,7 @@ public:
     int dstWidth = 0;
 
     auto frame = firstFrame;
-    auto rightFrame = playFrame + (((width + (frameWidth / 2)) * frameStep) / frameWidth);
+    auto rightFrame = playFrame + ((((getWidthInt()/2) + (frameWidth / 2)) * frameStep) / frameWidth);
     auto lastFrame = std::min (rightFrame, mSong.getLastFrame());
     while ((r.left < mRect.right) && (frame <= lastFrame)) {
       r.right = r.left + frameWidth;
@@ -157,21 +140,21 @@ public:
         }
         //}}}
 
-      if (mZoomIndex >= 0) {
-        //{{{  copy freqLuma to bitmapBuf column
-        for (int i = 0; i < frameWidth; i++) {
-          auto srcPtr = mSong.mFrames[frame]->getFreqLuma();
-          for (int y = 0; y < mBitmapHeight; y++) {
-            *dstPtr = *srcPtr++;
-            dstPtr -= mBitmapWidth;
-            }
-
-          // bottom of next bitmapBuf column
-          dstPtr += (mBitmapWidth * mBitmapHeight) + 1;
-          dstWidth++;
+      //{{{  copy freqLuma to bitmapBuf column
+      for (int i = 0; i < frameWidth; i++) {
+        //if (dstWidth > mBitmapWidth)
+        //  break;
+        auto srcPtr = mSong.mFrames[frame]->getFreqLuma();
+        for (int y = 0; y < mBitmapHeight; y++) {
+          *dstPtr = *srcPtr++;
+          dstPtr -= mBitmapWidth;
           }
+
+        // bottom of next bitmapBuf column
+        dstPtr += (mBitmapWidth * mBitmapHeight) + 1;
+        dstWidth++;
         }
-        //}}}
+      //}}}
 
       r.top = centreY - (leftValue * valueScale);
       r.bottom = centreY + (rightValue * valueScale);
@@ -200,6 +183,23 @@ public:
   //}}}
 
 private:
+  //{{{
+  void resizeBitmap (ID2D1DeviceContext* dc) {
+  //  create bitmapBuf and ID2D1Bitmap matching box size
+    mBitmapWidth = getWidthInt();
+    mBitmapHeight = getHeightInt() - kWaveHeight;
+
+    free (mBitmapBuf);
+    mBitmapBuf = (uint8_t*)malloc (mBitmapWidth * mBitmapHeight);
+
+    if (mBitmap)
+      mBitmap->Release();
+    dc->CreateBitmap (D2D1::SizeU (mBitmapWidth, mBitmapHeight),
+                      { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 },
+                      &mBitmap);
+    }
+  //}}}
+
   constexpr static int kWaveHeight = 100;
 
   cSong& mSong;
