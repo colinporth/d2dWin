@@ -49,20 +49,22 @@ protected:
     int frameStep = (zoomIndex > 0) ? zoomIndex+1 : 1; // zoomOut summing frameStep frames per pix
     int frameWidth = (zoomIndex < 0) ? -zoomIndex+1 : 1; // zoomIn expanding frame to frameWidth pix
 
-    // calc leftmost frame, clip to valid frame adjusting firstX
-    int firstX = centreX - width - (frameWidth/2) - ((width - (frameWidth/2)) % frameWidth);
-    auto leftFrame = playFrame - (width * frameStep) / frameWidth;
+    // calc leftmost frame, clip to valid frame, adjust firstX which may overlap left up to frameWidth
+    auto leftFrame = playFrame - (((width + (frameWidth/2)) * frameStep) / frameWidth);
+    int firstX = centreX - (((playFrame - leftFrame) * frameWidth) / frameStep) - (frameWidth/2);
     if (leftFrame < 0) {
-      firstX = (-leftFrame * frameWidth) / frameStep;
+      firstX += (-leftFrame * frameWidth) / frameStep;
       leftFrame = 0;
       }
+    //cLog::log (LOGINFO, "leftFrame:%d firstx:%d width:%d", leftFrame, firstX, frameWidth);
 
     auto colour = mWindow->getBlueBrush();
     float valueScale = getHeight() / 2.f / mSong.getMaxPowerValue();
     cRect r (mRect.left + firstX, 0.f, 0.f, 0.f);
 
     auto frame = leftFrame;
-    auto lastFrame = mSong.getLastFrame();
+    auto rightFrame = playFrame + (((width + (frameWidth / 2)) * frameStep) / frameWidth);
+    auto lastFrame = std::min (rightFrame, mSong.getLastFrame());
     while (r.left < mRect.right && frame <= lastFrame) {
       r.right = r.left + frameWidth;
 
