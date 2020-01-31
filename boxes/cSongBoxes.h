@@ -10,8 +10,8 @@
 class cSongBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cSongBox (cD2dWindow* window, float width, float height, cSong& song) :
-      cBox("songBox", window, width, height), mSong(song) {
+  cSongBox (cD2dWindow* window, float width, float height, float waveHeight, cSong& song) :
+      cBox("songBox", window, width, height), mSong(song), mWaveHeight(waveHeight) {
 
     mPin = true;
     //mTransform = D2D1::Matrix3x2F::Scale ({2.0f, 2.0f}, {0.f, 0.f});
@@ -72,10 +72,10 @@ public:
     auto colour = mWindow->getBlueBrush();
 
     cRect r (mRect.left + firstX, 0.f, 0.f, 0.f);
-    float waveCentreY = mRect.bottom - kWaveHeight/2;
-    float valueScale = (kWaveHeight/2.f) / mSong.getMaxPowerValue();
+    float waveCentreY = mRect.bottom - mWaveHeight/2.f;
+    float valueScale = (mWaveHeight/2.f) / mSong.getMaxPowerValue();
 
-    auto dstPtr = mBitmapBuf + ((mBitmapAllocated.height-1-kWaveHeight) * mBitmapAllocated.width);
+    auto dstPtr = mBitmapBuf + ((mSpectrumHeight-1) * mBitmapAllocated.width);
     int dstWidth = 0;
 
     auto frame = firstFrame;
@@ -170,7 +170,7 @@ public:
     // copy spectrum part of bitmapBuf to ID2D1Bitmap
     mBitmap->CopyFromMemory (&D2D1::RectU (0, 0, dstWidth, mSpectrumHeight), mBitmapBuf, mBitmapAllocated.width);
 
-    // stamp colour through spectrum part of ID2D1Bitmap alpha 
+    // stamp colour through spectrum part of ID2D1Bitmap alpha
     float dstLeft = (firstFrame > leftFrame) ? float(firstFrame - leftFrame) : 0.f;
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
 
@@ -199,7 +199,7 @@ private:
       mBitmap->Release();
 
     mBitmapAllocated = { (UINT32)getWidthInt(), (UINT32)getHeightInt() };
-    mSpectrumHeight = (UINT32)getHeightInt() - kWaveHeight;
+    mSpectrumHeight = (UINT32)getHeightInt() - UINT32(mWaveHeight);
 
     dc->CreateBitmap (mBitmapAllocated,
                       { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 },
@@ -207,14 +207,13 @@ private:
     }
   //}}}
 
-  constexpr static int kWaveHeight = 100;
 
   cSong& mSong;
   int mZoomIndex = 0;
+  float mWaveHeight = 0.f;
 
   D2D1_SIZE_U mBitmapAllocated = { 0,0 };
   UINT32 mSpectrumHeight = 0;
-
   uint8_t* mBitmapBuf = nullptr;
   ID2D1Bitmap* mBitmap = nullptr;
   };
@@ -263,6 +262,13 @@ public:
   //}}}
 
   //{{{
+  void layout() {
+    int mSummedNumFrames = -1;
+    cD2dWindow::cBox::layout();
+    }
+                                               //}}}  s
+
+  //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
     auto playFrame = mSong.getPlayFrame();
@@ -275,9 +281,9 @@ public:
         // animate on
         mLens += (getWidthInt() / 16) / 6;
       }
-    else if (mLens <= 0) {
+    else if (mLens <= 1) {
       mLens = 0;
-      draw (dc, playFrame, playFrameX, 0, mSummedMaxX);
+      drawSummed (dc, playFrame, playFrameX, 0, mSummedMaxX);
       return;
       }
     else // animate off
@@ -291,13 +297,13 @@ public:
       lensCentreX = getWidthInt() - mLens;
 
     if (lensCentreX > mLens) // draw left of lens
-      draw (dc, playFrame, playFrameX, 0, lensCentreX - mLens);
+      drawSummed (dc, playFrame, playFrameX, 0, lensCentreX - mLens);
 
     // draw lens
     drawLens (dc, playFrame, mLens-1, lensCentreX);
 
     if (lensCentreX < getWidthInt() - mLens) // draw right of lens
-      draw (dc, playFrame, playFrameX, lensCentreX + mLens, getWidthInt());
+      drawSummed (dc, playFrame, playFrameX, lensCentreX + mLens, getWidthInt());
 
     dc->DrawRectangle (cRect(mRect.left + lensCentreX - mLens, mRect.top + 1.f,
                              mRect.left + lensCentreX + mLens, mRect.top + getHeight() - 1.f),
@@ -346,7 +352,7 @@ private:
     }
   //}}}
   //{{{
-  void draw (ID2D1DeviceContext* dc, int playFrame, int playFrameX, int firstX, int lastX) {
+  void drawSummed (ID2D1DeviceContext* dc, int playFrame, int playFrameX, int firstX, int lastX) {
 
     auto colour = mWindow->getBlueBrush();
     float valueScale = getHeight() / 2.0f / mSong.getMaxPowerValue();
