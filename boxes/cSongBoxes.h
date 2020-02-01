@@ -34,8 +34,7 @@ public:
   bool onWheel (int delta, cPoint pos)  {
 
     if (getShow()) {
-      mZoomIndex -= delta / 120;
-      mZoomIndex = std::min (std::max (mZoomIndex, mSong.getMinZoomIndex()), mSong.getMaxZoomIndex());
+      mZoom = std::min (std::max (mZoom - (delta/120), mSong.getMinZoomIndex()), mSong.getMaxZoomIndex());
       return true;
       }
 
@@ -45,14 +44,14 @@ public:
 
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
-  // draw frames centred at playFrame -/+ width in pixels, centred at centreX, zoomed by mZoomIndex
+  // draw frames centred at playFrame
 
     auto playFrame = mSong.getPlayFrame();
 
     bool drawWaveform = mWaveHeight > 0.f;
     bool drawSpectrum = mWaveHeight < getHeight();
-    int frameStep = (mZoomIndex > 0) ? mZoomIndex+1 : 1; // zoomOut summing frameStep frames per pix
-    int frameWidth = (mZoomIndex < 0) ? -mZoomIndex+1 : 1; // zoomIn expanding frame to frameWidth pix
+    int frameStep = (mZoom > 0) ? mZoom+1 : 1; // zoomOut summing frameStep frames per pix
+    int frameWidth = (mZoom < 0) ? -mZoom+1 : 1; // zoomIn expanding frame to frameWidth pix
 
     resizeBitmap (dc);
 
@@ -67,36 +66,34 @@ public:
       firstFrame = 0;
       }
     auto lastFrame = std::min (rightFrame, mSong.getLastFrame());
-    //cLog::log (LOGINFO, "leftFrame:%d firstx:%d width:%d", leftFrame, firstX, frameWidth);
 
     auto colour = mWindow->getBlueBrush();
 
-    cRect r (mRect.left + firstX, 0.f, 0.f, 0.f);
+    float dstFirstX = mRect.left + firstX;
+    cRect r (dstFirstX, 0.f, 0.f, 0.f);
     float waveCentreY = mRect.bottom - mWaveHeight/2.f;
     float valueScale = (mWaveHeight/2.f) / mSong.getMaxPowerValue();
 
-    auto dstPtr = mBitmapBuf + ((mSpectrumHeight-1) * mBitmapAllocated.width);
-    int dstWidth = 0;
-
-    auto frame = firstFrame;
-    while ((r.left < mRect.right) && (frame <= lastFrame)) {
+    int dstBitmapWidth = 0;
+    auto dstBitmap = mBitmapBuf + ((mSpectrumHeight-1) * mBitmapAllocated.width);
+    for (auto frame = firstFrame; (frame <= lastFrame) && (r.left < mRect.right); frame += frameStep) {
       r.right = r.left + frameWidth;
-
       if (drawWaveform) {
         //{{{  draw frame waveform
         if (mSong.mFrames[frame]->hasTitle()) {
           //{{{  draw song title yellow bar and text
-          dc->FillRectangle (cRect (r.left, waveCentreY - (getHeight() / 2.f),
-                                    r.right + 2.f, waveCentreY + (getHeight() / 2.f)),
-                             mWindow->getYellowBrush());
+          dc->FillRectangle (cRect (r.left, waveCentreY - (mWaveHeight/2.f),
+                                    r.right + 2.f, waveCentreY + (mWaveHeight/2.f)), mWindow->getYellowBrush());
 
           auto str = mSong.mFrames[frame]->getTitle();
+
           IDWriteTextLayout* textLayout;
           mWindow->getDwriteFactory()->CreateTextLayout (
             std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
             mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+
           if (textLayout) {
-            dc->DrawTextLayout (cPoint (r.left, getBL().y - 120.f), textLayout, mWindow->getWhiteBrush());
+            dc->DrawTextLayout (cPoint (r.left, getBL().y - mWaveHeight - 20.f), textLayout, mWindow->getWhiteBrush());
             textLayout->Release();
             }
           }
@@ -115,7 +112,7 @@ public:
         float leftValue = 0.f;
         float rightValue = 0.f;
 
-        if (mZoomIndex <= 0) {
+        if (mZoom <= 0) {
           // no zoom, or zoomIn expanding frame
           if (frame == playFrame)
             colour = mWindow->getWhiteBrush();
@@ -123,6 +120,7 @@ public:
           leftValue = *powerValues++;
           rightValue = *powerValues;
           }
+
         else {
           // zoomOut, summing frames
           int firstSumFrame = frame - (frame % frameStep);
@@ -147,46 +145,39 @@ public:
         //}}}
       if (drawSpectrum) {
         //{{{  draw frame bitmap column
-        for (int i = 0; i < frameWidth; i++) {
-          //if (dstWidth > mBitmapWidth)
-          //  break;
-          auto srcPtr = mSong.mFrames[frame]->getFreqLuma();
-          for (UINT32 y = 0; y < mSpectrumHeight; y++) {
-            *dstPtr = *srcPtr++;
-            dstPtr -= mBitmapAllocated.width;
-            }
+        auto srcFreqLuma = mSong.mFrames[frame]->getFreqLuma();
 
-          // bottom of next bitmapBuf column
-          dstPtr += (mBitmapAllocated.width * mSpectrumHeight) + 1;
-          dstWidth++;
+        for (int y = mSpectrumHeight; y > 0; y--) {
+          for (int i = frameWidth; i > 0; i--)
+            *dstBitmap++ = *srcFreqLuma;
+          dstBitmap -= mBitmapAllocated.width + frameWidth;
+          srcFreqLuma++;
           }
+
+        // back to bottom of next frame bitmap column
+        dstBitmap += (mSpectrumHeight * mBitmapAllocated.width) + frameWidth;
+        dstBitmapWidth += frameWidth;
         }
         //}}}
-
       r.left = r.right;
-      frame += frameStep;
       }
 
-    if (mWaveHeight < getHeight()) {
+    if (dstBitmapWidth) {
       //{{{  stamp bitmap
       // copy spectrum part of bitmapBuf to ID2D1Bitmap
-      mBitmap->CopyFromMemory (&D2D1::RectU (0, 0, dstWidth, mSpectrumHeight), mBitmapBuf, mBitmapAllocated.width);
+      mBitmap->CopyFromMemory (&D2D1::RectU (0, 0, dstBitmapWidth, mSpectrumHeight), mBitmapBuf, mBitmapAllocated.width);
 
       // stamp colour through spectrum part of ID2D1Bitmap alpha
-      float dstLeft = (firstFrame > leftFrame) ? float(firstFrame - leftFrame) : 0.f;
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
-
       dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(),
-        &D2D1::RectF (dstLeft, mRect.top,
-                      dstLeft + (float)dstWidth,
-                      mRect.top + (float)mSpectrumHeight), // dstRect
+        &D2D1::RectF (dstFirstX, mRect.top,
+                      dstFirstX + dstBitmapWidth, mRect.top + (float)mSpectrumHeight), // dstRect
         &D2D1::RectF (0.f,0.f,
-                     (float)dstWidth,
-                     (float)mSpectrumHeight));  // srcRect
-
+                      (float)dstBitmapWidth, (float)mSpectrumHeight));  // srcRect
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
       }
       //}}}
+    //cLog::log (LOGINFO, "left:%d firstx:%d w:%d % bw:%d", leftFrame, firstX, frameWidth, dstBitmapWidth);
     }
   //}}}
 
@@ -219,7 +210,7 @@ private:
   //}}}
 
   cSong& mSong;
-  int mZoomIndex = 0;
+  int mZoom = 0;  // >0 = zoomOut framesPerPix, 0 = unity, <0 = zoomIn pixPerFrame
   float mWaveHeight = 0.f;
 
   D2D1_SIZE_U mBitmapAllocated = { 0,0 };
@@ -272,10 +263,10 @@ public:
 
   //{{{
   void layout() {
-    int mSummedNumFrames = -1;
+    mSummedNumFrames = -1;
     cD2dWindow::cBox::layout();
     }
-                                               //}}}  s
+  //}}}
 
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
@@ -469,7 +460,6 @@ private:
 
   bool mOn = false;
   int mLens = 0;
-  int mZoomIndex = 0;
   };
 //}}}
 

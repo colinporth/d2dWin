@@ -549,8 +549,8 @@ private:
               numSrcSamples = mSong.getSamplesPerFrame();
 
               mSong.incPlayFrame (1);
-              changed();
               });
+            changed();
             }
           else
             Sleep (10);
