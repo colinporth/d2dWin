@@ -75,7 +75,8 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      thread ([=]() { hlsThread (3, 320000); }).detach();
+      mStreamTemp = mStreamFirst;
+      thread ([=]() { hlsThread (4, 96000); }).detach();
       }
 
     if (streaming || !mFileList->empty())
@@ -177,15 +178,8 @@ private:
   static size_t httpHlsBody (uint8_t* ptr, size_t size, size_t numItems, cAppWindow* appWindow) {
 
     auto len = numItems * size;
-
-    if (appWindow->mHlsBufSize + len > appWindow->mHlsBufAllocSize) {
-      while (appWindow->mHlsBufSize + len > appWindow->mHlsBufAllocSize)
-        appWindow->mHlsBufAllocSize *= 2;
-      appWindow->mHlsBuf = (uint8_t*)realloc (appWindow->mHlsBuf, appWindow->mHlsBufAllocSize);
-      }
-
-    memcpy (appWindow->mHlsBuf + appWindow->mHlsBufSize, ptr, len);
-    appWindow->mHlsBufSize += (int)len;
+    memcpy (appWindow->mStreamTemp, ptr, len);
+    appWindow->mStreamTemp += (int)len;
 
     return len;
     }
@@ -199,14 +193,10 @@ private:
 
     auto curl = curl_easy_init();
     if (curl) {
-      mHlsBufSize = 0;
-      mHlsBufAllocSize = 1024;
-      mHlsBuf = (uint8_t*)malloc (mHlsBufAllocSize);
-
       const string path = "http://" + kSrc + "/pool_" + dec(kPool[chan]) + "/live/uk/" + kPathNames[chan] + '/' +
                     kPathNames[chan] + ".isml/" + kPathNames[chan] + "-audio=" + dec(bitrate);
       const string m3u8path = path + ".norewind.m3u8";
-      //{{{  load m3u8 and parse file
+      //{{{  load m3u8 into mStreamLat and parse
       curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
       curl_easy_setopt (curl, CURLOPT_URL, m3u8path.c_str());
       curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, httpHlsBody);
@@ -215,7 +205,7 @@ private:
 
       // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
       char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
-      char* extSeq = strstr ((char*)mHlsBuf, kExtSeq) + strlen (kExtSeq);
+      char* extSeq = strstr ((char*)mStreamLast, kExtSeq) + strlen (kExtSeq);
       char* extSeqEnd = strchr (extSeq, '\n');
       *extSeqEnd = '\0';
       uint32_t baseSeqNum = atoi (extSeq) + 3;
@@ -237,20 +227,21 @@ private:
       const auto seconds = chrono::duration_cast<chrono::seconds>(baseTimePoint - baseDatePoint);
       uint32_t baseFrame = uint32_t((uint32_t(seconds.count()) - kBaseTimeSecondsOffset) * kFramesPerSecond);
       //}}}
+      mStreamTemp = mStreamLast;
 
       auto seqNum = baseSeqNum;
       while (!getExit()) {
         cLog::log (LOGINFO, "hls loading " + dec(seqNum));
-        mHlsBufSize = 0;
         const string seqPath = path + '-' + dec(seqNum) + ".ts";
         curl_easy_setopt (curl, CURLOPT_URL, seqPath.c_str());
         curl_easy_perform (curl);
 
-        if (mHlsBufSize > 0) {
+        if (mStreamTemp > mStreamLast) {
           cLog::log (LOGINFO, "hls loaded %d", seqNum);
-          //{{{  pack transportStream to aacFrames, back into same buf
-          auto buf = mHlsBuf;
-          auto bufEnd = mHlsBuf + mHlsBufSize;
+
+          // pack transportStream to aacFrames, back into same buf
+          auto buf = mStreamLast;
+          auto bufEnd = mStreamTemp;
           auto packedBufEnd = buf;
           while ((buf < bufEnd) && (*buf++ == 0x47)) {
             auto payStart = buf[0] & 0x40;
@@ -269,9 +260,8 @@ private:
               }
             buf += tsFrameBytesLeft;
             }
-          //}}}
-          memcpy (mStreamLast, mHlsBuf, packedBufEnd - mHlsBuf);
-          mStreamLast += mHlsBufSize;
+          mStreamLast = packedBufEnd;
+          mStreamTemp = mStreamLast;
           mStreamSem.notifyAll();
 
           seqNum++;
@@ -721,11 +711,8 @@ private:
   cSong mSong;
   uint8_t* mStreamFirst = nullptr;
   uint8_t* mStreamLast = nullptr;
+  uint8_t* mStreamTemp = nullptr;
   cSemaphore mStreamSem;
-
-  uint8_t* mHlsBuf = nullptr;
-  int mHlsBufAllocSize = 0;
-  int mHlsBufSize = 0;
 
   cJpegImageView* mJpegImageView = nullptr;
 
