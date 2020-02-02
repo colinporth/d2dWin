@@ -17,22 +17,6 @@
 using namespace std;
 //}}}
 
-//{{{  const
-const static uint32_t kDefaultChan = 4;
-
-const static uint32_t kDefaultBitrate = 128000;
-const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
-
-const static string kHost = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
-const static string kPathNames[] = { "none",
-                                     "bbc_radio_one",
-                                     "bbc_radio_two",
-                                     "bbc_radio_three",
-                                     "bbc_radio_fourfm",
-                                     "bbc_radio_five_live",
-                                     "bbc_6music" };
-//}}}
-
 class cAppWindow : public cD2dWindow {
 public:
   cAppWindow() : mPlayDoneSem("playDone") {}
@@ -313,6 +297,16 @@ private:
   // hls http
   //{{{
   void hlsThread (int chan, int bitrate) {
+
+    const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
+    const static string kHost = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
+    const static string kPathNames[] = { "none",
+                                         "bbc_radio_one",
+                                         "bbc_radio_two",
+                                         "bbc_radio_three",
+                                         "bbc_radio_fourfm",
+                                         "bbc_radio_five_live",
+                                         "bbc_6music" };
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("hls ");
