@@ -15,6 +15,27 @@
 using namespace std;
 //}}}
 
+//{{{  const
+const static uint32_t kDefaultChan = 4;
+const static uint32_t kDefaultBitrate = 128000;
+
+const static std::string kSrc = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
+
+const static int kPool [] = { 0, 904, 904, 904, 904, 904, 904 };
+
+const static char* kPathNames[] = { "none", "bbc_radio_one",    "bbc_radio_two",       "bbc_radio_three",
+                                     "bbc_radio_fourfm", "bbc_radio_five_live", "bbc_6music" };
+
+const static uint16_t kFramesPerChunk = 300;
+const static uint16_t kSamplesPerFrame = 1024;
+const static uint16_t kSamplesPerSecond = 48000;
+
+const static float kSamplesPerSecondF = kSamplesPerSecond;
+const static double kSamplesPerSecondD = kSamplesPerSecond;
+const static float kFramesPerSecond = kSamplesPerSecondF / kSamplesPerFrame;
+const static float kSecondsPerFrame = kSamplesPerFrame / kSamplesPerSecondF;
+//}}}
+
 class cAppWindow : public cD2dWindow {
 public:
   cAppWindow() : mPlayDoneSem("playDone") {}
@@ -51,7 +72,7 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      thread ([=]() { httpThread (name.c_str()); }).detach();
+      thread ([=]() { hlsThread (4, 128000); }).detach();
       }
 
     if (streaming || !mFileList->empty())
@@ -64,6 +85,7 @@ public:
     delete mJpegImageView;
     }
   //}}}
+
 protected:
   //{{{
   bool onKey (int key) {
@@ -94,6 +116,7 @@ protected:
     return false;
     }
   //}}}
+
 private:
   //{{{
   class cAppFileListBox : public cFileListBox {
@@ -107,39 +130,6 @@ private:
     };
   //}}}
 
-  //{{{
-  void addIcyInfo (string icyInfo) {
-  // called by httpThread
-
-    mIcyStr = icyInfo;
-    cLog::log (LOGINFO1, "addIcyInfo " + mIcyStr);
-
-    string searchStr = "StreamTitle=\'";
-    auto searchStrPos = mIcyStr.find (searchStr);
-    if (searchStrPos != string::npos) {
-      auto searchEndPos = mIcyStr.find ("\';", searchStrPos + searchStr.size());
-      if (searchEndPos != string::npos) {
-        string titleStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-        if (titleStr != mTitleStr) {
-          cLog::log (LOGINFO1, "addIcyInfo found title = " + titleStr);
-          mSong.setTitle (titleStr);
-          mTitleStr = titleStr;
-          }
-        }
-      }
-
-    mUrlStr = "no url";
-    searchStr = "StreamUrl=\'";
-    searchStrPos = mIcyStr.find (searchStr);
-    if (searchStrPos != string::npos) {
-      auto searchEndPos = mIcyStr.find ('\'', searchStrPos + searchStr.size());
-      if (searchEndPos != string::npos) {
-        mUrlStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-        cLog::log (LOGINFO1, "addIcyInfo found url = " + mUrlStr);
-        }
-      }
-    }
-  //}}}
   //{{{
   static int httpTrace (CURL* handle, curl_infotype type, char* ptr, size_t size, cAppWindow* appWindow) {
 
@@ -179,6 +169,92 @@ private:
     return 0;
     }
   //}}}
+
+  //{{{
+  static size_t httpHlsBody (uint8_t* ptr, size_t size, size_t numItems, cAppWindow* appWindow) {
+
+    auto len = numItems * size;
+
+    appWindow->mHlsBuf = (uint8_t*)realloc (appWindow->mHlsBuf, appWindow->mHlsBufSize + len);
+    memcpy (appWindow->mHlsBuf + appWindow->mHlsBufSize, ptr, len);
+    appWindow->mHlsBufSize += (int)len;
+
+    return len;
+    }
+  //}}}
+  //{{{
+  void hlsThread (int chan, int bitrate) {
+
+    cLog::setThreadName ("hls ");
+
+    const int kBaseTimeSecondsOffset = 17;
+
+    mChan = 4;
+    mBitrate = 128000;
+
+    mHlsBufSize = 0;
+    auto curl = curl_easy_init();
+    if (curl) {
+      curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
+      string url = "http://" + kSrc + "/" + getM3u8path();
+      curl_easy_setopt (curl, CURLOPT_URL, url.c_str());
+      curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, httpHlsBody);
+      curl_easy_setopt (curl, CURLOPT_WRITEDATA, this);
+      curl_easy_perform (curl);
+      }
+
+    // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
+    char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
+    char* extSeq = strstr ((char*)mHlsBuf, kExtSeq) + strlen (kExtSeq);
+    char* extSeqEnd = strchr (extSeq, '\n');
+    *extSeqEnd = '\0';
+    mBaseSeqNum = atoi (extSeq) + 3;
+
+    // point to #EXT-X-PROGRAM-DATE-TIME dateTime str
+    const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
+    const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
+    const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
+    const auto extDateTimeString = std::string(extDateTime, size_t(extDateTimeEnd - extDateTime));
+    cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
+
+    // parse ISO time format from string
+    std::istringstream inputStream (extDateTimeString);
+    inputStream >> date::parse ("%FT%T", mBaseTimePoint);
+
+    mBaseDatePoint = date::floor<date::days>(mBaseTimePoint);
+    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mBaseTimePoint - mBaseDatePoint);
+    mBaseFrame = uint32_t((uint32_t(seconds.count()) - kBaseTimeSecondsOffset) * kFramesPerSecond);
+
+    auto seqNum = mBaseSeqNum;
+
+    while (!getExit()) {
+      cLog::log (LOGINFO, "hls loading " + dec(seqNum));
+      mHlsBufSize = 0;
+      //curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
+      string body = "http://" + kSrc + "/" + getTsPath (seqNum);
+      curl_easy_setopt (curl, CURLOPT_URL, body.c_str());
+      curl_easy_perform (curl);
+
+      if (mHlsBufSize > 0) {
+        cLog::log (LOGINFO, "hls loaded");
+
+        auto mSrcEnd = packTsBuffer (mHlsBuf, mHlsBuf + mHlsBufSize);
+        cLog::log (LOGINFO, "hls unpacked");
+
+        memcpy (mStreamLast, mHlsBuf, mSrcEnd - mHlsBuf);
+        mStreamLast += mHlsBufSize;
+        mStreamSem.notifyAll();
+
+        seqNum++;
+        }
+      else
+        Sleep (7000);
+      }
+
+    curl_easy_cleanup (curl);
+    }
+  //}}}
+
   //{{{
   static size_t httpHeader (const char* ptr, size_t size, size_t numItems, cAppWindow* appWindow) {
 
@@ -248,7 +324,39 @@ private:
     return len;
     }
   //}}}
+  //{{{
+  void addIcyInfo (string icyInfo) {
+  // called by httpThread
 
+    mIcyStr = icyInfo;
+    cLog::log (LOGINFO1, "addIcyInfo " + mIcyStr);
+
+    string searchStr = "StreamTitle=\'";
+    auto searchStrPos = mIcyStr.find (searchStr);
+    if (searchStrPos != string::npos) {
+      auto searchEndPos = mIcyStr.find ("\';", searchStrPos + searchStr.size());
+      if (searchEndPos != string::npos) {
+        string titleStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+        if (titleStr != mTitleStr) {
+          cLog::log (LOGINFO1, "addIcyInfo found title = " + titleStr);
+          mSong.setTitle (titleStr);
+          mTitleStr = titleStr;
+          }
+        }
+      }
+
+    mUrlStr = "no url";
+    searchStr = "StreamUrl=\'";
+    searchStrPos = mIcyStr.find (searchStr);
+    if (searchStrPos != string::npos) {
+      auto searchEndPos = mIcyStr.find ('\'', searchStrPos + searchStr.size());
+      if (searchEndPos != string::npos) {
+        mUrlStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+        cLog::log (LOGINFO1, "addIcyInfo found url = " + mUrlStr);
+        }
+      }
+    }
+  //}}}
   //{{{
   void httpThread (const char* url) {
 
@@ -282,6 +390,7 @@ private:
     curl_easy_cleanup (curl);
     }
   //}}}
+
   //{{{
   void analyseThread (bool streaming) {
 
@@ -572,6 +681,67 @@ private:
     CoUninitialize();
     }
   //}}}
+
+  //{{{
+  std::string getPathRoot() {
+
+    //pool_904/live/uk/bbc_radio_three/bbc_radio_three.isml/bbc_radio_three-audio=128000.norewind.m3u8
+    return "pool_" + dec(kPool[mChan]) +
+           "/live/uk/" +
+           kPathNames[mChan] + '/' +
+           kPathNames[mChan] + ".isml/" +
+           kPathNames[mChan] + "-audio=" + dec(mBitrate);
+    }
+  //}}}
+  //{{{
+  std::string getM3u8path() {
+    return getPathRoot() + ".norewind.m3u8";
+    }
+  //}}}
+  //{{{
+  std::string getTsPath (uint32_t seqNum) {
+    return getPathRoot() + '-' + dec(seqNum) + ".ts";
+    }
+  //}}}
+  //{{{
+  uint8_t* packTsBuffer (uint8_t* buf, uint8_t* bufEnd) {
+  // pack transportStream buf to aacFrames back into same buf
+  // return new end, shorter than bufEnd
+
+    auto packedBufEnd = buf;
+    while ((buf < bufEnd) && (*buf++ == 0x47)) {
+      auto payStart = *buf & 0x40;
+      auto pid = ((*buf & 0x1F) << 8) | *(buf+1);
+      auto headerBytes = (*(buf+2) & 0x20) ? (4 + *(buf+3)) : 3;
+      buf += headerBytes;
+      auto tsFrameBytesLeft = 187 - headerBytes;
+      if (pid == 34) {
+        if (payStart && !(*buf) && !(*(buf+1)) && (*(buf+2) == 1) && (*(buf+3) == 0xC0)) {
+          int pesHeaderBytes = 9 + *(buf+8);
+          buf += pesHeaderBytes;
+          tsFrameBytesLeft -= pesHeaderBytes;
+          }
+        memcpy (packedBufEnd, buf, tsFrameBytesLeft);
+        packedBufEnd += tsFrameBytesLeft;
+        }
+      buf += tsFrameBytesLeft;
+      }
+
+    return packedBufEnd;
+    }
+  //}}}
+  //{{{  vars
+  //vars
+  std::chrono::system_clock::time_point mBaseTimePoint;
+  std::chrono::system_clock::time_point mBaseDatePoint;
+  std::chrono::system_clock::time_point mPlayTimePoint;
+
+  int mChan = 0;
+  int mBitrate = 0;
+  uint32_t mBaseSeqNum = 0;
+  uint32_t mBaseFrame = 0;
+  //}}}
+
   //{{{  vars
   cFileList* mFileList;
 
@@ -579,6 +749,9 @@ private:
   uint8_t* mStreamFirst = nullptr;
   uint8_t* mStreamLast = nullptr;
   cSemaphore mStreamSem;
+
+  uint8_t* mHlsBuf = nullptr;
+  int mHlsBufSize = 0;
 
   cJpegImageView* mJpegImageView = nullptr;
 
