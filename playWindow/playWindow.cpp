@@ -21,6 +21,7 @@ const static uint32_t kDefaultBitrate = 128000;
 
 const static string kSrc = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
 const static int kPool [] = { 0, 904, 904, 904, 904, 904, 904 };
+const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
 const static char* kPathNames[] = { "none",
                                     "bbc_radio_one",
                                     "bbc_radio_two",
@@ -176,6 +177,7 @@ private:
 
   //{{{
   static size_t httpHlsBody (uint8_t* ptr, size_t size, size_t numItems, cAppWindow* appWindow) {
+  // copy into temp bit of main stream buffer, move streamTemp ptr
 
     auto len = numItems * size;
     memcpy (appWindow->mStreamTemp, ptr, len);
@@ -194,11 +196,14 @@ private:
     auto curl = curl_easy_init();
     if (curl) {
       const string path = "http://" + kSrc + "/pool_" + dec(kPool[chan]) + "/live/uk/" + kPathNames[chan] + '/' +
-                    kPathNames[chan] + ".isml/" + kPathNames[chan] + "-audio=" + dec(bitrate);
+                          kPathNames[chan] + ".isml/" + kPathNames[chan] + "-audio=" + dec(bitrate);
+      //{{{  load m3u8 into mStreamLast and parse to get baseSeqNum, baseTimePoint and baseDatePoint
       const string m3u8path = path + ".norewind.m3u8";
-      //{{{  load m3u8 into mStreamLat and parse
+
       curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
       curl_easy_setopt (curl, CURLOPT_URL, m3u8path.c_str());
+
+      mStreamTemp = mStreamLast;
       curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, httpHlsBody);
       curl_easy_setopt (curl, CURLOPT_WRITEDATA, this);
       curl_easy_perform (curl);
@@ -214,7 +219,7 @@ private:
       const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
       const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
       const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
-      const auto extDateTimeString = string(extDateTime, size_t(extDateTimeEnd - extDateTime));
+      const auto extDateTimeString = string (extDateTime, size_t(extDateTimeEnd - extDateTime));
       cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
 
       // parse ISO time format from string
@@ -225,43 +230,45 @@ private:
       chrono::system_clock::time_point baseDatePoint;
       baseDatePoint = date::floor<date::days>(baseTimePoint);
       const auto seconds = chrono::duration_cast<chrono::seconds>(baseTimePoint - baseDatePoint);
+
       uint32_t baseFrame = uint32_t((uint32_t(seconds.count()) - kBaseTimeSecondsOffset) * kFramesPerSecond);
       //}}}
-      mStreamTemp = mStreamLast;
 
       auto seqNum = baseSeqNum;
       while (!getExit()) {
         cLog::log (LOGINFO, "hls loading " + dec(seqNum));
+
         const string seqPath = path + '-' + dec(seqNum) + ".ts";
         curl_easy_setopt (curl, CURLOPT_URL, seqPath.c_str());
+        mStreamTemp = mStreamLast;
         curl_easy_perform (curl);
 
         if (mStreamTemp > mStreamLast) {
           cLog::log (LOGINFO, "hls loaded %d", seqNum);
 
           // pack transportStream to aacFrames, back into same buf
-          auto buf = mStreamLast;
-          auto bufEnd = mStreamTemp;
-          auto packedBufEnd = buf;
-          while ((buf < bufEnd) && (*buf++ == 0x47)) {
-            auto payStart = buf[0] & 0x40;
-            auto pid = ((buf[0] & 0x1F) << 8) | buf[1];
-            auto headerBytes = (buf[2] & 0x20) ? 4 + buf[3] : 3;
-            buf += headerBytes;
+          auto streamTs = mStreamLast;
+          auto streamAacFrames = mStreamLast;
+          while ((streamTs < mStreamTemp) && (*streamTs++ == 0x47)) {
+            auto payStart = streamTs[0] & 0x40;
+            auto pid = ((streamTs[0] & 0x1F) << 8) | streamTs[1];
+            auto headerBytes = (streamTs[2] & 0x20) ? 4 + streamTs[3] : 3;
+            streamTs += headerBytes;
             auto tsFrameBytesLeft = 187 - headerBytes;
             if (pid == 34) {
-              if (payStart && !buf[0] && !buf[1] && (buf[2] == 1) && (buf[3] == 0xC0)) {
-                int pesHeaderBytes = 9 + buf[8];
-                buf += pesHeaderBytes;
+              if (payStart &&
+                  !streamTs[0] && !streamTs[1] && (streamTs[2] == 1) && (streamTs[3] == 0xC0)) {
+                int pesHeaderBytes = 9 + streamTs[8];
+                streamTs += pesHeaderBytes;
                 tsFrameBytesLeft -= pesHeaderBytes;
                 }
-              memcpy (packedBufEnd, buf, tsFrameBytesLeft);
-              packedBufEnd += tsFrameBytesLeft;
+              // pack ts payload down into stream aacFrames
+              memcpy (streamAacFrames, streamTs, tsFrameBytesLeft);
+              streamAacFrames += tsFrameBytesLeft;
               }
-            buf += tsFrameBytesLeft;
+            streamTs += tsFrameBytesLeft;
             }
-          mStreamLast = packedBufEnd;
-          mStreamTemp = mStreamLast;
+          mStreamLast = streamAacFrames;
           mStreamSem.notifyAll();
 
           seqNum++;
