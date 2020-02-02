@@ -77,7 +77,7 @@ public:
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
       mStreamTemp = mStreamFirst;
-      thread ([=]() { hlsThread (4, 96000); }).detach();
+      thread ([=]() { hlsThread (4, 48000); }).detach();
       }
 
     if (streaming || !mFileList->empty())
@@ -234,7 +234,8 @@ private:
       uint32_t baseFrame = uint32_t((uint32_t(seconds.count()) - kBaseTimeSecondsOffset) * kFramesPerSecond);
       //}}}
 
-      auto seqNum = baseSeqNum;
+      auto seqNum = baseSeqNum - 100;
+
       while (!getExit()) {
         cLog::log (LOGINFO, "hls loading " + dec(seqNum));
 
