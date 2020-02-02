@@ -19,12 +19,15 @@ using namespace std;
 const static uint32_t kDefaultChan = 4;
 const static uint32_t kDefaultBitrate = 128000;
 
-const static std::string kSrc = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
-
+const static string kSrc = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
 const static int kPool [] = { 0, 904, 904, 904, 904, 904, 904 };
-
-const static char* kPathNames[] = { "none", "bbc_radio_one",    "bbc_radio_two",       "bbc_radio_three",
-                                     "bbc_radio_fourfm", "bbc_radio_five_live", "bbc_6music" };
+const static char* kPathNames[] = { "none",
+                                    "bbc_radio_one",
+                                    "bbc_radio_two",
+                                    "bbc_radio_three",
+                                    "bbc_radio_fourfm",
+                                    "bbc_radio_five_live",
+                                    "bbc_6music" };
 
 const static uint16_t kFramesPerChunk = 300;
 const static uint16_t kSamplesPerFrame = 1024;
@@ -72,7 +75,7 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      thread ([=]() { hlsThread (4, 128000); }).detach();
+      thread ([=]() { hlsThread (3, 320000); }).detach();
       }
 
     if (streaming || !mFileList->empty())
@@ -175,7 +178,12 @@ private:
 
     auto len = numItems * size;
 
-    appWindow->mHlsBuf = (uint8_t*)realloc (appWindow->mHlsBuf, appWindow->mHlsBufSize + len);
+    if (appWindow->mHlsBufSize + len > appWindow->mHlsBufAllocSize) {
+      while (appWindow->mHlsBufSize + len > appWindow->mHlsBufAllocSize)
+        appWindow->mHlsBufAllocSize *= 2;
+      appWindow->mHlsBuf = (uint8_t*)realloc (appWindow->mHlsBuf, appWindow->mHlsBufAllocSize);
+      }
+
     memcpy (appWindow->mHlsBuf + appWindow->mHlsBufSize, ptr, len);
     appWindow->mHlsBufSize += (int)len;
 
@@ -189,69 +197,92 @@ private:
 
     const int kBaseTimeSecondsOffset = 17;
 
-    mChan = 4;
-    mBitrate = 128000;
-
-    mHlsBufSize = 0;
     auto curl = curl_easy_init();
     if (curl) {
+      mHlsBufSize = 0;
+      mHlsBufAllocSize = 1024;
+      mHlsBuf = (uint8_t*)malloc (mHlsBufAllocSize);
+
+      const string path = "http://" + kSrc + "/pool_" + dec(kPool[chan]) + "/live/uk/" + kPathNames[chan] + '/' +
+                    kPathNames[chan] + ".isml/" + kPathNames[chan] + "-audio=" + dec(bitrate);
+      const string m3u8path = path + ".norewind.m3u8";
+      //{{{  load m3u8 and parse file
       curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
-      string url = "http://" + kSrc + "/" + getM3u8path();
-      curl_easy_setopt (curl, CURLOPT_URL, url.c_str());
+      curl_easy_setopt (curl, CURLOPT_URL, m3u8path.c_str());
       curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, httpHlsBody);
       curl_easy_setopt (curl, CURLOPT_WRITEDATA, this);
       curl_easy_perform (curl);
-      }
 
-    // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
-    char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
-    char* extSeq = strstr ((char*)mHlsBuf, kExtSeq) + strlen (kExtSeq);
-    char* extSeqEnd = strchr (extSeq, '\n');
-    *extSeqEnd = '\0';
-    mBaseSeqNum = atoi (extSeq) + 3;
+      // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
+      char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
+      char* extSeq = strstr ((char*)mHlsBuf, kExtSeq) + strlen (kExtSeq);
+      char* extSeqEnd = strchr (extSeq, '\n');
+      *extSeqEnd = '\0';
+      uint32_t baseSeqNum = atoi (extSeq) + 3;
 
-    // point to #EXT-X-PROGRAM-DATE-TIME dateTime str
-    const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
-    const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
-    const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
-    const auto extDateTimeString = std::string(extDateTime, size_t(extDateTimeEnd - extDateTime));
-    cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
+      // point to #EXT-X-PROGRAM-DATE-TIME dateTime str
+      const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
+      const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
+      const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
+      const auto extDateTimeString = string(extDateTime, size_t(extDateTimeEnd - extDateTime));
+      cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
 
-    // parse ISO time format from string
-    std::istringstream inputStream (extDateTimeString);
-    inputStream >> date::parse ("%FT%T", mBaseTimePoint);
+      // parse ISO time format from string
+      chrono::system_clock::time_point baseTimePoint;
+      istringstream inputStream (extDateTimeString);
+      inputStream >> date::parse ("%FT%T", baseTimePoint);
 
-    mBaseDatePoint = date::floor<date::days>(mBaseTimePoint);
-    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mBaseTimePoint - mBaseDatePoint);
-    mBaseFrame = uint32_t((uint32_t(seconds.count()) - kBaseTimeSecondsOffset) * kFramesPerSecond);
+      chrono::system_clock::time_point baseDatePoint;
+      baseDatePoint = date::floor<date::days>(baseTimePoint);
+      const auto seconds = chrono::duration_cast<chrono::seconds>(baseTimePoint - baseDatePoint);
+      uint32_t baseFrame = uint32_t((uint32_t(seconds.count()) - kBaseTimeSecondsOffset) * kFramesPerSecond);
+      //}}}
 
-    auto seqNum = mBaseSeqNum;
+      auto seqNum = baseSeqNum;
+      while (!getExit()) {
+        cLog::log (LOGINFO, "hls loading " + dec(seqNum));
+        mHlsBufSize = 0;
+        const string seqPath = path + '-' + dec(seqNum) + ".ts";
+        curl_easy_setopt (curl, CURLOPT_URL, seqPath.c_str());
+        curl_easy_perform (curl);
 
-    while (!getExit()) {
-      cLog::log (LOGINFO, "hls loading " + dec(seqNum));
-      mHlsBufSize = 0;
-      //curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
-      string body = "http://" + kSrc + "/" + getTsPath (seqNum);
-      curl_easy_setopt (curl, CURLOPT_URL, body.c_str());
-      curl_easy_perform (curl);
+        if (mHlsBufSize > 0) {
+          cLog::log (LOGINFO, "hls loaded %d", seqNum);
+          //{{{  pack transportStream to aacFrames, back into same buf
+          auto buf = mHlsBuf;
+          auto bufEnd = mHlsBuf + mHlsBufSize;
+          auto packedBufEnd = buf;
+          while ((buf < bufEnd) && (*buf++ == 0x47)) {
+            auto payStart = buf[0] & 0x40;
+            auto pid = ((buf[0] & 0x1F) << 8) | buf[1];
+            auto headerBytes = (buf[2] & 0x20) ? 4 + buf[3] : 3;
+            buf += headerBytes;
+            auto tsFrameBytesLeft = 187 - headerBytes;
+            if (pid == 34) {
+              if (payStart && !buf[0] && !buf[1] && (buf[2] == 1) && (buf[3] == 0xC0)) {
+                int pesHeaderBytes = 9 + buf[8];
+                buf += pesHeaderBytes;
+                tsFrameBytesLeft -= pesHeaderBytes;
+                }
+              memcpy (packedBufEnd, buf, tsFrameBytesLeft);
+              packedBufEnd += tsFrameBytesLeft;
+              }
+            buf += tsFrameBytesLeft;
+            }
+          //}}}
+          memcpy (mStreamLast, mHlsBuf, packedBufEnd - mHlsBuf);
+          mStreamLast += mHlsBufSize;
+          mStreamSem.notifyAll();
 
-      if (mHlsBufSize > 0) {
-        cLog::log (LOGINFO, "hls loaded");
-
-        auto mSrcEnd = packTsBuffer (mHlsBuf, mHlsBuf + mHlsBufSize);
-        cLog::log (LOGINFO, "hls unpacked");
-
-        memcpy (mStreamLast, mHlsBuf, mSrcEnd - mHlsBuf);
-        mStreamLast += mHlsBufSize;
-        mStreamSem.notifyAll();
-
-        seqNum++;
+          seqNum++;
+          }
+        else
+          Sleep (6920);
         }
-      else
-        Sleep (7000);
+      curl_easy_cleanup (curl);
       }
 
-    curl_easy_cleanup (curl);
+    cLog::log (LOGINFO, "exit");
     }
   //}}}
 
@@ -388,6 +419,8 @@ private:
 
     // never gets here
     curl_easy_cleanup (curl);
+
+    cLog::log (LOGINFO, "exit");
     }
   //}}}
 
@@ -682,66 +715,6 @@ private:
     }
   //}}}
 
-  //{{{
-  std::string getPathRoot() {
-
-    //pool_904/live/uk/bbc_radio_three/bbc_radio_three.isml/bbc_radio_three-audio=128000.norewind.m3u8
-    return "pool_" + dec(kPool[mChan]) +
-           "/live/uk/" +
-           kPathNames[mChan] + '/' +
-           kPathNames[mChan] + ".isml/" +
-           kPathNames[mChan] + "-audio=" + dec(mBitrate);
-    }
-  //}}}
-  //{{{
-  std::string getM3u8path() {
-    return getPathRoot() + ".norewind.m3u8";
-    }
-  //}}}
-  //{{{
-  std::string getTsPath (uint32_t seqNum) {
-    return getPathRoot() + '-' + dec(seqNum) + ".ts";
-    }
-  //}}}
-  //{{{
-  uint8_t* packTsBuffer (uint8_t* buf, uint8_t* bufEnd) {
-  // pack transportStream buf to aacFrames back into same buf
-  // return new end, shorter than bufEnd
-
-    auto packedBufEnd = buf;
-    while ((buf < bufEnd) && (*buf++ == 0x47)) {
-      auto payStart = *buf & 0x40;
-      auto pid = ((*buf & 0x1F) << 8) | *(buf+1);
-      auto headerBytes = (*(buf+2) & 0x20) ? (4 + *(buf+3)) : 3;
-      buf += headerBytes;
-      auto tsFrameBytesLeft = 187 - headerBytes;
-      if (pid == 34) {
-        if (payStart && !(*buf) && !(*(buf+1)) && (*(buf+2) == 1) && (*(buf+3) == 0xC0)) {
-          int pesHeaderBytes = 9 + *(buf+8);
-          buf += pesHeaderBytes;
-          tsFrameBytesLeft -= pesHeaderBytes;
-          }
-        memcpy (packedBufEnd, buf, tsFrameBytesLeft);
-        packedBufEnd += tsFrameBytesLeft;
-        }
-      buf += tsFrameBytesLeft;
-      }
-
-    return packedBufEnd;
-    }
-  //}}}
-  //{{{  vars
-  //vars
-  std::chrono::system_clock::time_point mBaseTimePoint;
-  std::chrono::system_clock::time_point mBaseDatePoint;
-  std::chrono::system_clock::time_point mPlayTimePoint;
-
-  int mChan = 0;
-  int mBitrate = 0;
-  uint32_t mBaseSeqNum = 0;
-  uint32_t mBaseFrame = 0;
-  //}}}
-
   //{{{  vars
   cFileList* mFileList;
 
@@ -751,6 +724,7 @@ private:
   cSemaphore mStreamSem;
 
   uint8_t* mHlsBuf = nullptr;
+  int mHlsBufAllocSize = 0;
   int mHlsBufSize = 0;
 
   cJpegImageView* mJpegImageView = nullptr;
