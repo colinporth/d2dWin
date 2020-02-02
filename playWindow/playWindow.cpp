@@ -2,6 +2,8 @@
 //{{{  includes
 #include "stdafx.h"
 
+#include "../../shared/net/cWinSockHttp.h"
+
 // should be in stdafx.h
 #include "../../shared/utils/cFileList.h"
 #include "../boxes/cFileListBox.h"
@@ -19,7 +21,7 @@ using namespace std;
 const static uint32_t kDefaultChan = 4;
 const static uint32_t kDefaultBitrate = 128000;
 
-const static string kSrc = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
+const static string kHost = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
 const static int kPool [] = { 0, 904, 904, 904, 904, 904, 904 };
 const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
 const static char* kPathNames[] = { "none",
@@ -76,8 +78,8 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      mStreamTemp = mStreamFirst;
-      thread ([=]() { hlsThread (4, 48000); }).detach();
+      thread ([=]() { hlsThread (3, 96000); }).detach();
+      //thread ([=]() { httpThread (name); }).detach();
       }
 
     if (streaming || !mFileList->empty())
@@ -140,32 +142,36 @@ private:
 
     switch (type) {
       case CURLINFO_TEXT:
-        cLog::log (LOGINFO, "TEXT %s", ptr);
+        cLog::log (LOGINFO1, "CURL %s", ptr);
         break;
+
 
       case CURLINFO_HEADER_OUT:
-        cLog::log (LOGINFO, "HEADER_OUT %s", ptr);
-        break;
-
-      case CURLINFO_DATA_OUT:
-        cLog::log (LOGINFO, "DATA_OUT %s", ptr);
-        break;
-
-      case CURLINFO_SSL_DATA_OUT:
-        cLog::log (LOGINFO, "SSL_DATA_OUT %s", ptr);
+        cLog::log (LOGINFO1, "HOUT %s", ptr);
         break;
 
       case CURLINFO_HEADER_IN:
-        cLog::log (LOGINFO, "HEADER_IN %s", ptr);
+        cLog::log (LOGINFO1, "H_IN %s", ptr);
+        break;
+
+
+      case CURLINFO_DATA_OUT:
+        cLog::log (LOGINFO1, "DOUT %d bytes", size);
         break;
 
       case CURLINFO_DATA_IN:
-        //cLog::log (LOGINFO, "DATA_IN size:%d", ptr);
+        cLog::log (LOGINFO1, "D_IN %d bytes", size);
+        break;
+
+
+      case CURLINFO_SSL_DATA_OUT:
+        cLog::log (LOGINFO1, "SOUT %d bytes", size);
         break;
 
       case CURLINFO_SSL_DATA_IN:
-        cLog::log (LOGINFO, "SSL_DATA_IN size:%d", ptr);
+        cLog::log (LOGINFO1, "SDIN %d bytes", size);
         break;
+
 
       default:
         return 0;
@@ -187,7 +193,7 @@ private:
     }
   //}}}
   //{{{
-  void hlsThread (int chan, int bitrate) {
+  void hlsCurlThread (int chan, int bitrate) {
 
     cLog::setThreadName ("hls ");
 
@@ -195,11 +201,14 @@ private:
 
     auto curl = curl_easy_init();
     if (curl) {
-      const string path = "http://" + kSrc + "/pool_" + dec(kPool[chan]) + "/live/uk/" + kPathNames[chan] + '/' +
+      const string path = "/pool_" + dec(kPool[chan]) + "/live/uk/" + kPathNames[chan] + '/' +
                           kPathNames[chan] + ".isml/" + kPathNames[chan] + "-audio=" + dec(bitrate);
-      //{{{  load m3u8 into mStreamLast and parse to get baseSeqNum, baseTimePoint and baseDatePoint
-      const string m3u8path = path + ".norewind.m3u8";
+      //{{{  load m3u8 into mStreamLast
+      const string m3u8path = "http://" + kHost + path + ".norewind.m3u8";
 
+      curl_easy_setopt (curl, CURLOPT_DEBUGFUNCTION, httpTrace);
+      curl_easy_setopt (curl, CURLOPT_DEBUGDATA, this);
+      curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
       curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
       curl_easy_setopt (curl, CURLOPT_URL, m3u8path.c_str());
 
@@ -208,76 +217,159 @@ private:
       curl_easy_setopt (curl, CURLOPT_WRITEDATA, this);
       curl_easy_perform (curl);
 
-      // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
-      char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
-      char* extSeq = strstr ((char*)mStreamLast, kExtSeq) + strlen (kExtSeq);
-      char* extSeqEnd = strchr (extSeq, '\n');
-      *extSeqEnd = '\0';
-      uint32_t baseSeqNum = atoi (extSeq) + 3;
-
-      // point to #EXT-X-PROGRAM-DATE-TIME dateTime str
-      const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
-      const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
-      const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
-      const auto extDateTimeString = string (extDateTime, size_t(extDateTimeEnd - extDateTime));
-      cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
-
-      // parse ISO time format from string
-      chrono::system_clock::time_point baseTimePoint;
-      istringstream inputStream (extDateTimeString);
-      inputStream >> date::parse ("%FT%T", baseTimePoint);
-
-      chrono::system_clock::time_point baseDatePoint;
-      baseDatePoint = date::floor<date::days>(baseTimePoint);
-      const auto seconds = chrono::duration_cast<chrono::seconds>(baseTimePoint - baseDatePoint);
-
-      uint32_t baseFrame = uint32_t((uint32_t(seconds.count()) - kBaseTimeSecondsOffset) * kFramesPerSecond);
+      //char* url = NULL;
+      //curl_easy_getinfo (curl, CURLINFO_REDIRECT_URL, &url);
       //}}}
+      if (mStreamTemp > mStreamLast) {
+        //{{{  parse to get baseSeqNum, baseTimePoint and baseDatePoint
+        // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
+        char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
+        char* extSeq = strstr ((char*)mStreamLast, kExtSeq) + strlen (kExtSeq);
+        char* extSeqEnd = strchr (extSeq, '\n');
+        *extSeqEnd = '\0';
+        uint32_t baseSeqNum = atoi (extSeq) + 3;
 
-      auto seqNum = baseSeqNum - 100;
+        // point to #EXT-X-PROGRAM-DATE-TIME dateTime str
+        const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
+        const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
+        const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
+        const auto extDateTimeString = string (extDateTime, size_t(extDateTimeEnd - extDateTime));
+        cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
 
-      while (!getExit()) {
-        cLog::log (LOGINFO, "hls loading " + dec(seqNum));
+        // parse ISO time format from string
+        chrono::system_clock::time_point baseTimePoint;
+        istringstream inputStream (extDateTimeString);
+        inputStream >> date::parse ("%FT%T", baseTimePoint);
 
-        const string seqPath = path + '-' + dec(seqNum) + ".ts";
-        curl_easy_setopt (curl, CURLOPT_URL, seqPath.c_str());
-        mStreamTemp = mStreamLast;
-        curl_easy_perform (curl);
+        chrono::system_clock::time_point baseDatePoint;
+        baseDatePoint = date::floor<date::days>(baseTimePoint);
+        const auto seconds = chrono::duration_cast<chrono::seconds>(baseTimePoint - baseDatePoint);
 
-        if (mStreamTemp > mStreamLast) {
-          cLog::log (LOGINFO, "hls loaded %d", seqNum);
+        uint32_t baseFrame = uint32_t((uint32_t(seconds.count()) - kBaseTimeSecondsOffset) * kFramesPerSecond);
+        //}}}
 
-          // pack transportStream to aacFrames, back into same buf
-          auto streamTs = mStreamLast;
-          auto streamAacFrames = mStreamLast;
-          while ((streamTs < mStreamTemp) && (*streamTs++ == 0x47)) {
-            auto payStart = streamTs[0] & 0x40;
-            auto pid = ((streamTs[0] & 0x1F) << 8) | streamTs[1];
-            auto headerBytes = (streamTs[2] & 0x20) ? 4 + streamTs[3] : 3;
-            streamTs += headerBytes;
-            auto tsFrameBytesLeft = 187 - headerBytes;
-            if (pid == 34) {
-              if (payStart &&
-                  !streamTs[0] && !streamTs[1] && (streamTs[2] == 1) && (streamTs[3] == 0xC0)) {
-                int pesHeaderBytes = 9 + streamTs[8];
-                streamTs += pesHeaderBytes;
-                tsFrameBytesLeft -= pesHeaderBytes;
+        auto seqNum = baseSeqNum;
+        while (!getExit()) {
+          //cLog::log (LOGINFO1, "hls loading " + dec(seqNum));
+          const string seqPath = "http://" + kHost + path + '-' + dec(seqNum) + ".ts";
+          curl_easy_setopt (curl, CURLOPT_URL, seqPath.c_str());
+          mStreamTemp = mStreamLast;
+          curl_easy_perform (curl);
+
+          if (mStreamTemp > mStreamLast) {
+            //{{{  pack transportStream to aacFrames, back into same buf
+            auto streamTs = mStreamLast;
+            auto streamAacFrames = mStreamLast;
+            while ((streamTs < mStreamTemp) && (*streamTs++ == 0x47)) {
+              auto payStart = streamTs[0] & 0x40;
+              auto pid = ((streamTs[0] & 0x1F) << 8) | streamTs[1];
+              auto headerBytes = (streamTs[2] & 0x20) ? 4 + streamTs[3] : 3;
+              streamTs += headerBytes;
+              auto tsFrameBytesLeft = 187 - headerBytes;
+              if (pid == 34) {
+                if (payStart &&
+                    !streamTs[0] && !streamTs[1] && (streamTs[2] == 1) && (streamTs[3] == 0xC0)) {
+                  int pesHeaderBytes = 9 + streamTs[8];
+                  streamTs += pesHeaderBytes;
+                  tsFrameBytesLeft -= pesHeaderBytes;
+                  }
+                // pack ts payload down into stream aacFrames
+                memcpy (streamAacFrames, streamTs, tsFrameBytesLeft);
+                streamAacFrames += tsFrameBytesLeft;
                 }
-              // pack ts payload down into stream aacFrames
-              memcpy (streamAacFrames, streamTs, tsFrameBytesLeft);
-              streamAacFrames += tsFrameBytesLeft;
+              streamTs += tsFrameBytesLeft;
               }
-            streamTs += tsFrameBytesLeft;
+            //}}}
+            mStreamLast = streamAacFrames;
+            mStreamSem.notifyAll();
+            //cLog::log (LOGINFO1, "hls loaded %d", seqNum);
+            seqNum++;
             }
-          mStreamLast = streamAacFrames;
-          mStreamSem.notifyAll();
-
-          seqNum++;
+          else
+            Sleep (6920);
           }
-        else
-          Sleep (6920);
         }
       curl_easy_cleanup (curl);
+      }
+
+    cLog::log (LOGINFO, "exit");
+    }
+  //}}}
+  //{{{
+  void hlsThread (int chan, int bitrate) {
+
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("hls ");
+
+    cWinSockHttp http;
+    const int kBaseTimeSecondsOffset = 17;
+
+    const string path = "pool_" + dec(kPool[chan]) + "/live/uk/" + kPathNames[chan] + '/' +
+                        kPathNames[chan] + ".isml/" + kPathNames[chan] + "-audio=" + dec(bitrate);
+    string host = http.getRedirectable (kHost, path + ".norewind.m3u8");
+
+    // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
+    char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
+    const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
+    char* extSeqEnd = strchr (extSeq, '\n');
+    *extSeqEnd = '\0';
+    uint32_t baseSeqNum = atoi (extSeq) + 3;
+
+    // point to #EXT-X-PROGRAM-DATE-TIME dateTime str
+    const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
+    const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
+    const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
+    const auto extDateTimeString = string (extDateTime, size_t(extDateTimeEnd - extDateTime));
+    cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
+    http.freeContent();
+
+    // parse ISO time format from string
+    chrono::system_clock::time_point baseTimePoint;
+    istringstream inputStream (extDateTimeString);
+    inputStream >> date::parse ("%FT%T", baseTimePoint);
+
+    chrono::system_clock::time_point baseDatePoint;
+    baseDatePoint = date::floor<date::days>(baseTimePoint);
+    const auto seconds = chrono::duration_cast<chrono::seconds>(baseTimePoint - baseDatePoint);
+
+    uint32_t baseFrame = uint32_t((uint32_t(seconds.count()) - kBaseTimeSecondsOffset) * kFramesPerSecond);
+
+    auto seqNum = baseSeqNum;
+    while (!getExit()) {
+      cLog::log (LOGINFO1, "hls loading " + dec(seqNum));
+      if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
+        // pack transportStream to aacFrames, back into same buf
+        auto streamTs = http.getContent();
+        auto streamTsEnd = http.getContent() + http.getContentSize();
+        auto streamAacFrames = mStreamLast;
+        while ((streamTs < streamTsEnd) && (*streamTs++ == 0x47)) {
+          auto payStart = streamTs[0] & 0x40;
+          auto pid = ((streamTs[0] & 0x1F) << 8) | streamTs[1];
+          auto headerBytes = (streamTs[2] & 0x20) ? 4 + streamTs[3] : 3;
+          streamTs += headerBytes;
+          auto tsFrameBytesLeft = 187 - headerBytes;
+          if (pid == 34) {
+            if (payStart &&
+                !streamTs[0] && !streamTs[1] && (streamTs[2] == 1) && (streamTs[3] == 0xC0)) {
+              int pesHeaderBytes = 9 + streamTs[8];
+              streamTs += pesHeaderBytes;
+              tsFrameBytesLeft -= pesHeaderBytes;
+              }
+            // pack ts payload down into stream aacFrames
+            memcpy (streamAacFrames, streamTs, tsFrameBytesLeft);
+            streamAacFrames += tsFrameBytesLeft;
+            }
+          streamTs += tsFrameBytesLeft;
+          }
+        mStreamLast = streamAacFrames;
+        http.freeContent();
+
+        mStreamSem.notifyAll();
+        cLog::log (LOGINFO1, "hls loaded %d", seqNum);
+        seqNum++;
+        }
+      else
+        Sleep (6920);
       }
 
     cLog::log (LOGINFO, "exit");
@@ -393,9 +485,9 @@ private:
 
     auto curl = curl_easy_init();
     if (curl) {
-      //curl_easy_setopt (curl, CURLOPT_DEBUGFUNCTION, httpTrace);
-      //curl_easy_setopt (curl, CURLOPT_DEBUGDATA, this);
-      //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
+      curl_easy_setopt (curl, CURLOPT_DEBUGFUNCTION, httpTrace);
+      curl_easy_setopt (curl, CURLOPT_DEBUGDATA, this);
+      curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
 
       curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
       curl_easy_setopt (curl, CURLOPT_URL, url);
@@ -602,11 +694,11 @@ private:
         //{{{  float 32 bit interleaved wav uses mapped stream directly
         while (!getExit() && !mSongChanged && (mSong.mPlayFrame <= mSong.getLastFrame()))
           if (mPlaying) {
-            cLog::log (LOGINFO1, "process wav frame:%d", mSong.getPlayFrame());
+            cLog::log (LOGINFO2, "process wav frame:%d", mSong.getPlayFrame());
             device->process ([&](float*& srcSamples, int& numSrcSamples,
                                  int numDstSamplesLeft, int numDstSamples) mutable noexcept {
               // load srcSamples callback lambda
-              cLog::log (LOGINFO2, " - callback wav src:%d dst:%d:%d",
+              cLog::log (LOGINFO3, " - callback wav src:%d dst:%d:%d",
                          mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
               srcSamples = (float*)(mStreamFirst + mSong.getPlayFrameStreamIndex());
               numSrcSamples = mSong.getSamplesPerFrame();
@@ -635,11 +727,11 @@ private:
         while (!getExit() && !mSongChanged &&
                (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
           if (mPlaying) {
-            cLog::log (LOGINFO1, "process for frame:%d", mSong.getPlayFrame());
+            cLog::log (LOGINFO2, "process for frame:%d", mSong.getPlayFrame());
             device->process ([&](float*& srcSamples, int& numSrcSamples,
                                  int numDstSamplesLeft, int numDstSamples) mutable noexcept {
               // load srcSamples callback lambda
-              cLog::log (LOGINFO2, " - callback for src:%d dst:%d:%d",
+              cLog::log (LOGINFO3, " - callback for src:%d dst:%d:%d",
                          mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
 
               int skip;
@@ -749,6 +841,10 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cLog::init (LOGINFO, true, "", "playWindow");
   av_log_set_level (AV_LOG_VERBOSE);
   av_log_set_callback (cLog::avLogCallback);
+
+  WSADATA wsaData;
+  if (WSAStartup (MAKEWORD(2,2), &wsaData))
+    exit (0);
 
   cAppWindow appWindow;
 
