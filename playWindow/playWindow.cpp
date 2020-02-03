@@ -53,11 +53,10 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      thread ([=]() { hlsThread (3, 96000); }).detach();
+      thread ([=]() { hlsThread (4, 48000); }).detach();
       //thread ([=]() { httpThread (name); }).detach();
       }
-
-    if (streaming || !mFileList->empty())
+    else if (streaming || !mFileList->empty())
       thread ([=](){ analyseThread (streaming); }).detach();
 
     // loop till quit
@@ -294,12 +293,18 @@ private:
     }
   //}}}
 
-  // hls http
   //{{{
   void hlsThread (int chan, int bitrate) {
+  // hls chunk http load and analyse thread, single thread helps channel change and jumping backwards
 
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("hls ");
+
+    //{{{  const
     const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
+
     const static string kHost = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
+
     const static string kPathNames[] = { "none",
                                          "bbc_radio_one",
                                          "bbc_radio_two",
@@ -308,87 +313,155 @@ private:
                                          "bbc_radio_five_live",
                                          "bbc_6music" };
 
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("hls ");
-
     const string channelPath = "pool_904/live/uk/" +
                                kPathNames[chan] + '/' +
                                kPathNames[chan] + ".isml/" +
                                kPathNames[chan] + "-audio=" + dec(bitrate);
+
+    const string kM3u8Suffix = ".norewind.m3u8";
+    //}}}
+
     cWinSockHttp http;
-    string redirectedHost = http.getRedirectable (kHost, channelPath + ".norewind.m3u8");
-    if (http.getContent()) {
-      cLog::log (LOGINFO, redirectedHost);
+    string redirectedHost = http.getRedirectable (kHost, channelPath + kM3u8Suffix);
+    if (!http.getContent())
+      return;
+    //{{{  parse m3u8 for startSeqNum, startDatePoint, startTimePoint
+    // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
+    char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
+    const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
+    char* extSeqEnd = strchr (extSeq, '\n');
+    *extSeqEnd = '\0';
+    uint32_t startSeqNum = atoi (extSeq) + 3;
 
-      // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
-      char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
-      const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
-      char* extSeqEnd = strchr (extSeq, '\n');
-      *extSeqEnd = '\0';
-      uint32_t startSeqNum = atoi (extSeq) + 3;
+    // point to #EXT-X-PROGRAM-DATE-TIME dateTime str
+    const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
+    const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
+    const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
+    const auto extDateTimeString = string (extDateTime, size_t(extDateTimeEnd - extDateTime));
+    cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
+    http.freeContent();
 
-      // point to #EXT-X-PROGRAM-DATE-TIME dateTime str
-      const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
-      const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
-      const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
-      const auto extDateTimeString = string (extDateTime, size_t(extDateTimeEnd - extDateTime));
-      cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
-      http.freeContent();
+    // parse ISO time format from string
+    chrono::system_clock::time_point startTimePoint;
+    istringstream inputStream (extDateTimeString);
+    inputStream >> date::parse ("%FT%T", startTimePoint);
 
-      // parse ISO time format from string
-      chrono::system_clock::time_point startTimePoint;
-      istringstream inputStream (extDateTimeString);
-      inputStream >> date::parse ("%FT%T", startTimePoint);
+    chrono::system_clock::time_point startDatePoint;
+    startDatePoint = date::floor<date::days>(startTimePoint);
 
-      chrono::system_clock::time_point startDatePoint;
-      startDatePoint = date::floor<date::days>(startTimePoint);
+    // 6.4 secsPerChunk, 300/150 framesPerChunk, 1024/2048 samplesPerFrame
+    const float kSamplesPerSecond = 48000.f;
+    const float kSamplesPerFrame = (bitrate <= 96000) ? 2048.f : 1024.f;
+    const float kFramesPerSecond = kSamplesPerSecond / kSamplesPerFrame;
+    const float kStartTimeSecondsOffset = 17.f;
 
-      // 6.4 secsPerChunk, 300/150 framesPerChunk, 1024/2048 samplesPerFrame
-      const float kSamplesPerSecond = 48000.f;
-      const float kSamplesPerFrame = (bitrate <= 96000) ? 2048.f : 1024.f;
-      const float kFramesPerSecond = kSamplesPerSecond / kSamplesPerFrame;
-      const float kStartTimeSecondsOffset = 17.f;
-      const auto seconds = chrono::duration_cast<chrono::seconds>(startTimePoint - startDatePoint);
-      uint32_t startFrame = uint32_t((uint32_t(seconds.count()) - kStartTimeSecondsOffset) * kFramesPerSecond);
+    const auto seconds = chrono::duration_cast<chrono::seconds>(startTimePoint - startDatePoint);
+    uint32_t startFrame = uint32_t((uint32_t(seconds.count()) - kStartTimeSecondsOffset) * kFramesPerSecond);
+    //}}}
 
-      auto seqNum = startSeqNum;
-      while (!getExit())
-        if (http.get (redirectedHost, channelPath + '-' + dec(seqNum) + ".ts") == 200) {
-          //{{{  parse aacFrames from transportStream packets
-          auto ts = http.getContent();
-          while ((ts < http.getContent() + http.getContentSize()) && (*ts++ == 0x47)) {
-            // ts packet start
-            auto payStart = ts[0] & 0x40;
-            auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
-            auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
-            ts += headerBytes;
-            auto tsBodyBytes = 187 - headerBytes;
-            if (pid == 34) {
-              if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-                int pesHeaderBytes = 9 + ts[8];
-                ts += pesHeaderBytes;
-                tsBodyBytes -= pesHeaderBytes;
-                }
-              // copy ts payload  into stream aacFrames
-              memcpy (mStreamLast, ts, tsBodyBytes);
-              mStreamLast += tsBodyBytes;  // could signal partial aac frame
+    //{{{  init aac codec, context, packet, avFrame
+    auto codec = avcodec_find_decoder (AV_CODEC_ID_AAC);
+    auto context = avcodec_alloc_context3 (codec);
+    avcodec_open2 (context, codec, NULL);
+
+    AVPacket avPacket;
+    av_init_packet (&avPacket);
+
+    auto avFrame = av_frame_alloc();
+    //}}}
+    mSong.init (eAac, 2, 2048, 48000);
+    auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
+
+    auto seqNum = startSeqNum;
+    auto stream = mStreamFirst;
+    while (!getExit()) {
+      // get hls seqNum chunk
+      if (http.get (redirectedHost, channelPath + '-' + dec(seqNum) + ".ts") == 200) {
+        //{{{  extract aac payload from ts packets
+        auto ts = http.getContent();
+        auto tsLen = http.getContentSize();
+
+        while ((ts < http.getContent() + tsLen) && (*ts++ == 0x47)) {
+          // ts packet start
+          auto payStart = ts[0] & 0x40;
+          auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
+          auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
+          ts += headerBytes;
+          auto tsBodyBytes = 187 - headerBytes;
+
+          if (pid == 34) {
+            if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
+              int pesHeaderBytes = 9 + ts[8];
+              ts += pesHeaderBytes;
+              tsBodyBytes -= pesHeaderBytes;
               }
-            ts += tsBodyBytes;
+
+            // copy ts payload aacFrames into stream
+            memcpy (mStreamLast, ts, tsBodyBytes);
+            mStreamLast += tsBodyBytes;
             }
-          mStreamSem.notifyAll();
 
-          http.freeContent();
-          seqNum++;
+          ts += tsBodyBytes;
           }
-          //}}}
-        else
-          Sleep (6400);
-      }
 
+        http.freeContent();
+        //}}}
+        int skip;
+        int sampleRate;
+        eAudioFrameType frameType;
+        while (parseAudioFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
+          // get aacFrame from chunk into avPacket
+          if (frameType == mSong.getAudioFrameType()) {
+            auto ret = avcodec_send_packet (context, &avPacket);
+            while (ret >= 0) {
+              ret = avcodec_receive_frame (context, avFrame);
+              if ((ret == AVERROR_EOF) || (ret < 0))
+                break;
+              if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
+                //{{{  frame of interleaved samples
+                if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
+                  mSong.setSamplesPerFrame (avFrame->nb_samples);
+                if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
+                  mSong.setSampleRate (avFrame->sample_rate);
+
+                // convert float 32bit planar data to interleaved
+                for (auto channel = 0; channel < avFrame->channels; channel++) {
+                  auto srcPtr = (float*)avFrame->data[channel];
+                  auto dstPtr = (float*)(samples) + channel;
+                  for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+                    *dstPtr = *srcPtr++;
+                    dstPtr += avFrame->channels;
+                    }
+                  }
+                //}}}
+                if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, int(mStreamLast - mStreamFirst),
+                                    avFrame->nb_samples, samples))
+                  thread ([=](){ playThread (true); }).detach();
+                changed();
+                }
+              }
+            }
+          stream += skip + avPacket.size;
+          }
+        seqNum++;
+        }
+      else // wait for next hls chunk
+        Sleep (6400);
+      }
+    //{{{  free samples, avFrame, context
+    // done
+    free (samples);
+    av_frame_free (&avFrame);
+    if (context)
+      avcodec_close (context);
+    //}}}
+
+    mPlayDoneSem.wait();
     cLog::log (LOGINFO, "exit");
+    CoUninitialize();
+    setExit();
     }
   //}}}
-
   //{{{
   void analyseThread (bool streaming) {
 
@@ -716,10 +789,6 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   cLog::init (LOGINFO, true, "", "playWindow");
   av_log_set_level (AV_LOG_VERBOSE);
   av_log_set_callback (cLog::avLogCallback);
-
-  WSADATA wsaData;
-  if (WSAStartup (MAKEWORD(2,2), &wsaData))
-    exit (0);
 
   cAppWindow appWindow;
 
