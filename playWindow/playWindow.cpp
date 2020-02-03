@@ -21,6 +21,7 @@ class cAppWindow : public cD2dWindow {
 public:
   cAppWindow() : mPlayDoneSem("playDone") {}
   virtual ~cAppWindow() {}
+
   //{{{
   void run (bool streaming, const string& title, int width, int height, const string& name) {
 
@@ -300,7 +301,7 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("hls ");
 
-    //{{{  const
+    //{{{  hls const
     const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
 
     const static string kHost = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
@@ -320,7 +321,6 @@ private:
 
     const string kM3u8Suffix = ".norewind.m3u8";
     //}}}
-
     cWinSockHttp http;
     string redirectedHost = http.getRedirectable (kHost, channelPath + kM3u8Suffix);
     if (!http.getContent())
@@ -370,14 +370,13 @@ private:
     auto avFrame = av_frame_alloc();
     //}}}
     mSong.init (eAac, 2, 2048, 48000);
-    auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
 
-    auto seqNum = startSeqNum;
     auto stream = mStreamFirst;
+    auto seqNum = startSeqNum;
     while (!getExit()) {
       // get hls seqNum chunk
       if (http.get (redirectedHost, channelPath + '-' + dec(seqNum) + ".ts") == 200) {
-        //{{{  extract aac payload from ts packets
+        //{{{  extract aacFrames from ts packets
         auto ts = http.getContent();
         auto tsLen = http.getContentSize();
 
@@ -406,11 +405,12 @@ private:
 
         http.freeContent();
         //}}}
+
         int skip;
         int sampleRate;
         eAudioFrameType frameType;
         while (parseAudioFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
-          // get aacFrame from chunk into avPacket
+          // get an aacFrame from chunk into avPacket
           if (frameType == mSong.getAudioFrameType()) {
             auto ret = avcodec_send_packet (context, &avPacket);
             while (ret >= 0) {
@@ -418,24 +418,23 @@ private:
               if ((ret == AVERROR_EOF) || (ret < 0))
                 break;
               if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
-                //{{{  frame of interleaved samples
                 if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
                   mSong.setSamplesPerFrame (avFrame->nb_samples);
                 if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
                   mSong.setSampleRate (avFrame->sample_rate);
-
-                // convert float 32bit planar data to interleaved
+                //{{{  convert planar float 32bit to interleaved samples, use end stream buffer for temp samples
                 for (auto channel = 0; channel < avFrame->channels; channel++) {
                   auto srcPtr = (float*)avFrame->data[channel];
-                  auto dstPtr = (float*)(samples) + channel;
+                  auto dstPtr = (float*)(mStreamLast) + channel;
                   for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
                     *dstPtr = *srcPtr++;
                     dstPtr += avFrame->channels;
                     }
                   }
                 //}}}
-                if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, int(mStreamLast - mStreamFirst),
-                                    avFrame->nb_samples, samples))
+                if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size,
+                                    int(mStreamLast - mStreamFirst),
+                                    avFrame->nb_samples, (float*)mStreamLast))
                   thread ([=](){ playThread (true); }).detach();
                 changed();
                 }
@@ -448,9 +447,7 @@ private:
       else // wait for next hls chunk
         Sleep (6400);
       }
-    //{{{  free samples, avFrame, context
-    // done
-    free (samples);
+    //{{{  free avFrame, context
     av_frame_free (&avFrame);
     if (context)
       avcodec_close (context);
@@ -784,6 +781,7 @@ private:
   };
 
 // main
+//{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO, true, "", "playWindow");
@@ -812,3 +810,4 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   CoUninitialize();
   return 0;
   }
+//}}}
