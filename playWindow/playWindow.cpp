@@ -298,9 +298,6 @@ private:
   void hlsThread (int chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps channel change and jumping backwards
 
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
-    cLog::setThreadName ("hls ");
-
     //{{{  hls const
     const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
 
@@ -314,50 +311,12 @@ private:
                                          "bbc_radio_five_live",
                                          "bbc_6music" };
 
-    const string channelPath = "pool_904/live/uk/" +
-                               kPathNames[chan] + '/' +
-                               kPathNames[chan] + ".isml/" +
-                               kPathNames[chan] + "-audio=" + dec(bitrate);
-
     const string kM3u8Suffix = ".norewind.m3u8";
     //}}}
+    CoInitializeEx (NULL, COINIT_MULTITHREADED);
+    cLog::setThreadName ("hls ");
+
     cWinSockHttp http;
-    string redirectedHost = http.getRedirectable (kHost, channelPath + kM3u8Suffix);
-    if (!http.getContent())
-      return;
-    //{{{  parse m3u8 for startSeqNum, startDatePoint, startTimePoint
-    // point to #EXT-X-MEDIA-SEQUENCE: sequence num strauto curl = curl_easy_init();
-    char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
-    const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
-    char* extSeqEnd = strchr (extSeq, '\n');
-    *extSeqEnd = '\0';
-    uint32_t startSeqNum = atoi (extSeq) + 3;
-
-    // point to #EXT-X-PROGRAM-DATE-TIME dateTime str
-    const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
-    const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
-    const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
-    const auto extDateTimeString = string (extDateTime, size_t(extDateTimeEnd - extDateTime));
-    cLog::log (LOGNOTICE, kExtDateTime + extDateTimeString);
-    http.freeContent();
-
-    // parse ISO time format from string
-    chrono::system_clock::time_point startTimePoint;
-    istringstream inputStream (extDateTimeString);
-    inputStream >> date::parse ("%FT%T", startTimePoint);
-
-    chrono::system_clock::time_point startDatePoint;
-    startDatePoint = date::floor<date::days>(startTimePoint);
-
-    // 6.4 secsPerChunk, 300/150 framesPerChunk, 1024/2048 samplesPerFrame
-    const float kSamplesPerSecond = 48000.f;
-    const float kSamplesPerFrame = (bitrate <= 96000) ? 2048.f : 1024.f;
-    const float kFramesPerSecond = kSamplesPerSecond / kSamplesPerFrame;
-    const float kStartTimeSecondsOffset = 17.f;
-
-    const auto seconds = chrono::duration_cast<chrono::seconds>(startTimePoint - startDatePoint);
-    uint32_t startFrame = uint32_t((uint32_t(seconds.count()) - kStartTimeSecondsOffset) * kFramesPerSecond);
-    //}}}
 
     //{{{  init aac codec, context, packet, avFrame
     auto codec = avcodec_find_decoder (AV_CODEC_ID_AAC);
@@ -371,82 +330,122 @@ private:
     //}}}
     mSong.init (eAac, 2, 2048, 48000);
 
-    auto stream = mStreamFirst;
-    auto seqNum = startSeqNum;
-    while (!getExit()) {
-      // get hls seqNum chunk
-      if (http.get (redirectedHost, channelPath + '-' + dec(seqNum) + ".ts") == 200) {
-        //{{{  extract aacFrames from ts packets
-        auto ts = http.getContent();
-        auto tsLen = http.getContentSize();
+    string host = kHost;
+    string path = "pool_904/live/uk/" + kPathNames[chan] + '/' +
+                  kPathNames[chan] + ".isml/" + kPathNames[chan] + "-audio=" + dec(bitrate);
+    host = http.getRedirect (host, path + kM3u8Suffix);
+    if (http.getContent()) {
+      //{{{  parse m3u8 for startSeqNum, startDatePoint, startTimePoint
+      // point to #EXT-X-MEDIA-SEQUENCE: sequence num
+      char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
+      const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
+      char* extSeqEnd = strchr (extSeq, '\n');
+      *extSeqEnd = '\0';
+      uint32_t startSeqNum = atoi (extSeq) + 3;
 
-        while ((ts < http.getContent() + tsLen) && (*ts++ == 0x47)) {
-          // ts packet start
-          auto payStart = ts[0] & 0x40;
-          auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
-          auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
-          ts += headerBytes;
-          auto tsBodyBytes = 187 - headerBytes;
+      // point to #EXT-X-PROGRAM-DATE-TIME: dateTime str
+      const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
+      const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
+      const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
+      const auto extDateTimeString = string (extDateTime, size_t(extDateTimeEnd - extDateTime));
+      cLog::log (LOGINFO, kExtDateTime + extDateTimeString);
+      http.freeContent();
 
-          if (pid == 34) {
-            if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-              int pesHeaderBytes = 9 + ts[8];
-              ts += pesHeaderBytes;
-              tsBodyBytes -= pesHeaderBytes;
+      // parse ISO time format from string
+      chrono::system_clock::time_point startTimePoint;
+      istringstream inputStream (extDateTimeString);
+      inputStream >> date::parse ("%FT%T", startTimePoint);
+
+      chrono::system_clock::time_point startDatePoint;
+      startDatePoint = date::floor<date::days>(startTimePoint);
+
+      // 6.4 secsPerChunk, 300/150 framesPerChunk, 1024/2048 samplesPerFrame
+      const float kSamplesPerSecond = 48000.f;
+      const float kSamplesPerFrame = (bitrate <= 96000) ? 2048.f : 1024.f;
+      const float kFramesPerSecond = kSamplesPerSecond / kSamplesPerFrame;
+      const float kStartTimeSecondsOffset = 17.f;
+
+      const auto seconds = chrono::duration_cast<chrono::seconds>(startTimePoint - startDatePoint);
+      uint32_t startFrame = uint32_t((uint32_t(seconds.count()) - kStartTimeSecondsOffset) * kFramesPerSecond);
+      //}}}
+
+      auto stream = mStreamFirst;
+      auto seqNum = startSeqNum;
+      while (!getExit()) {
+        // get hls seqNum chunk
+        if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
+          //{{{  extract aacFrames from ts packets
+          auto ts = http.getContent();
+          auto tsLen = http.getContentSize();
+
+          while ((ts < http.getContent() + tsLen) && (*ts++ == 0x47)) {
+            // ts packet start
+            auto payStart = ts[0] & 0x40;
+            auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
+            auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
+            ts += headerBytes;
+            auto tsBodyBytes = 187 - headerBytes;
+
+            if (pid == 34) {
+              if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
+                int pesHeaderBytes = 9 + ts[8];
+                ts += pesHeaderBytes;
+                tsBodyBytes -= pesHeaderBytes;
+                }
+
+              // copy ts payload aacFrames into stream
+              memcpy (mStreamLast, ts, tsBodyBytes);
+              mStreamLast += tsBodyBytes;
               }
 
-            // copy ts payload aacFrames into stream
-            memcpy (mStreamLast, ts, tsBodyBytes);
-            mStreamLast += tsBodyBytes;
+            ts += tsBodyBytes;
             }
 
-          ts += tsBodyBytes;
-          }
+          http.freeContent();
+          //}}}
 
-        http.freeContent();
-        //}}}
-
-        int skip;
-        int sampleRate;
-        eAudioFrameType frameType;
-        while (parseAudioFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
-          // get an aacFrame from chunk into avPacket
-          if (frameType == mSong.getAudioFrameType()) {
-            auto ret = avcodec_send_packet (context, &avPacket);
-            while (ret >= 0) {
-              ret = avcodec_receive_frame (context, avFrame);
-              if ((ret == AVERROR_EOF) || (ret < 0))
-                break;
-              if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
-                if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
-                  mSong.setSamplesPerFrame (avFrame->nb_samples);
-                if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
-                  mSong.setSampleRate (avFrame->sample_rate);
-                //{{{  convert planar float 32bit to interleaved samples, use end stream buffer for temp samples
-                for (auto channel = 0; channel < avFrame->channels; channel++) {
-                  auto srcPtr = (float*)avFrame->data[channel];
-                  auto dstPtr = (float*)(mStreamLast) + channel;
-                  for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                    *dstPtr = *srcPtr++;
-                    dstPtr += avFrame->channels;
+          int skip;
+          int sampleRate;
+          eAudioFrameType frameType;
+          while (parseAudioFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
+            // get an aacFrame from chunk into avPacket
+            if (frameType == mSong.getAudioFrameType()) {
+              auto ret = avcodec_send_packet (context, &avPacket);
+              while (ret >= 0) {
+                ret = avcodec_receive_frame (context, avFrame);
+                if ((ret == AVERROR_EOF) || (ret < 0))
+                  break;
+                if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
+                  if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
+                    mSong.setSamplesPerFrame (avFrame->nb_samples);
+                  if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
+                    mSong.setSampleRate (avFrame->sample_rate);
+                  //{{{  convert planar float 32bit to interleaved samples, use end stream buffer for temp samples
+                  for (auto channel = 0; channel < avFrame->channels; channel++) {
+                    auto srcPtr = (float*)avFrame->data[channel];
+                    auto dstPtr = (float*)(mStreamLast) + channel;
+                    for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+                      *dstPtr = *srcPtr++;
+                      dstPtr += avFrame->channels;
+                      }
                     }
+                  //}}}
+                  if (mSong.addFrame (avPacket.data, avPacket.size, mSong.getNumFrames(),
+                                      avFrame->nb_samples, (float*)mStreamLast))
+                    thread ([=](){ playThread (true); }).detach();
+                  changed();
                   }
-                //}}}
-                if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size,
-                                    int(mStreamLast - mStreamFirst),
-                                    avFrame->nb_samples, (float*)mStreamLast))
-                  thread ([=](){ playThread (true); }).detach();
-                changed();
                 }
               }
+            stream += skip + avPacket.size;
             }
-          stream += skip + avPacket.size;
+          seqNum++;
           }
-        seqNum++;
+        else // wait for next hls chunk
+          Sleep (6400);
         }
-      else // wait for next hls chunk
-        Sleep (6400);
       }
+
     //{{{  free avFrame, context
     av_frame_free (&avFrame);
     if (context)
@@ -504,7 +503,8 @@ private:
 
         auto frameSampleBytes = frameSamples * 2 * 4;
         while (!getExit() && !mSongChanged && !songDone) {
-          if (mSong.addFrame (uint32_t(data - mStreamFirst), frameSampleBytes, dataSize, frameSamples, (float*)data))
+          int totalFrames = int(mStreamLast - mStreamFirst) / dataSize;
+          if (mSong.addFrame (data, frameSampleBytes, totalFrames, frameSamples, (float*)data))
             thread ([=](){ playThread (false); }).detach();
 
           data += frameSampleBytes;
@@ -581,8 +581,9 @@ private:
                       cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
                     }
                   //}}}
-                  if (mSong.addFrame (uint32_t(avPacket.data - mStreamFirst), avPacket.size, int(mStreamLast - mStreamFirst),
-                                      avFrame->nb_samples, samples))
+                  int numFrames = mSong.getNumFrames();
+                  int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(avPacket.data - mStreamFirst) / numFrames) : 1;
+                  if (mSong.addFrame (avPacket.data, avPacket.size, totalFrames, avFrame->nb_samples, samples))
                     thread ([=](){ playThread (streaming); }).detach();
                   changed();
                   }
@@ -645,7 +646,7 @@ private:
               // load srcSamples callback lambda
               cLog::log (LOGINFO3, " - callback wav src:%d dst:%d:%d",
                          mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
-              srcSamples = (float*)(mStreamFirst + mSong.getPlayFrameStreamIndex());
+              srcSamples = (float*)mSong.getPlayFrameStream();
               numSrcSamples = mSong.getSamplesPerFrame();
 
               mSong.incPlayFrame (1);
@@ -682,7 +683,7 @@ private:
               int skip;
               int sampleRate;
               eAudioFrameType frameType;
-              if (parseAudioFrame (mStreamFirst + mSong.getPlayFrameStreamIndex(), mStreamLast,
+              if (parseAudioFrame (mSong.getPlayFrameStream(), mStreamLast,
                                    avPacket.data, avPacket.size, frameType, skip, sampleRate))
                 if (frameType == mSong.getAudioFrameType()) {
                   auto ret = avcodec_send_packet (context, &avPacket);
