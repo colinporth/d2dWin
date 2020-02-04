@@ -316,8 +316,6 @@ private:
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("hls ");
 
-    cWinSockHttp http;
-
     //{{{  init aac codec, context, packet, avFrame
     auto codec = avcodec_find_decoder (AV_CODEC_ID_AAC);
     auto context = avcodec_alloc_context3 (codec);
@@ -330,10 +328,10 @@ private:
     //}}}
     mSong.init (eAac, 2, 2048, 48000);
 
-    string host = kHost;
+    cWinSockHttp http;
     string path = "pool_904/live/uk/" + kPathNames[chan] + '/' +
                   kPathNames[chan] + ".isml/" + kPathNames[chan] + "-audio=" + dec(bitrate);
-    host = http.getRedirect (host, path + kM3u8Suffix);
+    string host = http.getRedirect (kHost, path + kM3u8Suffix);
     if (http.getContent()) {
       //{{{  parse m3u8 for startSeqNum, startDatePoint, startTimePoint
       // point to #EXT-X-MEDIA-SEQUENCE: sequence num
@@ -374,10 +372,9 @@ private:
       while (!getExit()) {
         // get hls seqNum chunk
         if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
-          //{{{  extract aacFrames from ts packets
           auto ts = http.getContent();
           auto tsLen = http.getContentSize();
-
+          //{{{  extract aacFrames to stream from chunk tsPackets
           while ((ts < http.getContent() + tsLen) && (*ts++ == 0x47)) {
             // ts packet start
             auto payStart = ts[0] & 0x40;
@@ -400,15 +397,14 @@ private:
 
             ts += tsBodyBytes;
             }
-
-          http.freeContent();
           //}}}
+          http.freeContent();
 
           int skip;
           int sampleRate;
           eAudioFrameType frameType;
           while (parseAudioFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
-            // get an aacFrame from chunk into avPacket
+            //{{{  add aacFrame from stream to song
             if (frameType == mSong.getAudioFrameType()) {
               auto ret = avcodec_send_packet (context, &avPacket);
               while (ret >= 0) {
@@ -420,7 +416,8 @@ private:
                     mSong.setSamplesPerFrame (avFrame->nb_samples);
                   if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
                     mSong.setSampleRate (avFrame->sample_rate);
-                  //{{{  convert planar float 32bit to interleaved samples, use end stream buffer for temp samples
+
+                  // convert planar float 32bit to interleaved samples, use end stream buffer for temp samples
                   for (auto channel = 0; channel < avFrame->channels; channel++) {
                     auto srcPtr = (float*)avFrame->data[channel];
                     auto dstPtr = (float*)(mStreamLast) + channel;
@@ -429,16 +426,19 @@ private:
                       dstPtr += avFrame->channels;
                       }
                     }
-                  //}}}
+
                   if (mSong.addFrame (avPacket.data, avPacket.size, mSong.getNumFrames(),
                                       avFrame->nb_samples, (float*)mStreamLast))
                     thread ([=](){ playThread (true); }).detach();
+
                   changed();
                   }
                 }
               }
+
             stream += skip + avPacket.size;
             }
+            //}}}
           seqNum++;
           }
         else // wait for next hls chunk
@@ -446,8 +446,9 @@ private:
         }
       }
 
-    //{{{  free avFrame, context
+    //{{{  free avFrame, avContext
     av_frame_free (&avFrame);
+
     if (context)
       avcodec_close (context);
     //}}}
