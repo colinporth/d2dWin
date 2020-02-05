@@ -2,8 +2,6 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "../../shared/net/cWinSockHttp.h"
-
 // should be in stdafx.h
 #include "../../shared/utils/cFileList.h"
 #include "../boxes/cFileListBox.h"
@@ -215,7 +213,7 @@ private:
         //{{{  header callback lambda
         // cLog::log (LOGINFO, "header key:" + key + " value:" + value);
 
-        if (key == "icy-metaint") 
+        if (key == "icy-metaint")
           mIcySkipLen = stoi (value);
         },
         //}}}

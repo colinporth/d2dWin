@@ -73,5 +73,6 @@ extern "C" {
   #include "libswresample/swresample.h"
   }
 
-#define CURL_STATICLIB
-#include "../../curl/include/curl/curl.h"
+#include "../../shared/net/cWinSockHttp.h"
+//#define CURL_STATICLIB
+//#include "../../curl/include/curl/curl.h"
