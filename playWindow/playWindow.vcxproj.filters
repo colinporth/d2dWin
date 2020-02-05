@@ -28,19 +28,10 @@
     <ClInclude Include="..\boxes\cClockBox.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\boxes\cFloatBox.h">
-      <Filter>h</Filter>
-    </ClInclude>
-    <ClInclude Include="..\boxes\cIntBox.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="..\boxes\cLogBox.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\boxes\ctitlebox.h">
-      <Filter>h</Filter>
-    </ClInclude>
-    <ClInclude Include="..\boxes\cVolumeBox.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\boxes\cWindowBox.h">
@@ -68,6 +59,12 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="stdafx.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\net\cHttp.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\net\cWinSockHttp.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

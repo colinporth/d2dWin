@@ -19,9 +19,6 @@ using namespace std;
 
 class cAppWindow : public cD2dWindow {
 public:
-  cAppWindow() : mPlayDoneSem("playDone") {}
-  virtual ~cAppWindow() {}
-
   //{{{
   void run (bool streaming, const string& title, int width, int height, const string& name) {
 
@@ -32,13 +29,8 @@ public:
 
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -135.f,35.f);
-
+    add (new cSongBox (this, 0.f,0.f, mSong), 0.f,0.f);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
-
-    add (new cSongBox (this, 0,450.f,100.f, mSong), 0.f,0.f);
-    add (new cSongLensBox (this, 0,100.f, mSong), 0.f,-150.f);
-    add (new cSongTimeBox (this, 600.f,50.f, mSong), -600.f,-50.f);
-    add (new cSongFreqBox (this, 0,150.f, mSong), 0.f,-150.f);
 
     mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
     thread([=]() { mFileList->watchThread(); }).detach();
@@ -54,8 +46,9 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      thread ([=]() { hlsThread (4, 48000); }).detach();
-      //thread ([=]() { httpThread (name); }).detach();
+      //thread ([=]() { hlsThread (3, 96000); }).detach();
+      thread ([=]() { shoutcastThread ("stream.wqxr.org", "js-stream.aac"); }).detach();
+      thread ([=](){ analyseThread (streaming); }).detach();
       }
     else if (streaming || !mFileList->empty())
       thread ([=](){ analyseThread (streaming); }).detach();
@@ -112,119 +105,6 @@ private:
     };
   //}}}
 
-  // shoutcast http curl
-  //{{{
-  static int httpTrace (CURL* handle, curl_infotype type, char* ptr, size_t size, cAppWindow* appWindow) {
-
-    switch (type) {
-      case CURLINFO_TEXT:
-        cLog::log (LOGINFO1, "CURL %s", ptr);
-        break;
-
-
-      case CURLINFO_HEADER_OUT:
-        cLog::log (LOGINFO1, "HOUT %s", ptr);
-        break;
-
-      case CURLINFO_HEADER_IN:
-        cLog::log (LOGINFO1, "H_IN %s", ptr);
-        break;
-
-
-      case CURLINFO_DATA_OUT:
-        cLog::log (LOGINFO1, "DOUT %d bytes", size);
-        break;
-
-      case CURLINFO_DATA_IN:
-        cLog::log (LOGINFO1, "D_IN %d bytes", size);
-        break;
-
-
-      case CURLINFO_SSL_DATA_OUT:
-        cLog::log (LOGINFO1, "SOUT %d bytes", size);
-        break;
-
-      case CURLINFO_SSL_DATA_IN:
-        cLog::log (LOGINFO1, "SDIN %d bytes", size);
-        break;
-
-
-      default:
-        return 0;
-      }
-
-    return 0;
-    }
-  //}}}
-  //{{{
-  static size_t httpHeader (const char* ptr, size_t size, size_t numItems, cAppWindow* appWindow) {
-
-    auto len = numItems * size;
-    cLog::log (LOGINFO2, "len:%d  %s", len, ptr);
-
-    string str (ptr);
-    string searchStr ("icy-metaint:");
-
-    auto searchStrPos = str.find (searchStr);
-    if (searchStrPos != string::npos) {
-      auto numStr = str.substr (searchStrPos + searchStr.size(), str.size() - searchStrPos - searchStr.size());
-      auto num = stoi (numStr);
-      cLog::log (LOGINFO, "httpHeader - found %s value:%d", searchStr.c_str(), num);
-
-      appWindow->mIcySkipLen = num;
-      }
-
-    return len;
-    }
-  //}}}
-  //{{{
-  static size_t httpBody (uint8_t* ptr, size_t size, size_t numItems, cAppWindow* appWindow) {
-
-    auto len = numItems * size;
-
-    if ((appWindow->mIcyInfoCount >= appWindow->mIcyInfoLen)  &&
-        (appWindow->mIcySkipCount + len <= appWindow->mIcySkipLen)) {
-
-      cLog::log (LOGINFO1, "body simple copy len:%d", len);
-
-      // simple copy of whole body, no metaInfo
-      memcpy (appWindow->mStreamLast, ptr, len);
-      appWindow->mStreamLast += len;
-      appWindow->mIcySkipCount += (int)len;
-      }
-
-    else {
-      cLog::log (LOGINFO1, "body split copy len:%d info:%d:%d skip:%d:%d ",
-                            len,
-                            appWindow->mIcyInfoCount, appWindow->mIcyInfoLen,
-                            appWindow->mIcySkipCount, appWindow->mIcySkipLen);
-
-      // dumb copy for metaInfo straddling body, could be much better
-      for (int i = 0; i < len; i++) {
-        if (appWindow->mIcyInfoCount < appWindow->mIcyInfoLen) {
-          appWindow->mIcyInfo [appWindow->mIcyInfoCount] = ptr[i];
-          appWindow->mIcyInfoCount++;
-          if (appWindow->mIcyInfoCount >= appWindow->mIcyInfoLen)
-            appWindow->addIcyInfo (appWindow->mIcyInfo);
-          }
-        else if (appWindow->mIcySkipCount >= appWindow->mIcySkipLen) {
-          appWindow->mIcyInfoLen = ptr[i] * 16;
-          appWindow->mIcyInfoCount = 0;
-          appWindow->mIcySkipCount = 0;
-          cLog::log (LOGINFO1, "body icyInfo len:", ptr[i] * 16);
-          }
-        else {
-          appWindow->mIcySkipCount++;
-          *appWindow->mStreamLast = ptr[i];
-          appWindow->mStreamLast++;
-          }
-        }
-      }
-
-    appWindow->mStreamSem.notifyAll();
-    return len;
-    }
-  //}}}
   //{{{
   void addIcyInfo (string icyInfo) {
   // called by httpThread
@@ -259,41 +139,136 @@ private:
     }
   //}}}
   //{{{
-  void httpThread (const char* url) {
+  static uint8_t* extractAacFramesFromTs (uint8_t* stream, uint8_t* ts, int tsLen) {
+  // extract aacFrames to stream from chunk tsPackets, ts and stream can be same buffer
 
-    cLog::setThreadName ("http");
+    auto tsDone = ts + tsLen - 188;
+    while ((ts <= tsDone) && (*ts++ == 0x47)) {
+      // ts packet start
+      auto payStart = ts[0] & 0x40;
+      auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
+      auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
+      ts += headerBytes;
+      auto tsBodyBytes = 187 - headerBytes;
 
-    auto curl = curl_easy_init();
-    if (curl) {
-      curl_easy_setopt (curl, CURLOPT_DEBUGFUNCTION, httpTrace);
-      curl_easy_setopt (curl, CURLOPT_DEBUGDATA, this);
-      curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
+      if (pid == 34) {
+        if (payStart &&
+            !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
+          int pesHeaderBytes = 9 + ts[8];
+          ts += pesHeaderBytes;
+          tsBodyBytes -= pesHeaderBytes;
+          }
 
-      curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 1L);
-      curl_easy_setopt (curl, CURLOPT_URL, url);
+        // copy ts payload aacFrames into stream
+        memcpy (stream, ts, tsBodyBytes);
+        stream += tsBodyBytes;
+        }
 
-      struct curl_slist* slist = NULL;
-      slist = curl_slist_append (slist, "Icy-MetaData: 1");
-      curl_easy_setopt (curl, CURLOPT_HTTPHEADER, slist);
-
-      curl_easy_setopt (curl, CURLOPT_HEADERFUNCTION, httpHeader);
-      curl_easy_setopt (curl, CURLOPT_HEADERDATA, this);
-
-      curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, httpBody);
-      curl_easy_setopt (curl, CURLOPT_WRITEDATA, this);
-
-      curl_easy_perform (curl);
-
-      curl_slist_free_all (slist);
+      ts += tsBodyBytes;
       }
 
-    // never gets here
-    curl_easy_cleanup (curl);
+    return stream;
+    }
+  //}}}
+  //{{{
+  static void convertAvFrameToSamples (int sampleFmt, AVFrame* avFrame, float* samples) {
+  //  covert planar avFrame->data to interleaved float samples
+
+    switch (sampleFmt) {
+      case AV_SAMPLE_FMT_S16P: // 16bit signed planar
+        for (auto channel = 0; channel < avFrame->channels; channel++) {
+          auto srcPtr = (int16_t*)avFrame->data[channel];
+          auto dstPtr = (float*)(samples) + channel;
+          for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+            *dstPtr = *srcPtr++ / float(0x8000);
+            dstPtr += avFrame->channels;
+            }
+          }
+        break;
+
+      case AV_SAMPLE_FMT_FLTP: // 32bit float planar
+        for (auto channel = 0; channel < avFrame->channels; channel++) {
+          auto srcPtr = (float*)avFrame->data[channel];
+          auto dstPtr = (float*)(samples) + channel;
+          for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+            *dstPtr = *srcPtr++;
+            dstPtr += avFrame->channels;
+            }
+          }
+        break;
+
+      default:
+        cLog::log (LOGERROR, "playThread - unrecognised sample_fmt %d ", sampleFmt);
+      }
+    }
+  //}}}
+
+  //{{{
+  void shoutcastThread (const string& host, const string& path) {
+
+    cLog::setThreadName ("cast");
+
+    cWinSockHttp http;
+
+    http.get (host, path, "Icy-MetaData: 1",
+      [&](const string& key, const string& value) noexcept {
+        //{{{  header callback lambda
+        // cLog::log (LOGINFO, "header key:" + key + " value:" + value);
+
+        if (key == "icy-metaint") 
+          mIcySkipLen = stoi (value);
+        },
+        //}}}
+      [&](const uint8_t* data, int length) noexcept {
+        //{{{  data callback lambda
+        // cLog::log (LOGINFO, "callback %d", length);
+        if ((mIcyInfoCount >= mIcyInfoLen)  &&
+            (mIcySkipCount + length <= mIcySkipLen)) {
+
+          cLog::log (LOGINFO1, "body simple copy len:%d", length);
+
+          // simple copy of whole body, no metaInfo
+          memcpy (mStreamLast, data, length);
+          mStreamLast += length;
+          mIcySkipCount += (int)length;
+          }
+
+        else {
+          cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
+                                length,
+                                mIcyInfoCount, mIcyInfoLen,
+                                mIcySkipCount, mIcySkipLen);
+
+          // dumb copy for metaInfo straddling body, could be much better
+          for (int i = 0; i < length; i++) {
+            if (mIcyInfoCount < mIcyInfoLen) {
+              mIcyInfo [mIcyInfoCount] = data[i];
+              mIcyInfoCount++;
+              if (mIcyInfoCount >= mIcyInfoLen)
+                addIcyInfo (mIcyInfo);
+              }
+            else if (mIcySkipCount >= mIcySkipLen) {
+              mIcyInfoLen = data[i] * 16;
+              mIcyInfoCount = 0;
+              mIcySkipCount = 0;
+              cLog::log (LOGINFO1, "body icyInfo len:", data[i] * 16);
+              }
+            else {
+              mIcySkipCount++;
+              *mStreamLast = data[i];
+              mStreamLast++;
+              }
+            }
+          }
+
+        mStreamSem.notifyAll();
+        }
+        //}}}
+      );
 
     cLog::log (LOGINFO, "exit");
     }
   //}}}
-
   //{{{
   void hlsThread (int chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps channel change and jumping backwards
@@ -313,7 +288,6 @@ private:
 
     const string kM3u8Suffix = ".norewind.m3u8";
     //}}}
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("hls ");
 
     //{{{  init aac codec, context, packet, avFrame
@@ -326,7 +300,7 @@ private:
 
     auto avFrame = av_frame_alloc();
     //}}}
-    mSong.init (eAac, 2, 2048, 48000);
+    mSong.init (eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
 
     cWinSockHttp http;
     string path = "pool_904/live/uk/" + kPathNames[chan] + '/' +
@@ -372,39 +346,14 @@ private:
       while (!getExit()) {
         // get hls seqNum chunk
         if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
-          auto ts = http.getContent();
-          auto tsLen = http.getContentSize();
-          //{{{  extract aacFrames to stream from chunk tsPackets
-          while ((ts < http.getContent() + tsLen) && (*ts++ == 0x47)) {
-            // ts packet start
-            auto payStart = ts[0] & 0x40;
-            auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
-            auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
-            ts += headerBytes;
-            auto tsBodyBytes = 187 - headerBytes;
-
-            if (pid == 34) {
-              if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-                int pesHeaderBytes = 9 + ts[8];
-                ts += pesHeaderBytes;
-                tsBodyBytes -= pesHeaderBytes;
-                }
-
-              // copy ts payload aacFrames into stream
-              memcpy (mStreamLast, ts, tsBodyBytes);
-              mStreamLast += tsBodyBytes;
-              }
-
-            ts += tsBodyBytes;
-            }
-          //}}}
+          mStreamLast = extractAacFramesFromTs (mStreamLast, http.getContent(), http.getContentSize());
           http.freeContent();
 
           int skip;
           int sampleRate;
           eAudioFrameType frameType;
           while (parseAudioFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
-            //{{{  add aacFrame from stream to song
+            //{{{  add aacFrame from stream to song, using mStreamLast as temp sample buffer
             if (frameType == mSong.getAudioFrameType()) {
               auto ret = avcodec_send_packet (context, &avPacket);
               while (ret >= 0) {
@@ -417,17 +366,9 @@ private:
                   if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
                     mSong.setSampleRate (avFrame->sample_rate);
 
-                  // convert planar float 32bit to interleaved samples, use end stream buffer for temp samples
-                  for (auto channel = 0; channel < avFrame->channels; channel++) {
-                    auto srcPtr = (float*)avFrame->data[channel];
-                    auto dstPtr = (float*)(mStreamLast) + channel;
-                    for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                      *dstPtr = *srcPtr++;
-                      dstPtr += avFrame->channels;
-                      }
-                    }
+                  convertAvFrameToSamples (context->sample_fmt, avFrame, (float*)mStreamLast);
 
-                  if (mSong.addFrame (avPacket.data, avPacket.size, mSong.getNumFrames(),
+                  if (mSong.addFrame (avPacket.data, avPacket.size, mSong.getNumFrames()+1,
                                       avFrame->nb_samples, (float*)mStreamLast))
                     thread ([=](){ playThread (true); }).detach();
 
@@ -455,7 +396,6 @@ private:
 
     mPlayDoneSem.wait();
     cLog::log (LOGINFO, "exit");
-    CoUninitialize();
     setExit();
     }
   //}}}
@@ -504,7 +444,7 @@ private:
 
         auto frameSampleBytes = frameSamples * 2 * 4;
         while (!getExit() && !mSongChanged && !songDone) {
-          int totalFrames = int(mStreamLast - mStreamFirst) / dataSize;
+          int totalFrames = int(mStreamLast - mStreamFirst) / frameSampleBytes;
           if (mSong.addFrame (data, frameSampleBytes, totalFrames, frameSamples, (float*)data))
             thread ([=](){ playThread (false); }).detach();
 
@@ -528,7 +468,7 @@ private:
           }
         //}}}
         auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
-
+        //{{{  init codec, context, avFrame, avPacket
         auto codec = avcodec_find_decoder (mSong.getAudioFrameType() == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
         auto context = avcodec_alloc_context3 (codec);
         avcodec_open2 (context, codec, NULL);
@@ -536,6 +476,7 @@ private:
         AVPacket avPacket;
         av_init_packet (&avPacket);
         auto avFrame = av_frame_alloc();
+        //}}}
 
         while (!getExit() && !mSongChanged && !songDone) {
           int skip;
@@ -554,37 +495,11 @@ private:
                   if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
                     mSong.setSampleRate (avFrame->sample_rate);
 
-                  //{{{  covert planar avFrame->data to interleaved float samples
-                  switch (context->sample_fmt) {
-                    case AV_SAMPLE_FMT_S16P: // 16bit signed planar
-                      for (auto channel = 0; channel < avFrame->channels; channel++) {
-                        auto srcPtr = (int16_t*)avFrame->data[channel];
-                        auto dstPtr = (float*)(samples) + channel;
-                        for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                          *dstPtr = *srcPtr++ / float(0x8000);
-                          dstPtr += avFrame->channels;
-                          }
-                        }
-                      break;
+                  convertAvFrameToSamples (context->sample_fmt, avFrame, samples);
 
-                    case AV_SAMPLE_FMT_FLTP: // 32bit float planar
-                      for (auto channel = 0; channel < avFrame->channels; channel++) {
-                        auto srcPtr = (float*)avFrame->data[channel];
-                        auto dstPtr = (float*)(samples) + channel;
-                        for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                          *dstPtr = *srcPtr++;
-                          dstPtr += avFrame->channels;
-                          }
-                        }
-                      break;
-
-                    default:
-                      cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
-                    }
-                  //}}}
                   int numFrames = mSong.getNumFrames();
-                  int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(avPacket.data - mStreamFirst) / numFrames) : 1;
-                  if (mSong.addFrame (avPacket.data, avPacket.size, totalFrames, avFrame->nb_samples, samples))
+                  int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(avPacket.data - mStreamFirst) / numFrames) : 0;
+                  if (mSong.addFrame (avPacket.data, avPacket.size, totalFrames+1, avFrame->nb_samples, samples))
                     thread ([=](){ playThread (streaming); }).detach();
                   changed();
                   }
@@ -599,12 +514,13 @@ private:
             songDone = true;
             }
           }
-
+        //{{{  free context, avFrame
         // done
         free (samples);
         av_frame_free (&avFrame);
         if (context)
           avcodec_close (context);
+        //}}}
         }
 
       // wait for play to end or abort
@@ -622,13 +538,13 @@ private:
         //}}}
       }
 
+    cLog::log (LOGINFO, "exit");
     setExit();
     }
   //}}}
   //{{{
   void playThread (bool streaming) {
 
-    CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("play");
 
     auto device = getDefaultAudioOutputDevice();
@@ -680,55 +596,25 @@ private:
               // load srcSamples callback lambda
               cLog::log (LOGINFO3, " - callback for src:%d dst:%d:%d",
                          mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
-
               int skip;
               int sampleRate;
               eAudioFrameType frameType;
               if (parseAudioFrame (mSong.getPlayFrameStream(), mStreamLast,
-                                   avPacket.data, avPacket.size, frameType, skip, sampleRate))
-                if (frameType == mSong.getAudioFrameType()) {
-                  auto ret = avcodec_send_packet (context, &avPacket);
-                  while (ret >= 0) {
-                    ret = avcodec_receive_frame (context, avFrame);
-                    if ((ret == AVERROR_EOF) || (ret < 0))
-                      break;
-                    if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
-                      //{{{  covert planar avFrame->data to interleaved float samples
-                      switch (context->sample_fmt) {
-                        case AV_SAMPLE_FMT_S16P: // 16bit signed planar
-                          for (auto channel = 0; channel < avFrame->channels; channel++) {
-                            auto srcPtr = (int16_t*)avFrame->data[channel];
-                            auto dstPtr = (float*)(samples) + channel;
-                            for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                              *dstPtr = *srcPtr++ / float(0x8000);
-                              dstPtr += avFrame->channels;
-                              }
-                            }
-                          break;
-
-                        case AV_SAMPLE_FMT_FLTP: // 32bit float planar
-                          for (auto channel = 0; channel < avFrame->channels; channel++) {
-                            auto srcPtr = (float*)avFrame->data[channel];
-                            auto dstPtr = (float*)(samples) + channel;
-                            for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                              *dstPtr = *srcPtr++;
-                              dstPtr += avFrame->channels;
-                              }
-                            }
-                          break;
-
-                        default:
-                          cLog::log (LOGERROR, "playThread - unrecognised sample_fmt " + dec (context->sample_fmt));
-                        }
-                      }
-                      //}}}
-                    }
+                                   avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
+                auto ret = avcodec_send_packet (context, &avPacket);
+                while (ret >= 0) {
+                  ret = avcodec_receive_frame (context, avFrame);
+                  if ((ret == AVERROR_EOF) || (ret < 0))
+                    break;
+                  if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0))
+                    convertAvFrameToSamples (context->sample_fmt, avFrame, samples);
                   }
+                }
               srcSamples = samples;
               numSrcSamples = mSong.getSamplesPerFrame();
-
               mSong.incPlayFrame (1);
               });
+
             changed();
             }
           else
@@ -748,7 +634,6 @@ private:
     mPlayDoneSem.notifyAll();
 
     cLog::log (LOGINFO, "exit");
-    CoUninitialize();
     }
   //}}}
 
@@ -765,7 +650,7 @@ private:
 
   bool mSongChanged = false;
   bool mPlaying = true;
-  cSemaphore mPlayDoneSem;
+  cSemaphore mPlayDoneSem = "playDone";
 
   cVolumeBox* mVolumeBox = nullptr;
 
@@ -785,6 +670,7 @@ private:
 // main
 //{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO, true, "", "playWindow");
   av_log_set_level (AV_LOG_VERBOSE);

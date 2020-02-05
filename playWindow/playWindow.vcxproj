@@ -38,17 +38,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\decoders\audioParser.h" />
+    <ClInclude Include="..\..\shared\net\cHttp.h" />
+    <ClInclude Include="..\..\shared\net\cWinSockHttp.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
     <ClInclude Include="..\..\shared\utils\cSong.h" />
     <ClInclude Include="..\..\shared\utils\date.h" />
     <ClInclude Include="..\boxes\cCalendarBox.h" />
     <ClInclude Include="..\boxes\cClockBox.h" />
-    <ClInclude Include="..\boxes\cFloatBox.h" />
-    <ClInclude Include="..\boxes\cIntBox.h" />
     <ClInclude Include="..\boxes\cLogBox.h" />
     <ClInclude Include="..\boxes\ctitlebox.h" />
-    <ClInclude Include="..\boxes\cVolumeBox.h" />
     <ClInclude Include="..\boxes\cWindowBox.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cJpegImage.h" />
@@ -141,7 +140,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>..\mfx\lib\lib32;..\ffmpeg\lib\Win32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>common.lib;avutil.lib;avcodec.lib;avformat.lib;swresample.lib;swscale.lib;libcurl.lib;ws2_32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>common.lib;avutil.lib;avcodec.lib;avformat.lib;swresample.lib;swscale.lib;ws2_32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -159,7 +158,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>common.lib;avutil.lib;avcodec.lib;avformat.lib;swresample.lib;swscale.lib;libcurl.lib;ws2_32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>common.lib;avutil.lib;avcodec.lib;avformat.lib;swresample.lib;swscale.lib;ws2_32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\x64\Debug;..\mfx\lib\lib64;..\..\ffmpeg\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -186,7 +185,7 @@
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
       <AdditionalLibraryDirectories>../Release;..\Win32\Release;..\ffmpeg\lib\Win32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>true</Profile>
-      <AdditionalDependencies>common.lib;avutil.lib;avcodec.lib;avformat.lib;swresample.lib;swscale.lib;libcurl.lib;ws2_32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>common.lib;avutil.lib;avcodec.lib;avformat.lib;swresample.lib;swscale.lib;ws2_32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -208,7 +207,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>common.lib;avutil.lib;avcodec.lib;avformat.lib;swresample.lib;swscale.lib;libcurl.lib;ws2_32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>common.lib;avutil.lib;avcodec.lib;avformat.lib;swresample.lib;swscale.lib;ws2_32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions> %(AdditionalOptions)</AdditionalOptions>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
       <AdditionalLibraryDirectories>..\x64\Release;..\..\ffmpeg\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
