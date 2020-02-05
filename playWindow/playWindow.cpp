@@ -551,54 +551,39 @@ private:
       SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
       device->start();
 
-      if (mSong.getAudioFrameType() == eWav) {
-        //{{{  float 32 bit interleaved wav uses mapped stream directly
-        while (!getExit() && !mSongChanged && (mSong.mPlayFrame <= mSong.getLastFrame()))
-          if (mPlaying) {
-            cLog::log (LOGINFO2, "process wav frame:%d", mSong.getPlayFrame());
-            device->process ([&](float*& srcSamples, int& numSrcSamples,
-                                 int numDstSamplesLeft, int numDstSamples) mutable noexcept {
-              // load srcSamples callback lambda
-              cLog::log (LOGINFO3, " - callback wav src:%d dst:%d:%d",
-                         mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
-              srcSamples = (float*)mSong.getPlayFrameStream();
-              numSrcSamples = mSong.getSamplesPerFrame();
-
-              mSong.incPlayFrame (1);
-              changed();
-              });
-            }
-          else
-            Sleep (10);
-
-        device->stop();
-        }
-        //}}}
-      else {
+      AVCodecContext* context = nullptr;
+      float* samples = nullptr;
+      if (mSong.getAudioFrameType() != eWav) {
         //{{{  init decoder
         auto codec = avcodec_find_decoder (mSong.getAudioFrameType() == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
-        auto context = avcodec_alloc_context3 (codec);
+        context = avcodec_alloc_context3 (codec);
         avcodec_open2 (context, codec, NULL);
 
-        AVPacket avPacket;
-        av_init_packet (&avPacket);
-        auto avFrame = av_frame_alloc();
+        samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
+        }
         //}}}
-        auto samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
-        while (!getExit() && !mSongChanged &&
-               (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
-          if (mPlaying) {
-            cLog::log (LOGINFO2, "process for frame:%d", mSong.getPlayFrame());
-            device->process ([&](float*& srcSamples, int& numSrcSamples,
-                                 int numDstSamplesLeft, int numDstSamples) mutable noexcept {
-              // load srcSamples callback lambda
-              cLog::log (LOGINFO3, " - callback for src:%d dst:%d:%d",
-                         mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
+
+      while (!getExit() && !mSongChanged &&
+             (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
+        if (mPlaying) {
+          cLog::log (LOGINFO2, "process for frame:%d", mSong.getPlayFrame());
+          device->process ([&](float*& srcSamples, int& numSrcSamples,
+                               int numDstSamplesLeft, int numDstSamples) mutable noexcept {
+            // load srcSamples callback lambda
+            cLog::log (LOGINFO3, " - callback for src:%d dst:%d:%d",
+                       mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
+            if (mSong.getAudioFrameType() == eWav)
+              srcSamples = (float*)mSong.getPlayFrameStream();
+            else {
               int skip;
               int sampleRate;
               eAudioFrameType frameType;
+              AVPacket avPacket;
+              av_init_packet (&avPacket);
               if (parseAudioFrame (mSong.getPlayFrameStream(), mStreamLast,
                                    avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
+                //{{{  decode packet to samples
+                auto avFrame = av_frame_alloc();
                 auto ret = avcodec_send_packet (context, &avPacket);
                 while (ret >= 0) {
                   ret = avcodec_receive_frame (context, avFrame);
@@ -607,30 +592,27 @@ private:
                   if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0))
                     convertAvFrameToSamples (context->sample_fmt, avFrame, samples);
                   }
+                av_frame_free (&avFrame);
                 }
+                //}}}
               srcSamples = samples;
-              numSrcSamples = mSong.getSamplesPerFrame();
-              mSong.incPlayFrame (1);
-              });
+              }
+            numSrcSamples = mSong.getSamplesPerFrame();
+            mSong.incPlayFrame (1);
+            });
 
-            changed();
-            }
-          else
-            Sleep (10);
+          changed();
+          }
+        else
+          Sleep (10);
 
-        device->stop();
-        free (samples);
-        //{{{  free decoder
-        av_frame_free (&avFrame);
-
-        if (context)
-          avcodec_close (context);
-        //}}}
-        }
+      device->stop();
+      free (samples);
+      if (context)
+        avcodec_close (context);
       }
 
     mPlayDoneSem.notifyAll();
-
     cLog::log (LOGINFO, "exit");
     }
   //}}}
