@@ -169,62 +169,6 @@ private:
     }
   //}}}
   //{{{
-  //int decodePacketToSamples (AVCodecContext* context, AVPacket* avPacket, float* samples, bool fixup) {
-
-    //auto avFrame = av_frame_alloc();
-    //auto numSamples = 0;
-
-    //auto ret = avcodec_send_packet (context, avPacket);
-    //while (ret >= 0) {
-      //ret = avcodec_receive_frame (context, avFrame);
-      //if ((ret == AVERROR_EOF) || (ret < 0))
-        //break;
-
-      //if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
-        //if (fixup) {
-          //if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
-            //mSong.setSamplesPerFrame (avFrame->nb_samples);
-          //if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
-            //mSong.setSampleRate (avFrame->sample_rate);
-          //}
-
-        ////  covert planar avFrame->data to interleaved float samples
-        //switch (context->sample_fmt) {
-          //case AV_SAMPLE_FMT_S16P: // 16bit signed planar
-            //for (auto channel = 0; channel < avFrame->channels; channel++) {
-              //auto srcPtr = (int16_t*)avFrame->data[channel];
-              //auto dstPtr = (float*)(samples) + channel;
-              //for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                //*dstPtr = *srcPtr++ / float(0x8000);
-                //dstPtr += avFrame->channels;
-                //}
-              //}
-            //break;
-
-          //case AV_SAMPLE_FMT_FLTP: // 32bit float planar
-            //for (auto channel = 0; channel < avFrame->channels; channel++) {
-              //auto srcPtr = (float*)avFrame->data[channel];
-              //auto dstPtr = (float*)(samples) + channel;
-              //for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-                //*dstPtr = *srcPtr++;
-                //dstPtr += avFrame->channels;
-                //}
-              //}
-            //break;
-
-          //default:
-            //cLog::log (LOGERROR, "playThread - unrecognised sample_fmt %d ", context->sample_fmt);
-          //}
-
-        //numSamples = avFrame->nb_samples;
-        //}
-      //}
-
-    //av_frame_free (&avFrame);
-    //return numSamples;
-    //}
-  //}}}
-  //{{{
   int frameToSamples (cAudioParser& parser, AVCodecContext* context, float* samples, bool fixup) {
 
     int numSamples = 0;
