@@ -44,9 +44,9 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      //thread ([=]() { hlsThread (3, 96000); }).detach();
-      thread ([=]() { icyThread ("stream.wqxr.org", "js-stream.aac"); }).detach();
-      thread ([=](){ analyseThread (streaming); }).detach();
+      thread ([=]() { hlsThread (3, 96000); }).detach();
+      //thread ([=]() { icyThread ("stream.wqxr.org", "js-stream.aac"); }).detach();
+      //thread ([=](){ analyseThread (streaming); }).detach();
       }
     else if (streaming || !mFileList->empty())
       thread ([=](){ analyseThread (streaming); }).detach();
@@ -107,31 +107,31 @@ private:
   void addIcyInfo (const string& icyInfo) {
   // called by httpThread
 
-    mIcyStr = icyInfo;
-    cLog::log (LOGINFO1, "addIcyInfo " + mIcyStr);
+    cLog::log (LOGINFO1, "addIcyInfo " + icyInfo);
 
+    string icysearchStr = "StreamTitle=\'";
     string searchStr = "StreamTitle=\'";
-    auto searchStrPos = mIcyStr.find (searchStr);
+    auto searchStrPos = icyInfo.find (searchStr);
     if (searchStrPos != string::npos) {
-      auto searchEndPos = mIcyStr.find ("\';", searchStrPos + searchStr.size());
+      auto searchEndPos = icyInfo.find ("\';", searchStrPos + searchStr.size());
       if (searchEndPos != string::npos) {
-        string titleStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-        if (titleStr != mTitleStr) {
+        string titleStr = icyInfo.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+        if (titleStr != mLastTitleStr) {
           cLog::log (LOGINFO1, "addIcyInfo found title = " + titleStr);
           mSong.setTitle (titleStr);
-          mTitleStr = titleStr;
+          mLastTitleStr = titleStr;
           }
         }
       }
 
-    mUrlStr = "no url";
+    string urlStr = "no url";
     searchStr = "StreamUrl=\'";
-    searchStrPos = mIcyStr.find (searchStr);
+    searchStrPos = icyInfo.find (searchStr);
     if (searchStrPos != string::npos) {
-      auto searchEndPos = mIcyStr.find ('\'', searchStrPos + searchStr.size());
+      auto searchEndPos = icyInfo.find ('\'', searchStrPos + searchStr.size());
       if (searchEndPos != string::npos) {
-        mUrlStr = mIcyStr.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-        cLog::log (LOGINFO1, "addIcyInfo found url = " + mUrlStr);
+        urlStr = icyInfo.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+        cLog::log (LOGINFO1, "addIcyInfo found url = " + urlStr);
         }
       }
     }
@@ -210,19 +210,19 @@ private:
     int icySkipLen = 0;
     int icyInfoCount = 0;
     int icyInfoLen = 0;
-    char icyInfo[255] = {0};
+    char icyInfo[255] = { 0 };
 
     cWinSockHttp http;
 
     http.get (host, path, "Icy-MetaData: 1",
       // headerCallback lambda
-      [&](const string& key, const string& value) noexcept { 
+      [&](const string& key, const string& value) noexcept {
         if (key == "icy-metaint")
           icySkipLen = stoi (value);
         },
 
       // dataCallback lambda
-      [&](const uint8_t* data, int length) noexcept { 
+      [&](const uint8_t* data, int length) noexcept {
         // cLog::log (LOGINFO, "callback %d", length);
         if ((icyInfoCount >= icyInfoLen)  &&
             (icySkipCount + length <= icySkipLen)) {
@@ -377,7 +377,7 @@ private:
           seqNum++;
           }
         else // wait for next hls chunk
-          Sleep (6400);
+          Sleep (1000);
         }
       }
 
@@ -647,11 +647,7 @@ private:
   cSemaphore mPlayDoneSem = "playDone";
 
   cVolumeBox* mVolumeBox = nullptr;
-
-  // icyMeta parsed into
-  string mIcyStr;
-  string mTitleStr;
-  string mUrlStr;
+  string mLastTitleStr;
   //}}}
   };
 
