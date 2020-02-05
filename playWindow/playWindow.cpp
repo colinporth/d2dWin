@@ -44,9 +44,9 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      //thread ([=]() { hlsThread (3, 96000); }).detach();
-      thread ([=]() { icyThread (name); }).detach();
-      thread ([=](){ analyseThread (streaming); }).detach();
+      thread ([=]() { hlsThread (3, 96000); }).detach();
+      //thread ([=]() { icyThread (name); }).detach();
+      //thread ([=](){ analyseThread (streaming); }).detach();
       }
     else if (streaming || !mFileList->empty())
       thread ([=](){ analyseThread (streaming); }).detach();
@@ -137,6 +137,62 @@ private:
     }
   //}}}
   //{{{
+  int decodePacketToSamples (AVCodecContext* context, AVPacket* avPacket, float* samples, bool fixup) {
+
+    auto avFrame = av_frame_alloc();
+    auto numSamples = 0;
+
+    auto ret = avcodec_send_packet (context, avPacket);
+    while (ret >= 0) {
+      ret = avcodec_receive_frame (context, avFrame);
+      if ((ret == AVERROR_EOF) || (ret < 0))
+        break;
+
+      if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
+        if (fixup) {
+          if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
+            mSong.setSamplesPerFrame (avFrame->nb_samples);
+          if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
+            mSong.setSampleRate (avFrame->sample_rate);
+          }
+
+        //  covert planar avFrame->data to interleaved float samples
+        switch (context->sample_fmt) {
+          case AV_SAMPLE_FMT_S16P: // 16bit signed planar
+            for (auto channel = 0; channel < avFrame->channels; channel++) {
+              auto srcPtr = (int16_t*)avFrame->data[channel];
+              auto dstPtr = (float*)(samples) + channel;
+              for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+                *dstPtr = *srcPtr++ / float(0x8000);
+                dstPtr += avFrame->channels;
+                }
+              }
+            break;
+
+          case AV_SAMPLE_FMT_FLTP: // 32bit float planar
+            for (auto channel = 0; channel < avFrame->channels; channel++) {
+              auto srcPtr = (float*)avFrame->data[channel];
+              auto dstPtr = (float*)(samples) + channel;
+              for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
+                *dstPtr = *srcPtr++;
+                dstPtr += avFrame->channels;
+                }
+              }
+            break;
+
+          default:
+            cLog::log (LOGERROR, "playThread - unrecognised sample_fmt %d ", context->sample_fmt);
+          }
+
+        numSamples = avFrame->nb_samples;
+        }
+      }
+
+    av_frame_free (&avFrame);
+    return numSamples;
+    }
+  //}}}
+  //{{{
   static uint8_t* extractAacFramesFromTs (uint8_t* stream, uint8_t* ts, int tsLen) {
   // extract aacFrames to stream from chunk tsPackets, ts and stream can be same buffer
 
@@ -166,38 +222,6 @@ private:
       }
 
     return stream;
-    }
-  //}}}
-  //{{{
-  static void convertAvFrameToSamples (int sampleFmt, AVFrame* avFrame, float* samples) {
-  //  covert planar avFrame->data to interleaved float samples
-
-    switch (sampleFmt) {
-      case AV_SAMPLE_FMT_S16P: // 16bit signed planar
-        for (auto channel = 0; channel < avFrame->channels; channel++) {
-          auto srcPtr = (int16_t*)avFrame->data[channel];
-          auto dstPtr = (float*)(samples) + channel;
-          for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-            *dstPtr = *srcPtr++ / float(0x8000);
-            dstPtr += avFrame->channels;
-            }
-          }
-        break;
-
-      case AV_SAMPLE_FMT_FLTP: // 32bit float planar
-        for (auto channel = 0; channel < avFrame->channels; channel++) {
-          auto srcPtr = (float*)avFrame->data[channel];
-          auto dstPtr = (float*)(samples) + channel;
-          for (auto sample = 0; sample < avFrame->nb_samples; sample++) {
-            *dstPtr = *srcPtr++;
-            dstPtr += avFrame->channels;
-            }
-          }
-        break;
-
-      default:
-        cLog::log (LOGERROR, "playThread - unrecognised sample_fmt %d ", sampleFmt);
-      }
     }
   //}}}
 
@@ -288,15 +312,10 @@ private:
     //}}}
     cLog::setThreadName ("hls ");
 
-    //{{{  init aac codec, context, packet, avFrame
+    //{{{  init aac codec, context
     auto codec = avcodec_find_decoder (AV_CODEC_ID_AAC);
     auto context = avcodec_alloc_context3 (codec);
     avcodec_open2 (context, codec, NULL);
-
-    AVPacket avPacket;
-    av_init_packet (&avPacket);
-
-    auto avFrame = av_frame_alloc();
     //}}}
     mSong.init (eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
 
@@ -350,34 +369,19 @@ private:
           int skip;
           int sampleRate;
           eAudioFrameType frameType;
+          AVPacket avPacket;
+          av_init_packet (&avPacket);
           while (parseAudioFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
-            //{{{  add aacFrame from stream to song, using mStreamLast as temp sample buffer
-            if (frameType == mSong.getAudioFrameType()) {
-              auto ret = avcodec_send_packet (context, &avPacket);
-              while (ret >= 0) {
-                ret = avcodec_receive_frame (context, avFrame);
-                if ((ret == AVERROR_EOF) || (ret < 0))
-                  break;
-                if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
-                  if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
-                    mSong.setSamplesPerFrame (avFrame->nb_samples);
-                  if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
-                    mSong.setSampleRate (avFrame->sample_rate);
-
-                  convertAvFrameToSamples (context->sample_fmt, avFrame, (float*)mStreamLast);
-
-                  if (mSong.addFrame (avPacket.data, avPacket.size, mSong.getNumFrames()+1,
-                                      avFrame->nb_samples, (float*)mStreamLast))
-                    thread ([=](){ playThread (true); }).detach();
-
-                  changed();
-                  }
-                }
+            //  add aacFrame from stream to song, using mStreamLast as temp sample buffer
+            auto numSamples = decodePacketToSamples (context, &avPacket, (float*)mStreamLast, true);
+            if (numSamples) {
+              if (mSong.addFrame (avPacket.data, avPacket.size, mSong.getNumFrames()+1,
+                                  numSamples, (float*)mStreamLast))
+                thread ([=](){ playThread (true); }).detach();
+              changed();
               }
-
             stream += skip + avPacket.size;
             }
-            //}}}
           seqNum++;
           }
         else // wait for next hls chunk
@@ -385,9 +389,7 @@ private:
         }
       }
 
-    //{{{  free avFrame, avContext
-    av_frame_free (&avFrame);
-
+    //{{{  free context
     if (context)
       avcodec_close (context);
     //}}}
@@ -470,37 +472,23 @@ private:
         auto codec = avcodec_find_decoder (mSong.getAudioFrameType() == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
         auto context = avcodec_alloc_context3 (codec);
         avcodec_open2 (context, codec, NULL);
-
-        AVPacket avPacket;
-        av_init_packet (&avPacket);
-        auto avFrame = av_frame_alloc();
         //}}}
 
         while (!getExit() && !mSongChanged && !songDone) {
           int skip;
           int sampleRate;
           eAudioFrameType frameType;
+          AVPacket avPacket;
+          av_init_packet (&avPacket);
           while (parseAudioFrame (stream, mStreamLast, avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
             if (frameType == mSong.getAudioFrameType()) {
-              auto ret = avcodec_send_packet (context, &avPacket);
-              while (ret >= 0) {
-                ret = avcodec_receive_frame (context, avFrame);
-                if ((ret == AVERROR_EOF) || (ret < 0))
-                  break;
-                if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
-                  if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
-                    mSong.setSamplesPerFrame (avFrame->nb_samples);
-                  if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
-                    mSong.setSampleRate (avFrame->sample_rate);
-
-                  convertAvFrameToSamples (context->sample_fmt, avFrame, samples);
-
-                  int numFrames = mSong.getNumFrames();
-                  int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(avPacket.data - mStreamFirst) / numFrames) : 0;
-                  if (mSong.addFrame (avPacket.data, avPacket.size, totalFrames+1, avFrame->nb_samples, samples))
-                    thread ([=](){ playThread (streaming); }).detach();
-                  changed();
-                  }
+              auto numSamples = decodePacketToSamples (context, &avPacket, samples, true);
+              if (numSamples) {
+                int numFrames = mSong.getNumFrames();
+                int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(avPacket.data - mStreamFirst) / numFrames) : 0;
+                if (mSong.addFrame (avPacket.data, avPacket.size, totalFrames+1, numSamples, samples))
+                  thread ([=](){ playThread (streaming); }).detach();
+                changed();
                 }
               }
             stream += skip + avPacket.size;
@@ -515,7 +503,6 @@ private:
         //{{{  free context, avFrame
         // done
         free (samples);
-        av_frame_free (&avFrame);
         if (context)
           avcodec_close (context);
         //}}}
@@ -551,10 +538,10 @@ private:
       SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
       device->start();
 
-      AVCodecContext* context = nullptr;
       float* samples = nullptr;
+      AVCodecContext* context = nullptr;
       if (mSong.getAudioFrameType() != eWav) {
-        //{{{  init decoder
+        //{{{  init decoder, alloc samples
         auto codec = avcodec_find_decoder (mSong.getAudioFrameType() == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
         context = avcodec_alloc_context3 (codec);
         avcodec_open2 (context, codec, NULL);
@@ -572,44 +559,31 @@ private:
             // load srcSamples callback lambda
             cLog::log (LOGINFO3, " - callback for src:%d dst:%d:%d",
                        mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
-            if (mSong.getAudioFrameType() == eWav)
-              srcSamples = (float*)mSong.getPlayFrameStream();
+            if (mSong.getAudioFrameType() == eWav) {
+              int len;
+              srcSamples = (float*)mSong.getPlayFrameStream (len);
+              }
             else {
-              int skip;
-              int sampleRate;
-              eAudioFrameType frameType;
               AVPacket avPacket;
               av_init_packet (&avPacket);
-              if (parseAudioFrame (mSong.getPlayFrameStream(), mStreamLast,
-                                   avPacket.data, avPacket.size, frameType, skip, sampleRate)) {
-                //{{{  decode packet to samples
-                auto avFrame = av_frame_alloc();
-                auto ret = avcodec_send_packet (context, &avPacket);
-                while (ret >= 0) {
-                  ret = avcodec_receive_frame (context, avFrame);
-                  if ((ret == AVERROR_EOF) || (ret < 0))
-                    break;
-                  if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0))
-                    convertAvFrameToSamples (context->sample_fmt, avFrame, samples);
-                  }
-                av_frame_free (&avFrame);
-                }
-                //}}}
+              avPacket.data = mSong.getPlayFrameStream (avPacket.size);
+              decodePacketToSamples ( context, &avPacket, samples, false);
               srcSamples = samples;
               }
             numSrcSamples = mSong.getSamplesPerFrame();
             mSong.incPlayFrame (1);
             });
-
           changed();
           }
         else
           Sleep (10);
 
       device->stop();
-      free (samples);
+      //{{{  free decoder, samples
       if (context)
         avcodec_close (context);
+      free (samples);
+      //}}}
       }
 
     mPlayDoneSem.notifyAll();
