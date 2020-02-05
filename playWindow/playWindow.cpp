@@ -45,7 +45,7 @@ public:
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
       //thread ([=]() { hlsThread (3, 96000); }).detach();
-      thread ([=]() { shoutcastThread ("stream.wqxr.org", "js-stream.aac"); }).detach();
+      thread ([=]() { icyThread ("stream.wqxr.org", "js-stream.aac"); }).detach();
       thread ([=](){ analyseThread (streaming); }).detach();
       }
     else if (streaming || !mFileList->empty())
@@ -104,7 +104,7 @@ private:
   //}}}
 
   //{{{
-  void addIcyInfo (string icyInfo) {
+  void addIcyInfo (const string& icyInfo) {
   // called by httpThread
 
     mIcyStr = icyInfo;
@@ -202,66 +202,62 @@ private:
   //}}}
 
   //{{{
-  void shoutcastThread (const string& host, const string& path) {
+  void icyThread (const string& host, const string& path) {
 
-    cLog::setThreadName ("cast");
+    cLog::setThreadName ("icy ");
+
+    int icySkipCount = 0;
+    int icySkipLen = 0;
+    int icyInfoCount = 0;
+    int icyInfoLen = 0;
+    char icyInfo[255] = {0};
 
     cWinSockHttp http;
 
     http.get (host, path, "Icy-MetaData: 1",
-      [&](const string& key, const string& value) noexcept {
-        //{{{  header callback lambda
-        // cLog::log (LOGINFO, "header key:" + key + " value:" + value);
-
+      // headerCallback lambda
+      [&](const string& key, const string& value) noexcept { 
         if (key == "icy-metaint")
-          mIcySkipLen = stoi (value);
+          icySkipLen = stoi (value);
         },
-        //}}}
-      [&](const uint8_t* data, int length) noexcept {
-        //{{{  data callback lambda
+
+      // dataCallback lambda
+      [&](const uint8_t* data, int length) noexcept { 
         // cLog::log (LOGINFO, "callback %d", length);
-        if ((mIcyInfoCount >= mIcyInfoLen)  &&
-            (mIcySkipCount + length <= mIcySkipLen)) {
-
-          cLog::log (LOGINFO1, "body simple copy len:%d", length);
-
+        if ((icyInfoCount >= icyInfoLen)  &&
+            (icySkipCount + length <= icySkipLen)) {
           // simple copy of whole body, no metaInfo
+          cLog::log (LOGINFO1, "body simple copy len:%d", length);
           memcpy (mStreamLast, data, length);
           mStreamLast += length;
-          mIcySkipCount += (int)length;
+          icySkipCount += length;
           }
-
         else {
-          cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
-                                length,
-                                mIcyInfoCount, mIcyInfoLen,
-                                mIcySkipCount, mIcySkipLen);
-
           // dumb copy for metaInfo straddling body, could be much better
+          cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
+                                length, icyInfoCount, icyInfoLen, icySkipCount, icySkipLen);
           for (int i = 0; i < length; i++) {
-            if (mIcyInfoCount < mIcyInfoLen) {
-              mIcyInfo [mIcyInfoCount] = data[i];
-              mIcyInfoCount++;
-              if (mIcyInfoCount >= mIcyInfoLen)
-                addIcyInfo (mIcyInfo);
+            if (icyInfoCount < icyInfoLen) {
+              icyInfo [icyInfoCount] = data[i];
+              icyInfoCount++;
+              if (icyInfoCount >= icyInfoLen)
+                addIcyInfo (icyInfo);
               }
-            else if (mIcySkipCount >= mIcySkipLen) {
-              mIcyInfoLen = data[i] * 16;
-              mIcyInfoCount = 0;
-              mIcySkipCount = 0;
+            else if (icySkipCount >= icySkipLen) {
+              icyInfoLen = data[i] * 16;
+              icyInfoCount = 0;
+              icySkipCount = 0;
               cLog::log (LOGINFO1, "body icyInfo len:", data[i] * 16);
               }
             else {
-              mIcySkipCount++;
+              icySkipCount++;
               *mStreamLast = data[i];
               mStreamLast++;
               }
             }
           }
-
         mStreamSem.notifyAll();
         }
-        //}}}
       );
 
     cLog::log (LOGINFO, "exit");
@@ -656,12 +652,6 @@ private:
   string mIcyStr;
   string mTitleStr;
   string mUrlStr;
-
-  int mIcySkipCount = 0;
-  int mIcySkipLen = 0;
-  int mIcyInfoCount = 0;
-  int mIcyInfoLen = 0;
-  char mIcyInfo[255] = {0};
   //}}}
   };
 
