@@ -169,7 +169,8 @@ private:
     }
   //}}}
   //{{{
-  int frameToSamples (cAudioParser& parser, AVCodecContext* context, float* samples, bool fixup) {
+  int frameToSamples (cAudioParser& parser, AVCodecContext* context, float* samples, bool fixupAac) {
+  // decode parser frame to samples using codec context, fixup song samplerate and samplesPerFrame
 
     int numSamples = 0;
 
@@ -187,11 +188,9 @@ private:
         break;
 
       if ((ret != AVERROR(EAGAIN)) && (avFrame->nb_samples > 0)) {
-        if (fixup) {
-          if (avFrame->nb_samples != mSong.getSamplesPerFrame()) // fixup mSamplesPerFrame
-            mSong.setSamplesPerFrame (avFrame->nb_samples);
-          if (avFrame->sample_rate > mSong.getSampleRate()) // fixup aac-sbr sample rate
-            mSong.setSampleRate (avFrame->sample_rate);
+        if (fixupAac) {
+          mSong.setSampleRate (avFrame->sample_rate);
+          mSong.setSamplesPerFrame (avFrame->nb_samples);
           }
 
         //  covert planar avFrame->data to interleaved float samples
