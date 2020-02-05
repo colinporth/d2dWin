@@ -44,9 +44,9 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      thread ([=]() { hlsThread (3, 96000); }).detach();
-      //thread ([=]() { icyThread ("stream.wqxr.org", "js-stream.aac"); }).detach();
-      //thread ([=](){ analyseThread (streaming); }).detach();
+      //thread ([=]() { hlsThread (3, 96000); }).detach();
+      thread ([=]() { icyThread (name); }).detach();
+      thread ([=](){ analyseThread (streaming); }).detach();
       }
     else if (streaming || !mFileList->empty())
       thread ([=](){ analyseThread (streaming); }).detach();
@@ -202,7 +202,7 @@ private:
   //}}}
 
   //{{{
-  void icyThread (const string& host, const string& path) {
+  void icyThread (const string& url) {
 
     cLog::setThreadName ("icy ");
 
@@ -212,16 +212,18 @@ private:
     int icyInfoLen = 0;
     char icyInfo[255] = { 0 };
 
-    cWinSockHttp http;
+    cHttp::cUrl parsedUrl;
+    parsedUrl.parse (url);
 
-    http.get (host, path, "Icy-MetaData: 1",
-      // headerCallback lambda
+    cWinSockHttp http;
+    http.get (parsedUrl.getHost(), parsedUrl.getPath(), "Icy-MetaData: 1",
+      //{{{  headerCallback lambda
       [&](const string& key, const string& value) noexcept {
         if (key == "icy-metaint")
           icySkipLen = stoi (value);
         },
-
-      // dataCallback lambda
+      //}}}
+      //{{{  dataCallback lambda
       [&](const uint8_t* data, int length) noexcept {
         // cLog::log (LOGINFO, "callback %d", length);
         if ((icyInfoCount >= icyInfoLen)  &&
@@ -256,8 +258,10 @@ private:
               }
             }
           }
+
         mStreamSem.notifyAll();
         }
+      //}}}
       );
 
     cLog::log (LOGINFO, "exit");
