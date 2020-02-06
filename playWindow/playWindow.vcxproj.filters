@@ -16,9 +16,6 @@
     <ClInclude Include="..\..\shared\utils\cSemaphore.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\cSong.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\utils\date.h">
       <Filter>h</Filter>
     </ClInclude>
@@ -55,9 +52,6 @@
     <ClInclude Include="audioWASAPI.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\audioParser.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>h</Filter>
     </ClInclude>
@@ -65,6 +59,15 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\net\cWinSockHttp.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="audioParser.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="cSong.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="cSongBoxes.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

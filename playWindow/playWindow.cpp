@@ -6,10 +6,10 @@
 #include "../../shared/utils/cFileList.h"
 #include "../boxes/cFileListBox.h"
 
-#include "../../shared/decoders/audioParser.h"
-#include "../../shared/utils/cSong.h"
-#include "../boxes/cSongBoxes.h"
+#include "cSong.h"
+#include "cSongBoxes.h"
 
+#include "audioParser.h"
 #include "audioWASAPI.h"
 
 using namespace std;
@@ -44,7 +44,18 @@ public:
       // allocate simnple big buffer for stream
       mStreamFirst = (uint8_t*)malloc (200000000);
       mStreamLast = mStreamFirst;
-      thread ([=]() { hlsThread (3, 96000); }).detach();
+
+      //{{{
+      const static string kPathNames[] = { "none",
+                                           "bbc_radio_one",
+                                           "bbc_radio_two",
+                                           "bbc_radio_three",
+                                           "bbc_radio_fourfm",
+                                           "bbc_radio_five_live",
+                                           "bbc_6music" };
+      //}}}
+      const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
+      thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
       //thread ([=]() { icyThread (name); }).detach();
       //thread ([=](){ analyseThread (streaming); }).detach();
       }
@@ -176,8 +187,8 @@ private:
 
     AVPacket avPacket;
     av_init_packet (&avPacket);
-    avPacket.data = parser.frame;
-    avPacket.size = parser.frameLen;
+    avPacket.data = parser.mFramePtr;
+    avPacket.size = parser.mFrameLen;
 
     auto avFrame = av_frame_alloc();
 
@@ -297,24 +308,11 @@ private:
     }
   //}}}
   //{{{
-  void hlsThread (int chan, int bitrate) {
+  void hlsThread (string host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps channel change and jumping backwards
 
-    //{{{  hls const
-    const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
-
-    const static string kHost = "as-hls-uk-live.bbcfmt.hs.llnwd.net";
-
-    const static string kPathNames[] = { "none",
-                                         "bbc_radio_one",
-                                         "bbc_radio_two",
-                                         "bbc_radio_three",
-                                         "bbc_radio_fourfm",
-                                         "bbc_radio_five_live",
-                                         "bbc_6music" };
-
+  //  hls const
     const string kM3u8Suffix = ".norewind.m3u8";
-    //}}}
     cLog::setThreadName ("hls ");
 
     //{{{  init aac codec, context
@@ -322,12 +320,11 @@ private:
     auto context = avcodec_alloc_context3 (codec);
     avcodec_open2 (context, codec, NULL);
     //}}}
-    mSong.init (eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
+    mSong.init (cAudioParser::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
 
     cWinSockHttp http;
-    string path = "pool_904/live/uk/" + kPathNames[chan] + '/' +
-                  kPathNames[chan] + ".isml/" + kPathNames[chan] + "-audio=" + dec(bitrate);
-    string host = http.getRedirect (kHost, path + kM3u8Suffix);
+    string path = "pool_904/live/uk/" + chan + '/' + chan + ".isml/" + chan + "-audio=" + dec(bitrate);
+    host = http.getRedirect (host, path + ".norewind.m3u8");
     if (http.getContent()) {
       //{{{  parse m3u8 for startSeqNum, startDatePoint, startTimePoint
       // point to #EXT-X-MEDIA-SEQUENCE: sequence num
@@ -376,12 +373,12 @@ private:
             //  add aacFrame from stream to song, using mStreamLast as temp sample buffer
             auto numSamples = frameToSamples (parser, context, (float*)mStreamLast, true);
             if (numSamples) {
-              if (mSong.addFrame (parser.frame, parser.frameLen, mSong.getNumFrames()+1,
+              if (mSong.addFrame (parser.mFramePtr, parser.mFrameLen, mSong.getNumFrames()+1,
                                   numSamples, (float*)mStreamLast))
                 thread ([=](){ playThread (true); }).detach();
               changed();
               }
-            stream += parser.skip + parser.frameLen;
+            stream += parser.mSkip + parser.mFrameLen;
             }
           seqNum++;
           }
@@ -427,18 +424,18 @@ private:
 
       // sampleRate for aac-sbr wrong in header, fixup later, use a maxValue for samples alloc
       int streamSampleRate;
-      auto audioFrameType = parseAudioFrames (mStreamFirst, mStreamLast, streamSampleRate);
+      auto frameType = parseAudioFrames (mStreamFirst, mStreamLast, streamSampleRate);
 
       bool songDone = false;
       auto stream = mStreamFirst;
-      if (audioFrameType == eWav) {
+      if (frameType == cAudioParser::eWav) {
         //{{{  float 32bit interleaved wav uses mapped stream directly
         auto frameSamples = 1024;
-        mSong.init (audioFrameType, 2, frameSamples, streamSampleRate);
+        mSong.init (frameType, 2, frameSamples, streamSampleRate);
 
         int skip;
         int sampleRate;
-        eAudioFrameType frameType;
+        cAudioParser::eFrameType frameType;
         uint8_t* data = nullptr;
         int dataSize = 0;
         parseAudioFrame (stream, mStreamLast, data, dataSize, frameType, skip, sampleRate);
@@ -457,7 +454,7 @@ private:
         }
         //}}}
       else {
-        mSong.init (audioFrameType, 2, audioFrameType == eMp3 ? 1152 : 2048, streamSampleRate);
+        mSong.init (frameType, 2, frameType == cAudioParser::eMp3 ? 1152 : 2048, streamSampleRate);
 
         //{{{  add jpeg if available
         int jpegLen = 0;
@@ -470,7 +467,7 @@ private:
         //}}}
         auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
         //{{{  init codec, context, avFrame, avPacket
-        auto codec = avcodec_find_decoder (mSong.getAudioFrameType() == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
+        auto codec = avcodec_find_decoder (mSong.getFrameType() == cAudioParser::eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
         auto context = avcodec_alloc_context3 (codec);
         avcodec_open2 (context, codec, NULL);
         //}}}
@@ -478,17 +475,17 @@ private:
         while (!getExit() && !mSongChanged && !songDone) {
           cAudioParser parser;
           while (parser.parseFrame (stream, mStreamLast)) {
-            if (parser.frameType == mSong.getAudioFrameType()) {
+            if (parser.mFrameType == mSong.getFrameType()) {
               auto numSamples = frameToSamples (parser, context, samples, true);
               if (numSamples) {
                 int numFrames = mSong.getNumFrames();
-                int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(parser.frame - mStreamFirst) / numFrames) : 0;
-                if (mSong.addFrame (parser.frame, parser.frameLen, totalFrames+1, numSamples, samples))
+                int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(parser.mFramePtr - mStreamFirst) / numFrames) : 0;
+                if (mSong.addFrame (parser.mFramePtr, parser.mFrameLen, totalFrames+1, numSamples, samples))
                   thread ([=](){ playThread (streaming); }).detach();
                 changed();
                 }
               }
-            stream += parser.skip + parser.frameLen;
+            stream += parser.mSkip + parser.mFrameLen;
             }
           if (streaming)
             mStreamSem.wait();
@@ -536,9 +533,9 @@ private:
 
       float* samples = nullptr;
       AVCodecContext* context = nullptr;
-      if (mSong.getAudioFrameType() != eWav) {
+      if (mSong.getFrameType() != cAudioParser::eWav) {
         //{{{  init decoder, alloc samples
-        auto codec = avcodec_find_decoder (mSong.getAudioFrameType() == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
+        auto codec = avcodec_find_decoder (mSong.getFrameType() == cAudioParser::eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
         context = avcodec_alloc_context3 (codec);
         avcodec_open2 (context, codec, NULL);
 
@@ -560,7 +557,7 @@ private:
             cLog::log (LOGINFO3, " - callback for src:%d dst:%d:%d",
                        mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
             //}}}
-            if (mSong.getAudioFrameType() == eWav)
+            if (mSong.getFrameType() == cAudioParser::eWav)
               srcSamples = (float*)mSong.getPlayFramePtr();
             else {
               cAudioParser parser (mSong.getPlayFramePtr(), mSong.getPlayFrameLen());
