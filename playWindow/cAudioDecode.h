@@ -10,7 +10,7 @@ extern "C" {
 
 class cAudioDecode {
 public:
-  enum eFrameType { eMp3, eAac, eId3Tag, eWav, eUnknown } ;
+  enum eFrameType { eUnknown, eMp3, eAac, eId3Tag, eWav } ;
 
   cAudioDecode() {}
   //{{{
@@ -46,6 +46,14 @@ public:
     av_frame_free (&mAvFrame);
     }
   //}}}
+
+  eFrameType getFrameType() { return mFrameType; }
+  int getSampleRate() { return mSampleRate; }
+  int getNumSamples() { return mNumSamples; }
+
+  uint8_t* getFramePtr() { return mFramePtr; }
+  int getFrameLen() { return mFrameLen; }
+  int getNextFrameOffset() { return mFrameLen + mSkip; }
 
   //{{{
   void setFrame (uint8_t* framePtr, int frameLen) {
@@ -397,19 +405,6 @@ public:
   inline static uint8_t* mJpegPtr = nullptr;
   inline static int mJpegLen = 0;
 
-  AVCodecContext* mContext = nullptr;
-  AVPacket mAvPacket;
-  AVFrame* mAvFrame;
-
-  uint8_t* mFramePtr;
-  int mFrameLen;
-
-  eFrameType mFrameType;
-  int mSampleRate;
-  int mNumSamples;
-
-  int mSkip;
-
 private:
   //{{{
   static bool parseId3Tag (uint8_t* framePtr, uint8_t* frameLast) {
@@ -458,4 +453,17 @@ private:
     return false;
     }
   //}}}
+
+  // vars
+  uint8_t* mFramePtr = nullptr;
+  int mFrameLen = 0;
+  int mSkip = 0;
+
+  eFrameType mFrameType = eUnknown;
+  int mSampleRate = 0;
+  int mNumSamples = 0;
+
+  AVCodecContext* mContext = nullptr;
+  AVPacket mAvPacket;
+  AVFrame* mAvFrame = nullptr;
   };

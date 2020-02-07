@@ -310,13 +310,13 @@ private:
             auto numSamples = decode.frameToSamples (samples);
             if (numSamples) {
               // frame fixup aacHE sampleRate, samplesPerFrame
-              mSong.setSampleRate (decode.mSampleRate);
-              mSong.setSamplesPerFrame (decode.mNumSamples);
-              if (mSong.addFrame (decode.mFramePtr, decode.mFrameLen, mSong.getNumFrames()+1, numSamples, samples))
+              mSong.setSampleRate (decode.getSampleRate());
+              mSong.setSamplesPerFrame (decode.getNumSamples());
+              if (mSong.addFrame (decode.getFramePtr(), decode.getFrameLen(), mSong.getNumFrames()+1, numSamples, samples))
                 thread ([=](){ playThread (true); }).detach();
               changed();
               }
-            stream += decode.mSkip + decode.mFrameLen;
+            stream += decode.getNextFrameOffset();
             }
           seqNum++;
           }
@@ -376,7 +376,7 @@ private:
 
         cAudioDecode decode (cAudioDecode::eWav);
         decode.parseFrame (stream, mStreamLast);
-        auto data = decode.mFramePtr;
+        auto data = decode.getFramePtr();
 
         auto frameSampleBytes = frameSamples * 2 * 4;
         while (!getExit() && !mSongChanged && !songDone) {
@@ -399,20 +399,20 @@ private:
 
         while (!getExit() && !mSongChanged && !songDone) {
           while (decode.parseFrame (stream, mStreamLast)) {
-            if (decode.mFrameType == mSong.getFrameType()) {
+            if (decode.getFrameType() == mSong.getFrameType()) {
               auto numSamples = decode.frameToSamples (samples);
               if (numSamples) {
                 // frame fixup aacHE sampleRate, samplesPerFrame
-                mSong.setSampleRate (decode.mSampleRate);
-                mSong.setSamplesPerFrame (decode.mNumSamples);
+                mSong.setSampleRate (decode.getSampleRate());
+                mSong.setSamplesPerFrame (decode.getNumSamples());
                 int numFrames = mSong.getNumFrames();
-                int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(decode.mFramePtr - mStreamFirst) / numFrames) : 0;
-                if (mSong.addFrame (decode.mFramePtr, decode.mFrameLen, totalFrames+1, numSamples, samples))
+                int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(decode.getFramePtr() - mStreamFirst) / numFrames) : 0;
+                if (mSong.addFrame (decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, numSamples, samples))
                   thread ([=](){ playThread (streaming); }).detach();
                 changed();
                 }
               }
-            stream += decode.mSkip + decode.mFrameLen;
+            stream += decode.getNextFrameOffset();
             }
           if (streaming)
             mStreamSem.wait();
