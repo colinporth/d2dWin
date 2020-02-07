@@ -42,15 +42,15 @@ public:
 
     if (streaming) {
       //{{{
-      const static string kPathNames[] = { "none",
-                                           "bbc_radio_one",
-                                           "bbc_radio_two",
-                                           "bbc_radio_three",
-                                           "bbc_radio_fourfm",
-                                           "bbc_radio_five_live",
-                                           "bbc_6music" };
+      //const static string kPathNames[] = { "none",
+                                           //"bbc_radio_one",
+                                           //"bbc_radio_two",
+                                           //"bbc_radio_three",
+                                           //"bbc_radio_fourfm",
+                                           //"bbc_radio_five_live",
+                                           //"bbc_6music" };
       //}}}
-      const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
+      //const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
       //thread ([=]() { icyThread (name); }).detach();
       //thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_three", 48000); }).detach();
@@ -111,39 +111,6 @@ private:
   //}}}
 
   //{{{
-  void addIcyInfo (const string& icyInfo) {
-  // called by httpThread
-
-    cLog::log (LOGINFO1, "addIcyInfo " + icyInfo);
-
-    string icysearchStr = "StreamTitle=\'";
-    string searchStr = "StreamTitle=\'";
-    auto searchStrPos = icyInfo.find (searchStr);
-    if (searchStrPos != string::npos) {
-      auto searchEndPos = icyInfo.find ("\';", searchStrPos + searchStr.size());
-      if (searchEndPos != string::npos) {
-        string titleStr = icyInfo.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-        if (titleStr != mLastTitleStr) {
-          cLog::log (LOGINFO1, "addIcyInfo found title = " + titleStr);
-          mSong.setTitle (titleStr);
-          mLastTitleStr = titleStr;
-          }
-        }
-      }
-
-    string urlStr = "no url";
-    searchStr = "StreamUrl=\'";
-    searchStrPos = icyInfo.find (searchStr);
-    if (searchStrPos != string::npos) {
-      auto searchEndPos = icyInfo.find ('\'', searchStrPos + searchStr.size());
-      if (searchEndPos != string::npos) {
-        urlStr = icyInfo.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
-        cLog::log (LOGINFO1, "addIcyInfo found url = " + urlStr);
-        }
-      }
-    }
-  //}}}
-  //{{{
   static uint8_t* extractAacFramesFromTs (uint8_t* stream, uint8_t* ts, int tsLen) {
   // extract aacFrames to stream from chunk tsPackets, ts and stream can be same buffer
 
@@ -177,16 +144,51 @@ private:
   //}}}
 
   //{{{
+  void addIcyInfo (const string& icyInfo) {
+  // called by httpThread
+
+    cLog::log (LOGINFO1, "addIcyInfo " + icyInfo);
+
+    string icysearchStr = "StreamTitle=\'";
+    string searchStr = "StreamTitle=\'";
+    auto searchStrPos = icyInfo.find (searchStr);
+    if (searchStrPos != string::npos) {
+      auto searchEndPos = icyInfo.find ("\';", searchStrPos + searchStr.size());
+      if (searchEndPos != string::npos) {
+        string titleStr = icyInfo.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+        if (titleStr != mLastTitleStr) {
+          cLog::log (LOGINFO1, "addIcyInfo found title = " + titleStr);
+          mSong.setTitle (titleStr);
+          mLastTitleStr = titleStr;
+          }
+        }
+      }
+
+    string urlStr = "no url";
+    searchStr = "StreamUrl=\'";
+    searchStrPos = icyInfo.find (searchStr);
+    if (searchStrPos != string::npos) {
+      auto searchEndPos = icyInfo.find ('\'', searchStrPos + searchStr.size());
+      if (searchEndPos != string::npos) {
+        urlStr = icyInfo.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
+        cLog::log (LOGINFO1, "addIcyInfo found url = " + urlStr);
+        }
+      }
+    }
+  //}}}
+
+  //{{{
   void hlsThread (string host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps channel change and jumping backwards
+  // - host is redirected, assumes bbc radio aac, 48000 sampleaRate
+  // - !!!! convert big dumb stream buffer to individual frame allocs !!!!
+  // - !!!! add discontiguous chunks for going backwards from start !!!!
 
     cLog::setThreadName ("hls ");
 
     // allocate simnple big buffer for stream
     auto streamFirst = (uint8_t*)malloc (200000000);
     auto streamEnd = streamFirst;
-
-    mSong.init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
 
     cWinSockHttp http;
     string path = "pool_904/live/uk/" + chan + '/' + chan + ".isml/" + chan + "-audio=" + dec(bitrate);
@@ -226,13 +228,14 @@ private:
       uint32_t startFrame = uint32_t((uint32_t(seconds.count()) - kStartTimeSecondsOffset) * kFramesPerSecond);
       //}}}
 
+      mSong.init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
       cAudioDecode decode (cAudioDecode::eAac);
       float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
       auto stream = streamFirst;
       auto seqNum = startSeqNum;
       while (!getExit()) {
-        // get hls seqNum chunk
+        // get hls seqNum chunk, about 100k bytes for 128kps stream
         if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
           streamEnd = extractAacFramesFromTs (streamEnd, http.getContent(), http.getContentSize());
           http.freeContent();
@@ -252,7 +255,7 @@ private:
             }
           seqNum++;
           }
-        else // wait for next hls chunk
+        else // wait for next hls chunk, !!! should be timed to wall clock !!!!
           Sleep (1000);
         }
       free (samples);

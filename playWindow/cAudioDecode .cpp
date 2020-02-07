@@ -1,4 +1,4 @@
-// cAudioDecode.h
+// cAudioDecode.cpp
 #pragma once
 //{{{  includes
 #include "stdafx.h"
@@ -6,10 +6,6 @@
 #include "cAudioDecode.h"
 
 #include "../../shared/utils/cLog.h"
-
-extern "C" {
-  #include "libavcodec/avcodec.h"
-  }
 //}}}
 
 // public
