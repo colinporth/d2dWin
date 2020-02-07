@@ -61,13 +61,13 @@
     <ClInclude Include="..\..\shared\net\cWinSockHttp.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="audioParser.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="cSong.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="cSongBoxes.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="cAudioDecode.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

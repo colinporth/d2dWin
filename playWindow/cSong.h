@@ -1,7 +1,7 @@
 // cSong.h
 #pragma once
 //{{{  includes
-#include "audioParser.h"
+#include "cAudioDecode.h"
 
 #include "../../shared/kissFft/kiss_fft.h"
 #include "../../shared/kissFft/kiss_fftr.h"
@@ -76,7 +76,9 @@ public:
   //}}}
 
   //{{{  gets
-  int getFrameType() { return mFrameType; }
+  cAudioDecode::eFrameType getFrameType() { return mFrameType; }
+  bool isFramePtrSamples() { return mFrameType == cAudioDecode::eWav; }
+
   int getNumChannels() { return mNumChannels; }
   int getNumSampleBytes() { return mNumChannels * sizeof(float); }
   int getSampleRate() { return mSampleRate; }
@@ -148,7 +150,7 @@ public:
   //}}}
 
   //{{{
-  void init (cAudioParser::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate) {
+  void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate) {
 
     mFrameType = frameType;
     mNumChannels = numChannels;
@@ -286,7 +288,7 @@ private:
   constexpr static float kMinPowerValue = 0.25f;
   constexpr static int kSilentWindowFrames = 10;
   //{{{  vars
-  cAudioParser::eFrameType mFrameType = cAudioParser::eUnknown;
+  cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
 
   int mNumChannels = 0;
   int mSampleRate = 0;

@@ -52,7 +52,7 @@
     <ClInclude Include="..\common\cJpegImageView.h" />
     <ClInclude Include="..\common\cPointRect.h" />
     <ClInclude Include="..\common\cView2d.h" />
-    <ClInclude Include="audioParser.h" />
+    <ClInclude Include="cAudioDecode.h" />
     <ClInclude Include="audioWASAPI.h" />
     <ClInclude Include="cSong.h" />
     <ClInclude Include="cSongBoxes.h" />
