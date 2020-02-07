@@ -41,10 +41,6 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (streaming) {
-      // allocate simnple big buffer for stream
-      mStreamFirst = (uint8_t*)malloc (200000000);
-      mStreamLast = mStreamFirst;
-
       //{{{
       const static string kPathNames[] = { "none",
                                            "bbc_radio_one",
@@ -55,12 +51,12 @@ public:
                                            "bbc_6music" };
       //}}}
       const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
-      thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
       //thread ([=]() { icyThread (name); }).detach();
-      //thread ([=](){ analyseThread (streaming); }).detach();
+      //thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
+      thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_three", 48000); }).detach();
       }
     else if (streaming || !mFileList->empty())
-      thread ([=](){ analyseThread (streaming); }).detach();
+      thread ([=](){ fileThread(); }).detach();
 
     // loop till quit
     messagePump();
@@ -181,78 +177,14 @@ private:
   //}}}
 
   //{{{
-  void icyThread (const string& url) {
-
-    cLog::setThreadName ("icy ");
-
-    int icySkipCount = 0;
-    int icySkipLen = 0;
-    int icyInfoCount = 0;
-    int icyInfoLen = 0;
-    char icyInfo[255] = { 0 };
-
-    cHttp::cUrl parsedUrl;
-    parsedUrl.parse (url);
-
-    cWinSockHttp http;
-    http.get (parsedUrl.getHost(), parsedUrl.getPath(), "Icy-MetaData: 1",
-      //{{{  headerCallback lambda
-      [&](const string& key, const string& value) noexcept {
-        if (key == "icy-metaint")
-          icySkipLen = stoi (value);
-        },
-      //}}}
-      //{{{  dataCallback lambda
-      [&](const uint8_t* data, int length) noexcept {
-        // cLog::log (LOGINFO, "callback %d", length);
-        if ((icyInfoCount >= icyInfoLen)  &&
-            (icySkipCount + length <= icySkipLen)) {
-          // simple copy of whole body, no metaInfo
-          cLog::log (LOGINFO1, "body simple copy len:%d", length);
-          memcpy (mStreamLast, data, length);
-          mStreamLast += length;
-          icySkipCount += length;
-          }
-        else {
-          // dumb copy for metaInfo straddling body, could be much better
-          cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
-                                length, icyInfoCount, icyInfoLen, icySkipCount, icySkipLen);
-          for (int i = 0; i < length; i++) {
-            if (icyInfoCount < icyInfoLen) {
-              icyInfo [icyInfoCount] = data[i];
-              icyInfoCount++;
-              if (icyInfoCount >= icyInfoLen)
-                addIcyInfo (icyInfo);
-              }
-            else if (icySkipCount >= icySkipLen) {
-              icyInfoLen = data[i] * 16;
-              icyInfoCount = 0;
-              icySkipCount = 0;
-              cLog::log (LOGINFO1, "body icyInfo len:", data[i] * 16);
-              }
-            else {
-              icySkipCount++;
-              *mStreamLast = data[i];
-              mStreamLast++;
-              }
-            }
-          }
-
-        mStreamSem.notifyAll();
-        }
-      //}}}
-      );
-
-    cLog::log (LOGINFO, "exit");
-    }
-  //}}}
-  //{{{
   void hlsThread (string host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps channel change and jumping backwards
 
-  //  hls const
-    const string kM3u8Suffix = ".norewind.m3u8";
     cLog::setThreadName ("hls ");
+
+    // allocate simnple big buffer for stream
+    auto streamFirst = (uint8_t*)malloc (200000000);
+    auto streamEnd = streamFirst;
 
     mSong.init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
 
@@ -297,15 +229,15 @@ private:
       cAudioDecode decode (cAudioDecode::eAac);
       float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
-      auto stream = mStreamFirst;
+      auto stream = streamFirst;
       auto seqNum = startSeqNum;
       while (!getExit()) {
         // get hls seqNum chunk
         if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
-          mStreamLast = extractAacFramesFromTs (mStreamLast, http.getContent(), http.getContentSize());
+          streamEnd = extractAacFramesFromTs (streamEnd, http.getContent(), http.getContentSize());
           http.freeContent();
 
-          while (decode.parseFrame (stream, mStreamLast)) {
+          while (decode.parseFrame (stream, streamEnd)) {
             //  add aacFrame from stream to song
             auto numSamples = decode.frameToSamples (samples);
             if (numSamples) {
@@ -332,33 +264,119 @@ private:
     }
   //}}}
   //{{{
-  void analyseThread (bool streaming) {
+  void icyThread (const string& url) {
 
-    cLog::setThreadName ("anal");
+    cLog::setThreadName ("icy ");
+
+    int icySkipCount = 0;
+    int icySkipLen = 0;
+    int icyInfoCount = 0;
+    int icyInfoLen = 0;
+    char icyInfo[255] = { 0 };
+
+    // allocate simnple big buffer for stream
+    auto streamFirst = (uint8_t*)malloc (200000000);
+    auto streamEnd = streamFirst;
+    auto stream = streamFirst;
+
+    bool firstTime = true;
+    cAudioDecode decode (cAudioDecode::eAac);
+    float* samples = nullptr;
+
+    cHttp::cUrl parsedUrl;
+    parsedUrl.parse (url);
+
+    cWinSockHttp http;
+    http.get (parsedUrl.getHost(), parsedUrl.getPath(), "Icy-MetaData: 1",
+      //{{{  lambda headerCallback
+      [&](const string& key, const string& value) noexcept {
+        if (key == "icy-metaint")
+          icySkipLen = stoi (value);
+        },
+      //}}}
+
+      // lambda dataCallback
+      [&](const uint8_t* data, int length) noexcept {
+        // cLog::log (LOGINFO, "callback %d", length);
+        if ((icyInfoCount >= icyInfoLen) && (icySkipCount + length <= icySkipLen)) {
+          //{{{  simple copy of whole body, no metaInfo
+          cLog::log (LOGINFO1, "body simple copy len:%d", length);
+          memcpy (streamEnd, data, length);
+          streamEnd += length;
+          icySkipCount += length;
+          }
+          //}}}
+        else {
+          //{{{  dumb copy for metaInfo straddling body, could be much better
+          cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
+                                length, icyInfoCount, icyInfoLen, icySkipCount, icySkipLen);
+          for (int i = 0; i < length; i++) {
+            if (icyInfoCount < icyInfoLen) {
+              icyInfo [icyInfoCount] = data[i];
+              icyInfoCount++;
+              if (icyInfoCount >= icyInfoLen)
+                addIcyInfo (icyInfo);
+              }
+            else if (icySkipCount >= icySkipLen) {
+              icyInfoLen = data[i] * 16;
+              icyInfoCount = 0;
+              icySkipCount = 0;
+              cLog::log (LOGINFO1, "body icyInfo len:", data[i] * 16);
+              }
+            else {
+              icySkipCount++;
+              *streamEnd = data[i];
+              streamEnd++;
+              }
+            }
+          }
+          //}}}
+
+        if (firstTime) {
+          firstTime = false;
+          int sampleRate;
+          auto frameType = cAudioDecode::parseFrames (streamFirst, streamEnd, sampleRate);
+          mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
+          samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
+          }
+
+        while (decode.parseFrame (stream, streamEnd)) {
+          if (decode.getFrameType() == mSong.getFrameType()) {
+            auto numSamples = decode.frameToSamples (samples);
+            if (numSamples) {
+              // frame fixup aacHE sampleRate, samplesPerFrame
+              mSong.setSampleRate (decode.getSampleRate());
+              mSong.setSamplesPerFrame (decode.getNumSamples());
+              int numFrames = mSong.getNumFrames();
+              int totalFrames = (numFrames > 0) ? int(streamEnd - streamFirst) / (int(decode.getFramePtr() - streamFirst) / numFrames) : 0;
+              if (mSong.addFrame (decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, numSamples, samples))
+                thread ([=](){ playThread (true); }).detach();
+              changed();
+              }
+            }
+          stream += decode.getNextFrameOffset();
+          }
+        } // end of lambda dataCallback
+      );
+
+    cLog::log (LOGINFO, "exit");
+    }
+  //}}}
+  //{{{
+  void fileThread() {
+
+    cLog::setThreadName ("file");
 
     while (!getExit()) {
-      HANDLE fileHandle = 0;
-      HANDLE mapping = 0;
-
-      if (streaming) {
-        //{{{  wait for a bit of stream
-        while (streaming && (mStreamLast - mStreamFirst) < 1440)
-          mStreamSem.wait();
-        }
-        //}}}
-      else {
-        //{{{  openFile mapping to stream
-        fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-        mapping = CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
-
-        mStreamFirst = (uint8_t*)MapViewOfFile (mapping, FILE_MAP_READ, 0, 0, 0);
-        mStreamLast = mStreamFirst + GetFileSize (fileHandle, NULL);
-        }
-        //}}}
+      HANDLE fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+      HANDLE mapping = CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
+      auto fileMapFirst = (uint8_t*)MapViewOfFile (mapping, FILE_MAP_READ, 0, 0, 0);
+      auto fileMapSize = GetFileSize (fileHandle, NULL);
+      auto fileMapEnd = fileMapFirst + fileMapSize;
 
       // sampleRate for aac-sbr wrong in header, fixup later, use a maxValue for samples alloc
       int sampleRate;
-      auto frameType = cAudioDecode::parseFrames (mStreamFirst, mStreamLast, sampleRate);
+      auto frameType = cAudioDecode::parseFrames (fileMapFirst, fileMapEnd, sampleRate);
       if (cAudioDecode::mJpegPtr) {
         //{{{  add jpeg
         mSong.mImage = new cJpegImage();
@@ -368,26 +386,24 @@ private:
         //}}}
 
       bool songDone = false;
-      auto stream = mStreamFirst;
+      auto fileMapPtr = fileMapFirst;
       if (frameType == cAudioDecode::eWav) {
-        //{{{  float 32bit interleaved wav uses mapped stream directly
+        //{{{  float 32bit interleaved wav uses file map directly
         auto frameSamples = 1024;
         mSong.init (frameType, 2, frameSamples, sampleRate);
 
         cAudioDecode decode (cAudioDecode::eWav);
-        decode.parseFrame (stream, mStreamLast);
+        decode.parseFrame (fileMapPtr, fileMapEnd);
         auto data = decode.getFramePtr();
 
         auto frameSampleBytes = frameSamples * 2 * 4;
         while (!getExit() && !mSongChanged && !songDone) {
-          int totalFrames = int(mStreamLast - mStreamFirst) / frameSampleBytes;
-          if (mSong.addFrame (data, frameSampleBytes, totalFrames, frameSamples, (float*)data))
+          if (mSong.addFrame (data, frameSampleBytes, fileMapSize / frameSampleBytes, frameSamples, (float*)data))
             thread ([=](){ playThread (false); }).detach();
 
           data += frameSampleBytes;
           changed();
-
-          songDone = (data + frameSampleBytes) > mStreamLast;
+          songDone = (data + frameSampleBytes) > fileMapEnd;
           }
         }
         //}}}
@@ -398,7 +414,7 @@ private:
         auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
 
         while (!getExit() && !mSongChanged && !songDone) {
-          while (decode.parseFrame (stream, mStreamLast)) {
+          while (decode.parseFrame (fileMapPtr, fileMapEnd)) {
             if (decode.getFrameType() == mSong.getFrameType()) {
               auto numSamples = decode.frameToSamples (samples);
               if (numSamples) {
@@ -406,20 +422,16 @@ private:
                 mSong.setSampleRate (decode.getSampleRate());
                 mSong.setSamplesPerFrame (decode.getNumSamples());
                 int numFrames = mSong.getNumFrames();
-                int totalFrames = (numFrames > 0) ? int(mStreamLast - mStreamFirst) / (int(decode.getFramePtr() - mStreamFirst) / numFrames) : 0;
+                int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
                 if (mSong.addFrame (decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, numSamples, samples))
-                  thread ([=](){ playThread (streaming); }).detach();
+                  thread ([=](){ playThread (false); }).detach();
                 changed();
                 }
               }
-            stream += decode.getNextFrameOffset();
+            fileMapPtr += decode.getNextFrameOffset();
             }
-          if (streaming)
-            mStreamSem.wait();
-          else {
-            cLog::log (LOGINFO, "song done");
-            songDone = true;
-            }
+          cLog::log (LOGINFO, "song done");
+          songDone = true;
           }
         // done
         free (samples);
@@ -427,17 +439,15 @@ private:
 
       // wait for play to end or abort
       mPlayDoneSem.wait();
-      if (!streaming && fileHandle) {
-        //{{{  next file
-        UnmapViewOfFile (mStreamFirst);
-        CloseHandle (fileHandle);
+      //{{{  next file
+      UnmapViewOfFile (fileMapFirst);
+      CloseHandle (fileHandle);
 
-        if (mSongChanged) // use changed fileIndex
-          mSongChanged = false;
-        else if (!mFileList->nextIndex())
-          break;
-        }
-        //}}}
+      if (mSongChanged) // use changed fileIndex
+        mSongChanged = false;
+      else if (!mFileList->nextIndex())
+        break;
+      //}}}
       }
 
     cLog::log (LOGINFO, "exit");
@@ -501,18 +511,14 @@ private:
   cFileList* mFileList;
 
   cSong mSong;
-  uint8_t* mStreamFirst = nullptr;
-  uint8_t* mStreamLast = nullptr;
-  uint8_t* mStreamTemp = nullptr;
-  cSemaphore mStreamSem;
-
+  bool mSongChanged = false;
   cJpegImageView* mJpegImageView = nullptr;
 
-  bool mSongChanged = false;
   bool mPlaying = true;
   cSemaphore mPlayDoneSem = "playDone";
 
   cVolumeBox* mVolumeBox = nullptr;
+
   string mLastTitleStr;
   //}}}
   };
