@@ -3,7 +3,7 @@
   <ItemGroup>
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="playWindow.cpp" />
-    <ClCompile Include="cAudioDecode .cpp" />
+    <ClCompile Include="cAudioDecode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">

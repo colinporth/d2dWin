@@ -338,7 +338,7 @@ private:
         if (firstTime) {
           firstTime = false;
           int sampleRate;
-          auto frameType = cAudioDecode::parseFrames (streamFirst, streamEnd, sampleRate);
+          auto frameType = cAudioDecode::parseSomeFrames (streamFirst, streamEnd, sampleRate);
           mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
           samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
           }
@@ -379,7 +379,7 @@ private:
 
       // sampleRate for aac-sbr wrong in header, fixup later, use a maxValue for samples alloc
       int sampleRate;
-      auto frameType = cAudioDecode::parseFrames (fileMapFirst, fileMapEnd, sampleRate);
+      auto frameType = cAudioDecode::parseSomeFrames (fileMapFirst, fileMapEnd, sampleRate);
       if (cAudioDecode::mJpegPtr) {
         //{{{  add jpeg
         mSong.mImage = new cJpegImage();

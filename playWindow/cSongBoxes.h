@@ -94,6 +94,8 @@ public:
     int frameWidth = (mZoom < 0) ? -mZoom+1 : 1; // zoomIn expanding frame to frameWidth pix
 
     resizeBitmap (dc);
+
+    mCompatibleRenderTarget->BeginDraw();
     mCompatibleRenderTarget->Clear (D2D1::ColorF (D2D1::ColorF::Black));
 
     // calc leftFrame, clip to valid frame, adjust firstX which may overlap left up to frameWidth
@@ -212,6 +214,7 @@ public:
       dstBitmapWidth += frameWidth;
       r.left = r.right;
       }
+    mCompatibleRenderTarget->EndDraw();
 
     if (dstBitmapWidth) {
       //{{{  stamp bitmap
@@ -280,14 +283,15 @@ private:
 
       if (mSpecBitmap)
         mSpecBitmap->Release();
-      if (mWaveBitmap)
-        mSpecBitmap->Release();
 
       mSpecBitmapSize = { (UINT32)getWidthInt(), (UINT32)mWaveY};
       dc->CreateBitmap (mSpecBitmapSize,
                         { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT, 0,0 },
                         &mSpecBitmap);
 
+
+      if (mWaveBitmap)
+        mWaveBitmap->Release();
       D2D1_PIXEL_FORMAT pixelFormat = D2D1::PixelFormat(
         DXGI_FORMAT_A8_UNORM,
         D2D1_ALPHA_MODE_STRAIGHT

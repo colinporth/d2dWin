@@ -30,7 +30,8 @@ public:
   int frameToSamples (float* samples);
 
   // statics not quite right but being here picks up eFrameType
-  static eFrameType parseFrames (uint8_t* framePtr, uint8_t* frameLast, int& sampleRate);
+  static eFrameType parseSomeFrames (uint8_t* framePtr, uint8_t* frameLast, int& sampleRate);
+  static eFrameType parseAllFrames (uint8_t* framePtr, uint8_t* frameLast, int& sampleRate);
   inline static uint8_t* mJpegPtr = nullptr;
   inline static int mJpegLen = 0;
 
