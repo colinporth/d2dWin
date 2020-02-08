@@ -354,8 +354,44 @@ int cAudioDecode::frameToSamples (float* samples) {
   }
 //}}}
 
+// static
 //{{{
-cAudioDecode::eFrameType cAudioDecode::parseFrames (uint8_t* framePtr, uint8_t* frameLast, int& sampleRate) {
+cAudioDecode::eFrameType cAudioDecode::parseSomeFrames (uint8_t* framePtr, uint8_t* frameLast, int& sampleRate) {
+// return streamAudioFrameType
+
+  eFrameType frameType = eUnknown;
+
+  sampleRate = 0;
+
+  int tags = 0;
+  int frames = 0;
+  int lostSync = 0;
+
+  cAudioDecode decode;
+  while (decode.parseFrame (framePtr, frameLast) && ((frameType == eUnknown) || (frameType == eId3Tag)) {
+    if (decode.mFrameType == decode.eId3Tag) {
+      if (parseId3Tag (framePtr, frameLast))
+        cLog::log (LOGINFO, "parseFrames found jpeg");
+      tags++;
+      }
+    else {
+      frameType = decode.mFrameType;
+      sampleRate = decode.mSampleRate;
+      frames++;
+      }
+    // onto next frame
+    framePtr += decode.mSkip + decode.mFrameLen;
+    lostSync += decode.mSkip;
+    }
+
+  cLog::log (LOGINFO, "parseFrames f:%d lost:%d type:%d sampleRate:%d",
+                      frames, lostSync, frameType, sampleRate);
+
+  return frameType;
+  }
+//}}}
+//{{{
+cAudioDecode::eFrameType cAudioDecode::parseAllFrames (uint8_t* framePtr, uint8_t* frameLast, int& sampleRate) {
 // return streamAudioFrameType
 
   eFrameType frameType = eUnknown;

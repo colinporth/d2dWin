@@ -8,7 +8,7 @@ extern "C" {
 
 class cAudioDecode {
 public:
-  enum eFrameType { eUnknown, eMp3, eAac, eId3Tag, eWav } ;
+  enum eFrameType { eUnknown, eId3Tag, eWav, eMp3, eAac } ;
 
   cAudioDecode() {}
   cAudioDecode (eFrameType frameType);
