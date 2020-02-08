@@ -297,14 +297,15 @@ private:
           icySkipLen = stoi (value);
         },
       //}}}
-
-      // lambda dataCallback
+      //{{{  lambda dataCallback
       [&](const uint8_t* data, int length) noexcept {
         // cLog::log (LOGINFO, "callback %d", length);
         if ((icyInfoCount >= icyInfoLen) && (icySkipCount + length <= icySkipLen)) {
           //{{{  simple copy of whole body, no metaInfo
           cLog::log (LOGINFO1, "body simple copy len:%d", length);
+
           memcpy (streamEnd, data, length);
+
           streamEnd += length;
           icySkipCount += length;
           }
@@ -313,6 +314,7 @@ private:
           //{{{  dumb copy for metaInfo straddling body, could be much better
           cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
                                 length, icyInfoCount, icyInfoLen, icySkipCount, icySkipLen);
+
           for (int i = 0; i < length; i++) {
             if (icyInfoCount < icyInfoLen) {
               icyInfo [icyInfoCount] = data[i];
@@ -359,7 +361,8 @@ private:
             }
           stream += decode.getNextFrameOffset();
           }
-        } // end of lambda dataCallback
+        }
+      //}}}
       );
 
     cLog::log (LOGINFO, "exit");
