@@ -17,17 +17,24 @@ public:
 
     mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
       DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
-      &mTextFormat);
-    mTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+      &mTimeTextFormat);
+    mTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
     }
   //}}}
   //{{{
   virtual ~cSongBox() {
 
-    mTextFormat->Release();
+    if (mTimeTextFormat)
+      mTimeTextFormat->Release();
 
     if (mSpecBitmap)
       mSpecBitmap->Release();
+
+    if (mWaveBitmapTarget)
+      mWaveBitmapTarget->Release();
+
+    if (mOverBitmapTarget)
+      mOverBitmapTarget->Release();
     }
   //}}}
 
@@ -84,6 +91,7 @@ public:
 
     mOverHeight = getHeight() - mOverY;
     mOverCentre = mOverHeight / 2.f;
+
     mOverNumFrames = 0;
     mOverTotalFrames = 0;
     mOverValueScale = 1.f;
@@ -119,6 +127,7 @@ public:
     D2D1_COLOR_F off = { 0.f };
     mWaveBitmapTarget->BeginDraw();
     mWaveBitmapTarget->Clear (&off);
+
     float playFrameX = 0;
     int dstBitmapX = 0;
     int dstBitmapWidth = 0;
@@ -215,61 +224,58 @@ public:
       // stamp colour through used part of ID2D1Bitmap alpha
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
 
-      if (mFirstFrameIndex + dstBitmapWidth <= (int)mSpecBitmapSize.width)
-        dc->FillOpacityMask (mSpecBitmap, mWindow->getWhiteBrush(),
-          &D2D1::RectF (dstFirstX, mRect.top, dstFirstX + dstBitmapWidth, mRect.top + (float)mSpecBitmapSize.height),
-          &D2D1::RectF (0.f,0.f, (float)dstBitmapWidth, (float)mSpecBitmapSize.height));
+      cRect srcRect (0.f,0.f, (float)dstBitmapWidth, (float)mSpecBitmapSize.height);
+      cRect dstRect (dstFirstX, mRect.top, dstFirstX + dstBitmapWidth, mRect.top + (float)mSpecBitmapSize.height);
 
+      if (mFirstFrameIndex + dstBitmapWidth <= (int)mSpecBitmapSize.width)
+        dc->FillOpacityMask (mSpecBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
       else {
         float firstFrameIndex = (float)mFirstFrameIndex;
-        float firstStamp = (float)mSpecBitmapSize.width - mFirstFrameIndex;
+        float firstStamp = mSpecBitmapSize.width - firstFrameIndex;
         float secondStamp = dstBitmapWidth - firstStamp;
 
-        dc->FillOpacityMask (mSpecBitmap, mWindow->getGreenBrush(),
-          &D2D1::RectF (dstFirstX, mRect.top, dstFirstX + firstStamp, mRect.top + (float)mSpecBitmapSize.height),
-          &D2D1::RectF ((float)mFirstFrameIndex,0.f, mFirstFrameIndex + firstStamp, (float)mSpecBitmapSize.height));
+        srcRect.left = firstFrameIndex;
+        srcRect.right = firstFrameIndex + firstStamp;
+        dstRect.right = dstFirstX + firstStamp;
+        dc->FillOpacityMask (mSpecBitmap, mWindow->getGreenBrush(), dstRect, srcRect);
 
-        dc->FillOpacityMask (mSpecBitmap, mWindow->getYellowBrush(),
-          &D2D1::RectF (dstFirstX + firstStamp, mRect.top,
-                        dstFirstX + firstStamp + secondStamp, mRect.top + (float)mSpecBitmapSize.height),
-          &D2D1::RectF (0.f,0.f, secondStamp, (float)mSpecBitmapSize.height));
+        srcRect.left = 0.f;
+        srcRect.right = secondStamp;
+        dstRect.left = dstFirstX + firstStamp;
+        dstRect.right = dstFirstX + firstStamp + secondStamp;
+        dc->FillOpacityMask (mSpecBitmap, mWindow->getYellowBrush(), dstRect, srcRect);
         }
 
       // draw waveform 3 stamps, before, on, after playframe
       ID2D1Bitmap* waveBitmap;
       mWaveBitmapTarget->GetBitmap (&waveBitmap);
 
-      cRect srcRect (0.f,0.f, playFrameX, mWaveHeight);
-      cRect dstRect (mRect.left, mRect.top + mWaveY, mRect.left + playFrameX, mRect.top + mOverY);
+      srcRect = { 0.f,0.f, playFrameX, mWaveHeight };
+      dstRect = { mRect.left, mRect.top + mWaveY, mRect.left + (playFrameX*frameWidth), mRect.top + mOverY };
       dc->FillOpacityMask (waveBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
 
       srcRect.left = srcRect.right;
       srcRect.right += 1.f;
       dstRect.left = dstRect.right;
-      dstRect.right += 1.f;
+      dstRect.right += frameWidth;
       dc->FillOpacityMask (waveBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
 
       srcRect.left = srcRect.right;
-      srcRect.right += (float)getWidthInt();
+      srcRect.right += getWidth();
       dstRect.left = dstRect.right;
-      dstRect.right = mRect.left + getWidthInt();
+      dstRect.right = mRect.left + getWidth();
       dc->FillOpacityMask (waveBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
 
       waveBitmap->Release();
 
       dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-
-      //mWaveBitmapTarget->GetBitmap (&mWaveBitmap);
-      //dc->DrawBitmap (mWaveBitmap,
-      //  &D2D1::RectF (mRect.left, mRect.top + mWaveY, mRect.left + getWidthInt(), mRect.top + mOverY),
-      //  1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-      //  &D2D1::RectF (0.f,0.f, (float)getWidthInt(), mWaveHeight));
       }
       //}}}
 
     //{{{  on screen debug
     auto str = "i:" + dec (mFirstFrameIndex) + " bit:" + dec (mFirstFrame) + ":" + dec(mLastFrame) +
                " draw:" + dec (firstFrame) + ":" + dec(lastFrame);
+
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
       std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
@@ -356,7 +362,7 @@ private:
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
       std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-      mTextFormat, getWidth(), getHeight(), &textLayout);
+      mTimeTextFormat, getWidth(), getHeight(), &textLayout);
 
     if (textLayout) {
       dc->DrawTextLayout (getBL() - cPoint(0.f, 50.f), textLayout, mWindow->getWhiteBrush());
@@ -382,17 +388,19 @@ private:
 
   //{{{
   void drawOverWave (ID2D1DeviceContext* dc, int playFrame, float playFrameX, float valueScale) {
+  // draw overview using bitmap cache
 
     int numFrames = mSong.getNumFrames();
     int totalFrames = mSong.getTotalFrames();
     float framesPerPix = totalFrames / getWidth();
-    bool forceTotalRedraw = (totalFrames != mOverTotalFrames) || (valueScale != mOverValueScale);
+    bool forceTotalRedraw = (mSong.getId() != mSongId) ||
+                            (totalFrames != mOverTotalFrames) || (valueScale != mOverValueScale);
 
     if (forceTotalRedraw || (numFrames > mOverNumFrames)) {
-      D2D1_COLOR_F off = { 0.f };
+      D2D1_COLOR_F alphaOff = { 0.f };
       mOverBitmapTarget->BeginDraw();
       if (forceTotalRedraw)
-        mOverBitmapTarget->Clear (&off);
+        mOverBitmapTarget->Clear (&alphaOff);
 
       int frame = 0;
       for (float x = 0.f; x < getWidth(); x += 1.f) {
@@ -420,7 +428,7 @@ private:
 
           mOverBitmapTarget->FillRectangle (
             cRect (x, mOverCentre - (leftValue * valueScale) - 2.f,
-                   x + 1.f,  mOverCentre + (rightValue * valueScale) + 2.f), mWindow->getWhiteBrush());
+                   x+1.f,  mOverCentre + (rightValue * valueScale) + 2.f), mWindow->getWhiteBrush());
           }
 
         frame = toFrame;
@@ -428,10 +436,12 @@ private:
         //}}}
       mOverBitmapTarget->EndDraw();
       mOverNumFrames = numFrames;
+      mOverTotalFrames = totalFrames;
       mOverValueScale = valueScale;
+      mSongId = mSong.getId();
       }
 
-    // stamp playFrame using overBitmap
+    // stamp overview using overBitmap
     ID2D1Bitmap* overBitmap;
     mOverBitmapTarget->GetBitmap (&overBitmap);
 
@@ -571,12 +581,16 @@ private:
   cSong& mSong;
   int mZoom = 0;  // >0 = zoomOut framesPerPix, 0 = unity, <0 = zoomIn pixPerFrame
 
+  //{{{  vertical layout
   float mWaveY = 0.f;
   float mWaveHeight = 0.f;
   float mWaveCentre = 0.f;
   float mOverY = 0.f;
   float mOverHeight = 0.f;
   float mOverCentre = 0.f;
+  //}}}
+
+  int mSongId = 0;
 
   bool mFramesValid = false;
   int mFirstFrame = -1;
@@ -589,14 +603,14 @@ private:
   D2D1_SIZE_U mWaveBitmapSize = { 0,0 };
   ID2D1BitmapRenderTarget* mWaveBitmapTarget = nullptr;
 
-  D2D1_SIZE_U mOverBitmapSize = { 0,0 };
-  ID2D1BitmapRenderTarget* mOverBitmapTarget = nullptr;
+  bool mOn = false;
+  float mLens = 0.f;
   int mOverNumFrames = 0;
   int mOverTotalFrames = 0;
   float mOverValueScale = 1.f;
 
-  bool mOn = false;
-  float mLens = 0.f;
+  D2D1_SIZE_U mOverBitmapSize = { 0,0 };
+  ID2D1BitmapRenderTarget* mOverBitmapTarget = nullptr;
 
-  IDWriteTextFormat* mTextFormat = nullptr;
+  IDWriteTextFormat* mTimeTextFormat = nullptr;
   };

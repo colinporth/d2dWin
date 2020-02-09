@@ -94,6 +94,7 @@ public:
   int getNumFrames() { return (int)mFrames.size(); }
   int getLastFrame() { return getNumFrames() - 1;  }
   int getTotalFrames() { return mTotalFrames; }
+  int getId() { return mId; }
 
   //{{{
   int getPlayFrame() {
@@ -151,6 +152,8 @@ public:
 
   //{{{
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate) {
+
+    mId++;
 
     mFrameType = frameType;
     mNumChannels = numChannels;
@@ -290,6 +293,7 @@ private:
   //{{{  vars
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
 
+  int mId = 0;
   int mNumChannels = 0;
   int mSampleRate = 0;
   int mSamplesPerFrame = 0;
