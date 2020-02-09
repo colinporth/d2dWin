@@ -360,33 +360,24 @@ cAudioDecode::eFrameType cAudioDecode::parseSomeFrames (uint8_t* framePtr, uint8
 // return fameType
 
   eFrameType frameType = eUnknown;
-
   sampleRate = 0;
-
-  int tags = 0;
-  int frames = 0;
-  int lostSync = 0;
 
   cAudioDecode decode;
   while (decode.parseFrame (framePtr, frameEnd) && ((frameType == eUnknown) || (frameType == eId3Tag))) {
     if (decode.mFrameType == decode.eId3Tag) {
       if (parseId3Tag (framePtr, frameEnd))
         cLog::log (LOGINFO, "parseFrames found jpeg");
-      tags++;
       }
     else {
       frameType = decode.mFrameType;
       sampleRate = decode.mSampleRate;
-      frames++;
       }
 
     // onto next frame
     framePtr += decode.mSkip + decode.mFrameLen;
-    lostSync += decode.mSkip;
     }
 
-  cLog::log (LOGINFO, "parseFrames f:%d lost:%d type:%d sampleRate:%d",
-                      frames, lostSync, frameType, sampleRate);
+  cLog::log (LOGINFO, "parseSomeFrames type:%d sampleRate:%d", frameType, sampleRate);
 
   return frameType;
   }
@@ -396,32 +387,31 @@ cAudioDecode::eFrameType cAudioDecode::parseAllFrames (uint8_t* framePtr, uint8_
 // return frameType
 
   eFrameType frameType = eUnknown;
-
   sampleRate = 0;
 
-  int tags = 0;
-  int frames = 0;
-  int lostSync = 0;
+  int numTags = 0;
+  int numFrames = 0;
+  int numLostSync = 0;
 
   cAudioDecode decode;
   while (decode.parseFrame (framePtr, frameEnd)) {
     if (decode.mFrameType == decode.eId3Tag) {
       if (parseId3Tag (framePtr, frameEnd))
         cLog::log (LOGINFO, "parseFrames found jpeg");
-      tags++;
+      numTags++;
       }
     else {
       frameType = decode.mFrameType;
       sampleRate = decode.mSampleRate;
-      frames++;
+      numFrames++;
       }
     // onto next frame
     framePtr += decode.mSkip + decode.mFrameLen;
-    lostSync += decode.mSkip;
+    numLostSync += decode.mSkip;
     }
 
-  cLog::log (LOGINFO, "parseFrames f:%d lost:%d type:%d sampleRate:%d",
-                      frames, lostSync, frameType, sampleRate);
+  cLog::log (LOGINFO, "parseAllFrames f:%d tags:%d lost:%d type:%d sampleRate:%d",
+                      numFrames, numLostSync, numTags, frameType, sampleRate);
 
   return frameType;
   }

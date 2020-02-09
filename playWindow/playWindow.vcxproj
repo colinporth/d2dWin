@@ -61,7 +61,7 @@
     <ClInclude Include="cAudioDecode.h" />
     <ClInclude Include="audioWASAPI.h" />
     <ClInclude Include="cSong.h" />
-    <ClInclude Include="cSongBoxes.h" />
+    <ClInclude Include="cSongBox.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

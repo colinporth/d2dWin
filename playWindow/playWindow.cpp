@@ -7,7 +7,7 @@
 #include "../boxes/cFileListBox.h"
 
 #include "cSong.h"
-#include "cSongBoxes.h"
+#include "cSongBox.h"
 
 #include "cAudioDecode.h"
 #include "audioWASAPI.h"

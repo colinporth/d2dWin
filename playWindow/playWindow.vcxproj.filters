@@ -65,10 +65,10 @@
     <ClInclude Include="cSong.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="cSongBoxes.h">
+    <ClInclude Include="cAudioDecode.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="cAudioDecode.h">
+    <ClInclude Include="cSongBox.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>
