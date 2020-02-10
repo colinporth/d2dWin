@@ -397,6 +397,7 @@ public:
   IDWriteTextFormat* getTextFormat() { return mTextFormat.Get(); }
 
   // brushes
+  ID2D1SolidColorBrush* getClearBrush() { return mClearBrush.Get(); }
   ID2D1SolidColorBrush* getBlackBrush() { return mBlackBrush.Get(); }
   ID2D1SolidColorBrush* getDarkGreyBrush() { return mDarkGreyBrush.Get(); }
   ID2D1SolidColorBrush* getGreyBrush() { return mGreyBrush.Get(); }
@@ -488,6 +489,7 @@ private:
   // useful resources
   Microsoft::WRL::ComPtr<IDWriteTextFormat> mTextFormat;
 
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mClearBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mBlackBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDarkGreyBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mGreyBrush;

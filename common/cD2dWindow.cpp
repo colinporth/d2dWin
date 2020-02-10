@@ -2,7 +2,7 @@
 //{{{  includes
 #define _CRT_SECURE_NO_WARNINGS
 #define NOMINMAX
-#define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS 
+#define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
 
 #include <windows.h>
 #include <wrl.h>
@@ -431,6 +431,7 @@ void cD2dWindow::createDirect2d() {
   mTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_EMERGENCY_BREAK);
 
   // create solid brushes
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black, 0.f), &mClearBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black), &mBlackBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::DimGray), &mDarkGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Gray), &mGreyBrush);
