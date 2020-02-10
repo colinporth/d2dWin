@@ -11,11 +11,6 @@
 
 class cSong {
 public:
-  //{{{  static constexpr
-  constexpr static int kMaxSamplesPerFrame = 2048;
-  constexpr static int kMaxFreq = (kMaxSamplesPerFrame/2) + 1;
-  constexpr static int kMaxSpectrum = kMaxFreq;
-  //}}}
   //{{{
   class cFrame {
   public:
@@ -68,10 +63,7 @@ public:
   virtual ~cSong() {
 
     mFrames.clear();
-
-    auto temp = mImage;
-    mImage = nullptr;
-    delete temp;
+    setJpegImage (nullptr);
     }
   //}}}
 
@@ -90,6 +82,8 @@ public:
   float getMaxPowerValue() { return mMaxPowerValue; }
   float getMaxFreqValue() { return mMaxFreqValue; }
   int getMaxFreq() { return kMaxFreq; }
+  int getMaxSpectrum() { return kMaxSpectrum; }
+  cJpegImage* getJpegImage() { return mJpegImage; }
 
   int getNumFrames() { return (int)mFrames.size(); }
   int getLastFrame() { return getNumFrames() - 1;  }
@@ -134,6 +128,14 @@ public:
   void setSamplesPerFrame (int samplePerFrame) { mSamplesPerFrame = samplePerFrame; }
 
   //{{{
+  void setJpegImage (cJpegImage* jpegImage) {
+
+    auto temp = mJpegImage;
+    mJpegImage = jpegImage;;
+    delete temp;
+    }
+  //}}}
+  //{{{
   void setTitle (std::string title) {
 
     if (!mFrames.empty())
@@ -165,9 +167,7 @@ public:
     mPlayFrame = 0;
     mTotalFrames = 0;
 
-    auto temp = mImage;
-    mImage = nullptr;
-    delete temp;
+    setJpegImage (nullptr);
 
     mMaxPowerValue = kMinPowerValue;
     mMaxFreqValue = 0.f;
@@ -214,7 +214,7 @@ public:
     auto lumaValues = (uint8_t*)malloc (kMaxSpectrum);
     for (auto freq = 0; freq < kMaxSpectrum; freq++) {
       auto value = freqValues[freq] * scale;
-      lumaValues[freq] = value > 255 ? 255 : uint8_t(value);
+      lumaValues[kMaxSpectrum - freq - 1] = value > 255 ? 255 : uint8_t(value);
       }
 
     mFrames.push_back (new cFrame (stream, frameLen, powerValues, freqValues, lumaValues));
@@ -258,15 +258,13 @@ public:
   // public vars
   concurrency::concurrent_vector<cFrame*> mFrames;
 
-  int mPlayFrame = 0;
-
-  float mMaxPowerValue = kMinPowerValue;
-  float mMaxFreqValue = 0.f;
-  float mMaxFreqValues[kMaxFreq];
-
-  cJpegImage* mImage = nullptr;
-
 private:
+  //{{{  static constexpr
+  constexpr static int kMaxSamplesPerFrame = 2048;
+  constexpr static int kMaxFreq = (kMaxSamplesPerFrame/2) + 1;
+  constexpr static int kMaxSpectrum = kMaxFreq;
+  //}}}
+
   //{{{
   int skipPrev (int fromFrame, bool silent) {
 
@@ -290,6 +288,7 @@ private:
 
   constexpr static float kMinPowerValue = 0.25f;
   constexpr static int kSilentWindowFrames = 10;
+
   //{{{  vars
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
 
@@ -298,10 +297,16 @@ private:
   int mSampleRate = 0;
   int mSamplesPerFrame = 0;
 
+  int mPlayFrame = 0;
   int mTotalFrames = 0;
 
   kiss_fftr_cfg fftrConfig;
   kiss_fft_scalar timeBuf[kMaxSamplesPerFrame];
   kiss_fft_cpx freqBuf[kMaxFreq];
+
+  float mMaxFreqValues[kMaxFreq];
+  float mMaxPowerValue = kMinPowerValue;
+  float mMaxFreqValue = 0.f;
   //}}}
+  cJpegImage* mJpegImage = nullptr;
   };

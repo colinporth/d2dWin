@@ -22,7 +22,7 @@ public:
 
     initialise (title, width, height, false);
 
-    mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, mSong.mImage);
+    mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, mSong.getJpegImage());
     add (mJpegImageView);
 
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
@@ -385,9 +385,10 @@ private:
       auto frameType = cAudioDecode::parseSomeFrames (fileMapFirst, fileMapEnd, sampleRate);
       if (cAudioDecode::mJpegPtr) {
         //{{{  add jpeg
-        mSong.mImage = new cJpegImage();
-        mSong.mImage->setBuf (cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen);
-        mJpegImageView->setImage (mSong.mImage);
+        auto jpegImage = new cJpegImage();
+        jpegImage->setBuf (cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen);
+        mSong.setJpegImage (jpegImage);
+        mJpegImageView->setImage (jpegImage);
         }
         //}}}
 
@@ -476,7 +477,7 @@ private:
 
       device->start();
       while (!getExit() && !mSongChanged &&
-             (streaming || (mSong.mPlayFrame <= mSong.getLastFrame())))
+             (streaming || (mSong.getPlayFrame() <= mSong.getLastFrame())))
         if (mPlaying) {
           //{{{
           cLog::log (LOGINFO2, "process for frame:%d", mSong.getPlayFrame());
