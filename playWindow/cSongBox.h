@@ -83,20 +83,21 @@ public:
 
     mSpectroHeight = getHeight() - 200.f;
     mWaveHeight = 98.f;
-    mSilenceHeight = 4.f;
+    mSrcSilenceHeight = 1.f;
+    mDstSilenceHeight = 4.f;
     mOverviewHeight = 98.f;
 
     mSrcSpectroTop = 0.f;
     mSrcWaveTop = mSrcSpectroTop + mSpectroHeight;
     mSrcWaveCentre = mSrcWaveTop + (mWaveHeight/2.f);
     mSrcSilenceTop = mSrcWaveTop + mWaveHeight;
-    mSrcOverviewTop = mSrcSilenceTop + mSilenceHeight;
+    mSrcOverviewTop = mSrcSilenceTop + mSrcSilenceHeight;
     mSrcOverviewCentre = mSrcOverviewTop + (mOverviewHeight/2.f);
 
     mDstSpectroTop = mRect.top;
     mDstWaveTop = mDstSpectroTop + mSpectroHeight;
     mDstWaveCentre = mDstWaveTop + (mWaveHeight/2.f);
-    mDstOverviewTop = mDstWaveTop + mWaveHeight + mSilenceHeight;
+    mDstOverviewTop = mDstWaveTop + mWaveHeight + mDstSilenceHeight;
     mDstOverviewCentre = mDstOverviewTop + (mOverviewHeight/2.f);
 
     mOverviewNumFrames = 0;
@@ -178,7 +179,7 @@ private:
       float frameSrc = (float)frameSrcIndex;
 
       // clear bitmap frame column, could do in 1 or 2 chunks before loop
-      cRect r = { frameSrc, mSrcSpectroTop, frameSrc+1.f, mSrcSilenceTop + mSilenceHeight };
+      cRect r = { frameSrc, mSrcSpectroTop, frameSrc+1.f, mSrcSilenceTop + mSrcSilenceHeight };
       mWaveBitmapTarget->FillRectangle (r, mWindow->getClearBrush());
 
       if (frame >= 0) {
@@ -217,7 +218,7 @@ private:
 
         if (mSong.mFrames[frame]->isSilent()) {
           r.top = mSrcSilenceTop;
-          r.bottom = mSrcSilenceTop + mSilenceHeight;
+          r.bottom = mSrcSilenceTop + mSrcSilenceHeight;
           mWaveBitmapTarget->FillRectangle (r, mWindow->getWhiteBrush());
           }
         }
@@ -291,52 +292,73 @@ private:
 
     //{{{  stamp spectrum first dst chunk
     cRect srcRect = { leftSrc, mSrcSpectroTop, firstSrcEnd, mSrcSpectroTop + mSpectroHeight };
-    cRect dstRect = { mRect.left, mDstSpectroTop,
-                      mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mDstSpectroTop + mSpectroHeight };
+    cRect dstRect = { mRect.left,
+                      mDstSpectroTop,
+                      mRect.left + (firstSrcEnd - leftSrc) * frameWidth,
+                      mDstSpectroTop + mSpectroHeight };
     dc->FillOpacityMask (mWaveBitmap, mWindow->getGreenBrush(), dstRect, srcRect);
     //}}}
     if (wraparound) {
       //{{{  stamp spectrum second dst chunk
       srcRect = { 0.f, mSrcSpectroTop, rightSrc, mSrcSpectroTop + mSpectroHeight };
-      dstRect = { mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mDstSpectroTop,
-                  mRect.left + (firstSrcEnd - leftSrc + rightSrc) * frameWidth, mDstSpectroTop + mSpectroHeight };
+      dstRect = { mRect.left + (firstSrcEnd - leftSrc) * frameWidth,
+                  mDstSpectroTop,
+                  mRect.left + (firstSrcEnd - leftSrc + rightSrc) * frameWidth,
+                  mDstSpectroTop + mSpectroHeight };
+
       dc->FillOpacityMask (mWaveBitmap, mWindow->getYellowBrush(), dstRect, srcRect);
       }
       //}}}
 
     //{{{  stamp waveform first dst chunk
-    srcRect = { leftSrc, mSrcSilenceTop, firstSrcEnd, mSrcSilenceTop + mSilenceHeight };
-    dstRect = { mRect.left, mDstWaveCentre - mSilenceHeight/2.f,
-                mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mDstWaveCentre + mSilenceHeight/2.f, };
+    srcRect = { leftSrc, mSrcSilenceTop, firstSrcEnd, mSrcSilenceTop + mSrcSilenceHeight };
+
+    dstRect = { mRect.left,
+                mDstWaveCentre - mDstSilenceHeight/2.f,
+                mRect.left + (firstSrcEnd - leftSrc) * frameWidth,
+                mDstWaveCentre + mDstSilenceHeight/2.f, };
+
     dc->FillOpacityMask (mWaveBitmap, mWindow->getRedBrush(), dstRect, srcRect);
 
     srcRect = { leftSrc, mSrcWaveTop, firstSrcEnd, mSrcWaveTop + mWaveHeight };
-    dstRect = { mRect.left, mDstWaveTop,
-                mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mDstWaveTop + mWaveHeight };
+
+    dstRect = { mRect.left,
+                mDstWaveTop,
+                mRect.left + (firstSrcEnd - leftSrc) * frameWidth,
+                mDstWaveTop + mWaveHeight };
+
     dc->FillOpacityMask (mWaveBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
     //}}}
     if (wraparound) {
       //{{{  stamp waveform second dst chunk
-      srcRect = { 0.f, mSrcSilenceTop, rightSrc, mSrcSilenceTop + mSilenceHeight };
+      srcRect = { 0.f, mSrcSilenceTop, rightSrc, mSrcSilenceTop + mSrcSilenceHeight };
+
       dstRect = { mRect.left + (firstSrcEnd - leftSrc) * frameWidth,
-                  mDstWaveCentre - mSilenceHeight/2.f,
+                  mDstWaveCentre - mDstSilenceHeight/2.f,
                   mRect.left + (firstSrcEnd - leftSrc + rightSrc) * frameWidth,
-                  mDstWaveCentre + mSilenceHeight/2.f };
+                  mDstWaveCentre + mDstSilenceHeight/2.f };
+
       dc->FillOpacityMask (mWaveBitmap, mWindow->getRedBrush(), dstRect, srcRect);
 
       srcRect = { 0.f, mSrcWaveTop, rightSrc, mSrcWaveTop + mWaveHeight };
+
       dstRect = { mRect.left + (firstSrcEnd - leftSrc) * frameWidth,
                   mDstWaveTop,
                   mRect.left + (firstSrcEnd - leftSrc + rightSrc) * frameWidth,
                   mDstWaveTop + mWaveHeight };
+
       dc->FillOpacityMask (mWaveBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
       }
       //}}}
 
     //{{{  draw playFrame waveform
     srcRect = { playSrc, mSrcWaveTop, playSrc+1.f, mSrcWaveTop + mWaveHeight };
-    dstRect = { mRect.left + getCentreX(), mDstWaveTop,
-                mRect.left + getCentreX() + frameWidth, mDstWaveTop + mWaveHeight };
+
+    dstRect = { mRect.left + getCentreX(),
+                mDstWaveTop,
+                mRect.left + getCentreX() + frameWidth,
+                mDstWaveTop + mWaveHeight };
+
     dc->FillOpacityMask (mWaveBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
     //}}}
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
@@ -618,8 +640,9 @@ private:
   // vertical layout
   float mSpectroHeight = 0.f;
   float mWaveHeight = 0.f;
+  float mSrcSilenceHeight = 0.f;
+  float mDstSilenceHeight = 0.f;
   float mOverviewHeight = 0.f;
-  float mSilenceHeight = 0.f;
 
   float mSrcSpectroTop = 0.f;
   float mSrcWaveTop = 0.f;
@@ -627,7 +650,6 @@ private:
   float mSrcSilenceTop = 0.f;
   float mSrcOverviewTop = 0.f;
   float mSrcOverviewCentre = 0.f;
-
 
   float mDstSpectroTop = 0.f;
   float mDstWaveTop = 0.f;
