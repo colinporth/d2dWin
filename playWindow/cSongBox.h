@@ -29,12 +29,8 @@ public:
 
     if (mWaveBitmapTarget)
       mWaveBitmapTarget->Release();
-
     if (mWaveBitmap)
       mWaveBitmap->Release();
-
-    if (mOverviewBitmapTarget)
-      mOverviewBitmapTarget->Release();
     }
   //}}}
 
@@ -98,16 +94,15 @@ public:
     mOverviewTotalFrames = 0;
     mOverviewValueScale = 1.f;
 
+    // invalidate bitmap cache
     mBitmapFramesOk = false;
-    mBitmapFirstFrame = 0;
-    mBitmapLastFrame = 0;
     }
   //}}}
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
   // draw stuff centred at playFrame
 
-    allocBitmaps (dc);
+    allocBitmapCache (dc);
 
     if (!mSong.getNumFrames()) // nothing yet, give up
       return;
@@ -123,37 +118,31 @@ public:
 
 private:
   //{{{
-  void allocBitmaps (ID2D1DeviceContext* dc) {
-  // create mWaveBitmapTarget and mOverviewBitmap at size
+  void allocBitmapCache (ID2D1DeviceContext* dc) {
+  // create mWaveBitmapTarget at size
 
-    if (!mWaveBitmapTarget || !mOverviewBitmapTarget ||
-        (getWidthInt() != (int)mWaveBitmapSize.width) ||
-        (mSpecHeight + mWaveHeight != mWaveBitmapSize.height) || (mOverviewHeight != mOverviewBitmapSize.height)) {
+    if (!mWaveBitmapTarget ||
+        (getWidthInt() != mWaveBitmapSize.width) || (getHeightInt() != mWaveBitmapSize.height)) {
 
-      // wave bitmapTarget
+      // release old
+      if (mWaveBitmap)
+        mWaveBitmap->Release();
       if (mWaveBitmapTarget)
         mWaveBitmapTarget->Release();
-      D2D1_SIZE_F waveSizeF = D2D1::SizeF (getWidth(), mSpecHeight + mWaveHeight);
-      mWaveBitmapSize = { UINT32(getWidthInt()), UINT32(mSpecHeight + mWaveHeight) };
+
+      // wave bitmapTarget
+      D2D1_SIZE_F waveSizeF = D2D1::SizeF (getWidth(), getHeight());
+      mWaveBitmapSize = { UINT32(getWidthInt()), UINT32(getHeightInt()) };
       D2D1_PIXEL_FORMAT pixelFormat = { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_UNKNOWN };
       dc->CreateCompatibleRenderTarget (&waveSizeF, &mWaveBitmapSize, &pixelFormat,
                                         D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
                                         &mWaveBitmapTarget);
-      if (mWaveBitmap)
-        mWaveBitmap->Release();
+
+      // wave bitmap
       mWaveBitmapTarget->GetBitmap (&mWaveBitmap);
 
-      // over bitmapTarget
-      if (mOverviewBitmapTarget)
-        mOverviewBitmapTarget->Release();
-      D2D1_SIZE_F overSizeF = D2D1::SizeF (getWidth(), mOverviewHeight);
-      mOverviewBitmapSize = { (UINT32)getWidthInt(), (UINT32)mOverviewHeight };
-      dc->CreateCompatibleRenderTarget (&overSizeF, &mOverviewBitmapSize, &pixelFormat,
-                                        D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
-                                        &mOverviewBitmapTarget);
-      if (mOverviewBitmap)
-        mOverviewBitmap->Release();
-      mOverviewBitmapTarget->GetBitmap (&mOverviewBitmap);
+      // invalidate bitmap cache
+      mBitmapFramesOk = false;
       }
     }
   //}}}
@@ -168,148 +157,154 @@ private:
     }
   //}}}
   //{{{
-  void drawWave (ID2D1DeviceContext* dc, int playFrame) {
-
-    float valueScale = mWaveCentre / mSong.getMaxPowerValue();
+  void drawFrameToBitmap (int frame, int playFrame, int rightFrame, int frameStep, float valueScale) {
 
     int spectrumSize = std::min (mSong.getMaxSpectrum(), (int)mSpecHeight);
     int spectrumOffset = mSong.getMaxSpectrum() > (int)mSpecHeight ?
                            mSong.getMaxSpectrum() - (int)mSpecHeight : 0;
 
+    auto frameSrcIndex = frameToSrcIndex (frame);
+    float frameSrc = (float)frameSrcIndex;
+
+    // clear frame column of spectrum + wave
+    cRect r = { frameSrc,0.f, frameSrc+1.f, mSpecHeight + mWaveHeight };
+    mWaveBitmapTarget->FillRectangle (r, mWindow->getClearBrush());
+
+    if (frame >= 0) {
+      // copy reversed spectrum column to bitmap, clip high freqs to height
+      D2D1_RECT_U rectU = { (UINT32)frameSrcIndex,0, (UINT32)frameSrcIndex+1,(UINT32)spectrumSize };
+      mWaveBitmap->CopyFromMemory (&rectU, mSong.mFrames[frame]->getFreqLuma() + spectrumOffset, 1);
+
+      // draw wave rectangle
+      float leftValue = 0.f;
+      float rightValue = 0.f;
+      if (mZoom <= 0) {
+        // no zoom, or zoomIn expanding frame
+        auto powerValues = mSong.mFrames[frame]->getPowerValues();
+        leftValue = *powerValues++;
+        rightValue = *powerValues;
+        }
+      else {
+        // zoomOut, summing frames
+        int firstSumFrame = frame - (frame % frameStep);
+        int nextSumFrame = firstSumFrame + frameStep;
+        for (auto i = firstSumFrame; i < firstSumFrame + frameStep; i++) {
+          auto powerValues = mSong.mFrames[std::min (i, rightFrame)]->getPowerValues();
+          if (i == playFrame) {
+            leftValue = *powerValues++;
+            rightValue = *powerValues;
+            break;
+            }
+          leftValue += *powerValues++ / frameStep;
+          rightValue += *powerValues / frameStep;
+          }
+        }
+
+      r.top = mSpecHeight + mWaveCentre - (leftValue * valueScale);
+      r.bottom  = mSpecHeight + mWaveCentre + (rightValue * valueScale);
+      mWaveBitmapTarget->FillRectangle (r, mWindow->getWhiteBrush());
+      }
+
+    //if (mSong.mFrames[frame]->hasTitle()) {
+      //{{{  draw song title yellow bar and text
+      //dc->FillRectangle (cRect (r.left, 0.f, r.right + 2.f, mWaveHeight) + getTR(), mWindow->getYellowBrush());
+
+      //auto str = mSong.mFrames[frame]->getTitle();
+
+      //IDWriteTextLayout* textLayout;
+      //mWindow->getDwriteFactory()->CreateTextLayout (
+        //std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+        //mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+
+      //if (textLayout) {
+        //dc->DrawTextLayout (cPoint (r.left, getBL().y - mWaveHeight - 20.f), textLayout, mWindow->getWhiteBrush());
+        //textLayout->Release();
+        //}
+      //}
+      //}}}
+    //if (mSong.mFrames[frame]->isSilent()) {
+      //{{{  draw red silent frame
+      //r.top = mWaveCentre - 2.f;
+      //r.bottom = mWaveCentre + 2.f;
+      //dc->FillRectangle (r + getTR(), mWindow->getRedBrush());
+      //}
+      //}}}
+    }
+  //}}}
+  //{{{
+  void drawWave (ID2D1DeviceContext* dc, int playFrame) {
+
+    float valueScale = mWaveCentre / mSong.getMaxPowerValue();
+
     int frameStep = (mZoom > 0) ? mZoom+1 : 1; // zoomOut summing frameStep frames per pix
     int frameWidth = (mZoom < 0) ? -mZoom+1 : 1; // zoomIn expanding frame to frameWidth pix
 
-    // calc leftFrame, rightFrame
+    // calc leftFrame,rightFrame
     auto leftFrame = playFrame - (((getWidthInt() + frameWidth) / 2) * frameStep) / frameWidth;
     auto rightFrame = playFrame + (((getWidthInt() + frameWidth) / 2) * frameStep) / frameWidth;
     rightFrame = std::min (rightFrame, mSong.getLastFrame());
 
-    // check for bitmap cache overlap
-    mBitmapFramesOk = mBitmapFramesOk && (rightFrame > mBitmapFirstFrame) && (leftFrame < mBitmapLastFrame);
+    // check bitmap cache overlap
+    mBitmapFramesOk = mBitmapFramesOk && 
+                      (frameStep == mBitmapFrameStep) &&
+                      (rightFrame > mBitmapFirstFrame) && (leftFrame < mBitmapLastFrame);
 
-    // update wave and spectrum bitmaps
+    // add new frames to spectrum,wave bitmaps
     mWaveBitmapTarget->BeginDraw();
-    for (auto frame = leftFrame; frame < rightFrame; frame += frameStep) {
-      if (!mBitmapFramesOk || (frame < mBitmapFirstFrame) || (frame >= mBitmapLastFrame)) {
-        //{{{  draw frame to bitmaps
-        auto frameSrcIndex = frameToSrcIndex (frame);
-        float frameSrc = (float)frameSrcIndex;
-
-        cRect dstRect = { frameSrc,0.f, frameSrc+1.f, mSpecHeight + mWaveHeight };
-        mWaveBitmapTarget->FillRectangle (dstRect, mWindow->getClearBrush());
-
-        if (frame >= 0) {
-          // copy reversed spectrum column to bitmap, clip high freqs to height
-          D2D1_RECT_U rectU = { (UINT32)frameSrcIndex,0, (UINT32)frameSrcIndex+1,(UINT32)spectrumSize };
-          mWaveBitmap->CopyFromMemory (&rectU, mSong.mFrames[frame]->getFreqLuma() + spectrumOffset, 1);
-
-          // draw wave rectangle
-          float leftValue = 0.f;
-          float rightValue = 0.f;
-          if (mZoom <= 0) {
-            // no zoom, or zoomIn expanding frame
-            auto powerValues = mSong.mFrames[frame]->getPowerValues();
-            leftValue = *powerValues++;
-            rightValue = *powerValues;
-            }
-          else {
-            // zoomOut, summing frames
-            int firstSumFrame = frame - (frame % frameStep);
-            int nextSumFrame = firstSumFrame + frameStep;
-            for (auto i = firstSumFrame; i < firstSumFrame + frameStep; i++) {
-              auto powerValues = mSong.mFrames[std::min (i, rightFrame)]->getPowerValues();
-              if (i == playFrame) {
-                leftValue = *powerValues++;
-                rightValue = *powerValues;
-                break;
-                }
-              leftValue += *powerValues++ / frameStep;
-              rightValue += *powerValues / frameStep;
-              }
-            }
-
-          dstRect.top = mSpecHeight + mWaveCentre - (leftValue * valueScale);
-          dstRect.bottom  = mSpecHeight + mWaveCentre + (rightValue * valueScale);
-          mWaveBitmapTarget->FillRectangle (dstRect, mWindow->getWhiteBrush());
-          }
-        }
-        //}}}
-      //{{{  title and silence
-      //if (mSong.mFrames[frame]->hasTitle()) {
-        //{{{  draw song title yellow bar and text
-        //dc->FillRectangle (cRect (r.left, 0.f, r.right + 2.f, mWaveHeight) + getTR(), mWindow->getYellowBrush());
-
-        //auto str = mSong.mFrames[frame]->getTitle();
-
-        //IDWriteTextLayout* textLayout;
-        //mWindow->getDwriteFactory()->CreateTextLayout (
-          //std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-          //mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-
-        //if (textLayout) {
-          //dc->DrawTextLayout (cPoint (r.left, getBL().y - mWaveHeight - 20.f), textLayout, mWindow->getWhiteBrush());
-          //textLayout->Release();
-          //}
-        //}
-        //}}}
-      //if (mSong.mFrames[frame]->isSilent()) {
-        //{{{  draw red silent frame
-        //r.top = mWaveCentre - 2.f;
-        //r.bottom = mWaveCentre + 2.f;
-        //dc->FillRectangle (r + getTR(), mWindow->getRedBrush());
-        //}
-        //}}}
-      //}}}
-      }
+    for (auto frame = leftFrame; frame < rightFrame; frame += frameStep)
+      if (!mBitmapFramesOk || (frame < mBitmapFirstFrame) || (frame >= mBitmapLastFrame))
+        drawFrameToBitmap (frame, playFrame, rightFrame, frameStep, valueScale);
     mWaveBitmapTarget->EndDraw();
 
     // save bitmap range
     mBitmapFramesOk = true;
+    mBitmapFrameStep = frameStep;
     mBitmapFirstFrame = leftFrame;
     mBitmapLastFrame = rightFrame;
 
-    //{{{  stamp colours through bitmap alpha
-    dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
-
+    // calc bitmap stamps
     float leftSrc = (float)frameToSrcIndex (leftFrame);
     float rightSrc = (float)frameToSrcIndex (rightFrame);
     float playSrc = (float)frameToSrcIndex (playFrame);
     bool wraparound = rightSrc <= leftSrc;
     float firstSrcEnd = wraparound ? float(mWaveBitmapSize.width) : rightSrc;
 
-    // stamp spectrum first dst chunk
+    //  stamp colours through bitmap alpha
+    dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
+    //{{{  stamp spectrum first dst chunk
     cRect srcRect = { leftSrc, 0.f, firstSrcEnd, mSpecHeight };
     cRect dstRect = { mRect.left, mRect.top,
                       mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mRect.top + mSpecHeight };
     dc->FillOpacityMask (mWaveBitmap, mWindow->getGreenBrush(), dstRect, srcRect);
-
+    //}}}
     if (wraparound) {
-      // stamp spectrum second dst chunk
+      //{{{  stamp spectrum second dst chunk
       srcRect = { 0.f, 0.f, rightSrc, mSpecHeight };
       dstRect = { mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mRect.top,
                   mRect.left + (firstSrcEnd - leftSrc + rightSrc) * frameWidth, mRect.top + mSpecHeight };
       dc->FillOpacityMask (mWaveBitmap, mWindow->getYellowBrush(), dstRect, srcRect);
       }
-
-    // stamp waveform first dst chunk
+      //}}}
+    //{{{  stamp waveform first dst chunk
     srcRect = { leftSrc, mSpecHeight, firstSrcEnd, mSpecHeight + mWaveHeight };
-    dstRect = { mRect.left, mRect.top + mWaveTop,
-                mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mRect.top + mWaveTop + mWaveHeight };
+    dstRect = { mRect.left, mRect.top + mSpecHeight,
+                mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mRect.top + mSpecHeight + mWaveHeight };
     dc->FillOpacityMask (mWaveBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
-
+    //}}}
     if (wraparound) {
-      // stamp waveform second dst chunk
+      //{{{  stamp waveform second dst chunk
       srcRect = { 0.f, mSpecHeight, rightSrc, mSpecHeight + mWaveHeight };
-      dstRect = { mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mRect.top + mWaveTop,
-                  mRect.left + (firstSrcEnd - leftSrc + rightSrc) * frameWidth, mRect.top + mWaveTop + mWaveHeight };
+      dstRect = { mRect.left + (firstSrcEnd - leftSrc) * frameWidth, mRect.top + mSpecHeight,
+                  mRect.left + (firstSrcEnd - leftSrc + rightSrc) * frameWidth, mRect.top + mSpecHeight + mWaveHeight };
       dc->FillOpacityMask (mWaveBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
       }
-
-    // draw playFrame waveform
+      //}}}
+    //{{{  draw playFrame waveform
     srcRect = { playSrc, mSpecHeight, playSrc+1.f, mSpecHeight + mWaveHeight };
     dstRect = { mRect.left + getCentreX(), mRect.top + mWaveTop,
                 mRect.left + getCentreX() + frameWidth, mRect.top + mWaveTop + mWaveHeight };
     dc->FillOpacityMask (mWaveBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
+    //}}}
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     // debug
@@ -327,7 +322,6 @@ private:
       dc->DrawTextLayout ({ 0.f, 100.f }, textLayout, mWindow->getWhiteBrush());
       textLayout->Release();
       }
-    //}}}
     //}}}
     }
   //}}}
@@ -437,13 +431,11 @@ private:
                        (totalFrames != mOverviewTotalFrames) || (valueScale != mOverviewValueScale);
 
     if (forceRedraw || (numFrames > mOverviewNumFrames)) {
-      mOverviewBitmapTarget->BeginDraw();
+      mWaveBitmapTarget->BeginDraw();
       if (forceRedraw) {
-        //{{{  clear bitmap to alpha off
-        D2D1_COLOR_F alphaOff = { 0.f };
-        mOverviewBitmapTarget->Clear (&alphaOff);
+        cRect r = { 0.f, mSpecHeight+mWaveHeight, getWidth(), mSpecHeight+mWaveHeight + mOverviewHeight };
+        mWaveBitmapTarget->FillRectangle (r, mWindow->getClearBrush());
         }
-        //}}}
 
       int frame = 0;
       for (float x = 0.f; x < getWidth(); x += 1.f) {
@@ -469,15 +461,15 @@ private:
             rightValue /= numSummedFrames;
             }
 
-          mOverviewBitmapTarget->FillRectangle (
-            cRect (x, mOverviewCentre - (leftValue * valueScale) - 2.f,
-                   x+1.f,  mOverviewCentre + (rightValue * valueScale) + 2.f), mWindow->getWhiteBrush());
+          cRect r = { x, mOverviewTop + mOverviewCentre - (leftValue * valueScale) - 2.f,
+                      x+1.f, mOverviewTop + mOverviewCentre + (rightValue * valueScale) + 2.f };
+          mWaveBitmapTarget->FillRectangle (r, mWindow->getWhiteBrush());
           }
 
         frame = toFrame;
         }
         //}}}
-      mOverviewBitmapTarget->EndDraw();
+      mWaveBitmapTarget->EndDraw();
 
       mOverviewNumFrames = numFrames;
       mOverviewTotalFrames = totalFrames;
@@ -489,27 +481,24 @@ private:
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
 
     // before playFrame
-    cRect srcRect (0.f,0.f, playFrameX, mOverviewHeight);
-    cRect dstRect (mRect.left, mRect.top + mOverviewTop, mRect.left + playFrameX, mRect.bottom);
-    dc->FillOpacityMask (mOverviewBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
+    cRect srcRect (0.f,mSpecHeight+mWaveHeight, playFrameX,mSpecHeight + mWaveHeight + mOverviewHeight);
+    cRect dstRect (mRect.left, mRect.top + mSpecHeight+mWaveHeight,
+                   mRect.left + playFrameX, mRect.top + mSpecHeight + mWaveHeight + mOverviewHeight);
+    dc->FillOpacityMask (mWaveBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
 
     // on playFrame
-    auto powerValues = mSong.mFrames[playFrame]->getPowerValues();
-    auto leftValue = *powerValues++;
-    auto rightValue = *powerValues;
+    srcRect.left = srcRect.right;
     srcRect.right += 1.f;
     dstRect.left = dstRect.right;
     dstRect.right += 1.f;
-    dc->FillRectangle (cRect (dstRect.left, dstRect.top + mOverviewCentre - (leftValue * valueScale),
-                              dstRect.right, dstRect.top + mOverviewCentre + (rightValue * valueScale)),
-                       mWindow->getWhiteBrush());
+    dc->FillOpacityMask (mWaveBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
 
     // after playFrame
     srcRect.left = srcRect.right;
-    srcRect.right += (float)getWidthInt();
+    srcRect.right = getWidth();
     dstRect.left = dstRect.right;
-    dstRect.right = mRect.left + getWidthInt();
-    dc->FillOpacityMask (mOverviewBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
+    dstRect.right = mRect.right;
+    dc->FillOpacityMask (mWaveBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
 
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
     }
@@ -613,16 +602,13 @@ private:
   float mOverviewValueScale = 1.f;
 
   bool mBitmapFramesOk = false;
+  int mBitmapFrameStep = 0;
   int mBitmapFirstFrame = 0;
   int mBitmapLastFrame = 0;
 
   D2D1_SIZE_U mWaveBitmapSize = { 0,0 };
   ID2D1BitmapRenderTarget* mWaveBitmapTarget = nullptr;
   ID2D1Bitmap* mWaveBitmap;
-
-  D2D1_SIZE_U mOverviewBitmapSize = { 0,0 };
-  ID2D1BitmapRenderTarget* mOverviewBitmapTarget = nullptr;
-  ID2D1Bitmap* mOverviewBitmap;
 
   IDWriteTextFormat* mTimeTextFormat = nullptr;
   //}}}
