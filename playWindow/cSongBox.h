@@ -133,7 +133,7 @@ private:
   // create mWaveBitmapTarget at size
 
     if (!mWaveBitmapTarget ||
-        (getWidthInt() != mWaveBitmapSize.width) || (getHeightInt() != mWaveBitmapSize.height)) {
+        (getWidthInt() >= (int)mWaveBitmapSize.width) || (getHeightInt() != mWaveBitmapSize.height)) {
 
       // release old
       if (mWaveBitmap)
@@ -142,8 +142,8 @@ private:
         mWaveBitmapTarget->Release();
 
       // wave bitmapTarget
-      D2D1_SIZE_F waveSizeF = D2D1::SizeF (getWidth(), getHeight());
-      mWaveBitmapSize = { UINT32(getWidthInt()), UINT32(getHeightInt()) };
+      mWaveBitmapSize = { 2048, UINT32(getHeightInt()) };
+      D2D1_SIZE_F waveSizeF =  { float(mWaveBitmapSize.width), (float(mWaveBitmapSize.height)) };
       D2D1_PIXEL_FORMAT pixelFormat = { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_UNKNOWN };
       dc->CreateCompatibleRenderTarget (&waveSizeF, &mWaveBitmapSize, &pixelFormat,
                                         D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
