@@ -470,7 +470,6 @@ void cD2dWindow::createDirect2d() {
   mTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_EMERGENCY_BREAK);
 
   // create solid brushes
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::White, 0.f), &mClearBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black), &mBlackBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::DimGray), &mDarkGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Gray), &mGreyBrush);

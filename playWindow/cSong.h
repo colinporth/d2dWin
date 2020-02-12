@@ -81,8 +81,8 @@ public:
   int getMaxZoomIndex() { return 8; }
   float getMaxPowerValue() { return mMaxPowerValue; }
   float getMaxFreqValue() { return mMaxFreqValue; }
-  int getMaxFreq() { return kMaxFreq; }
-  int getMaxSpectrum() { return kMaxSpectrum; }
+  int getNumFreq() { return kMaxFreq; }
+  int getNumFreqLuma() { return kMaxSpectrum; }
   cJpegImage* getJpegImage() { return mJpegImage; }
 
   int getNumFrames() { return (int)mFrames.size(); }
