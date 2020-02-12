@@ -58,10 +58,11 @@ cD2dWindow::~cD2dWindow() {
 //}}}
 
 //{{{
-void cD2dWindow::initialise (string title, int width, int height, bool fullScreen) {
+void cD2dWindow::initialise (const string& title, int width, int height, bool fullScreen) {
 
   mD2dWindow = this;
 
+  //{{{
   WNDCLASSEX wndclass = { sizeof (WNDCLASSEX),
                           CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW,
                           WndProc,
@@ -73,8 +74,9 @@ void cD2dWindow::initialise (string title, int width, int height, bool fullScree
                           0,
                           "windowClass",
                           LoadIcon (0,IDI_APPLICATION) };
-
+  //}}}
   if (RegisterClassEx (&wndclass))
+    //{{{
     mHWND = CreateWindowEx (0,
                             "windowClass",
                             title.data(),
@@ -82,6 +84,7 @@ void cD2dWindow::initialise (string title, int width, int height, bool fullScree
                             20, 20, width+4, height+32,
                             0, 0,
                             GetModuleHandle(0), 0);
+    //}}}
 
   if (mHWND) {
     //SetWindowLong (hWnd, GWL_STYLE, 0);
@@ -96,11 +99,46 @@ void cD2dWindow::initialise (string title, int width, int height, bool fullScree
     if (GetTimeZoneInformation (&timeZoneInfo) == TIME_ZONE_ID_DAYLIGHT)
       mDaylightSeconds = -timeZoneInfo.DaylightBias * 60;
 
-    mRenderThread = thread ([=]() { renderThread(); } );
-    mRenderThread.detach();
+    // renderThread
+    thread ([=]() {
+      // lambda renderThread
+      CoInitializeEx (NULL, COINIT_MULTITHREADED);
+      cLog::setThreadName ("rend");
+
+      // wait for target bitmap creation
+      while (mD2dTargetBitmap == nullptr)
+        Sleep (10);
+
+      while (mDeviceContext && !mExit) {
+        if (mCountDown > 0) {
+          mCountDown--;
+          Sleep (10);
+          }
+        else {
+          mCountDown = mChangeCountDown;
+
+          mTimePoint = system_clock::now();
+          mDeviceContext->BeginDraw();
+          mDeviceContext->Clear (ColorF (ColorF::Black));
+          onDraw (mDeviceContext.Get());
+          mDeviceContext->EndDraw();
+          mRenderTime = duration_cast<milliseconds>(system_clock::now() - mTimePoint).count() / 1000.f;
+
+          if (mSwapChain->Present (1, 0) == DXGI_ERROR_DEVICE_REMOVED) {
+            mSwapChain = nullptr;
+            createDeviceResources();
+            cLog::log (LOGERROR, "device removed");
+            }
+          }
+        }
+
+      cLog::log (LOGINFO, "exit");
+      CoUninitialize();
+      }).detach();
     }
   }
 //}}}
+
 //{{{
 cD2dWindow::cBox* cD2dWindow::add (cBox* box, cPoint pos) {
 
@@ -202,6 +240,8 @@ void cD2dWindow::onResize() {
 
   if (((rect.right - rect.left) != mClient.height) || ((rect.bottom - rect.top) != mClient.width)) {
     if (mDeviceContext) {
+      cLog::log (LOGINFO, "onResize %d %d %d %d", rect.left, rect.top, rect.right, rect.bottom);
+
       mDeviceContext->SetTarget (nullptr);
       mD2dTargetBitmap = nullptr;
       createSizedResources();
@@ -409,11 +449,10 @@ void cD2dWindow::createDirect2d() {
 
   // create D2D1Factory
   #ifdef _DEBUG
-    D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, {D2D1_DEBUG_LEVEL_INFORMATION},
-                       mD2D1Factory.GetAddressOf());
+    D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, { D2D1_DEBUG_LEVEL_INFORMATION }, mD2D1Factory.GetAddressOf());
   #else
-    D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, {D2D1_DEBUG_LEVEL_NONE},
-                       mD2D1Factory.GetAddressOf());
+    D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, { D2D1_DEBUG_LEVEL_NONE }, mD2D1Factory.GetAddressOf());
+    //D2D1CreateFactory (D2D1_FACTORY_TYPE_SINGLE_THREADED, { D2D1_DEBUG_LEVEL_NONE }, mD2D1Factory.GetAddressOf());
   #endif
 
   // create DWriteFactory
@@ -431,7 +470,7 @@ void cD2dWindow::createDirect2d() {
   mTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_EMERGENCY_BREAK);
 
   // create solid brushes
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black, 0.f), &mClearBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::White, 0.f), &mClearBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black), &mBlackBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::DimGray), &mDarkGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Gray), &mGreyBrush);
@@ -452,7 +491,7 @@ void cD2dWindow::createDeviceResources() {
   D3D_FEATURE_LEVEL featureLevels[] = {
     D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0,
     D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0,
-    D3D_FEATURE_LEVEL_9_3, D3D_FEATURE_LEVEL_9_2, D3D_FEATURE_LEVEL_9_1 };
+    D3D_FEATURE_LEVEL_9_3,  D3D_FEATURE_LEVEL_9_2, D3D_FEATURE_LEVEL_9_1 };
 
   D3D_FEATURE_LEVEL featureLevel;
 
@@ -468,6 +507,7 @@ void cD2dWindow::createDeviceResources() {
                          &d3d11deviceContext) != S_OK) {             // returns the device immediate context
     cLog::log (LOGERROR, "D3D11CreateDevice - failed");
     }
+
   cLog::log (LOGNOTICE, "D3D11CreateDevice - featureLevel %d.%d",
                          (featureLevel >> 12) & 0xF, (featureLevel >> 8) & 0xF);
 
@@ -489,6 +529,8 @@ void cD2dWindow::createSizedResources() {
 
   RECT rect;
   GetClientRect (mHWND, &rect);
+  cLog::log (LOGINFO, "createSizedResources %d %d %d %d", rect.left, rect.top, rect.right, rect.bottom);
+
   mClient.width = rect.right - rect.left;
   mClient.height = rect.bottom - rect.top;
   mClientF.x = float(mClient.width);
@@ -539,10 +581,11 @@ void cD2dWindow::createSizedResources() {
       }
     }
 
-  // get DXGIbackbuffer surface pointer from swapchain
-  ComPtr<IDXGISurface> dxgiBackBuffer;
   //ComPtr<ID3D11Texture2D> backBuffer;
   //mSwapChain->GetBuffer (0, IID_PPV_ARGS (&backBuffer));
+
+  // get DXGIbackbuffer surface pointer from swapchain
+  ComPtr<IDXGISurface> dxgiBackBuffer;
   mSwapChain->GetBuffer (0, IID_PPV_ARGS (&dxgiBackBuffer));
   D2D1_BITMAP_PROPERTIES1 d2d1_bitmapProperties =
     {DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0,
@@ -554,44 +597,6 @@ void cD2dWindow::createSizedResources() {
 
   // grayscale text anti-aliasing
   mDeviceContext->SetTextAntialiasMode (D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
-  }
-//}}}
-
-//{{{
-void cD2dWindow::renderThread() {
-
-  CoInitializeEx (NULL, COINIT_MULTITHREADED);
-  cLog::setThreadName ("rend");
-
-  // wait for target bitmap
-  while (mD2dTargetBitmap == nullptr)
-    Sleep (10);
-
-  while (mDeviceContext && !mExit) {
-    if (mCountDown > 0) {
-      mCountDown--;
-      Sleep (10);
-      }
-    else {
-      mCountDown = mChangeCountDown;
-
-      mTimePoint = system_clock::now();
-      mDeviceContext->BeginDraw();
-      mDeviceContext->Clear (ColorF (ColorF::Black));
-      onDraw (mDeviceContext.Get());
-      mDeviceContext->EndDraw();
-      mRenderTime = duration_cast<milliseconds>(system_clock::now() - mTimePoint).count() / 1000.f;
-
-      if (mSwapChain->Present (1, 0) == DXGI_ERROR_DEVICE_REMOVED) {
-        mSwapChain = nullptr;
-        createDeviceResources();
-        cLog::log (LOGERROR, "device removed");
-        }
-      }
-    }
-
-  cLog::log (LOGINFO, "exit");
-  CoUninitialize();
   }
 //}}}
 

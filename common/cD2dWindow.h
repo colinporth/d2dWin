@@ -370,7 +370,7 @@ public:
 
   ~cD2dWindow();
 
-  void initialise (std::string title, int width, int height, bool fullScreen);
+  void initialise (const std::string& title, int width, int height, bool fullScreen);
   cBox* add (cBox* box, cPoint pos);
   cBox* add (cBox* box, float x, float y);
   cBox* add (cBox* box);
@@ -451,7 +451,6 @@ private:
   void createSizedResources();
 
   void updateClockTime();
-  void renderThread();
 
   bool onMouseProx (bool inClient, cPoint pos);
   bool onMouseWheel (int delta, cPoint pos);
@@ -535,7 +534,5 @@ private:
   bool mTimedMenuOn = true;
   uint32_t mCursorDown = 50;
   uint32_t mCursorCountDown = 50;
-
-  std::thread mRenderThread;
   //}}}
   };
