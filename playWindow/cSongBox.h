@@ -173,16 +173,14 @@ private:
 
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     if (fromFrame < 0) {
-      // clear bitmap for -ve frames, simpler drawing logic later
+      //{{{  clear bitmap for -ve frames, allows simpler drawing logic later
       cRect bitmapRect = { (float)(fromFrame & mBitmapMask), mSrcFreqTop, (float)mBitmapWidth, mSrcOverviewTop };
       mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
       mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
       mBitmapTarget->PopAxisAlignedClip();
       fromFrame = 0;
       }
-
-    int freqSize = std::min (mSong.getNumFreqLuma(), (int)mFreqHeight);
-    int freqOffset = mSong.getNumFreqLuma() > (int)mFreqHeight ? mSong.getNumFreqLuma() - (int)mFreqHeight : 0;
+      //}}}
 
     auto fromSrcIndex = float(fromFrame & mBitmapMask);
     auto toSrcIndex = float(toFrame & mBitmapMask);
@@ -195,7 +193,7 @@ private:
     mBitmapTarget->PopAxisAlignedClip();
     //}}}
     if (wrap) {
-      //{{{  clear chunk after wrap 
+      //{{{  clear chunk after wrap
       cRect bitmapRect = { 0.f, mSrcWaveTop, toSrcIndex, mSrcOverviewTop };
       mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
       mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
@@ -255,6 +253,8 @@ private:
       }
 
     // seems to interfere with above loop if interleaved, copyFromMemory stalling drawing ???
+    int freqSize = std::min (mSong.getNumFreqLuma(), (int)mFreqHeight);
+    int freqOffset = mSong.getNumFreqLuma() > (int)mFreqHeight ? mSong.getNumFreqLuma() - (int)mFreqHeight : 0;
     for (auto frame = fromFrame; frame < toFrame; frame += frameStep) {
        // copy reversed spectrum column to bitmap, clip high freqs to height
       D2D1_RECT_U rectU = { frame & mBitmapMask, 0, (frame & mBitmapMask)+1, (UINT32)freqSize };
@@ -326,8 +326,8 @@ private:
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
     //{{{  draw playFrame mark
     auto dstPlay = playSrcIndex - leftSrcIndex + (playSrcIndex < leftSrcIndex ? endSrcIndex : 0);
-    dstRect = { mRect.left + dstPlay * frameWidth, mDstFreqTop,
-                mRect.left + (dstPlay * frameWidth) + 1.f, mDstWaveTop + mWaveHeight };
+    dstRect = { mRect.left + (dstPlay+0.5f) * frameWidth, mDstFreqTop,
+                mRect.left + ((dstPlay+0.5f) * frameWidth) + 1.f, mDstWaveTop + mWaveHeight };
     dc->FillRectangle (dstRect, mWindow->getDarkGreyBrush());
     //}}}
     //{{{  draw chunk before wrap
