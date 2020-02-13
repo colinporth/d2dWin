@@ -186,14 +186,14 @@ private:
     auto toSrcIndex = float(toFrame & mBitmapMask);
     bool wrap = toSrcIndex <= fromSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : toSrcIndex;
-    //{{{  clear chunk before wrap
+    //{{{  clear bitmap chunk before wrap
     cRect bitmapRect = { fromSrcIndex, mSrcWaveTop, endSrcIndex, mSrcOverviewTop };
     mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
     mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
     mBitmapTarget->PopAxisAlignedClip();
     //}}}
     if (wrap) {
-      //{{{  clear chunk after wrap
+      //{{{  clear bitmap chunk after wrap
       cRect bitmapRect = { 0.f, mSrcWaveTop, toSrcIndex, mSrcOverviewTop };
       mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
       mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
@@ -252,11 +252,12 @@ private:
         //}}}
       }
 
-    // seems to interfere with above loop if interleaved, copyFromMemory stalling drawing ???
+    // copy reversed spectrum column to bitmap, clip high freqs to height
     int freqSize = std::min (mSong.getNumFreqLuma(), (int)mFreqHeight);
     int freqOffset = mSong.getNumFreqLuma() > (int)mFreqHeight ? mSong.getNumFreqLuma() - (int)mFreqHeight : 0;
+
+    // seems to interfere with draws above if interleaved, copyFromMemory stalling drawing ???
     for (auto frame = fromFrame; frame < toFrame; frame += frameStep) {
-       // copy reversed spectrum column to bitmap, clip high freqs to height
       D2D1_RECT_U rectU = { frame & mBitmapMask, 0, (frame & mBitmapMask)+1, (UINT32)freqSize };
       mBitmap->CopyFromMemory (&rectU, mSong.mFrames[frame]->getFreqLuma() + freqOffset, 1);
       }
@@ -289,30 +290,30 @@ private:
       mBitmapLastFrame = rightFrame;
       }
       //}}}
-    else {
-      //{{{  frame range overlaps bitmap frames
+    else { // frame range overlaps bitmap frames
       if (leftFrame < mBitmapFirstFrame) {
-        // draw new bitmap leftFrames
+        //{{{  draw new bitmap leftFrames
         drawBitmapFrames (leftFrame, mBitmapFirstFrame, playFrame, rightFrame, frameStep, valueScale);
         mBitmapFirstFrame = leftFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
           mBitmapLastFrame = mBitmapFirstFrame + mBitmapWidth;
         }
+        //}}}
       if (rightFrame > mBitmapLastFrame) {
-        // draw new bitmap rightFrames
+        //{{{  draw new bitmap rightFrames
         drawBitmapFrames (mBitmapLastFrame, rightFrame, playFrame, rightFrame, frameStep, valueScale);
         mBitmapLastFrame = rightFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
           mBitmapFirstFrame = mBitmapLastFrame - mBitmapWidth;
         }
+        //}}}
       }
-      //}}}
     mBitmapTarget->EndDraw();
 
     mBitmapFramesOk = true;
     mBitmapFrameStep = frameStep;
 
-    // calc bitmap stamps
+    // calc bitmap wrap chunks
     float leftSrcIndex = (float)(leftFrame & mBitmapMask);
     float rightSrcIndex = (float)(rightFrame & mBitmapMask);
     float playSrcIndex = (float)(playFrame & mBitmapMask);
@@ -320,7 +321,7 @@ private:
     bool wrap = rightSrcIndex <= leftSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : rightSrcIndex;
 
-    //  draw dst, mostly stamping colour through alpha bitmap
+    //  draw dst chunks, mostly stamping colour through alpha bitmap
     cRect srcRect;
     cRect dstRect;
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
