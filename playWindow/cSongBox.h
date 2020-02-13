@@ -144,7 +144,6 @@ private:
     uint32_t bitmapHeight = (int)mSrcHeight;
 
     if (!mBitmapTarget || (bitmapHeight != mBitmapTarget->GetSize().height)) {
-      // fixed width for more cache
       cLog::log (LOGINFO, "reallocBitmap %d %d", bitmapHeight, mBitmapTarget ? mBitmapTarget->GetSize().height : -1);
 
       // invalidate bitmap caches
@@ -160,8 +159,7 @@ private:
       // wave bitmapTarget
       D2D1_SIZE_U bitmapSizeU = { mBitmapWidth, bitmapHeight };
       D2D1_PIXEL_FORMAT pixelFormat = { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT };
-      dc->CreateCompatibleRenderTarget (NULL, &bitmapSizeU, &pixelFormat,
-                                        D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
+      dc->CreateCompatibleRenderTarget (NULL, &bitmapSizeU, &pixelFormat, D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
                                         &mBitmapTarget);
       mBitmapTarget->GetBitmap (&mBitmap);
       }
@@ -505,16 +503,23 @@ private:
 
     if (mOverviewPressed) {
       //{{{  animate on
-      if (mOverviewLens < getWidth() / 16.f)
+      if (mOverviewLens < getWidth() / 16.f) {
         mOverviewLens += getWidth() / 16.f / 6.f;
+        mWindow->changed();
+        }
       }
       //}}}
     else {
       //{{{  animate off
-      if (mOverviewLens > 1.f)
+      if (mOverviewLens > 1.f) {
         mOverviewLens /= 2.f;
-      else  // animate done
+        mWindow->changed();
+        }
+      else if (mOverviewLens > 0.f) {
+        // finish animate
         mOverviewLens = 0.f;
+        mWindow->changed();
+        }
       }
       //}}}
 
