@@ -54,7 +54,7 @@ public:
   bool onDown (bool right, cPoint pos)  {
 
     if (pos.y > mDstOverviewTop) {
-      mOn = true;
+      mOverviewPressed = true;
       auto frame = int((pos.x * mSong.getTotalFrames()) / getWidth());
       mSong.setPlayFrame (frame);
       }
@@ -65,7 +65,7 @@ public:
   //{{{
   bool onMove (bool right, cPoint pos, cPoint inc) {
 
-    if (pos.y > mDstOverviewTop)
+    if (mOverviewPressed)
       mSong.setPlayFrame (int((pos.x * mSong.getTotalFrames()) / getWidth()));
     else
       mSong.incPlayFrame (int(-inc.x));
@@ -75,7 +75,7 @@ public:
   //}}}
   //{{{
   bool onUp (bool right, bool mouseMoved, cPoint pos) {
-    mOn = false;
+    mOverviewPressed = false;
     return true;
     }
   //}}}
@@ -319,8 +319,6 @@ private:
     //  stamp colours through alpha bitmap
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
     //{{{  stamp first dst chunk
-    bool split = (playSrcIndex >= leftSrcIndex) && (playSrcIndex < firstEndSrcIndex);
-
     cRect srcRect;
     cRect dstRect;
 
@@ -330,7 +328,7 @@ private:
                 mDstFreqTop,
                 mRect.left + (firstEndSrcIndex - leftSrcIndex) * frameWidth,
                 mDstFreqTop + mFreqHeight };
-    dc->FillOpacityMask (mBitmap, mWindow->getGreenBrush(), dstRect, srcRect);
+    dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
 
     // silence
     srcRect = { leftSrcIndex, mSrcSilenceTop, firstEndSrcIndex, mSrcSilenceTop + mSrcSilenceHeight };
@@ -349,14 +347,17 @@ private:
     dc->FillOpacityMask (mBitmap, mWindow->getYellowBrush(), dstRect, srcRect);
 
     // wave
-    srcRect = { leftSrcIndex, mSrcWaveTop, (split ? playSrcIndex : firstEndSrcIndex), mSrcWaveTop + mWaveHeight };
+    bool firstSplit = (playSrcIndex >= leftSrcIndex) && (playSrcIndex < firstEndSrcIndex);
+    bool secondSplit = false;
+
+    srcRect = { leftSrcIndex, mSrcWaveTop, (firstSplit ? playSrcIndex : firstEndSrcIndex), mSrcWaveTop + mWaveHeight };
     dstRect = { mRect.left,
                 mDstWaveTop,
-                mRect.left + ((split ? playSrcIndex : firstEndSrcIndex) - leftSrcIndex) * frameWidth,
+                mRect.left + ((firstSplit ? playSrcIndex : firstEndSrcIndex) - leftSrcIndex) * frameWidth,
                 mDstWaveTop + mWaveHeight };
     dc->FillOpacityMask (mBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
 
-    if (split) {
+    if (firstSplit) {
       // split chunk after play
       srcRect = { playSrcIndex, mSrcWaveTop, firstEndSrcIndex, mSrcWaveTop + mWaveHeight };
       dstRect = { mRect.left + (playSrcIndex - leftSrcIndex) * frameWidth,
@@ -368,14 +369,13 @@ private:
     //}}}
     if (wraparound) {
       //{{{  stamp second dst chunk
-      bool split = false;
       // Freq
       srcRect = { 0.f, mSrcFreqTop, rightSrcIndex, mSrcFreqTop + mFreqHeight };
       dstRect = { mRect.left + (firstEndSrcIndex - leftSrcIndex) * frameWidth,
                   mDstFreqTop,
                   mRect.left + (firstEndSrcIndex - leftSrcIndex + rightSrcIndex) * frameWidth,
                   mDstFreqTop + mFreqHeight };
-      dc->FillOpacityMask (mBitmap, mWindow->getYellowBrush(), dstRect, srcRect);
+      dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
 
       // silence
       srcRect = { 0.f, mSrcSilenceTop, rightSrcIndex, mSrcSilenceTop + mSrcSilenceHeight };
@@ -394,29 +394,23 @@ private:
       dc->FillOpacityMask (mBitmap, mWindow->getYellowBrush(), dstRect, srcRect);
 
       // wave
-      if (split) {
+      secondSplit = playSrcIndex < rightSrcIndex;
+      if (secondSplit) {
         srcRect = { 0.f, mSrcWaveTop, playSrcIndex, mSrcWaveTop + mWaveHeight };
         dstRect = { mRect.left + (firstEndSrcIndex - leftSrcIndex) * frameWidth,
                     mDstWaveTop,
                     mRect.left + (firstEndSrcIndex - leftSrcIndex + playSrcIndex) * frameWidth,
                     mDstWaveTop + mWaveHeight };
         dc->FillOpacityMask (mBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
+        }
 
-        srcRect = { playSrcIndex, mSrcWaveTop, rightSrcIndex, mSrcWaveTop + mWaveHeight };
-        dstRect = { mRect.left + (firstEndSrcIndex - leftSrcIndex + playSrcIndex) * frameWidth,
-                    mDstWaveTop,
-                    mRect.left + (firstEndSrcIndex - leftSrcIndex + rightSrcIndex) * frameWidth,
-                    mDstWaveTop + mWaveHeight };
-        dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
-        }
-      else
-        srcRect = { 0.f, mSrcWaveTop, rightSrcIndex, mSrcWaveTop + mWaveHeight };
-        dstRect = { mRect.left + (firstEndSrcIndex - leftSrcIndex) * frameWidth,
-                    mDstWaveTop,
-                    mRect.left + (firstEndSrcIndex - leftSrcIndex + rightSrcIndex) * frameWidth,
-                    mDstWaveTop + mWaveHeight };
-        dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
-        }
+      srcRect = { secondSplit ? playSrcIndex : 0.f, mSrcWaveTop, rightSrcIndex, mSrcWaveTop + mWaveHeight };
+      dstRect = { mRect.left + (firstEndSrcIndex - leftSrcIndex + (secondSplit ? playSrcIndex : 0.f)) * frameWidth,
+                  mDstWaveTop,
+                  mRect.left + (firstEndSrcIndex - leftSrcIndex + rightSrcIndex) * frameWidth,
+                  mDstWaveTop + mWaveHeight };
+      dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
+      }
       //}}}
     //{{{  stamp playFrame wave
     srcRect = { playSrcIndex, mSrcWaveTop, playSrcIndex+1.f, mSrcWaveTop + mWaveHeight };
@@ -432,8 +426,12 @@ private:
 
     // debug
     auto str = dec(leftFrame) + "," + dec(rightFrame) + (wraparound ? " wrap" : "") +
+               (firstSplit ? " split1" : "") + (secondSplit ? " split2" : "") +
                " bit" + dec(mBitmapFirstFrame) + "," + dec(mBitmapLastFrame) +
-               " leftInd:" + dec(leftSrcIndex) + " rightInd:" + dec(rightSrcIndex) + " firstEndInd:" + dec(firstEndSrcIndex) +
+               " leftInd:" + dec(leftSrcIndex) +
+               " playInd:" + dec(playSrcIndex) +
+               " rightInd:" + dec(rightSrcIndex) +
+               " firstEndInd:" + dec(firstEndSrcIndex) +
                " w:" + dec(frameWidth) + " s:" + dec(frameStep);
     //{{{  draw debug str
     IDWriteTextLayout* textLayout;
@@ -517,29 +515,29 @@ private:
     float playFrameX = (mSong.getTotalFrames() > 0) ? (playFrame * getWidth()) / mSong.getTotalFrames() : 0.f;
     drawOverviewWave (dc, playFrame, playFrameX, valueScale);
 
-    if (mOn) {
+    if (mOverviewPressed) {
       //{{{  animate on
-      if (mLens < getWidth() / 16.f)
-        mLens += getWidth() / 16.f / 6.f;
+      if (mOverviewLens < getWidth() / 16.f)
+        mOverviewLens += getWidth() / 16.f / 6.f;
       }
       //}}}
     else {
       //{{{  animate off
-      if (mLens > 1.f)
-        mLens /= 2.f;
+      if (mOverviewLens > 1.f)
+        mOverviewLens /= 2.f;
       else  // animate done
-        mLens = 0.f;
+        mOverviewLens = 0.f;
       }
       //}}}
 
-    if (mLens > 0.f) {
+    if (mOverviewLens > 0.f) {
       float lensCentreX = (float)playFrameX;
-      if (lensCentreX - mLens < 0.f)
-        lensCentreX = (float)mLens;
-      else if (lensCentreX + mLens > getWidth())
-        lensCentreX = getWidth() - mLens;
+      if (lensCentreX - mOverviewLens < 0.f)
+        lensCentreX = (float)mOverviewLens;
+      else if (lensCentreX + mOverviewLens > getWidth())
+        lensCentreX = getWidth() - mOverviewLens;
 
-      drawOverviewLens (dc, playFrame, lensCentreX, mLens-1.f, valueScale);
+      drawOverviewLens (dc, playFrame, lensCentreX, mOverviewLens-1.f, valueScale);
       }
     }
   //}}}
@@ -636,8 +634,8 @@ private:
   void drawOverviewLens (ID2D1DeviceContext* dc, int playFrame, float centreX, float width, float valueScale) {
   // draw frames centred at playFrame -/+ width in pixels, centred at centreX, zoomed by zoomIndex
 
-    cRect r = { mRect.left + centreX - mLens, mDstOverviewTop,
-                mRect.left + centreX + mLens, mRect.bottom - 1.f };
+    cRect r = { mRect.left + centreX - mOverviewLens, mDstOverviewTop,
+                mRect.left + centreX + mOverviewLens, mRect.bottom - 1.f };
 
     dc->FillRectangle (r, mWindow->getBlackBrush());
     dc->DrawRectangle (r, mWindow->getYellowBrush(), 1.f);
@@ -736,13 +734,12 @@ private:
 
   int mZoom = 0;  // >0 = zoomOut framesPerPix, 0 = unity, <0 = zoomIn pixPerFrame
 
-  bool mOn = false;
-  float mLens = 0.f;
-
   bool mBitmapOverviewOk = false;
+  bool mOverviewPressed = false;
   int mOverviewNumFrames = 0;
   int mOverviewTotalFrames = 0;
   float mOverviewValueScale = 1.f;
+  float mOverviewLens = 0.f;
 
   bool mBitmapFramesOk = false;
   int mBitmapFrameStep = 0;
