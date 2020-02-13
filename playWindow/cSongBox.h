@@ -41,7 +41,7 @@ public:
   void layout() {
 
     cD2dWindow::cBox::layout();
-    cLog::log (LOGINFO, "cSongBox layout %d %d %d %d", mRect.left, mRect.top, mRect.right, mRect.bottom);
+    cLog::log (LOGINFO, "cSongBox::layout %d %d %d %d", mRect.left, mRect.top, mRect.right, mRect.bottom);
 
     // invalidate frame bitmap
     mBitmapFramesOk = false;
@@ -499,6 +499,7 @@ private:
 
     float valueScale = mOverviewHeight / 2.f / mSong.getMaxPowerValue();
     float playFrameX = (mSong.getTotalFrames() > 0) ? (playFrame * getWidth()) / mSong.getTotalFrames() : 0.f;
+
     drawOverviewWave (dc, playFrame, playFrameX, valueScale);
 
     if (mOverviewPressed) {
@@ -597,7 +598,7 @@ private:
       mSongId = mSong.getId();
       }
 
-    // stamp Overview using overBitmap
+    // draw overview, stamping colours through alpha bitmap
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
 
     // before playFrame
@@ -620,13 +621,13 @@ private:
   //}}}
   //{{{
   void drawOverviewLens (ID2D1DeviceContext* dc, int playFrame, float centreX, float width, float valueScale) {
-  // draw frames centred at playFrame -/+ width in pixels, centred at centreX, zoomed by zoomIndex
+  // draw frames centred at playFrame -/+ width in pixels, centred at centreX
 
-    cRect r = { mRect.left + centreX - mOverviewLens, mDstOverviewTop,
-                mRect.left + centreX + mOverviewLens, mRect.bottom - 1.f };
-
-    dc->FillRectangle (r, mWindow->getBlackBrush());
-    dc->DrawRectangle (r, mWindow->getYellowBrush(), 1.f);
+    // cut hole and frame it
+    cRect dstRect = { mRect.left + centreX - mOverviewLens, mDstOverviewTop,
+                      mRect.left + centreX + mOverviewLens, mRect.bottom - 1.f };
+    dc->FillRectangle (dstRect, mWindow->getBlackBrush());
+    dc->DrawRectangle (dstRect, mWindow->getYellowBrush(), 1.f);
 
     // calc leftmost frame, clip to valid frame, adjust firstX which may overlap left up to frameWidth
     float leftFrame = playFrame - width;
@@ -636,19 +637,20 @@ private:
       leftFrame = 0;
       }
 
+    // simple draw of unzoomed waveform, no use of bitmap cache
     auto colour = mWindow->getBlueBrush();
 
     int frame = (int)leftFrame;
     int rightFrame = (int)(playFrame + width);
     int lastFrame = std::min (rightFrame, mSong.getLastFrame());
 
-    r.left = mRect.left + firstX;
-    while ((r.left < mRect.right) && (frame <= lastFrame)) {
-      r.right = r.left + 1.f;
+    dstRect.left = mRect.left + firstX;
+    while ((dstRect.left < mRect.right) && (frame <= lastFrame)) {
+      dstRect.right = dstRect.left + 1.f;
 
       if (mSong.mFrames[frame]->hasTitle()) {
         //{{{  draw song title yellow bar and text
-        dc->FillRectangle (cRect (r.left-1.f, mDstOverviewTop, r.left+1.f, mRect.bottom),
+        dc->FillRectangle (cRect (dstRect.left-1.f, mDstOverviewTop, dstRect.left+1.f, mRect.bottom),
                            mWindow->getYellowBrush());
 
         auto str = mSong.mFrames[frame]->getTitle();
@@ -658,16 +660,16 @@ private:
           std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
           mWindow->getTextFormat(), getWidth(), mOverviewHeight, &textLayout);
         if (textLayout) {
-          dc->DrawTextLayout (cPoint (r.left+2.f, mDstOverviewTop), textLayout, mWindow->getWhiteBrush());
+          dc->DrawTextLayout (cPoint (dstRect.left+2.f, mDstOverviewTop), textLayout, mWindow->getWhiteBrush());
           textLayout->Release();
           }
         }
         //}}}
       if (mSong.mFrames[frame]->isSilent()) {
         //{{{  draw red silent frame
-        r.top = mDstOverviewCentre - 2.f;
-        r.bottom = mDstOverviewCentre + 2.f;
-        dc->FillRectangle (r, mWindow->getRedBrush());
+        dstRect.top = mDstOverviewCentre - 2.f;
+        dstRect.bottom = mDstOverviewCentre + 2.f;
+        dc->FillRectangle (dstRect, mWindow->getRedBrush());
         }
         //}}}
 
@@ -683,11 +685,11 @@ private:
       leftValue = *powerValues++;
       rightValue = *powerValues;
 
-      r.top = mDstOverviewCentre - (leftValue * valueScale);
-      r.bottom = mDstOverviewCentre + (rightValue * valueScale);
-      dc->FillRectangle (r, colour);
+      dstRect.top = mDstOverviewCentre - (leftValue * valueScale);
+      dstRect.bottom = mDstOverviewCentre + (rightValue * valueScale);
+      dc->FillRectangle (dstRect, colour);
 
-      r.left = r.right;
+      dstRect.left = dstRect.right;
       frame++;
       }
     }
