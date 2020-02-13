@@ -31,6 +31,7 @@ public:
 
     if (mBitmapTarget)
       mBitmapTarget->Release();
+
     if (mBitmap)
       mBitmap->Release();
     }
@@ -170,8 +171,7 @@ private:
   //{{{
   void drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame, int frameStep, float valueScale) {
 
-    cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
-
+    //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     if (fromFrame < 0) {
       // clear bitmap for -ve frames, simpler drawing logic later
       cRect bitmapRect = { (float)(fromFrame & mBitmapMask), mSrcFreqTop, (float)mBitmapWidth, mSrcOverviewTop };
@@ -184,13 +184,27 @@ private:
     int freqSize = std::min (mSong.getNumFreqLuma(), (int)mFreqHeight);
     int freqOffset = mSong.getNumFreqLuma() > (int)mFreqHeight ? mSong.getNumFreqLuma() - (int)mFreqHeight : 0;
 
-    for (auto frame = fromFrame; frame < toFrame; frame += frameStep) {
-      // clear freq,wave,silence,mark bitmap frame column
-      cRect bitmapRect = { (float)(frame & mBitmapMask), mSrcWaveTop, (frame & mBitmapMask)+1.f, mSrcOverviewTop };
+    auto fromSrcIndex = float(fromFrame & mBitmapMask);
+    auto toSrcIndex = float(toFrame & mBitmapMask);
+    bool wrap = toSrcIndex <= fromSrcIndex;
+    float endSrcIndex = wrap ? float(mBitmapWidth) : toSrcIndex;
+    //{{{  clear chunk before wrap
+    cRect bitmapRect = { fromSrcIndex, mSrcWaveTop, endSrcIndex, mSrcOverviewTop };
+    mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
+    mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
+    mBitmapTarget->PopAxisAlignedClip();
+    //}}}
+    if (wrap) {
+      //{{{  clear chunk after wrap 
+      cRect bitmapRect = { 0.f, mSrcWaveTop, toSrcIndex, mSrcOverviewTop };
       mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
       mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
       mBitmapTarget->PopAxisAlignedClip();
+      }
+      //}}}
 
+    for (auto frame = fromFrame; frame < toFrame; frame += frameStep) {
+      cRect bitmapRect = { (float)(frame & mBitmapMask), mSrcWaveTop, (frame & mBitmapMask)+1.f, mSrcOverviewTop };
       //{{{  draw wave bitmap
       float leftValue = 0.f;
       float rightValue = 0.f;
@@ -240,7 +254,7 @@ private:
         //}}}
       }
 
-    // seems to interfere with above loop if mixed, also the copyFromMemory stalls drawing
+    // seems to interfere with above loop if interleaved, copyFromMemory stalling drawing ???
     for (auto frame = fromFrame; frame < toFrame; frame += frameStep) {
        // copy reversed spectrum column to bitmap, clip high freqs to height
       D2D1_RECT_U rectU = { frame & mBitmapMask, 0, (frame & mBitmapMask)+1, (UINT32)freqSize };
@@ -306,13 +320,18 @@ private:
     bool wrap = rightSrcIndex <= leftSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : rightSrcIndex;
 
-    //  stamp colours through alpha bitmap
-    dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
-
-    //{{{  first dst chunk
-    // freq
+    //  draw dst, mostly stamping colour through alpha bitmap
     cRect srcRect;
     cRect dstRect;
+    dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
+    //{{{  draw playFrame mark
+    auto dstPlay = playSrcIndex - leftSrcIndex + (playSrcIndex < leftSrcIndex ? endSrcIndex : 0);
+    dstRect = { mRect.left + dstPlay * frameWidth, mDstFreqTop,
+                mRect.left + (dstPlay * frameWidth) + 1.f, mDstWaveTop + mWaveHeight };
+    dc->FillRectangle (dstRect, mWindow->getDarkGreyBrush());
+    //}}}
+    //{{{  draw chunk before wrap
+    // freq
     srcRect = { leftSrcIndex, mSrcFreqTop, endSrcIndex, mSrcFreqTop + mFreqHeight };
     dstRect = { mRect.left, mDstFreqTop,
                 mRect.left + (endSrcIndex - leftSrcIndex) * frameWidth, mDstFreqTop + mFreqHeight };
@@ -348,7 +367,7 @@ private:
       }
     //}}}
     if (wrap) {
-      //{{{  second dst chunk
+      //{{{  draw second chunk after wrap
       // Freq
       srcRect = { 0.f, mSrcFreqTop,  rightSrcIndex, mSrcFreqTop + mFreqHeight };
       dstRect = { mRect.left + (endSrcIndex - leftSrcIndex) * frameWidth, mDstFreqTop,
@@ -384,14 +403,12 @@ private:
       dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
       }
       //}}}
-
-    // stamp play frame
-    auto playIndex = playSrcIndex - leftSrcIndex + (playSrcIndex < leftSrcIndex ? endSrcIndex : 0);
+    //{{{  draw playFrame power
     srcRect = { playSrcIndex, mSrcWaveTop, playSrcIndex+1.f, mSrcWaveTop + mWaveHeight };
-    dstRect = { mRect.left + playIndex * frameWidth, mDstWaveTop,
-                mRect.left + (playIndex+1.f) * frameWidth, mDstWaveTop + mWaveHeight };
+    dstRect = { mRect.left + dstPlay * frameWidth, mDstWaveTop,
+                mRect.left + (dstPlay+1.f) * frameWidth, mDstWaveTop + mWaveHeight };
     dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
-
+    //}}}
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     //{{{  debug
@@ -424,15 +441,15 @@ private:
       auto valueScale = mOverviewHeight / mSong.getMaxFreqValue();
       auto maxFreqIndex = std::min (getWidthInt()/2, mSong.getNumFreq());
 
-      cRect r =  { 0.f,0.f, 0.f,mRect.bottom };
+      cRect dstRect = { 0.f,0.f, 0.f,mRect.bottom };
       auto freq = mSong.mFrames[playFrame]->getFreqValues();
       for (auto i = 0; i < maxFreqIndex; i++) {
         auto value =  freq[i] * valueScale;
         if (value > 1.f)  {
-          r.left = mRect.left + (i*2);
-          r.right = r.left + 2;
-          r.top = mRect.bottom - value;
-          dc->FillRectangle (r, mWindow->getYellowBrush());
+          dstRect.left = mRect.left + (i*2);
+          dstRect.right = dstRect.left + 2;
+          dstRect.top = mRect.bottom - value;
+          dc->FillRectangle (dstRect, mWindow->getYellowBrush());
           }
         }
       }
