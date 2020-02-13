@@ -341,8 +341,8 @@ private:
 
     if (split) {
       // split wave chunk after play
-      srcRect = { playSrcIndex, mSrcWaveTop, endSrcIndex, mSrcWaveTop + mWaveHeight };
-      dstRect = { mRect.left + (playSrcIndex - leftSrcIndex) * frameWidth, mDstWaveTop,
+      srcRect = { playSrcIndex+1.f, mSrcWaveTop, endSrcIndex, mSrcWaveTop + mWaveHeight };
+      dstRect = { mRect.left + (playSrcIndex+1.f - leftSrcIndex) * frameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex) * frameWidth, mDstWaveTop + mWaveHeight };
       dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
       }
@@ -378,19 +378,19 @@ private:
         }
 
       // chunk after play
-      srcRect = { split ? playSrcIndex : 0.f, mSrcWaveTop,  rightSrcIndex, mSrcWaveTop + mWaveHeight };
-      dstRect = { mRect.left + (endSrcIndex - leftSrcIndex + (split ? playSrcIndex : 0.f)) * frameWidth, mDstWaveTop,
+      srcRect = { split ? playSrcIndex+1.f : 0.f, mSrcWaveTop,  rightSrcIndex, mSrcWaveTop + mWaveHeight };
+      dstRect = { mRect.left + (endSrcIndex - leftSrcIndex + (split ? (playSrcIndex+1.f) : 0.f)) * frameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * frameWidth, mDstWaveTop + mWaveHeight };
       dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
       }
       //}}}
 
-    //{{{  playFrame wave
-    srcRect = { playSrcIndex, mSrcWaveTop,  playSrcIndex+1.f, mSrcWaveTop + mWaveHeight };
-    dstRect = { mRect.left + getCentreX(), mDstWaveTop,
-                mRect.left + getCentreX() + frameWidth, mDstWaveTop + mWaveHeight };
+    // stamp play frame
+    auto playIndex = playSrcIndex - leftSrcIndex + (playSrcIndex < leftSrcIndex ? endSrcIndex : 0);
+    srcRect = { playSrcIndex, mSrcWaveTop, playSrcIndex+1.f, mSrcWaveTop + mWaveHeight };
+    dstRect = { mRect.left + playIndex * frameWidth, mDstWaveTop,
+                mRect.left + (playIndex+1.f) * frameWidth, mDstWaveTop + mWaveHeight };
     dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
-    //}}}
 
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
