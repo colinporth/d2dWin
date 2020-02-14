@@ -88,9 +88,7 @@ public:
   bool onWheel (int delta, cPoint pos)  {
 
     if (getShow()) {
-      mZoom = std::min (std::max (mZoom - (delta/120), mSong.getMinZoomIndex()), mSong.getMaxZoomIndex());
-      mFrameStep = (mZoom > 0) ? mZoom+1 : 1; // zoomOut summing mFrameStep frames per pix
-      mFrameWidth = (mZoom < 0) ? -mZoom+1 : 1; // zoomIn expanding frame to mFrameWidth pix
+      setZoom (mZoom - (delta/120));
       return true;
       }
 
@@ -140,7 +138,18 @@ public:
   //}}}
 
 private:
+  //{{{
+  void setZoom (int zoom) {
 
+    mZoom = std::min (std::max (zoom, mSong.getMinZoomIndex()), mSong.getMaxZoomIndex());
+
+    // zoomIn expanding frame to mFrameWidth pix
+    mFrameWidth = (mZoom < 0) ? -mZoom+1 : 1;
+
+    // zoomOut summing mFrameStep frames per pix
+    mFrameStep = (mZoom > 0) ? mZoom+1 : 1;
+    }
+  //}}}
   //{{{
   void reallocBitmap (ID2D1DeviceContext* dc) {
   // fixed bitmap width for big cache, src bitmap height tracks dst box height
@@ -211,14 +220,14 @@ private:
     // draw bitmap as frames
     for (auto frame = fromFrame; frame < toFrame; frame += mFrameStep) {
       //{{{  draw bitmap for frame
-      float values[2];
-      bool silence;
       bool mark;
+      bool silence;
+      float values[2];
 
       if (mFrameStep == 1) {
         // simple case
-        silence = mSong.mFrames[frame]->isSilent();
         mark = mSong.mFrames[frame]->hasTitle();
+        silence = mSong.mFrames[frame]->isSilent();
 
         auto powerValues = mSong.mFrames[frame]->getPowerValues();
         for (auto i = 0; i < 2; i++)
@@ -234,9 +243,8 @@ private:
         auto alignedFrame = frame - (frame % mFrameStep);
         auto toSumFrame = std::min (alignedFrame + mFrameStep, rightFrame);
         for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
-          silence |= mSong.mFrames[frame]->isSilent();
-          mark |= mSong.mFrames[frame]->hasTitle();
-
+          mark |= mSong.mFrames[sumFrame]->hasTitle();
+          silence |= mSong.mFrames[sumFrame]->isSilent();
           auto powerValues = mSong.mFrames[sumFrame]->getPowerValues();
           for (auto i = 0; i < 2; i++)
             values[i] += *powerValues++;
