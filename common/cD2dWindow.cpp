@@ -51,8 +51,10 @@ LRESULT CALLBACK WndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lpa
 // public
 //{{{
 cD2dWindow::~cD2dWindow() {
+
   for (auto boxIt = mBoxes.begin(); boxIt != mBoxes.end(); ++boxIt)
     delete (*boxIt);
+
   mBoxes.clear();
   }
 //}}}
@@ -475,12 +477,14 @@ void cD2dWindow::createDirect2d() {
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Gray), &mGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::LightGray), &mLightGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::White), &mWhiteBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::CornflowerBlue), &mBlueBrush);
+
+  mDeviceContext->CreateSolidColorBrush (ColorF (0.1f, 0.1f, 0.1f, 0.5f), &mTransparentBgndBrush);
+
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Red), &mRedBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Green), &mGreenBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Yellow), &mYellowBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Orange), &mOrangeBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Red), &mRedBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (0.1f, 0.1f, 0.1f, 0.5f), &mTransparentBgndBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::CornflowerBlue), &mBlueBrush);
   }
 //}}}
 //{{{
@@ -618,6 +622,7 @@ bool cD2dWindow::onMouseProx (bool inClient, cPoint pos) {
       change |= (*boxIt)->onProxExit();
       }
     }
+
   return change || (mProxBox != lastProxBox);
   };
 //}}}

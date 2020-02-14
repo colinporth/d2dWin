@@ -129,7 +129,7 @@ public:
     drawWave (dc, playFrame);
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
-    drawTime (dc, getTimeStr (playFrame) + " " + getTimeStr (mSong.getTotalFrames()));
+    drawTime (dc, frameString (playFrame) + " " + frameString (mSong.getTotalFrames()));
     }
   //}}}
 
@@ -170,9 +170,10 @@ private:
   void drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame, int frameStep, float valueScale) {
 
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
-    if (fromFrame < 0) {
+    cRect bitmapRect;
+    if (fromFrame < 0) {  // !!! div for neg maybe wrong !!!!
       //{{{  clear bitmap for -ve frames, allows simpler drawing logic later
-      cRect bitmapRect = { (float)(fromFrame & mBitmapMask), mSrcFreqTop, (float)mBitmapWidth, mSrcOverviewTop };
+      bitmapRect = { (float)((fromFrame / frameStep) & mBitmapMask), mSrcFreqTop, (float)mBitmapWidth, mSrcOverviewTop };
       mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
       mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
       mBitmapTarget->PopAxisAlignedClip();
@@ -180,84 +181,104 @@ private:
       }
       //}}}
 
-    auto fromSrcIndex = float(fromFrame & mBitmapMask);
-    auto toSrcIndex = float(toFrame & mBitmapMask);
+    // clear bitmap as chunks
+    auto fromSrcIndex = float((fromFrame / frameStep) & mBitmapMask);
+    auto toSrcIndex = float((toFrame / frameStep) & mBitmapMask);
     bool wrap = toSrcIndex <= fromSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : toSrcIndex;
     //{{{  clear bitmap chunk before wrap
-    cRect bitmapRect = { fromSrcIndex, mSrcWaveTop, endSrcIndex, mSrcOverviewTop };
+    bitmapRect = { fromSrcIndex, mSrcWaveTop, endSrcIndex, mSrcOverviewTop };
     mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
     mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
     mBitmapTarget->PopAxisAlignedClip();
     //}}}
     if (wrap) {
       //{{{  clear bitmap chunk after wrap
-      cRect bitmapRect = { 0.f, mSrcWaveTop, toSrcIndex, mSrcOverviewTop };
+      bitmapRect = { 0.f, mSrcWaveTop, toSrcIndex, mSrcOverviewTop };
       mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
       mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
       mBitmapTarget->PopAxisAlignedClip();
       }
       //}}}
 
+    // draw bitmap as frames
     for (auto frame = fromFrame; frame < toFrame; frame += frameStep) {
-      cRect bitmapRect = { (float)(frame & mBitmapMask), mSrcWaveTop, (frame & mBitmapMask)+1.f, mSrcOverviewTop };
-      //{{{  draw wave bitmap
-      float leftValue = 0.f;
-      float rightValue = 0.f;
+      //{{{  draw bitmap for frame
+      float values[2];
+      bool silence;
+      bool mark;
 
-      if (mZoom <= 0) {
-        // no zoom, or zoomIn expanding frame
+      if (frameStep == 1) {
+        // simple case
+        silence = mSong.mFrames[frame]->isSilent();
+        mark = mSong.mFrames[frame]->hasTitle();
+
         auto powerValues = mSong.mFrames[frame]->getPowerValues();
-        leftValue = *powerValues++;
-        rightValue = *powerValues;
+        for (auto i = 0; i < 2; i++)
+          values[i] = *powerValues++;
         }
-
       else {
-        // zoomOut, summing frames
-        int firstSumFrame = frame - (frame % frameStep);
-        int nextSumFrame = firstSumFrame + frameStep;
-        for (auto i = firstSumFrame; i < firstSumFrame + frameStep; i++) {
-          auto powerValues = mSong.mFrames[std::min (i, rightFrame)]->getPowerValues();
-          if (i == playFrame) {
-            leftValue = *powerValues++;
-            rightValue = *powerValues;
-            break;
-            }
-          leftValue += *powerValues++ / frameStep;
-          rightValue += *powerValues / frameStep;
+        // sum frameStep frames, frameStep aligned
+        silence = false;
+        mark = false;
+        for (auto i = 0; i < 2; i++)
+          values[i] = 0.f;
+
+        auto alignedFrame = frame - (frame % frameStep);
+        auto toSumFrame = std::min (alignedFrame + frameStep, rightFrame);
+        for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
+          silence |= mSong.mFrames[frame]->isSilent();
+          mark |= mSong.mFrames[frame]->hasTitle();
+
+          auto powerValues = mSong.mFrames[sumFrame]->getPowerValues();
+          for (auto i = 0; i < 2; i++)
+            values[i] += *powerValues++;
           }
+
+        for (auto i = 0; i < 2; i++)
+          values[i] /= toSumFrame - alignedFrame + 1;
         }
 
-      bitmapRect.top = mSrcWaveCentre - (leftValue * valueScale);
-      bitmapRect.bottom = mSrcWaveCentre + (rightValue * valueScale);
+      float srcIndex = float((frame / frameStep) & mBitmapMask);
+      bitmapRect = { srcIndex, mSrcWaveCentre - (values[0] * valueScale),
+                     srcIndex + 1.f, mSrcWaveCentre + (values[1] * valueScale) };
       mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
-      //}}}
 
-      if (mSong.mFrames[frame]->isSilent()) {
-        //{{{  draw silence bitmap
+      if (silence) {
+        // draw silence bitmap
         bitmapRect.top = mSrcSilenceTop;
         bitmapRect.bottom = mSrcSilenceTop + 1.f;
         mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
         }
-        //}}}
 
-      if (mSong.mFrames[frame]->hasTitle()) {
-        //{{{  draw song title bitmap
+      if (mark) {
+        // draw song title bitmap
         bitmapRect.top = mSrcMarkTop;
         bitmapRect.bottom = mSrcMarkTop + 1.f;
         mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
         }
-        //}}}
       }
+      //}}}
 
     // copy reversed spectrum column to bitmap, clip high freqs to height
     int freqSize = std::min (mSong.getNumFreqLuma(), (int)mFreqHeight);
     int freqOffset = mSong.getNumFreqLuma() > (int)mFreqHeight ? mSong.getNumFreqLuma() - (int)mFreqHeight : 0;
 
-    // seems to interfere with draws above if interleaved, copyFromMemory stalling drawing ???
-    for (auto frame = fromFrame; frame < toFrame; frame += frameStep) {
-      D2D1_RECT_U rectU = { frame & mBitmapMask, 0, (frame & mBitmapMask)+1, (UINT32)freqSize };
-      mBitmap->CopyFromMemory (&rectU, mSong.mFrames[frame]->getFreqLuma() + freqOffset, 1);
+    if (frameStep == 1) {
+      // seems to interfere with draws above if interleaved, copyFromMemory stalling drawing ???
+      for (auto frame = fromFrame; frame < toFrame; frame += frameStep) {
+        uint32_t bitmapIndex = (frame / frameStep) & mBitmapMask;
+        D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
+        mBitmap->CopyFromMemory (&bitmapRectU, mSong.mFrames[frame]->getFreqLuma() + freqOffset, 1);
+        }
+      }
+    else {
+      auto alignedFromFrame = fromFrame - (fromFrame % frameStep); 
+      for (auto frame = alignedFromFrame; frame < toFrame; frame += frameStep) {
+        uint32_t bitmapIndex = (frame / frameStep) & mBitmapMask;
+        D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
+        mBitmap->CopyFromMemory (&bitmapRectU, mSong.mFrames[frame]->getFreqLuma() + freqOffset, 1);
+        }
       }
     }
   //}}}
@@ -312,9 +333,9 @@ private:
     mBitmapFrameStep = frameStep;
 
     // calc bitmap wrap chunks
-    float leftSrcIndex = (float)(leftFrame & mBitmapMask);
-    float rightSrcIndex = (float)(rightFrame & mBitmapMask);
-    float playSrcIndex = (float)(playFrame & mBitmapMask);
+    float leftSrcIndex = (float)((leftFrame / frameStep) & mBitmapMask);
+    float rightSrcIndex = (float)((rightFrame / frameStep) & mBitmapMask);
+    float playSrcIndex = (float)((playFrame / frameStep) & mBitmapMask);
 
     bool wrap = rightSrcIndex <= leftSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : rightSrcIndex;
@@ -323,13 +344,13 @@ private:
     cRect srcRect;
     cRect dstRect;
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
-    //{{{  draw playFrame mark
+    //{{{  stamp playFrame mark
     auto dstPlay = playSrcIndex - leftSrcIndex + (playSrcIndex < leftSrcIndex ? endSrcIndex : 0);
     dstRect = { mRect.left + (dstPlay+0.5f) * frameWidth, mDstFreqTop,
                 mRect.left + ((dstPlay+0.5f) * frameWidth) + 1.f, mDstWaveTop + mWaveHeight };
     dc->FillRectangle (dstRect, mWindow->getDarkGreyBrush());
     //}}}
-    //{{{  draw chunk before wrap
+    //{{{  stamp chunk before wrap
     // freq
     srcRect = { leftSrcIndex, mSrcFreqTop, endSrcIndex, mSrcFreqTop + mFreqHeight };
     dstRect = { mRect.left, mDstFreqTop,
@@ -366,7 +387,7 @@ private:
       }
     //}}}
     if (wrap) {
-      //{{{  draw second chunk after wrap
+      //{{{  stamp second chunk after wrap
       // Freq
       srcRect = { 0.f, mSrcFreqTop,  rightSrcIndex, mSrcFreqTop + mFreqHeight };
       dstRect = { mRect.left + (endSrcIndex - leftSrcIndex) * frameWidth, mDstFreqTop,
@@ -402,34 +423,15 @@ private:
       dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
       }
       //}}}
-    //{{{  draw playFrame power
-    srcRect = { playSrcIndex, mSrcWaveTop, playSrcIndex+1.f, mSrcWaveTop + mWaveHeight };
-    dstRect = { mRect.left + dstPlay * frameWidth, mDstWaveTop,
-                mRect.left + (dstPlay+1.f) * frameWidth, mDstWaveTop + mWaveHeight };
-    dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
+
+    //{{{  draw playFrame
+    auto powerValues = mSong.mFrames[playFrame]->getPowerValues();
+    dstRect = { mRect.left + dstPlay * frameWidth, mDstWaveCentre - (*powerValues++ * valueScale),
+                mRect.left + (dstPlay+1.f) * frameWidth, mDstWaveCentre + (*powerValues * valueScale) };
+    dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
     //}}}
+
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-
-    //{{{  debug
-    //auto str = dec(leftFrame) + "," + dec(rightFrame) + (wrap ? " wrap" : "") +
-               //" bit" + dec(mBitmapFirstFrame) + "," + dec(mBitmapLastFrame) +
-               //" leftInd:" + dec(leftSrcIndex) +
-               //" playInd:" + dec(playSrcIndex) +
-               //" endInd:" + dec(endSrcIndex) +
-               //" rightInd:" + dec(rightSrcIndex) +
-               //" w:" + dec(frameWidth) + " s:" + dec(frameStep);
-
-    //// draw debug str
-    //IDWriteTextLayout* textLayout;
-    //mWindow->getDwriteFactory()->CreateTextLayout (
-      //std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-      //mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-
-    //if (textLayout) {
-      //dc->DrawTextLayout ({ 0.f, 40.f }, textLayout, mWindow->getWhiteBrush());
-      //textLayout->Release();
-      //}
-    //}}}
     }
   //}}}
 
@@ -456,7 +458,7 @@ private:
   //}}}
 
   //{{{
-  std::string getTimeStr (uint32_t frame) {
+  std::string frameString (uint32_t frame) {
 
     if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
       uint32_t frameHs = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
@@ -525,13 +527,13 @@ private:
       //}}}
 
     if (mOverviewLens > 0.f) {
-      float lensCentreX = (float)playFrameX;
-      if (lensCentreX - mOverviewLens < 0.f)
-        lensCentreX = (float)mOverviewLens;
-      else if (lensCentreX + mOverviewLens > getWidth())
-        lensCentreX = getWidth() - mOverviewLens;
+      float overviewLensCentreX = (float)playFrameX;
+      if (overviewLensCentreX - mOverviewLens < 0.f)
+        overviewLensCentreX = (float)mOverviewLens;
+      else if (overviewLensCentreX + mOverviewLens > getWidth())
+        overviewLensCentreX = getWidth() - mOverviewLens;
 
-      drawOverviewLens (dc, playFrame, lensCentreX, mOverviewLens-1.f, valueScale);
+      drawOverviewLens (dc, playFrame, overviewLensCentreX, mOverviewLens-1.f, valueScale);
       }
     }
   //}}}
@@ -606,10 +608,13 @@ private:
     cRect dstRect = { mRect.left, mDstOverviewTop, mRect.left + playFrameX, mDstOverviewTop + mOverviewHeight };
     dc->FillOpacityMask (mBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
 
-    // playFrame
-    srcRect = { playFrameX, mSrcOverviewTop,  playFrameX+1.f, mSrcOverviewTop + mOverviewHeight };
-    dstRect = { mRect.left + playFrameX, mDstOverviewTop, mRect.left + playFrameX+1.f, mDstOverviewTop + mOverviewHeight };
-    dc->FillOpacityMask (mBitmap, mWindow->getWhiteBrush(), dstRect, srcRect);
+    //  draw playFrame
+    dstRect = { mRect.left + playFrameX, mDstOverviewTop,
+                mRect.left + playFrameX+1.f, mDstOverviewTop + mOverviewHeight };
+    auto powerValues = mSong.mFrames[playFrame]->getPowerValues();
+    dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
+    dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
+    dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
 
     // after playFrame
     srcRect = { playFrameX+1.f, mSrcOverviewTop,  getWidth(), mSrcOverviewTop + mOverviewHeight };

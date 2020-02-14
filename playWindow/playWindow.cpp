@@ -52,8 +52,8 @@ public:
       //}}}
       //const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
       //thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_three", 48000); }).detach();
-      //thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
-      thread ([=]() { icyThread (name); }).detach();
+      thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
+      //thread ([=]() { icyThread (name); }).detach();
       }
     else if (streaming || !mFileList->empty())
       thread ([=](){ fileThread(); }).detach();
