@@ -17,10 +17,13 @@ public:
 
     mPin = true;
 
+    // time display font
     mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
       DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
       &mTimeTextFormat);
-    mTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+
+    if (mTimeTextFormat)
+      mTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
     }
   //}}}
   //{{{
@@ -139,46 +142,39 @@ public:
 
 private:
   //{{{
+  std::string frameString (uint32_t frame) {
+
+    if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
+      uint32_t frameHs = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
+
+      uint32_t hs = frameHs % 100;
+
+      frameHs /= 100;
+      uint32_t secs = frameHs % 60;
+
+      frameHs /= 60;
+      uint32_t mins = frameHs % 60;
+
+      frameHs /= 60;
+      uint32_t hours = frameHs % 60;
+
+      std::string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
+      return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
+      }
+    else
+      return ("--:--:--");
+    }
+  //}}}
+  //{{{
   void setZoom (int zoom) {
 
-    mZoom = std::min (std::max (zoom, mSong.getMinZoomIndex()), mSong.getMaxZoomIndex());
+    mZoom = std::min (std::max (zoom, mMinZoom), mMaxZoom);
 
     // zoomIn expanding frame to mFrameWidth pix
     mFrameWidth = (mZoom < 0) ? -mZoom+1 : 1;
 
     // zoomOut summing mFrameStep frames per pix
     mFrameStep = (mZoom > 0) ? mZoom+1 : 1;
-    }
-  //}}}
-  //{{{
-  void reallocBitmap (ID2D1DeviceContext* dc) {
-  // fixed bitmap width for big cache, src bitmap height tracks dst box height
-
-    mBitmapWidth = 0x800; // 2048, power of 2
-    mBitmapMask =  0x7FF; // wrap mask
-
-    uint32_t bitmapHeight = (int)mSrcHeight;
-
-    if (!mBitmapTarget || (bitmapHeight != mBitmapTarget->GetSize().height)) {
-      cLog::log (LOGINFO, "reallocBitmap %d %d", bitmapHeight, mBitmapTarget ? mBitmapTarget->GetSize().height : -1);
-
-      // invalidate bitmap caches
-      mBitmapFramesOk = false;
-      mBitmapOverviewOk = false;
-
-      // release old
-      if (mBitmap)
-        mBitmap->Release();
-      if (mBitmapTarget)
-        mBitmapTarget->Release();
-
-      // wave bitmapTarget
-      D2D1_SIZE_U bitmapSizeU = { mBitmapWidth, bitmapHeight };
-      D2D1_PIXEL_FORMAT pixelFormat = { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT };
-      dc->CreateCompatibleRenderTarget (NULL, &bitmapSizeU, &pixelFormat, D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
-                                        &mBitmapTarget);
-      mBitmapTarget->GetBitmap (&mBitmap);
-      }
     }
   //}}}
 
@@ -294,6 +290,38 @@ private:
         D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
         mBitmap->CopyFromMemory (&bitmapRectU, mSong.mFrames[frame]->getFreqLuma() + freqOffset, 1);
         }
+      }
+    }
+  //}}}
+
+  //{{{
+  void reallocBitmap (ID2D1DeviceContext* dc) {
+  // fixed bitmap width for big cache, src bitmap height tracks dst box height
+
+    mBitmapWidth = 0x800; // 2048, power of 2
+    mBitmapMask =  0x7FF; // wrap mask
+
+    uint32_t bitmapHeight = (int)mSrcHeight;
+
+    if (!mBitmapTarget || (bitmapHeight != mBitmapTarget->GetSize().height)) {
+      cLog::log (LOGINFO, "reallocBitmap %d %d", bitmapHeight, mBitmapTarget ? mBitmapTarget->GetSize().height : -1);
+
+      // invalidate bitmap caches
+      mBitmapFramesOk = false;
+      mBitmapOverviewOk = false;
+
+      // release old
+      if (mBitmap)
+        mBitmap->Release();
+      if (mBitmapTarget)
+        mBitmapTarget->Release();
+
+      // wave bitmapTarget
+      D2D1_SIZE_U bitmapSizeU = { mBitmapWidth, bitmapHeight };
+      D2D1_PIXEL_FORMAT pixelFormat = { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT };
+      dc->CreateCompatibleRenderTarget (NULL, &bitmapSizeU, &pixelFormat, D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
+                                        &mBitmapTarget);
+      mBitmapTarget->GetBitmap (&mBitmap);
       }
     }
   //}}}
@@ -442,7 +470,6 @@ private:
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
     }
   //}}}
-
   //{{{
   void drawFreq (ID2D1DeviceContext* dc, int playFrame) {
 
@@ -464,46 +491,22 @@ private:
       }
     }
   //}}}
-
-  //{{{
-  std::string frameString (uint32_t frame) {
-
-    if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
-      uint32_t frameHs = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
-
-      uint32_t hs = frameHs % 100;
-
-      frameHs /= 100;
-      uint32_t secs = frameHs % 60;
-
-      frameHs /= 60;
-      uint32_t mins = frameHs % 60;
-
-      frameHs /= 60;
-      uint32_t hours = frameHs % 60;
-
-      std::string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
-      return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
-      }
-    else
-      return ("--:--:--");
-    }
-  //}}}
   //{{{
   void drawTime (ID2D1DeviceContext* dc, const std::string& str) {
 
-    IDWriteTextLayout* textLayout;
-    mWindow->getDwriteFactory()->CreateTextLayout (
-      std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-      mTimeTextFormat, getWidth(), getHeight(), &textLayout);
+    if (mTimeTextFormat) {
+      IDWriteTextLayout* textLayout;
+      mWindow->getDwriteFactory()->CreateTextLayout (
+        std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+        mTimeTextFormat, getWidth(), getHeight(), &textLayout);
 
-    if (textLayout) {
-      dc->DrawTextLayout (getBL() - cPoint(0.f, 50.f), textLayout, mWindow->getWhiteBrush());
-      textLayout->Release();
+      if (textLayout) {
+        dc->DrawTextLayout (getBL() - cPoint(0.f, 50.f), textLayout, mWindow->getWhiteBrush());
+        textLayout->Release();
+        }
       }
     }
   //}}}
-
   //{{{
   void drawOverview (ID2D1DeviceContext* dc, int playFrame) {
 
@@ -541,7 +544,7 @@ private:
       else if (overviewLensCentreX + mOverviewLens > getWidth())
         overviewLensCentreX = getWidth() - mOverviewLens;
 
-      drawOverviewLens (dc, playFrame, overviewLensCentreX, mOverviewLens-1.f, valueScale);
+      drawOverviewLens (dc, playFrame, overviewLensCentreX, mOverviewLens-1.f);
       }
     }
   //}}}
@@ -553,7 +556,7 @@ private:
     int totalFrames = mSong.getTotalFrames();
 
     bool forceRedraw = !mBitmapOverviewOk ||
-                       (mSong.getId() != mSongId) ||
+                       (mSong.getId() != mSongLastId) ||
                        (totalFrames > mOverviewTotalFrames) || (valueScale != mOverviewValueScale);
 
     if (forceRedraw || (numFrames > mOverviewNumFrames)) {
@@ -605,7 +608,7 @@ private:
       mOverviewNumFrames = numFrames;
       mOverviewTotalFrames = totalFrames;
       mOverviewValueScale = valueScale;
-      mSongId = mSong.getId();
+      mSongLastId = mSong.getId();
       }
 
     // draw overview, stamping colours through alpha bitmap
@@ -633,7 +636,7 @@ private:
     }
   //}}}
   //{{{
-  void drawOverviewLens (ID2D1DeviceContext* dc, int playFrame, float centreX, float width, float valueScale) {
+  void drawOverviewLens (ID2D1DeviceContext* dc, int playFrame, float centreX, float width) {
   // draw frames centred at playFrame -/+ width in pixels, centred at centreX
 
     // cut hole and frame it
@@ -650,21 +653,28 @@ private:
       leftFrame = 0;
       }
 
+    int rightFrame = (int)(playFrame + width);
+    rightFrame = std::min (rightFrame, mSong.getLastFrame());
+
+    // calc lens max power
+    float maxPowerValue = 0.f;
+    for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
+      auto powerValues = mSong.mFrames[frame]->getPowerValues();
+      maxPowerValue = std::max (maxPowerValue, *powerValues++);
+      maxPowerValue = std::max (maxPowerValue, *powerValues);
+      }
+
     // simple draw of unzoomed waveform, no use of bitmap cache
     auto colour = mWindow->getBlueBrush();
-
-    int frame = (int)leftFrame;
-    int rightFrame = (int)(playFrame + width);
-    int lastFrame = std::min (rightFrame, mSong.getLastFrame());
-
+    float valueScale = mOverviewHeight / 2.f / maxPowerValue;
     dstRect.left = mRect.left + firstX;
-    while ((dstRect.left < mRect.right) && (frame <= lastFrame)) {
+    for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
       dstRect.right = dstRect.left + 1.f;
 
       if (mSong.mFrames[frame]->hasTitle()) {
         //{{{  draw song title yellow bar and text
-        dc->FillRectangle (cRect (dstRect.left-1.f, mDstOverviewTop, dstRect.left+1.f, mRect.bottom),
-                           mWindow->getYellowBrush());
+        cRect barRect = { dstRect.left-1.f, mDstOverviewTop, dstRect.left+1.f, mRect.bottom };
+        dc->FillRectangle (barRect, mWindow->getYellowBrush());
 
         auto str = mSong.mFrames[frame]->getTitle();
 
@@ -686,30 +696,23 @@ private:
         }
         //}}}
 
-      if (frame > playFrame)
-        colour = mWindow->getGreyBrush();
-
-      float leftValue = 0.f;
-      float rightValue = 0.f;
-
+      auto powerValues = mSong.mFrames[frame]->getPowerValues();
+      dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
+      dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
       if (frame == playFrame)
         colour = mWindow->getWhiteBrush();
-      auto powerValues = mSong.mFrames[frame]->getPowerValues();
-      leftValue = *powerValues++;
-      rightValue = *powerValues;
-
-      dstRect.top = mDstOverviewCentre - (leftValue * valueScale);
-      dstRect.bottom = mDstOverviewCentre + (rightValue * valueScale);
       dc->FillRectangle (dstRect, colour);
+      if (frame == playFrame)
+        colour = mWindow->getGreyBrush();
 
       dstRect.left = dstRect.right;
-      frame++;
       }
     }
   //}}}
 
   //{{{  private vars
   cSong& mSong;
+  int mSongLastId = 0;
 
   // vertical layout
   float mFreqHeight = 0.f;
@@ -733,9 +736,11 @@ private:
   float mDstOverviewTop = 0.f;
   float mDstOverviewCentre = 0.f;
 
-  int mSongId = 0;
+  // zoom - 0 unity, > 0 zoomOut framesPerPix, < 0 zoomIn pixPerFrame
+  int mZoom = 0;
+  int mMinZoom = -32;
+  int mMaxZoom = 8;
 
-  int mZoom = 0;  // >0 = zoomOut framesPerPix, 0 = unity, <0 = zoomIn pixPerFrame
   int mFrameWidth = 1;
   int mFrameStep = 1;
   float mPressedFrame = 0.f;

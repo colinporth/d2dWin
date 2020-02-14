@@ -59,13 +59,7 @@ public:
     };
   //}}}
 
-  //{{{
-  virtual ~cSong() {
-
-    mFrames.clear();
-    setJpegImage (nullptr);
-    }
-  //}}}
+  virtual ~cSong();
 
   //{{{  gets
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
@@ -77,183 +71,46 @@ public:
   int getSamplesPerFrame() { return mSamplesPerFrame; }
   int getMaxSamplesPerFrame() { return kMaxSamplesPerFrame; }
 
-  int getMinZoomIndex() { return -32; }
-  int getMaxZoomIndex() { return 8; }
   float getMaxPowerValue() { return mMaxPowerValue; }
   float getMaxFreqValue() { return mMaxFreqValue; }
   int getNumFreq() { return kMaxFreq; }
   int getNumFreqLuma() { return kMaxSpectrum; }
-  cJpegImage* getJpegImage() { return mJpegImage; }
 
   int getNumFrames() { return (int)mFrames.size(); }
   int getLastFrame() { return getNumFrames() - 1;  }
   int getTotalFrames() { return mTotalFrames; }
+
   int getId() { return mId; }
 
-  //{{{
-  int getPlayFrame() {
-    if (mPlayFrame < mFrames.size())
-      return mPlayFrame;
-    else if (!mFrames.empty())
-      return (int)mFrames.size() - 1;
-    else // startup case
-      return 0;
-    }
-  //}}}
-  //{{{
-  uint8_t* getPlayFramePtr() {
+  int getPlayFrame();
+  uint8_t* getPlayFramePtr();
+  int getPlayFrameLen();
 
-    if (mPlayFrame < mFrames.size())
-      return mFrames[mPlayFrame]->getPtr();
-    else if (!mFrames.empty())
-      return mFrames[mFrames.size()-1]->getPtr();
-
-    return nullptr;
-    }
-  //}}}
-  //{{{
-  int getPlayFrameLen() {
-
-    if (mPlayFrame < mFrames.size())
-      return mFrames[mPlayFrame]->getLen();
-    else if (!mFrames.empty())
-      return mFrames[mFrames.size()-1]->getLen();
-
-     return 0;
-    }
-  //}}}
+  // optional info
+  int getBitrate() { return mBitrate; }
+  std::string getChan() { return mChan; }
+  cJpegImage* getJpegImage() { return mJpegImage; }
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
   void setSamplesPerFrame (int samplePerFrame) { mSamplesPerFrame = samplePerFrame; }
 
-  //{{{
-  void setJpegImage (cJpegImage* jpegImage) {
+  void setPlayFrame (int frame);
+  void incPlayFrame (int frames);
+  void incPlaySec (int secs);
 
-    auto temp = mJpegImage;
-    mJpegImage = jpegImage;;
-    delete temp;
-    }
-  //}}}
-  //{{{
-  void setTitle (std::string title) {
+  void setTitle (const std::string& title);
 
-    if (!mFrames.empty())
-      mFrames.back()->setTitle (title);
-    }
+  void setJpegImage (cJpegImage* jpegImage);
+  void setChan (const std::string& chan) { mChan = chan; }
+  void setBitrate (int bitrate) { mBitrate = bitrate; }
   //}}}
 
-  //{{{
-  void setPlayFrame (int frame) {
-    mPlayFrame = std::min (std::max (frame, 0), getLastFrame());
-    }
-  //}}}
-  void incPlayFrame (int frames) { setPlayFrame (mPlayFrame + frames); }
-  void incPlaySec (int secs) { incPlayFrame (secs * mSampleRate / mSamplesPerFrame); }
-  //}}}
+  void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
+  bool addFrame (uint8_t* stream, int frameLen, int estimatedTotalFrames, int samplesPerFrame, float* samples);
 
-  //{{{
-  void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate) {
-
-    mId++;
-
-    mFrameType = frameType;
-    mNumChannels = numChannels;
-    mSampleRate = sampleRate;
-    mSamplesPerFrame = samplesPerFrame;
-
-    mFrames.clear();
-
-    mPlayFrame = 0;
-    mTotalFrames = 0;
-
-    setJpegImage (nullptr);
-
-    mMaxPowerValue = kMinPowerValue;
-    mMaxFreqValue = 0.f;
-    for (int i = 0; i < kMaxFreq; i++)
-      mMaxFreqValues[i] = 0.f;
-
-    fftrConfig = kiss_fftr_alloc (samplesPerFrame, 0, 0, 0);
-    }
-  //}}}
-  //{{{
-  bool addFrame (uint8_t* stream, int frameLen, int estimatedTotalFrames, int samplesPerFrame, float* samples) {
-  // return true if enough frames added to start playing, streamLen only used to estimate totalFrames
-
-    mSamplesPerFrame = samplesPerFrame;
-    mTotalFrames = estimatedTotalFrames;
-
-    // sum of squares channel power
-    auto powerValues = (float*)malloc (mNumChannels * 4);
-    memset (powerValues, 0, mNumChannels * 4);
-    for (int sample = 0; sample < samplesPerFrame; sample++) {
-      timeBuf[sample] = 0;
-      for (auto chan = 0; chan < mNumChannels; chan++) {
-        auto value = *samples++;
-        timeBuf[sample] += value;
-        powerValues[chan] += value * value;
-        }
-      }
-    for (auto chan = 0; chan < mNumChannels; chan++) {
-      powerValues[chan] = sqrtf (powerValues[chan] / samplesPerFrame);
-      mMaxPowerValue = std::max (mMaxPowerValue, powerValues[chan]);
-      }
-
-    kiss_fftr (fftrConfig, timeBuf, freqBuf);
-
-    auto freqValues = (float*)malloc (kMaxFreq * 4);
-    for (auto freq = 0; freq < kMaxFreq; freq++) {
-      freqValues[freq] = sqrt ((freqBuf[freq].r * freqBuf[freq].r) + (freqBuf[freq].i * freqBuf[freq].i));
-      mMaxFreqValue = std::max (mMaxFreqValue, freqValues[freq]);
-      mMaxFreqValues[freq] = std::max (mMaxFreqValues[freq], freqValues[freq]);
-      }
-
-    // dodgy juicing of maxFreqValue * 4 to max Luma
-    float scale = 1024.f / mMaxFreqValue;
-    auto lumaValues = (uint8_t*)malloc (kMaxSpectrum);
-    for (auto freq = 0; freq < kMaxSpectrum; freq++) {
-      auto value = freqValues[freq] * scale;
-      lumaValues[kMaxSpectrum - freq - 1] = value > 255 ? 255 : uint8_t(value);
-      }
-
-    mFrames.push_back (new cFrame (stream, frameLen, powerValues, freqValues, lumaValues));
-
-    // calc silent window
-    auto frameNum = getLastFrame();
-    if (mFrames[frameNum]->isSilent()) {
-      auto window = kSilentWindowFrames;
-      auto windowFrame = frameNum - 1;
-      while ((window >= 0) && (windowFrame >= 0)) {
-        // walk backwards looking for no silence
-        if (!mFrames[windowFrame]->isSilentThreshold()) {
-          mFrames[frameNum]->setSilent (false);
-          break;
-          }
-        windowFrame--;
-        window--;
-        }
-      }
-
-    // return true if first frame, used to launch player
-    return frameNum == 0;
-    }
-  //}}}
-
-  //{{{
-  void prevSilence() {
-    mPlayFrame = skipPrev (mPlayFrame, false);
-    mPlayFrame = skipPrev (mPlayFrame, true);
-    mPlayFrame = skipPrev (mPlayFrame, false);
-    }
-  //}}}
-  //{{{
-  void nextSilence() {
-    mPlayFrame = skipNext (mPlayFrame, true);
-    mPlayFrame = skipNext (mPlayFrame, false);
-    mPlayFrame = skipNext (mPlayFrame, true);
-    }
-  //}}}
+  void prevSilence();
+  void nextSilence();
 
   // public vars
   concurrency::concurrent_vector<cFrame*> mFrames;
@@ -265,26 +122,8 @@ private:
   constexpr static int kMaxSpectrum = kMaxFreq;
   //}}}
 
-  //{{{
-  int skipPrev (int fromFrame, bool silent) {
-
-    for (auto frame = fromFrame-1; frame >= 0; frame--)
-      if (mFrames[frame]->isSilent() ^ silent)
-        return frame;
-
-    return fromFrame;
-    }
-  //}}}
-  //{{{
-  int skipNext (int fromFrame, bool silent) {
-
-    for (int frame = fromFrame; frame < getNumFrames(); frame++)
-      if (mFrames[frame]->isSilent() ^ silent)
-        return frame;
-
-    return fromFrame;
-    }
-  //}}}
+  int skipPrev (int fromFrame, bool silent);
+  int skipNext (int fromFrame, bool silent);
 
   constexpr static float kMinPowerValue = 0.25f;
   constexpr static int kSilentWindowFrames = 10;
@@ -307,6 +146,9 @@ private:
   float mMaxFreqValues[kMaxFreq];
   float mMaxPowerValue = kMinPowerValue;
   float mMaxFreqValue = 0.f;
-  //}}}
+
+  int mBitrate;
+  std::string mChan;
   cJpegImage* mJpegImage = nullptr;
+  //}}}
   };

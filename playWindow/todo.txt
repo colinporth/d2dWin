@@ -1,0 +1,47 @@
+main wave
+- zoom out flashing to black
+- silence not wide enough, subpixel wrong
+- mark subpixel wrong
+- check -ve clear with div
+
+overview
+- fix gaps
+- lens dim and flashing
+
+sizing window flashing, short and crashes
+
+filelist broken
+
+jpeg tag load broken
+
+hls, shoutcast
+- stop using big buffer
+- shoutcast
+  - title display broken
+- hls
+  - channel change
+  - bitrate change
+  - go back in time
+  - broadcast clocktime display
+
+command line invocation
+- web sites
+- hls file list
+- group of files etc,
+- links to directories etc
+
+direct2d
+- investigate src coordinates to subpixel accuracy
+- investigate bitmapbrush with alpha
+  - gradient brush for waveform
+
+play
+- more buttons
+- play on off
+- stutter when stopped
+- play region marking
+
+editing
+- mute marking
+- save with edits
+- compress to aaa

@@ -9,8 +9,8 @@
 #include "cSong.h"
 #include "cSongBox.h"
 
-#include "cAudioDecode.h"
 #include "audioWASAPI.h"
+#include "cAudioDecode.h"
 
 using namespace std;
 //}}}
@@ -41,21 +41,10 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (streaming) {
-      //{{{
-      //const static string kPathNames[] = { "none",
-                                           //"bbc_radio_one",
-                                           //"bbc_radio_two",
-                                           //"bbc_radio_three",
-                                           //"bbc_radio_fourfm",
-                                           //"bbc_radio_five_live",
-                                           //"bbc_6music" };
-      //}}}
-      //const static int kBitrates [] = { 48000, 96000, 128000, 320000 };
-      //thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_three", 48000); }).detach();
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
       //thread ([=]() { icyThread (name); }).detach();
       }
-    else if (streaming || !mFileList->empty())
+    else if (!mFileList->empty())
       thread ([=](){ fileThread(); }).detach();
 
     // loop till quit
@@ -89,6 +78,18 @@ protected:
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
       case 0x0d: mSongChanged = true; changed(); break; // enter - play file
+
+      // crude chan,bitrate change
+      case  '1': mSong.setChan ("bbc_radio_one"); break;
+      case  '2': mSong.setChan ("bbc_radio_two"); break;
+      case  '3': mSong.setChan ("bbc_radio_three"); break;
+      case  '4': mSong.setChan ("bbc_radio_fourfm"); break;
+      case  '5': mSong.setChan ("bbc_radio_five_live"); break;
+      case  '6': mSong.setChan ("bbc_6music"); break;
+      case  '7': mSong.setBitrate (48000); break;
+      case  '8': mSong.setBitrate (96000); break;
+      case  '9': mSong.setBitrate (128000); break;
+      case  '0': mSong.setBitrate (320000); break;
 
       default  : cLog::log (LOGINFO, "key %x", key);
       }
@@ -179,20 +180,23 @@ private:
 
   //{{{
   void hlsThread (string host, const string& chan, int bitrate) {
-  // hls chunk http load and analyse thread, single thread helps channel change and jumping backwards
+  // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
   // - host is redirected, assumes bbc radio aac, 48000 sampleaRate
   // - !!!! convert big dumb stream buffer to individual frame allocs !!!!
   // - !!!! add discontiguous chunks for going backwards from start !!!!
 
     cLog::setThreadName ("hls ");
+    mSong.setChan (chan);
+    mSong.setBitrate (bitrate);
 
     // allocate simnple big buffer for stream
     auto streamFirst = (uint8_t*)malloc (200000000);
     auto streamEnd = streamFirst;
 
     cWinSockHttp http;
-    string path = "pool_904/live/uk/" + chan + '/' + chan + ".isml/" + chan + "-audio=" + dec(bitrate);
-    host = http.getRedirect (host, path + ".norewind.m3u8");
+    string m3u8Path = "pool_904/live/uk/" + mSong.getChan() + '/' + mSong.getChan() + ".isml/" + mSong.getChan() +
+                      "-audio=" + dec(mSong.getBitrate()) + ".norewind.m3u8";
+    host = http.getRedirect (host, m3u8Path);
     if (http.getContent()) {
       //{{{  parse m3u8 for startSeqNum, startDatePoint, startTimePoint
       // point to #EXT-X-MEDIA-SEQUENCE: sequence num
@@ -236,7 +240,9 @@ private:
       auto seqNum = startSeqNum;
       while (!getExit()) {
         // get hls seqNum chunk, about 100k bytes for 128kps stream
-        if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
+        string path = "pool_904/live/uk/" + mSong.getChan() + '/' + mSong.getChan() + ".isml/" + mSong.getChan() +
+                      "-audio=" + dec(mSong.getBitrate()) + '-' + dec(seqNum) + ".ts";
+        if (http.get (host, path) == 200) {
           streamEnd = extractAacFramesFromTs (streamEnd, http.getContent(), http.getContentSize());
           http.freeContent();
 
