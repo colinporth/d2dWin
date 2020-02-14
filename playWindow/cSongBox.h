@@ -265,7 +265,6 @@ private:
     int freqOffset = mSong.getNumFreqLuma() > (int)mFreqHeight ? mSong.getNumFreqLuma() - (int)mFreqHeight : 0;
 
     if (frameStep == 1) {
-      // seems to interfere with draws above if interleaved, copyFromMemory stalling drawing ???
       for (auto frame = fromFrame; frame < toFrame; frame += frameStep) {
         uint32_t bitmapIndex = (frame / frameStep) & mBitmapMask;
         D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
@@ -273,7 +272,8 @@ private:
         }
       }
     else {
-      auto alignedFromFrame = fromFrame - (fromFrame % frameStep); 
+      // align to frameStep, could sum as well
+      auto alignedFromFrame = fromFrame - (fromFrame % frameStep);
       for (auto frame = alignedFromFrame; frame < toFrame; frame += frameStep) {
         uint32_t bitmapIndex = (frame / frameStep) & mBitmapMask;
         D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
@@ -295,21 +295,11 @@ private:
     auto rightFrame = playFrame + (((getWidthInt() + frameWidth) / 2) * frameStep) / frameWidth;
     rightFrame = std::min (rightFrame, mSong.getLastFrame());
 
-    // check for bitmap range overlap
-    mBitmapFramesOk = mBitmapFramesOk &&
-                      (frameStep == mBitmapFrameStep) &&
-                      (rightFrame > mBitmapFirstFrame) && (leftFrame < mBitmapLastFrame);
-
-    // add frames to freq,wave,silence,mark bitmap
     mBitmapTarget->BeginDraw();
-    if (!mBitmapFramesOk || (leftFrame >= mBitmapLastFrame) || (rightFrame < mBitmapFirstFrame)) {
-      //{{{  draw all bitmap frames
-      drawBitmapFrames (leftFrame, rightFrame, playFrame, rightFrame, frameStep, valueScale);
-      mBitmapFirstFrame = leftFrame;
-      mBitmapLastFrame = rightFrame;
-      }
-      //}}}
-    else { // frame range overlaps bitmap frames
+    if (mBitmapFramesOk &&
+        (frameStep == mBitmapFrameStep) &&
+        (rightFrame > mBitmapFirstFrame) && (leftFrame < mBitmapLastFrame)) {
+      // overlap
       if (leftFrame < mBitmapFirstFrame) {
         //{{{  draw new bitmap leftFrames
         drawBitmapFrames (leftFrame, mBitmapFirstFrame, playFrame, rightFrame, frameStep, valueScale);
@@ -327,10 +317,16 @@ private:
         }
         //}}}
       }
-    mBitmapTarget->EndDraw();
-
+    else {
+      //{{{  no overlap, draw all bitmap frames
+      drawBitmapFrames (leftFrame, rightFrame, playFrame, rightFrame, frameStep, valueScale);
+      mBitmapFirstFrame = leftFrame;
+      mBitmapLastFrame = rightFrame;
+      }
+      //}}}
     mBitmapFramesOk = true;
     mBitmapFrameStep = frameStep;
+    mBitmapTarget->EndDraw();
 
     // calc bitmap wrap chunks
     float leftSrcIndex = (float)((leftFrame / frameStep) & mBitmapMask);
