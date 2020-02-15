@@ -21,8 +21,9 @@ public:
   void run (bool streaming, const string& title, int width, int height, const string& name) {
 
     initialise (title + " " + name, width, height, false);
+    mSong = new cSong();
 
-    mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, mSong.getJpegImage());
+    mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, mSong->getJpegImage());
     add (mJpegImageView);
 
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
@@ -66,30 +67,30 @@ protected:
 
       case  ' ': mPlaying = !mPlaying; break;
 
-      case 0x21: mSong.prevSilence(); changed(); break;; // page up
-      case 0x22: mSong.nextSilence(); changed(); break;; // page down
+      case 0x21: mSong->prevSilence(); changed(); break;; // page up
+      case 0x22: mSong->nextSilence(); changed(); break;; // page down
 
-      case 0x25: mSong.incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
-      case 0x27: mSong.incPlaySec (getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
+      case 0x25: mSong->incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
+      case 0x27: mSong->incPlaySec (getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
 
-      case 0x24: mSong.setPlayFrame (0); changed(); break; // home
-      case 0x23: mSong.setPlayFrame (mSong.getTotalFrames() -1); changed(); break; // end
+      case 0x24: mSong->setPlayFrame (0); changed(); break; // home
+      case 0x23: mSong->setPlayFrame (mSong->getTotalFrames() -1); changed(); break; // end
 
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
       case 0x0d: mSongChanged = true; changed(); break; // enter - play file
 
       // crude chan,bitrate change
-      case  '1': mSong.setChan ("bbc_radio_one"); break;
-      case  '2': mSong.setChan ("bbc_radio_two"); break;
-      case  '3': mSong.setChan ("bbc_radio_three"); break;
-      case  '4': mSong.setChan ("bbc_radio_fourfm"); break;
-      case  '5': mSong.setChan ("bbc_radio_five_live"); break;
-      case  '6': mSong.setChan ("bbc_6music"); break;
-      case  '7': mSong.setBitrate (48000); break;
-      case  '8': mSong.setBitrate (96000); break;
-      case  '9': mSong.setBitrate (128000); break;
-      case  '0': mSong.setBitrate (320000); break;
+      case  '1': mSong->setChan ("bbc_radio_one"); break;
+      case  '2': mSong->setChan ("bbc_radio_two"); break;
+      case  '3': mSong->setChan ("bbc_radio_three"); break;
+      case  '4': mSong->setChan ("bbc_radio_fourfm"); break;
+      case  '5': mSong->setChan ("bbc_radio_five_live"); break;
+      case  '6': mSong->setChan ("bbc_6music"); break;
+      case  '7': mSong->setBitrate (48000); break;
+      case  '8': mSong->setBitrate (96000); break;
+      case  '9': mSong->setBitrate (128000); break;
+      case  '0': mSong->setBitrate (320000); break;
 
       default  : cLog::log (LOGINFO, "key %x", key);
       }
@@ -161,7 +162,7 @@ private:
         string titleStr = icyInfo.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
         if (titleStr != mLastTitleStr) {
           cLog::log (LOGINFO1, "addIcyInfo found title = " + titleStr);
-          mSong.setTitle (titleStr);
+          mSong->setTitle (titleStr);
           mLastTitleStr = titleStr;
           }
         }
@@ -186,12 +187,13 @@ private:
   // - host is redirected, assumes bbc radio aac, 48000 sampleaRate
 
     cLog::setThreadName ("hls ");
-    mSong.setChan (chan);
-    mSong.setBitrate (bitrate);
+    mSong->setChan (chan);
+    mSong->setBitrate (bitrate);
 
+    const string m3u8Path = "pool_904/live/uk/" + mSong->getChan() +
+                            "/" + mSong->getChan() + ".isml/" + mSong->getChan() +
+                            "-audio=" + dec(mSong->getBitrate()) + ".norewind.m3u8";
     cWinSockHttp http;
-    string m3u8Path = "pool_904/live/uk/" + mSong.getChan() + '/' + mSong.getChan() + ".isml/" + mSong.getChan() +
-                      "-audio=" + dec(mSong.getBitrate()) + ".norewind.m3u8";
     host = http.getRedirect (host, m3u8Path);
     if (http.getContent()) {
       //{{{  parse m3u8 for startSeqNum, startDatePoint, startTimePoint
@@ -228,16 +230,18 @@ private:
       uint32_t startFrame = uint32_t((uint32_t(seconds.count()) - kStartTimeSecondsOffset) * kFramesPerSecond);
       //}}}
 
-      mSong.init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
+      mSong->init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
       cAudioDecode decode (cAudioDecode::eAac);
-      float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
+      float* samples = (float*)malloc (mSong->getMaxSamplesPerFrame() * mSong->getNumSampleBytes());
 
       auto seqNum = startSeqNum;
       while (!getExit()) {
         // get hls seqNum chunk, about 100k bytes for 128kps stream
-        string path = "pool_904/live/uk/" + mSong.getChan() + '/' + mSong.getChan() + ".isml/" + mSong.getChan() +
-                      "-audio=" + dec(mSong.getBitrate()) + '-' + dec(seqNum) + ".ts";
+        const string path = "pool_904/live/uk/" + mSong->getChan() +
+                            "/" + mSong->getChan() + ".isml/" + mSong->getChan() +
+                            "-audio=" + dec(mSong->getBitrate()) + '-' + dec(seqNum) + ".ts";
         if (http.get (host, path) == 200) {
+          cLog::log (LOGINFO, "get %d", seqNum);
           auto aacFrames = http.getContent();
           auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
           while (decode.parseFrame (aacFrames, aacFramesEnd)) {
@@ -250,9 +254,9 @@ private:
               memcpy (aacFrame, decode.getFramePtr(), aacFrameLen);
 
               // frame fixup aacHE sampleRate, samplesPerFrame
-              mSong.setSampleRate (decode.getSampleRate());
-              mSong.setSamplesPerFrame (decode.getNumSamples());
-              if (mSong.addFrame (aacFrame, aacFrameLen, mSong.getNumFrames()+1, numSamples, samples))
+              mSong->setSampleRate (decode.getSampleRate());
+              mSong->setSamplesPerFrame (decode.getNumSamples());
+              if (mSong->addFrame (aacFrame, aacFrameLen, mSong->getNumFrames()+1, numSamples, samples))
                 thread ([=](){ playThread (true); }).detach();
               changed();
               }
@@ -307,7 +311,7 @@ private:
         // cLog::log (LOGINFO, "callback %d", length);
         if ((icyInfoCount >= icyInfoLen) && (icySkipCount + length <= icySkipLen)) {
           //{{{  simple copy of whole body, no metaInfo
-          cLog::log (LOGINFO1, "body simple copy len:%d", length);
+          //cLog::log (LOGINFO1, "body simple copy len:%d", length);
 
           memcpy (bufferEnd, data, length);
 
@@ -317,8 +321,8 @@ private:
           //}}}
         else {
           //{{{  dumb copy for metaInfo straddling body, could be much better
-          cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
-                                length, icyInfoCount, icyInfoLen, icySkipCount, icySkipLen);
+          //cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
+                                //length, icyInfoCount, icyInfoLen, icySkipCount, icySkipLen);
 
           for (int i = 0; i < length; i++) {
             if (icyInfoCount < icyInfoLen) {
@@ -331,7 +335,7 @@ private:
               icyInfoLen = data[i] * 16;
               icyInfoCount = 0;
               icySkipCount = 0;
-              cLog::log (LOGINFO1, "body icyInfo len:", data[i] * 16);
+              //cLog::log (LOGINFO1, "body icyInfo len:", data[i] * 16);
               }
             else {
               icySkipCount++;
@@ -346,12 +350,12 @@ private:
           firstTime = false;
           int sampleRate;
           auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
-          mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
-          samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
+          mSong->init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
+          samples = (float*)malloc (mSong->getSamplesPerFrame() * mSong->getNumSampleBytes());
           }
 
         while (decode.parseFrame (buffer, bufferEnd)) {
-          if (decode.getFrameType() == mSong.getFrameType()) {
+          if (decode.getFrameType() == mSong->getFrameType()) {
             auto numSamples = decode.frameToSamples (samples);
             if (numSamples) {
               int framelen = decode.getFrameLen();
@@ -359,9 +363,9 @@ private:
               memcpy (frame, decode.getFramePtr(), framelen);
 
               // frame fixup aacHE sampleRate, samplesPerFrame
-              mSong.setSampleRate (decode.getSampleRate());
-              mSong.setSamplesPerFrame (decode.getNumSamples());
-              if (mSong.addFrame (frame, framelen, mSong.getNumFrames()+1, numSamples, samples))
+              mSong->setSampleRate (decode.getSampleRate());
+              mSong->setSamplesPerFrame (decode.getNumSamples());
+              if (mSong->addFrame (frame, framelen, mSong->getNumFrames()+1, numSamples, samples))
                 thread ([=](){ playThread (true); }).detach();
               changed();
               }
@@ -402,7 +406,7 @@ private:
         //{{{  add jpeg
         auto jpegImage = new cJpegImage();
         jpegImage->setBuf (cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen);
-        mSong.setJpegImage (jpegImage);
+        mSong->setJpegImage (jpegImage);
         mJpegImageView->setImage (jpegImage);
         }
         //}}}
@@ -412,7 +416,7 @@ private:
       if (frameType == cAudioDecode::eWav) {
         //{{{  float 32bit interleaved wav uses file map directly
         auto frameSamples = 1024;
-        mSong.init (frameType, 2, frameSamples, sampleRate);
+        mSong->init (frameType, 2, frameSamples, sampleRate);
 
         cAudioDecode decode (cAudioDecode::eWav);
         decode.parseFrame (fileMapPtr, fileMapEnd);
@@ -420,7 +424,7 @@ private:
 
         auto frameSampleBytes = frameSamples * 2 * 4;
         while (!getExit() && !mSongChanged && !songDone) {
-          if (mSong.addFrame (data, frameSampleBytes, fileMapSize / frameSampleBytes, frameSamples, (float*)data))
+          if (mSong->addFrame (data, frameSampleBytes, fileMapSize / frameSampleBytes, frameSamples, (float*)data))
             thread ([=](){ playThread (false); }).detach();
 
           data += frameSampleBytes;
@@ -430,22 +434,22 @@ private:
         }
         //}}}
       else {
-        mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
+        mSong->init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
 
         cAudioDecode decode (frameType);
-        auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
+        auto samples = (float*)malloc (mSong->getSamplesPerFrame() * mSong->getNumSampleBytes());
 
         while (!getExit() && !mSongChanged && !songDone) {
           while (decode.parseFrame (fileMapPtr, fileMapEnd)) {
-            if (decode.getFrameType() == mSong.getFrameType()) {
+            if (decode.getFrameType() == mSong->getFrameType()) {
               auto numSamples = decode.frameToSamples (samples);
               if (numSamples) {
                 // frame fixup aacHE sampleRate, samplesPerFrame
-                mSong.setSampleRate (decode.getSampleRate());
-                mSong.setSamplesPerFrame (decode.getNumSamples());
-                int numFrames = mSong.getNumFrames();
+                mSong->setSampleRate (decode.getSampleRate());
+                mSong->setSamplesPerFrame (decode.getNumSamples());
+                int numFrames = mSong->getNumFrames();
                 int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
-                if (mSong.addFrame (decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, numSamples, samples))
+                if (mSong->addFrame (decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, numSamples, samples))
                   thread ([=](){ playThread (false); }).detach();
                 changed();
                 }
@@ -483,31 +487,31 @@ private:
 
     auto device = getDefaultAudioOutputDevice();
     if (device) {
-      device->setSampleRate (mSong.getSampleRate());
+      device->setSampleRate (mSong->getSampleRate());
       SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-      cAudioDecode decode (mSong.getFrameType());
-      float* samples = (mSong.getFrameType() == cAudioDecode::eWav) ?
-                         nullptr : (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
+      cAudioDecode decode (mSong->getFrameType());
+      float* samples = (mSong->getFrameType() == cAudioDecode::eWav) ?
+                         nullptr : (float*)malloc (mSong->getMaxSamplesPerFrame() * mSong->getNumSampleBytes());
 
       device->start();
-      while (!getExit() && !mSongChanged && (streaming || (mSong.getPlayFrame() <= mSong.getLastFrame())))
+      while (!getExit() && !mSongChanged && (streaming || (mSong->getPlayFrame() <= mSong->getLastFrame())))
         if (mPlaying) {
-          //cLog::log (LOGINFO2, "process for frame:%d", mSong.getPlayFrame());
+          //cLog::log (LOGINFO2, "process for frame:%d", mSong->getPlayFrame());
           device->process ([&](float*& srcSamples, int& numSrcSamples,
                                int numDstSamplesLeft, int numDstSamples) mutable noexcept {
             // lambda callback - load srcSamples
             //cLog::log (LOGINFO3, " - callback for src:%d dst:%d:%d",
-                       //mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
-            if (mSong.isFramePtrSamples())
-              srcSamples = (float*)mSong.getPlayFramePtr();
+                       //mSong->getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
+            if (mSong->isFramePtrSamples())
+              srcSamples = (float*)mSong->getPlayFramePtr();
             else {
-              decode.setFrame (mSong.getPlayFramePtr(), mSong.getPlayFrameLen());
+              decode.setFrame (mSong->getPlayFramePtr(), mSong->getPlayFrameLen());
               decode.frameToSamples (samples);
               srcSamples = samples;
               }
-            numSrcSamples = mSong.getSamplesPerFrame();
-            mSong.incPlayFrame (1);
+            numSrcSamples = mSong->getSamplesPerFrame();
+            mSong->incPlayFrame (1);
             });
 
           changed();
@@ -527,7 +531,7 @@ private:
   //{{{  vars
   cFileList* mFileList;
 
-  cSong mSong;
+  cSong* mSong = nullptr;
   bool mSongChanged = false;
   cJpegImageView* mJpegImageView = nullptr;
 
@@ -554,7 +558,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
   if (numArgs > 1)
-    appWindow.run (false, "playWindow", 800, 600, wcharToString (args[1]));
+    appWindow.run (false, "playWindow", 800, 480, wcharToString (args[1]));
   else {
     //{{{  urls
     //const string url = "http://stream.wqxr.org/wqxr.aac";
@@ -565,7 +569,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
     //}}}
     const string url = "http://stream.wqxr.org/js-stream.aac";
-    appWindow.run (true, "playWindow", 800, 600, url);
+    appWindow.run (true, "playWindow", 800, 480, url);
     }
 
   CoUninitialize();
