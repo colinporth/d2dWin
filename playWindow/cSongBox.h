@@ -500,10 +500,10 @@ private:
       //}}}
 
     //{{{  draw playFrame
-    auto powerValues = mSong.mFrames[playFrame]->getPowerValues();
-    dstRect = { mRect.left + dstPlay * mFrameWidth, mDstWaveCentre - (*powerValues++ * valueScale),
-                mRect.left + (dstPlay+1.f) * mFrameWidth, mDstWaveCentre + (*powerValues * valueScale) };
-    dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
+    auto powerValues = mSong.mFrames[playFrame]->getPeakPowerValues();
+    dstRect = { mRect.left + (dstPlay * mFrameWidth)-1.f, mDstWaveCentre - (*powerValues++ * valueScale),
+                mRect.left + ((dstPlay+1.f) * mFrameWidth)+1.f, mDstWaveCentre + (*powerValues * valueScale) };
+    dc->FillRectangle (dstRect, mWindow->getGreenBrush());
     //}}}
 
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);

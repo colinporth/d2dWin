@@ -481,7 +481,7 @@ void cD2dWindow::createDirect2d() {
   mDeviceContext->CreateSolidColorBrush (ColorF (0.1f, 0.1f, 0.1f, 0.5f), &mTransparentBgndBrush);
 
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Red), &mRedBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Green), &mGreenBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::GreenYellow), &mGreenBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Blue), &mDarkBlueBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::CornflowerBlue), &mBlueBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Yellow), &mYellowBrush);

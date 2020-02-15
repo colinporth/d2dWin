@@ -3,7 +3,6 @@ main wave
 - silence not wide enough, subpixel wrong
 - mark subpixel wrong
 - check -ve clear with div
-- peak display colours
 
 overview
 - fix gaps
@@ -16,7 +15,6 @@ filelist broken
 jpeg tag load broken
 
 hls, shoutcast
-- stop using big buffer
 - shoutcast
   - title display broken
 - hls
