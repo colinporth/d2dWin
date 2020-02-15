@@ -91,8 +91,6 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   mSampleRate = sampleRate;
   mSamplesPerFrame = samplesPerFrame;
 
-  mFrames.clear();
-
   mPlayFrame = 0;
   mTotalFrames = 0;
 
@@ -106,6 +104,8 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
     mMaxFreqValues[i] = 0.f;
 
   fftrConfig = kiss_fftr_alloc (samplesPerFrame, 0, 0, 0);
+
+  mFrameChunks.push_back (new cFrameChunk ((int)mFrames.size()));
   }
 //}}}
 //{{{
@@ -157,8 +157,10 @@ bool cSong::addFrame (uint8_t* stream, int frameLen, int estimatedTotalFrames, i
 
   mFrames.push_back (new cFrame (stream, frameLen, powerValues, peakPowerValues, freqValues, lumaValues));
 
-  // calc silent window
   auto frameNum = getLastFrame();
+  mFrameChunks.back()->mLastFrame = frameNum;
+
+  // calc silent window
   if (mFrames[frameNum]->isSilent()) {
     auto window = kSilentWindowFrames;
     auto windowFrame = frameNum - 1;

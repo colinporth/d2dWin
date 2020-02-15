@@ -69,6 +69,29 @@ public:
     std::string mTitle;
     };
   //}}}
+  //{{{
+  class cFrameChunk {
+  public:
+    cFrameChunk (int frame) : mFirstFrame(frame), mLastFrame(frame) {}
+
+    // gets
+    int getFirstFrame() { return mFirstFrame; }
+    int getLastFrame() { return mLastFrame; }
+    int getNumFrames() { return mLastFrame - mFirstFrame; }
+
+    bool hasTitle() { return !mTitle.empty(); }
+    std::string getTitle() { return mTitle; }
+
+    // set
+    void setTitle (const std::string& title) { mTitle = title; }
+
+    int mFirstFrame;
+    int mLastFrame;
+
+  private:
+    std::string mTitle;
+    };
+  //}}}
   virtual ~cSong();
 
   //{{{  gets
@@ -125,6 +148,7 @@ public:
 
   // public var
   concurrency::concurrent_vector<cFrame*> mFrames;
+  concurrency::concurrent_vector<cFrameChunk*> mFrameChunks;
 
 private:
   constexpr static int kMaxSamplesPerFrame = 2048;
