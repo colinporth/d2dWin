@@ -59,7 +59,7 @@
 #include "../boxes/cIntBox.h"
 #include "../boxes/cFloatBox.h"
 #include "../boxes/cTitleBox.h"
-#include "../common/cJpegImageView.h"
+#include "../boxes/cJpegImageView.h"
 
 extern "C" {
   #include "libavformat/avformat.h"

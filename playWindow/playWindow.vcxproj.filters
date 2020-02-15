@@ -36,9 +36,6 @@
     <ClInclude Include="..\boxes\cWindowBox.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\cJpegImageView.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\cView2d.h">
       <Filter>h</Filter>
     </ClInclude>
@@ -70,6 +67,9 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="cSongBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cJpegImageView.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

@@ -20,7 +20,6 @@ kiss_fft_cpx freqBuf[cSong::kMaxFreq];
 cSong::~cSong() {
 
   mFrames.clear();
-  setJpegImage (nullptr);
   }
 //}}}
 
@@ -60,13 +59,6 @@ int cSong::getPlayFrameLen() {
 
 // sets
 //{{{
-void cSong::setJpegImage (cJpegImage* jpegImage) {
-  auto temp = mJpegImage;
-  mJpegImage = jpegImage;;
-  delete temp;
-  }
-//}}}
-//{{{
 void cSong::setTitle (const string& title) {
 
   if (!mFrames.empty())
@@ -94,8 +86,6 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
 
   mPlayFrame = 0;
   mTotalFrames = 0;
-
-  setJpegImage (nullptr);
 
   mMaxPowerValue = kMinPowerValue;
   mMaxPeakPowerValue = kMinPowerValue;

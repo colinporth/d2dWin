@@ -126,7 +126,6 @@ public:
   // optional info
   int getBitrate() { return mBitrate; }
   std::string getChan() { return mChan; }
-  cJpegImage* getJpegImage() { return mJpegImage; }
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
@@ -138,7 +137,6 @@ public:
 
   void setTitle (const std::string& title);
 
-  void setJpegImage (cJpegImage* jpegImage);
   void setChan (const std::string& chan) { mChan = chan; }
   void setBitrate (int bitrate) { mBitrate = bitrate; }
   //}}}
@@ -176,5 +174,4 @@ private:
 
   int mBitrate;
   std::string mChan;
-  cJpegImage* mJpegImage = nullptr;
   };

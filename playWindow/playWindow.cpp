@@ -21,9 +21,9 @@ public:
   void run (bool streaming, const string& title, int width, int height, const string& name) {
 
     initialise (title + " " + name, width, height, false);
-    mSong = new cSong();
 
-    mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, mSong->getJpegImage());
+    mSong = new cSong();
+    mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
     add (mJpegImageView);
 
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
@@ -392,6 +392,8 @@ private:
 
     cLog::setThreadName ("file");
 
+    cJpegImage* jpegImage = nullptr;
+
     while (!getExit()) {
       HANDLE fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
       HANDLE mapping = CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
@@ -403,13 +405,9 @@ private:
       int sampleRate;
       auto frameType = cAudioDecode::parseSomeFrames (fileMapFirst, fileMapEnd, sampleRate);
       if (cAudioDecode::mJpegPtr) {
-        //{{{  add jpeg
-        auto jpegImage = new cJpegImage();
-        jpegImage->setBuf (cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen);
-        mSong->setJpegImage (jpegImage);
+        jpegImage = new cJpegImage(cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen);
         mJpegImageView->setImage (jpegImage);
         }
-        //}}}
 
       bool songDone = false;
       auto fileMapPtr = fileMapFirst;

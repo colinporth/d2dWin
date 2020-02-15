@@ -1,5 +1,7 @@
-// cJpegImageView.cpp
-#include "cD2dWindow.h"
+// cJpegImageView.h
+#pragma once
+
+#include "../common/cD2dWindow.h"
 
 class cJpegImageView : public cD2dWindow::cView {
 public:

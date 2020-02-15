@@ -10,7 +10,7 @@
 #include "../boxes/cWindowBox.h"
 #include "../boxes/cClockBox.h"
 #include "../boxes/cCalendarBox.h"
-#include "../common/cJpegImageView.h"
+#include "../boxes/cJpegImageView.h"
 
 using namespace std;
 using namespace concurrency;

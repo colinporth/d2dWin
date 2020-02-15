@@ -14,6 +14,8 @@
 
 class cJpegImage : public iImage {
 public:
+  cJpegImage() {}
+  cJpegImage (uint8_t* buf, int bufLen) : mBuf(buf), mBufLen (bufLen) {}
   //{{{
   void setBuf (uint8_t* buf, int bufLen) {
     mBuf = buf;

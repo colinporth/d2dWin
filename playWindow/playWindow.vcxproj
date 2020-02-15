@@ -56,12 +56,12 @@
     <ClInclude Include="..\..\shared\utils\date.h" />
     <ClInclude Include="..\boxes\cCalendarBox.h" />
     <ClInclude Include="..\boxes\cClockBox.h" />
+    <ClInclude Include="..\boxes\cJpegImageView.h" />
     <ClInclude Include="..\boxes\cLogBox.h" />
     <ClInclude Include="..\boxes\ctitlebox.h" />
     <ClInclude Include="..\boxes\cWindowBox.h" />
     <ClInclude Include="..\common\cD2dWindow.h" />
     <ClInclude Include="..\common\cJpegImage.h" />
-    <ClInclude Include="..\common\cJpegImageView.h" />
     <ClInclude Include="..\common\cPointRect.h" />
     <ClInclude Include="..\common\cView2d.h" />
     <ClInclude Include="cAudioDecode.h" />

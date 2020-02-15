@@ -12,7 +12,8 @@ sizing window flashing, short and crashes
 
 filelist broken
 
-jpeg tag load broken
+jpeg tag 
+ - westwing jpeg no SOI
 
 hls, shoutcast
 - shoutcast
