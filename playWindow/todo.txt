@@ -12,8 +12,8 @@ sizing window flashing, short and crashes
 
 filelist broken
 
-jpeg tag 
- - westwing jpeg no SOI
+jpeg tag
+ - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
 
 hls, shoutcast
 - shoutcast

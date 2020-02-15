@@ -74,18 +74,22 @@ void cSong::setPlayFrame (int frame) {
 void cSong::incPlayFrame (int frames) { setPlayFrame (mPlayFrame + frames); }
 void cSong::incPlaySec (int secs) { incPlayFrame (secs * mSampleRate / mSamplesPerFrame); }
 
+//std::mutex mMutex;
 //{{{
 void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate) {
 
+  lock_guard<mutex> lockGuard (mMutex);
+
   mId++;
+
+  mPlayFrame = 0;
+  mTotalFrames = 0;
+  mFrames.clear();
 
   mFrameType = frameType;
   mNumChannels = numChannels;
   mSampleRate = sampleRate;
   mSamplesPerFrame = samplesPerFrame;
-
-  mPlayFrame = 0;
-  mTotalFrames = 0;
 
   mMaxPowerValue = kMinPowerValue;
   mMaxPeakPowerValue = kMinPowerValue;
@@ -95,13 +99,13 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
     mMaxFreqValues[i] = 0.f;
 
   fftrConfig = kiss_fftr_alloc (samplesPerFrame, 0, 0, 0);
-
-  mFrameChunks.push_back (new cFrameChunk ((int)mFrames.size()));
   }
 //}}}
 //{{{
-bool cSong::addFrame (uint8_t* stream, int frameLen, int estimatedTotalFrames, int samplesPerFrame, float* samples) {
+bool cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int estimatedTotalFrames, int samplesPerFrame, float* samples) {
 // return true if enough frames added to start playing, streamLen only used to estimate totalFrames
+
+  lock_guard<mutex> lockGuard (mMutex);
 
   mSamplesPerFrame = samplesPerFrame;
   mTotalFrames = estimatedTotalFrames;
@@ -146,11 +150,9 @@ bool cSong::addFrame (uint8_t* stream, int frameLen, int estimatedTotalFrames, i
     lumaValues[kMaxSpectrum - freq - 1] = value > 255 ? 255 : uint8_t(value);
     }
 
-  mFrames.push_back (new cFrame (stream, frameLen, powerValues, peakPowerValues, freqValues, lumaValues));
+  mFrames.push_back (new cFrame (mapped, stream, frameLen, powerValues, peakPowerValues, freqValues, lumaValues));
 
   auto frameNum = getLastFrame();
-  mFrameChunks.back()->mLastFrame = frameNum;
-
   // calc silent window
   if (mFrames[frameNum]->isSilent()) {
     auto window = kSilentWindowFrames;

@@ -28,13 +28,15 @@
 #include "../boxes/cCalendarBox.h"
 #include "../boxes/cHlsPeakBox.h"
 #include "../boxes/cHlsDotsBox.h"
+
+using namespace std;
 //}}}
 
 class cAppWindow : public cHls, public cD2dWindow {
 public:
   cAppWindow (int chan, int bitrate) : cHls(chan, bitrate, getDaylightSeconds()) {}
   //{{{
-  void run (const std::string& title, int width, int height) {
+  void run (const string& title, int width, int height) {
 
     initialise (title, width, height, false);
     add (new cCalendarBox (this, 190.f,160.f, mTimePoint), -190.f - 24.f,0);
@@ -56,7 +58,7 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0);
 
     // launch loaderThread
-    std::thread ([=]() {
+    thread ([=]() {
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
       cWinSockHttp http;
       loader (http);
@@ -64,15 +66,14 @@ public:
       }).detach();
 
     // launch playerThread, high priority
-    auto playerThread = std::thread ([=]() {
+    thread ([=]() {
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
+      SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
       cWinAudio audio (2, 48000);
       mVolumeBox->setAudio (&audio);
       player (audio, this);
       CoUninitialize();
-      });
-    SetThreadPriority (playerThread.native_handle(), THREAD_PRIORITY_HIGHEST);
-    playerThread.detach();
+      }).detach();
 
     // loop till quit
     messagePump();

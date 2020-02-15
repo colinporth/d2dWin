@@ -26,10 +26,12 @@
 //{{{  stl
 #include <algorithm>
 #include <string>
+
 #include <map>
 #include <vector>
 #include <deque>
 #include <thread>
+
 #include <mutex>
 //}}}
 //{{{  direct2d
