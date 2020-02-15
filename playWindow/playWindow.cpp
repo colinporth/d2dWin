@@ -392,8 +392,6 @@ private:
 
     cLog::setThreadName ("file");
 
-    cJpegImage* jpegImage = nullptr;
-
     while (!getExit()) {
       HANDLE fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
       HANDLE mapping = CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
@@ -404,10 +402,8 @@ private:
       // sampleRate for aac-sbr wrong in header, fixup later, use a maxValue for samples alloc
       int sampleRate;
       auto frameType = cAudioDecode::parseSomeFrames (fileMapFirst, fileMapEnd, sampleRate);
-      if (cAudioDecode::mJpegPtr) {
-        jpegImage = new cJpegImage(cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen);
-        mJpegImageView->setImage (jpegImage);
-        }
+      if (cAudioDecode::mJpegPtr) // should delete old jpegImage, but we have memory to waste
+        mJpegImageView->setImage (new cJpegImage (cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen));
 
       bool songDone = false;
       auto fileMapPtr = fileMapFirst;
