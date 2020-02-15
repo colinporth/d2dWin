@@ -16,9 +16,9 @@ public:
   public:
     static constexpr float kSilentThreshold = 0.05f;
     //{{{
-    cFrame (uint8_t* ptr, uint32_t len, 
+    cFrame (uint8_t* ptr, uint32_t len,
             float* powerValues, float* peakPowerValues,
-            float* freqValues, uint8_t* lumaValues) : 
+            float* freqValues, uint8_t* lumaValues) :
           mPtr(ptr), mLen(len),
           mPowerValues(powerValues), mPeakPowerValues(peakPowerValues),
           mFreqValues(freqValues), mFreqLuma(lumaValues) {
@@ -28,6 +28,7 @@ public:
     //}}}
     //{{{
     ~cFrame() {
+      // !!! ownership of mPtr still be decided, don't delete for now !!!!
       free (mPowerValues);
       free (mPeakPowerValues);
       free (mFreqValues);

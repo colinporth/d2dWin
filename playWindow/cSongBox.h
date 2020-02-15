@@ -448,7 +448,7 @@ private:
       srcRect = { playSrcIndex+1.f, mSrcWaveTop, endSrcIndex, mSrcWaveTop + mWaveHeight };
       dstRect = { mRect.left + (playSrcIndex+1.f - leftSrcIndex) * mFrameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
-      dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
+      dc->FillOpacityMask (mBitmap, mWindow->getLightGreyBrush(), dstRect, srcRect);
       }
     //}}}
     if (wrap) {
@@ -495,7 +495,7 @@ private:
       srcRect = { split ? playSrcIndex+1.f : 0.f, mSrcWaveTop,  rightSrcIndex, mSrcWaveTop + mWaveHeight };
       dstRect = { mRect.left + (endSrcIndex - leftSrcIndex + (split ? (playSrcIndex+1.f) : 0.f)) * mFrameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
-      dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
+      dc->FillOpacityMask (mBitmap, mWindow->getLightGreyBrush(), dstRect, srcRect);
       }
       //}}}
 

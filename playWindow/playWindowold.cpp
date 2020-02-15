@@ -112,10 +112,9 @@ private:
   //}}}
 
   //{{{
-  static uint8_t* extractAacFramesFromTs (uint8_t* ts, int tsLen) {
-  // extract aacFrames from ts packets, pack back into ts, gets smaller ts gets stripped
-
-    auto aacFramesPtr = ts;
+  static uint8_t* extractAacFramesFromTs (uint8_t* stream, uint8_t* ts, int tsLen) {
+  // extract aacFrames from stream chunk tsPackets
+  // - ts and stream can be same buffer, only packs smaller
 
     auto tsDone = ts + tsLen - 188;
     while ((ts <= tsDone) && (*ts++ == 0x47)) {
@@ -135,14 +134,14 @@ private:
           }
 
         // copy ts payload aacFrames into stream
-        memcpy (aacFramesPtr, ts, tsBodyBytes);
-        aacFramesPtr += tsBodyBytes;
+        memcpy (stream, ts, tsBodyBytes);
+        stream += tsBodyBytes;
         }
 
       ts += tsBodyBytes;
       }
 
-    return aacFramesPtr;
+    return stream;
     }
   //}}}
 
@@ -191,6 +190,10 @@ private:
     mSong.setChan (chan);
     mSong.setBitrate (bitrate);
 
+    // allocate simnple big buffer for stream
+    auto streamFirst = (uint8_t*)malloc (200000000);
+    auto streamEnd = streamFirst;
+
     cWinSockHttp http;
     string m3u8Path = "pool_904/live/uk/" + mSong.getChan() + '/' + mSong.getChan() + ".isml/" + mSong.getChan() +
                       "-audio=" + dec(mSong.getBitrate()) + ".norewind.m3u8";
@@ -234,33 +237,29 @@ private:
       cAudioDecode decode (cAudioDecode::eAac);
       float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
+      auto stream = streamFirst;
       auto seqNum = startSeqNum;
       while (!getExit()) {
         // get hls seqNum chunk, about 100k bytes for 128kps stream
         string path = "pool_904/live/uk/" + mSong.getChan() + '/' + mSong.getChan() + ".isml/" + mSong.getChan() +
                       "-audio=" + dec(mSong.getBitrate()) + '-' + dec(seqNum) + ".ts";
         if (http.get (host, path) == 200) {
-          auto aacFrames = http.getContent();
-          auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
-          while (decode.parseFrame (aacFrames, aacFramesEnd)) {
+          streamEnd = extractAacFramesFromTs (streamEnd, http.getContent(), http.getContentSize());
+          http.freeContent();
+
+          while (decode.parseFrame (stream, streamEnd)) {
             //  add aacFrame from stream to song
             auto numSamples = decode.frameToSamples (samples);
             if (numSamples) {
-              // copy single aacFrame and save to frame
-              int aacFrameLen = decode.getFrameLen();
-              auto aacFrame = (uint8_t*)malloc (aacFrameLen);
-              memcpy (aacFrame, decode.getFramePtr(), aacFrameLen);
-
               // frame fixup aacHE sampleRate, samplesPerFrame
               mSong.setSampleRate (decode.getSampleRate());
               mSong.setSamplesPerFrame (decode.getNumSamples());
-              if (mSong.addFrame (aacFrame, aacFrameLen, mSong.getNumFrames()+1, numSamples, samples))
+              if (mSong.addFrame (decode.getFramePtr(), decode.getFrameLen(), mSong.getNumFrames()+1, numSamples, samples))
                 thread ([=](){ playThread (true); }).detach();
               changed();
               }
-            aacFrames += decode.getNextFrameOffset();
+            stream += decode.getNextFrameOffset();
             }
-          http.freeContent();
           seqNum++;
           }
         else // wait for next hls chunk, !!! should be timed to wall clock !!!!
@@ -285,10 +284,10 @@ private:
     int icyInfoLen = 0;
     char icyInfo[255] = { 0 };
 
-    // allocate buffer for stream
-    uint8_t streamFirst[2048];
-    uint8_t* streamEnd = streamFirst;
-    uint8_t* stream = streamFirst;
+    // allocate simnple big buffer for stream
+    auto streamFirst = (uint8_t*)malloc (200000000);
+    auto streamEnd = streamFirst;
+    auto stream = streamFirst;
 
     bool firstTime = true;
     cAudioDecode decode (cAudioDecode::eAac);
@@ -357,27 +356,17 @@ private:
           if (decode.getFrameType() == mSong.getFrameType()) {
             auto numSamples = decode.frameToSamples (samples);
             if (numSamples) {
-              int framelen = decode.getFrameLen();
-              auto frame = (uint8_t*)malloc (framelen);
-              memcpy (frame, decode.getFramePtr(), framelen);
-
               // frame fixup aacHE sampleRate, samplesPerFrame
               mSong.setSampleRate (decode.getSampleRate());
               mSong.setSamplesPerFrame (decode.getNumSamples());
-              if (mSong.addFrame (frame, framelen, mSong.getNumFrames()+1, numSamples, samples))
+              int numFrames = mSong.getNumFrames();
+              int totalFrames = (numFrames > 0) ? int(streamEnd - streamFirst) / (int(decode.getFramePtr() - streamFirst) / numFrames) : 0;
+              if (mSong.addFrame (decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, numSamples, samples))
                 thread ([=](){ playThread (true); }).detach();
               changed();
               }
             }
           stream += decode.getNextFrameOffset();
-          }
-
-        if ((stream > streamFirst) && (stream < streamEnd)) {
-          // shuffle down last partial frame
-          auto streamLeft = int(streamEnd - stream);
-          memcpy (streamFirst, stream, streamLeft);
-          streamEnd = streamFirst + streamLeft;
-          stream = streamFirst;
           }
         }
       //}}}
