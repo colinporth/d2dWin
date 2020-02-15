@@ -14,9 +14,14 @@ public:
   //{{{
   class cFrame {
   public:
+    static constexpr float kSilentThreshold = 0.05f;
     //{{{
-    cFrame (uint8_t* ptr, uint32_t len, float* powerValues, float* freqValues, uint8_t* lumaValues)
-        : mPtr(ptr), mLen(len), mPowerValues(powerValues), mFreqValues(freqValues), mFreqLuma(lumaValues) {
+    cFrame (uint8_t* ptr, uint32_t len, 
+            float* powerValues, float* peakPowerValues,
+            float* freqValues, uint8_t* lumaValues) : 
+          mPtr(ptr), mLen(len),
+          mPowerValues(powerValues), mPeakPowerValues(peakPowerValues),
+          mFreqValues(freqValues), mFreqLuma(lumaValues) {
 
       mSilent = isSilentThreshold();
       }
@@ -24,15 +29,18 @@ public:
     //{{{
     ~cFrame() {
       free (mPowerValues);
+      free (mPeakPowerValues);
       free (mFreqValues);
       free (mFreqLuma);
       }
     //}}}
 
+    // gets
     uint8_t* getPtr() { return mPtr; }
     int getLen() { return mLen; }
 
     float* getPowerValues() { return mPowerValues;  }
+    float* getPeakPowerValues() { return mPeakPowerValues;  }
     float* getFreqValues() { return mFreqValues; }
     uint8_t* getFreqLuma() { return mFreqLuma; }
 
@@ -42,15 +50,17 @@ public:
 
     bool hasTitle() { return !mTitle.empty(); }
     std::string getTitle() { return mTitle; }
+
+    // set
     void setTitle (const std::string& title) { mTitle = title; }
 
-    static constexpr float kSilentThreshold = 0.05f;
-
   private:
+    // vars
     uint8_t* mPtr;
     uint32_t mLen;
 
     float* mPowerValues;
+    float* mPeakPowerValues;
     float* mFreqValues;
     uint8_t* mFreqLuma;
 
@@ -58,7 +68,6 @@ public:
     std::string mTitle;
     };
   //}}}
-
   virtual ~cSong();
 
   //{{{  gets
@@ -72,6 +81,7 @@ public:
   int getMaxSamplesPerFrame() { return kMaxSamplesPerFrame; }
 
   float getMaxPowerValue() { return mMaxPowerValue; }
+  float getMaxPeakPowerValue() { return mMaxPeakPowerValue; }
   float getMaxFreqValue() { return mMaxFreqValue; }
   int getNumFreq() { return kMaxFreq; }
   int getNumFreqLuma() { return kMaxSpectrum; }
@@ -112,23 +122,20 @@ public:
   void prevSilence();
   void nextSilence();
 
-  // public vars
+  // public var
   concurrency::concurrent_vector<cFrame*> mFrames;
 
 private:
-  //{{{  static constexpr
   constexpr static int kMaxSamplesPerFrame = 2048;
-  constexpr static int kMaxFreq = (kMaxSamplesPerFrame/2) + 1;
+  constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1;
   constexpr static int kMaxSpectrum = kMaxFreq;
-  //}}}
+  constexpr static float kMinPowerValue = 0.25f;
+  constexpr static int kSilentWindowFrames = 10;
 
   int skipPrev (int fromFrame, bool silent);
   int skipNext (int fromFrame, bool silent);
 
-  constexpr static float kMinPowerValue = 0.25f;
-  constexpr static int kSilentWindowFrames = 10;
-
-  //{{{  vars
+  // private vars
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
 
   int mId = 0;
@@ -143,12 +150,13 @@ private:
   kiss_fft_scalar timeBuf[kMaxSamplesPerFrame];
   kiss_fft_cpx freqBuf[kMaxFreq];
 
+  float mMaxPowerValue = 0.f;
+  float mMaxPeakPowerValue = 0.f;
+
   float mMaxFreqValues[kMaxFreq];
-  float mMaxPowerValue = kMinPowerValue;
   float mMaxFreqValue = 0.f;
 
   int mBitrate;
   std::string mChan;
   cJpegImage* mJpegImage = nullptr;
-  //}}}
   };

@@ -3,6 +3,7 @@ main wave
 - silence not wide enough, subpixel wrong
 - mark subpixel wrong
 - check -ve clear with div
+- peak display
 
 overview
 - fix gaps

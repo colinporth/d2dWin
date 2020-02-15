@@ -108,26 +108,32 @@ public:
     auto playFrame = mSong.getPlayFrame();
 
     // src bitmap explicit layout
-    mSrcHeight = getHeight();
-    mWaveHeight = 98.f;
-    mSrcSilenceHeight = 2.f;
+    mWaveHeight = 100.f;
+    mOverviewHeight = 100.f;
+    mFreqHeight = getHeight() - mWaveHeight - mOverviewHeight;
+
+    mSrcPeakHeight = mWaveHeight;
     mSrcMarkHeight = 2.f;
-    mOverviewHeight = 98.f;
-    mFreqHeight = mSrcHeight - mWaveHeight - mSrcSilenceHeight - mSrcMarkHeight - mOverviewHeight;
+    mSrcSilenceHeight = 2.f;
+    mSrcHeight = mFreqHeight + mWaveHeight + mSrcPeakHeight + mSrcMarkHeight + mSrcSilenceHeight + mOverviewHeight;
 
     mSrcFreqTop = 0.f;
     mSrcWaveTop = mSrcFreqTop + mFreqHeight;
+    mSrcPeakTop = mSrcWaveTop + mWaveHeight;
+    mSrcMarkTop = mSrcPeakTop + mSrcPeakHeight;
+    mSrcSilenceTop = mSrcMarkTop + mSrcMarkHeight;
+    mSrcOverviewTop = mSrcSilenceTop + mSrcSilenceHeight;
+
     mSrcWaveCentre = mSrcWaveTop + (mWaveHeight/2.f);
-    mSrcSilenceTop = mSrcWaveTop + mWaveHeight;
-    mSrcMarkTop = mSrcSilenceTop + mSrcSilenceHeight;
-    mSrcOverviewTop = mSrcMarkTop + mSrcMarkHeight;
+    mSrcPeakCentre = mSrcPeakTop + (mSrcPeakHeight/2.f);
     mSrcOverviewCentre = mSrcOverviewTop + (mOverviewHeight/2.f);
 
     // dst box explicit layout
     mDstFreqTop = mRect.top;
     mDstWaveTop = mDstFreqTop + mFreqHeight + mSrcSilenceHeight;
-    mDstWaveCentre = mDstWaveTop + (mWaveHeight/2.f);
     mDstOverviewTop = mDstWaveTop + mWaveHeight + mSrcMarkHeight;
+
+    mDstWaveCentre = mDstWaveTop + (mWaveHeight/2.f);
     mDstOverviewCentre = mDstOverviewTop + (mOverviewHeight/2.f);
 
     reallocBitmap (mWindow->getDc());
@@ -142,7 +148,7 @@ public:
 
 private:
   //{{{
-  std::string frameString (uint32_t frame) {
+  std::string frameString (int frame) {
 
     if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
       uint32_t frameHs = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
@@ -219,6 +225,7 @@ private:
       bool mark;
       bool silence;
       float values[2];
+      float peakValues[2];
 
       if (mFrameStep == 1) {
         // simple case
@@ -226,8 +233,11 @@ private:
         silence = mSong.mFrames[frame]->isSilent();
 
         auto powerValues = mSong.mFrames[frame]->getPowerValues();
-        for (auto i = 0; i < 2; i++)
+        auto peakPowerValues = mSong.mFrames[frame]->getPeakPowerValues();
+        for (auto i = 0; i < 2; i++) {
           values[i] = *powerValues++;
+          peakValues[i] = *peakPowerValues++;
+          }
         }
       else {
         // sum mFrameStep frames, mFrameStep aligned
@@ -253,6 +263,10 @@ private:
       float srcIndex = float((frame / mFrameStep) & mBitmapMask);
       bitmapRect = { srcIndex, mSrcWaveCentre - (values[0] * valueScale),
                      srcIndex + 1.f, mSrcWaveCentre + (values[1] * valueScale) };
+      mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
+
+      bitmapRect = { srcIndex, mSrcPeakCentre - (peakValues[0] * valueScale),
+                     srcIndex + 1.f, mSrcPeakCentre + (peakValues[1] * valueScale) };
       mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
 
       if (silence) {
@@ -325,10 +339,11 @@ private:
       }
     }
   //}}}
+
   //{{{
   void drawWave (ID2D1DeviceContext* dc, int playFrame) {
 
-    float valueScale = mWaveHeight / 2.f / mSong.getMaxPowerValue();
+    float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakPowerValue();
 
     // calc leftFrame,rightFrame
     auto leftFrame = playFrame - (((getWidthInt() + mFrameWidth) / 2) * mFrameStep) / mFrameWidth;
@@ -343,6 +358,7 @@ private:
       if (leftFrame < mBitmapFirstFrame) {
         //{{{  draw new bitmap leftFrames
         drawBitmapFrames (leftFrame, mBitmapFirstFrame, playFrame, rightFrame, valueScale);
+
         mBitmapFirstFrame = leftFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
           mBitmapLastFrame = mBitmapFirstFrame + mBitmapWidth;
@@ -351,6 +367,7 @@ private:
       if (rightFrame > mBitmapLastFrame) {
         //{{{  draw new bitmap rightFrames
         drawBitmapFrames (mBitmapLastFrame, rightFrame, playFrame, rightFrame, valueScale);
+
         mBitmapLastFrame = rightFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
           mBitmapFirstFrame = mBitmapLastFrame - mBitmapWidth;
@@ -360,6 +377,7 @@ private:
     else {
       //{{{  no overlap, draw all bitmap frames
       drawBitmapFrames (leftFrame, rightFrame, playFrame, rightFrame, valueScale);
+
       mBitmapFirstFrame = leftFrame;
       mBitmapLastFrame = rightFrame;
       }
@@ -376,7 +394,7 @@ private:
     bool wrap = rightSrcIndex <= leftSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : rightSrcIndex;
 
-    //  draw dst chunks, mostly stamping colour through alpha bitmap
+    // draw dst chunks, mostly stamping colour through alpha bitmap
     cRect srcRect;
     cRect dstRect;
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
@@ -408,7 +426,13 @@ private:
     // wave
     bool split = (playSrcIndex >= leftSrcIndex) && (playSrcIndex < endSrcIndex);
 
+
     // wave chunk before play
+    srcRect = { leftSrcIndex, mSrcPeakTop, (split ? playSrcIndex : endSrcIndex), mSrcPeakTop + mSrcPeakHeight };
+    dstRect = { mRect.left, mDstWaveTop,
+                mRect.left + ((split ? playSrcIndex : endSrcIndex) - leftSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
+    dc->FillOpacityMask (mBitmap, mWindow->getDarkBlueBrush(), dstRect, srcRect);
+
     srcRect = { leftSrcIndex, mSrcWaveTop, (split ? playSrcIndex : endSrcIndex), mSrcWaveTop + mWaveHeight };
     dstRect = { mRect.left, mDstWaveTop,
                 mRect.left + ((split ? playSrcIndex : endSrcIndex) - leftSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
@@ -416,6 +440,11 @@ private:
 
     if (split) {
       // split wave chunk after play
+      srcRect = { playSrcIndex+1.f, mSrcPeakTop, endSrcIndex, mSrcPeakTop + mSrcPeakHeight };
+      dstRect = { mRect.left + (playSrcIndex+1.f - leftSrcIndex) * mFrameWidth, mDstWaveTop,
+                  mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
+      dc->FillOpacityMask (mBitmap, mWindow->getDarkGreyBrush(), dstRect, srcRect);
+
       srcRect = { playSrcIndex+1.f, mSrcWaveTop, endSrcIndex, mSrcWaveTop + mWaveHeight };
       dstRect = { mRect.left + (playSrcIndex+1.f - leftSrcIndex) * mFrameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
@@ -446,6 +475,11 @@ private:
       bool split = playSrcIndex < rightSrcIndex;
       if (split) {
         // split chunk before play
+        srcRect = { 0.f, mSrcPeakTop,  playSrcIndex, mSrcPeakTop + mSrcPeakHeight };
+        dstRect = { mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveTop,
+                    mRect.left + (endSrcIndex - leftSrcIndex + playSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
+        dc->FillOpacityMask (mBitmap, mWindow->getDarkBlueBrush(), dstRect, srcRect);
+
         srcRect = { 0.f, mSrcWaveTop,  playSrcIndex, mSrcWaveTop + mWaveHeight };
         dstRect = { mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveTop,
                     mRect.left + (endSrcIndex - leftSrcIndex + playSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
@@ -453,6 +487,11 @@ private:
         }
 
       // chunk after play
+      srcRect = { split ? playSrcIndex+1.f : 0.f, mSrcPeakTop,  rightSrcIndex, mSrcPeakTop + mSrcPeakHeight };
+      dstRect = { mRect.left + (endSrcIndex - leftSrcIndex + (split ? (playSrcIndex+1.f) : 0.f)) * mFrameWidth, mDstWaveTop,
+                  mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
+      dc->FillOpacityMask (mBitmap, mWindow->getDarkGreyBrush(), dstRect, srcRect);
+
       srcRect = { split ? playSrcIndex+1.f : 0.f, mSrcWaveTop,  rightSrcIndex, mSrcWaveTop + mWaveHeight };
       dstRect = { mRect.left + (endSrcIndex - leftSrcIndex + (split ? (playSrcIndex+1.f) : 0.f)) * mFrameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
@@ -719,21 +758,27 @@ private:
   float mWaveHeight = 0.f;
   float mOverviewHeight = 0.f;
 
+  float mSrcPeakHeight = 0.f;
+  float mSrcMarkHeight = 0.f;
+  float mSrcSilenceHeight = 0.f;
+
   float mSrcFreqTop = 0.f;
   float mSrcWaveTop = 0.f;
-  float mSrcWaveCentre = 0.f;
+  float mSrcPeakTop = 0.f;
   float mSrcSilenceTop = 0.f;
-  float mSrcSilenceHeight = 0.f;
   float mSrcMarkTop = 0.f;
-  float mSrcMarkHeight = 0.f;
   float mSrcOverviewTop = 0.f;
-  float mSrcOverviewCentre = 0.f;
   float mSrcHeight = 0.f;
+
+  float mSrcWaveCentre = 0.f;
+  float mSrcPeakCentre = 0.f;
+  float mSrcOverviewCentre = 0.f;
 
   float mDstFreqTop = 0.f;
   float mDstWaveTop = 0.f;
-  float mDstWaveCentre = 0.f;
   float mDstOverviewTop = 0.f;
+
+  float mDstWaveCentre = 0.f;
   float mDstOverviewCentre = 0.f;
 
   // zoom - 0 unity, > 0 zoomOut framesPerPix, < 0 zoomIn pixPerFrame

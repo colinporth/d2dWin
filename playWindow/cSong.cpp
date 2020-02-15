@@ -11,6 +11,8 @@
 #include "cSong.h"
 
 #include "concurrent_vector.h"
+
+using namespace std;
 //}}}
 
 //{{{
@@ -64,7 +66,7 @@ void cSong::setJpegImage (cJpegImage* jpegImage) {
   }
 //}}}
 //{{{
-void cSong::setTitle (const std::string& title) {
+void cSong::setTitle (const string& title) {
 
   if (!mFrames.empty())
     mFrames.back()->setTitle (title);
@@ -72,7 +74,7 @@ void cSong::setTitle (const std::string& title) {
 //}}}
 //{{{
 void cSong::setPlayFrame (int frame) {
-  mPlayFrame = std::min (std::max (frame, 0), getLastFrame());
+  mPlayFrame = min (max (frame, 0), getLastFrame());
   }
 //}}}
 
@@ -97,6 +99,8 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   setJpegImage (nullptr);
 
   mMaxPowerValue = kMinPowerValue;
+  mMaxPeakPowerValue = kMinPowerValue;
+
   mMaxFreqValue = 0.f;
   for (int i = 0; i < kMaxFreq; i++)
     mMaxFreqValues[i] = 0.f;
@@ -114,17 +118,24 @@ bool cSong::addFrame (uint8_t* stream, int frameLen, int estimatedTotalFrames, i
   // sum of squares channel power
   auto powerValues = (float*)malloc (mNumChannels * 4);
   memset (powerValues, 0, mNumChannels * 4);
+
+  auto peakPowerValues = (float*)malloc (mNumChannels * 4);
+  memset (peakPowerValues, 0, mNumChannels * 4);
+
   for (int sample = 0; sample < samplesPerFrame; sample++) {
     timeBuf[sample] = 0;
     for (auto chan = 0; chan < mNumChannels; chan++) {
       auto value = *samples++;
       timeBuf[sample] += value;
       powerValues[chan] += value * value;
+      peakPowerValues[chan] = max (abs(peakPowerValues[chan]), value);
       }
     }
+
   for (auto chan = 0; chan < mNumChannels; chan++) {
     powerValues[chan] = sqrtf (powerValues[chan] / samplesPerFrame);
-    mMaxPowerValue = std::max (mMaxPowerValue, powerValues[chan]);
+    mMaxPowerValue = max (mMaxPowerValue, powerValues[chan]);
+    mMaxPeakPowerValue = max (mMaxPeakPowerValue, peakPowerValues[chan]);
     }
 
   kiss_fftr (fftrConfig, timeBuf, freqBuf);
@@ -132,8 +143,8 @@ bool cSong::addFrame (uint8_t* stream, int frameLen, int estimatedTotalFrames, i
   auto freqValues = (float*)malloc (kMaxFreq * 4);
   for (auto freq = 0; freq < kMaxFreq; freq++) {
     freqValues[freq] = sqrt ((freqBuf[freq].r * freqBuf[freq].r) + (freqBuf[freq].i * freqBuf[freq].i));
-    mMaxFreqValue = std::max (mMaxFreqValue, freqValues[freq]);
-    mMaxFreqValues[freq] = std::max (mMaxFreqValues[freq], freqValues[freq]);
+    mMaxFreqValue = max (mMaxFreqValue, freqValues[freq]);
+    mMaxFreqValues[freq] = max (mMaxFreqValues[freq], freqValues[freq]);
     }
 
   // dodgy juicing of maxFreqValue * 4 to max Luma
@@ -144,7 +155,7 @@ bool cSong::addFrame (uint8_t* stream, int frameLen, int estimatedTotalFrames, i
     lumaValues[kMaxSpectrum - freq - 1] = value > 255 ? 255 : uint8_t(value);
     }
 
-  mFrames.push_back (new cFrame (stream, frameLen, powerValues, freqValues, lumaValues));
+  mFrames.push_back (new cFrame (stream, frameLen, powerValues, peakPowerValues, freqValues, lumaValues));
 
   // calc silent window
   auto frameNum = getLastFrame();

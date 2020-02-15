@@ -20,7 +20,7 @@ public:
   //{{{
   void run (bool streaming, const string& title, int width, int height, const string& name) {
 
-    initialise (title, width, height, false);
+    initialise (title + " " + name, width, height, false);
 
     mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, mSong.getJpegImage());
     add (mJpegImageView);
@@ -113,7 +113,8 @@ private:
 
   //{{{
   static uint8_t* extractAacFramesFromTs (uint8_t* stream, uint8_t* ts, int tsLen) {
-  // extract aacFrames to stream from chunk tsPackets, ts and stream can be same buffer
+  // extract aacFrames from stream chunk tsPackets
+  // - ts and stream can be same buffer, only packs smaller
 
     auto tsDone = ts + tsLen - 188;
     while ((ts <= tsDone) && (*ts++ == 0x47)) {
@@ -482,19 +483,14 @@ private:
                          nullptr : (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
       device->start();
-      while (!getExit() && !mSongChanged &&
-             (streaming || (mSong.getPlayFrame() <= mSong.getLastFrame())))
+      while (!getExit() && !mSongChanged && (streaming || (mSong.getPlayFrame() <= mSong.getLastFrame())))
         if (mPlaying) {
-          //{{{
-          cLog::log (LOGINFO2, "process for frame:%d", mSong.getPlayFrame());
-          //}}}
+          //cLog::log (LOGINFO2, "process for frame:%d", mSong.getPlayFrame());
           device->process ([&](float*& srcSamples, int& numSrcSamples,
                                int numDstSamplesLeft, int numDstSamples) mutable noexcept {
             // lambda callback - load srcSamples
-            //{{{
-            cLog::log (LOGINFO3, " - callback for src:%d dst:%d:%d",
-                       mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
-            //}}}
+            //cLog::log (LOGINFO3, " - callback for src:%d dst:%d:%d",
+                       //mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
             if (mSong.isFramePtrSamples())
               srcSamples = (float*)mSong.getPlayFramePtr();
             else {
@@ -561,7 +557,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
     //}}}
     const string url = "http://stream.wqxr.org/js-stream.aac";
-    appWindow.run (true, "playWindow " + url, 800, 600, url);
+    appWindow.run (true, "playWindow", 800, 600, url);
     }
 
   CoUninitialize();
