@@ -1,19 +1,20 @@
-// cSong.cpp
+// cSong.cpp - singleton class
 #pragma once
 //{{{  includes
 #include "stdafx.h"
 
-#include "cAudioDecode.h"
+#include "cSong.h"
 
 #include "../../shared/kissFft/kiss_fft.h"
 #include "../../shared/kissFft/kiss_fftr.h"
 
-#include "cSong.h"
-
-#include "concurrent_vector.h"
-
 using namespace std;
 //}}}
+
+// assumes cSong singleton, to remove from header
+kiss_fftr_cfg fftrConfig;
+kiss_fft_scalar timeBuf[cSong::kMaxSamplesPerFrame];
+kiss_fft_cpx freqBuf[cSong::kMaxFreq];
 
 //{{{
 cSong::~cSong() {

@@ -3,14 +3,17 @@
 //{{{  includes
 #include "cAudioDecode.h"
 
-#include "../../shared/kissFft/kiss_fft.h"
-#include "../../shared/kissFft/kiss_fftr.h"
-
 #include "concurrent_vector.h"
 //}}}
 
 class cSong {
 public:
+  constexpr static int kMaxSamplesPerFrame = 2048;
+  constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1;
+  constexpr static int kMaxSpectrum = kMaxFreq;
+  constexpr static float kMinPowerValue = 0.25f;
+  constexpr static int kSilentWindowFrames = 10;
+
   //{{{
   class cFrame {
   public:
@@ -151,12 +154,6 @@ public:
   concurrency::concurrent_vector<cFrameChunk*> mFrameChunks;
 
 private:
-  constexpr static int kMaxSamplesPerFrame = 2048;
-  constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1;
-  constexpr static int kMaxSpectrum = kMaxFreq;
-  constexpr static float kMinPowerValue = 0.25f;
-  constexpr static int kSilentWindowFrames = 10;
-
   int skipPrev (int fromFrame, bool silent);
   int skipNext (int fromFrame, bool silent);
 
@@ -170,10 +167,6 @@ private:
 
   int mPlayFrame = 0;
   int mTotalFrames = 0;
-
-  kiss_fftr_cfg fftrConfig;
-  kiss_fft_scalar timeBuf[kMaxSamplesPerFrame];
-  kiss_fft_cpx freqBuf[kMaxFreq];
 
   float mMaxPowerValue = 0.f;
   float mMaxPeakPowerValue = 0.f;

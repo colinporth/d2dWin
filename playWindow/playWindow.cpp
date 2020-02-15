@@ -134,7 +134,7 @@ private:
           tsBodyBytes -= pesHeaderBytes;
           }
 
-        // copy ts payload aacFrames into stream
+        // copy ts payload aacFrames back into buffer
         memcpy (aacFramesPtr, ts, tsBodyBytes);
         aacFramesPtr += tsBodyBytes;
         }
@@ -184,8 +184,6 @@ private:
   void hlsThread (string host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
   // - host is redirected, assumes bbc radio aac, 48000 sampleaRate
-  // - !!!! convert big dumb stream buffer to individual frame allocs !!!!
-  // - !!!! add discontiguous chunks for going backwards from start !!!!
 
     cLog::setThreadName ("hls ");
     mSong.setChan (chan);
@@ -243,7 +241,7 @@ private:
           auto aacFrames = http.getContent();
           auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
           while (decode.parseFrame (aacFrames, aacFramesEnd)) {
-            //  add aacFrame from stream to song
+            //  add aacFrame from aacFrames to song
             auto numSamples = decode.frameToSamples (samples);
             if (numSamples) {
               // copy single aacFrame and save to frame
@@ -285,10 +283,9 @@ private:
     int icyInfoLen = 0;
     char icyInfo[255] = { 0 };
 
-    // allocate buffer for stream
-    uint8_t streamFirst[2048];
-    uint8_t* streamEnd = streamFirst;
-    uint8_t* stream = streamFirst;
+    uint8_t bufferFirst[2048];
+    uint8_t* bufferEnd = bufferFirst;
+    uint8_t* buffer = bufferFirst;
 
     bool firstTime = true;
     cAudioDecode decode (cAudioDecode::eAac);
@@ -312,9 +309,9 @@ private:
           //{{{  simple copy of whole body, no metaInfo
           cLog::log (LOGINFO1, "body simple copy len:%d", length);
 
-          memcpy (streamEnd, data, length);
+          memcpy (bufferEnd, data, length);
 
-          streamEnd += length;
+          bufferEnd += length;
           icySkipCount += length;
           }
           //}}}
@@ -338,8 +335,8 @@ private:
               }
             else {
               icySkipCount++;
-              *streamEnd = data[i];
-              streamEnd++;
+              *bufferEnd = data[i];
+              bufferEnd++;
               }
             }
           }
@@ -348,12 +345,12 @@ private:
         if (firstTime) {
           firstTime = false;
           int sampleRate;
-          auto frameType = cAudioDecode::parseSomeFrames (streamFirst, streamEnd, sampleRate);
+          auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
           mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
           samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
           }
 
-        while (decode.parseFrame (stream, streamEnd)) {
+        while (decode.parseFrame (buffer, bufferEnd)) {
           if (decode.getFrameType() == mSong.getFrameType()) {
             auto numSamples = decode.frameToSamples (samples);
             if (numSamples) {
@@ -369,15 +366,15 @@ private:
               changed();
               }
             }
-          stream += decode.getNextFrameOffset();
+          buffer += decode.getNextFrameOffset();
           }
 
-        if ((stream > streamFirst) && (stream < streamEnd)) {
+        if ((buffer > bufferFirst) && (buffer < bufferEnd)) {
           // shuffle down last partial frame
-          auto streamLeft = int(streamEnd - stream);
-          memcpy (streamFirst, stream, streamLeft);
-          streamEnd = streamFirst + streamLeft;
-          stream = streamFirst;
+          auto bufferLeft = int(bufferEnd - buffer);
+          memcpy (bufferFirst, buffer, bufferLeft);
+          bufferEnd = bufferFirst + bufferLeft;
+          buffer = bufferFirst;
           }
         }
       //}}}

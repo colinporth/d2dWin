@@ -53,7 +53,6 @@ public:
     mBitmapOverviewOk = false;
     }
   //}}}
-
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
@@ -83,6 +82,7 @@ public:
   //}}}
   //{{{
   bool onUp (bool right, bool mouseMoved, cPoint pos) {
+
     mOverviewPressed = false;
     return true;
     }
