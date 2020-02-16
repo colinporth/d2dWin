@@ -9,11 +9,11 @@
 
 class cSong {
 public:
+  constexpr static float kMinPowerValue = 0.25f;
+  constexpr static int kSilentWindowFrames = 10;
   constexpr static int kMaxSamplesPerFrame = 2048;
   constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1;
   constexpr static int kMaxSpectrum = kMaxFreq;
-  constexpr static float kMinPowerValue = 0.25f;
-  constexpr static int kSilentWindowFrames = 10;
 
   //{{{
   class cFrame {

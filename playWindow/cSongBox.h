@@ -149,13 +149,14 @@ public:
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
     if (mSong->hasTime()) {
+      //{{{  add base time to frame
       auto startDatePoint = date::floor<date::days>(mSong->getStartTimePoint());
       auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mSong->getStartTimePoint() - startDatePoint);
       uint64_t framesBase = (seconds.count() * mSong->getSampleRate()) / mSong->getSamplesPerFrame();
-
       drawTime (dc, " " + frameString (framesBase + playFrame) +
                     " " + frameString (framesBase + mSong->getTotalFrames()));
       }
+      //}}}
     else
       drawTime (dc, frameString (playFrame) + " " + frameString (mSong->getTotalFrames()));
     }

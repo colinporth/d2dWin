@@ -226,6 +226,7 @@ private:
         istringstream inputStream (extDateTimeString);
         system_clock::time_point startTimePoint;
         inputStream >> date::parse ("%FT%T", startTimePoint);
+        startTimePoint -= seconds (17);
 
         http.freeContent();
 
