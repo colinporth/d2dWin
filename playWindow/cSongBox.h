@@ -56,7 +56,7 @@ public:
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
-    std::lock_guard<std::mutex> lockGuard (cSong::mMutex);
+    std::lock_guard<std::mutex> lockGuard (mSong->getMutex());
 
     if (pos.y > mDstOverviewTop) {
       mOverviewPressed = true;
@@ -72,7 +72,7 @@ public:
   //{{{
   bool onMove (bool right, cPoint pos, cPoint inc) {
 
-    std::lock_guard<std::mutex> lockGuard (cSong::mMutex);
+    std::lock_guard<std::mutex> lockGuard (mSong->getMutex());
 
     if (mOverviewPressed)
       mSong->setPlayFrame (int((pos.x * mSong->getTotalFrames()) / getWidth()));
@@ -109,7 +109,7 @@ public:
     if (!mSong->getNumFrames()) // no frames yet, give up
       return;
 
-    std::lock_guard<std::mutex> lockGuard (cSong::mMutex);
+    std::lock_guard<std::mutex> lockGuard (mSong->getMutex());
 
     auto playFrame = mSong->getPlayFrame();
 

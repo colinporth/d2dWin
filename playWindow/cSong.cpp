@@ -5,16 +5,8 @@
 
 #include "cSong.h"
 
-#include "../../shared/kissFft/kiss_fft.h"
-#include "../../shared/kissFft/kiss_fftr.h"
-
 using namespace std;
 //}}}
-
-// assumes cSong singleton, to remove from header
-kiss_fftr_cfg fftrConfig;
-kiss_fft_scalar timeBuf[cSong::kMaxSamplesPerFrame];
-kiss_fft_cpx freqBuf[cSong::kMaxFreq];
 
 //{{{
 cSong::~cSong() {

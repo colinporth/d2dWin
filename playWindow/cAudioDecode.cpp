@@ -95,13 +95,14 @@ bool cAudioDecode::parseFrame (uint8_t* framePtr, uint8_t* frameLast) {
         // return aacFrame & size
         mFramePtr = framePtr;
         mFrameLen = (((unsigned int)framePtr[3] & 0x3) << 11) | (((unsigned int)framePtr[4]) << 3) | (framePtr[5] >> 5);
+
         mAvPacket.data = mFramePtr;
         mAvPacket.size = mFrameLen;
 
         mFrameType = eAac;
 
         // check for enough bytes for frame body
-        return framePtr + mFrameLen < frameLast;
+        return (framePtr + mFrameLen) <= frameLast;
         }
         //}}}
       else {
@@ -231,7 +232,7 @@ bool cAudioDecode::parseFrame (uint8_t* framePtr, uint8_t* frameLast) {
         mFrameType = eMp3;
 
         // check for enough bytes for frame body
-        return framePtr + mFrameLen < frameLast;
+        return (framePtr + mFrameLen) <= frameLast;
         }
         //}}}
       }
@@ -290,7 +291,7 @@ bool cAudioDecode::parseFrame (uint8_t* framePtr, uint8_t* frameLast) {
       mFrameType = eId3Tag;
 
       // check for enough bytes for frame body
-      return framePtr + mFrameLen < frameLast;
+      return (framePtr + mFrameLen) <= frameLast;
       }
       //}}}
     else {

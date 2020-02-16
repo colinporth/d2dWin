@@ -2,6 +2,9 @@
 #pragma once
 //{{{  includes
 #include "cAudioDecode.h"
+
+#include "../../shared/kissFft/kiss_fft.h"
+#include "../../shared/kissFft/kiss_fftr.h"
 //}}}
 
 class cSong {
@@ -76,6 +79,8 @@ public:
   virtual ~cSong();
 
   //{{{  gets
+  std::mutex& getMutex() { return mMutex; }
+
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
   bool isFramePtrSamples() { return mFrameType == cAudioDecode::eWav; }
 
@@ -120,14 +125,11 @@ public:
   //}}}
 
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
-  bool addFrame (bool mapped, uint8_t* stream, int frameLen, 
+  bool addFrame (bool mapped, uint8_t* stream, int frameLen,
                  int estimatedTotalFrames, int samplesPerFrame, float* samples);
 
   void prevSilence();
   void nextSilence();
-
-  // public var
-  inline static std::mutex mMutex;
 
   std::vector<cFrame*> mFrames;
 
@@ -136,6 +138,7 @@ private:
   int skipNext (int fromFrame, bool silent);
 
   // private vars
+  std::mutex mMutex;
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
 
   int mId = 0;
@@ -154,4 +157,8 @@ private:
 
   int mBitrate;
   std::string mChan;
+
+  kiss_fftr_cfg fftrConfig;
+  kiss_fft_scalar timeBuf[cSong::kMaxSamplesPerFrame];
+  kiss_fft_cpx freqBuf[cSong::kMaxFreq];
   };
