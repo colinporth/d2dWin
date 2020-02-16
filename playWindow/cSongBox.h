@@ -148,27 +148,36 @@ public:
     drawWave (dc, playFrame);
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
-    drawTime (dc, frameString (playFrame) + " " + frameString (mSong->getTotalFrames()));
+    if (mSong->hasTime()) {
+      auto startDatePoint = date::floor<date::days>(mSong->getStartTimePoint());
+      auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mSong->getStartTimePoint() - startDatePoint);
+      uint64_t framesBase = (seconds.count() * mSong->getSampleRate()) / mSong->getSamplesPerFrame();
+
+      drawTime (dc, " " + frameString (framesBase + playFrame) +
+                    " " + frameString (framesBase + mSong->getTotalFrames()));
+      }
+    else
+      drawTime (dc, frameString (playFrame) + " " + frameString (mSong->getTotalFrames()));
     }
   //}}}
 
 private:
   //{{{
-  std::string frameString (int frame) {
+  std::string frameString (uint64_t frame) {
 
     if (mSong->getSamplesPerFrame() && mSong->getSampleRate()) {
-      uint32_t frameHs = (frame * mSong->getSamplesPerFrame()) / (mSong->getSampleRate() / 100);
+      uint64_t frameHs = (frame * mSong->getSamplesPerFrame()) / (mSong->getSampleRate() / 100);
 
-      uint32_t hs = frameHs % 100;
+      uint64_t hs = frameHs % 100;
 
       frameHs /= 100;
-      uint32_t secs = frameHs % 60;
+      uint64_t secs = frameHs % 60;
 
       frameHs /= 60;
-      uint32_t mins = frameHs % 60;
+      uint64_t mins = frameHs % 60;
 
       frameHs /= 60;
-      uint32_t hours = frameHs % 60;
+      uint64_t hours = frameHs % 60;
 
       std::string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
       return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');

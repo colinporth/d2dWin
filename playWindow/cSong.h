@@ -109,6 +109,10 @@ public:
   // optional info
   int getBitrate() { return mBitrate; }
   std::string getChan() { return mChan; }
+
+  bool hasTime() { return mHasTime; }
+  int getStartSeqNum() { return mStartSeqNum; }
+  std::chrono::system_clock::time_point getStartTimePoint() { return mStartTimePoint; }
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
@@ -122,6 +126,14 @@ public:
 
   void setChan (const std::string& chan) { mChan = chan; }
   void setBitrate (int bitrate) { mBitrate = bitrate; }
+
+  //{{{
+  void setSequence (int startSeqNum, std::chrono::system_clock::time_point startTimePoint) {
+    mStartSeqNum = startSeqNum;
+    mStartTimePoint = startTimePoint;
+    mHasTime = true;
+    }
+  //}}}
   //}}}
 
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
@@ -157,6 +169,10 @@ private:
 
   int mBitrate;
   std::string mChan;
+  bool mHasTime = false;
+  int mStartSeqNum = 0;
+  std::chrono::system_clock::time_point mStartTimePoint;
+
 
   kiss_fftr_cfg fftrConfig;
   kiss_fft_scalar timeBuf[cSong::kMaxSamplesPerFrame];

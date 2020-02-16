@@ -13,6 +13,7 @@
 #include "cAudioDecode.h"
 
 using namespace std;
+using namespace chrono;
 //}}}
 
 class cAppWindow : public cD2dWindow {
@@ -26,8 +27,8 @@ public:
     mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
     add (mJpegImageView);
 
-    add (new cTitleBox (this, 200.f,20.f, mStartStr), 0.f,40.f);
-    add (new cTitleBox (this, 200.f,20.f, mCurStr), 0.f,60.f);
+    add (new cTitleBox (this, 200.f,20.f, mM3u8Str), 0.f,40.f);
+    add (new cTitleBox (this, 200.f,20.f, mNowStr), 0.f,60.f);
     add (new cTitleBox (this, 600.f,20.f, mDebugStr), 0.f,80.f);
 
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
@@ -212,7 +213,7 @@ private:
         const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
         char* extSeqEnd = strchr (extSeq, '\n');
         *extSeqEnd = '\0';
-        mStartSeqNum = atoi (extSeq) + 3;
+        int startSeqNum = atoi (extSeq) + 3;
 
         // point to #EXT-X-PROGRAM-DATE-TIME: dateTime str
         const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
@@ -223,38 +224,40 @@ private:
 
         // parse ISO time format from string
         istringstream inputStream (extDateTimeString);
-        inputStream >> date::parse ("%FT%T", mStartTimePoint);
+        system_clock::time_point startTimePoint;
+        inputStream >> date::parse ("%FT%T", startTimePoint);
 
         http.freeContent();
+
+        mM3u8Str =
+          "m3u8:" + date::format ("%D %T", floor<seconds>(system_clock::now() + seconds (getDaylightSeconds()))) +
+          " first:" + date::format ("%D %T", floor<seconds>(startTimePoint)) +
+          " seqNum:" + dec(startSeqNum);
         //}}}
 
-        auto startCurTimePoint = chrono::system_clock::now() + chrono::seconds (getDaylightSeconds());
-
         mSong->init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
+        mSong->setSequence (startSeqNum, startTimePoint);
+
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong->getMaxSamplesPerFrame() * mSong->getNumSampleBytes());
 
-        auto seqNum = mStartSeqNum;
+        auto seqNum = 0;
         while (!getExit() && !mSongChanged) {
           // date, time
-          mStartStr = "1st " + date::format ("%D %T", floor<chrono::seconds>(mStartTimePoint)) +
-                      " cur " + date::format ("%D %T", floor<chrono::seconds>(startCurTimePoint)) +
-                      " seq " + dec(mStartSeqNum);
+          auto nowTimePoint = system_clock::now() + seconds (getDaylightSeconds());
+          mNowStr = "now:" + date::format ("%D %T", floor<seconds>(nowTimePoint));
 
-          auto curTimePoint = chrono::system_clock::now() + chrono::seconds (getDaylightSeconds());
-          mCurStr = "cur " + date::format ("%D %T", floor<chrono::seconds>(curTimePoint)) +
-                    " seq " + dec(seqNum);
-
-          chrono::milliseconds durationSinceStart = chrono::duration_cast<chrono::milliseconds>(curTimePoint - mStartTimePoint);
-          mDebugStr = "chunks " + dec(seqNum - mStartSeqNum+1) +
-                      " loadedMs " + frac((seqNum - mStartSeqNum+1) * 6.4f, 6,2,' ') +
-                      " loadedFrames " + dec(mSong->getNumFrames()) +
-                      " " + frac((int)(durationSinceStart.count())/1000.f,6,2,' ');
+          milliseconds durationSinceStart = duration_cast<milliseconds>(nowTimePoint - mSong->getStartTimePoint());
+          mDebugStr = "chunks:" + dec(seqNum) +
+                      " frames:" + dec(mSong->getNumFrames()) +
+                      " t1:" + frac(seqNum * 6.4f, 6,2,' ') +
+                      " t2:" + frac((int)(durationSinceStart.count())/1000.f,6,2,' ');
 
           // get hls seqNum chunk, about 100k bytes for 128kps stream
           const string path = "pool_904/live/uk/" + mSong->getChan() +
                               "/" + mSong->getChan() + ".isml/" + mSong->getChan() +
-                              "-audio=" + dec(mSong->getBitrate()) + '-' + dec(seqNum) + ".ts";
+                              "-audio=" + dec(mSong->getBitrate()) +
+                              '-' + dec(mSong->getStartSeqNum()+seqNum) + ".ts";
           if (http.get (host, path) == 200) {
             cLog::log (LOGINFO, "got %d", seqNum);
             auto aacFrames = http.getContent();
@@ -557,13 +560,9 @@ private:
 
   string mLastTitleStr;
 
-  string mStartStr;
-  string mCurStr;
+  string mM3u8Str;
+  string mNowStr;
   string mDebugStr;
-
-  uint32_t mStartSeqNum = 0;
-  chrono::system_clock::time_point mStartTimePoint;
-  chrono::system_clock::time_point mStartDatePoint;
   //}}}
   };
 
