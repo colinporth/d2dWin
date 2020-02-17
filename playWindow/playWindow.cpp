@@ -291,7 +291,6 @@ private:
         }
       }
 
-    //mPlayDoneSem.wait();
     cLog::log (LOGINFO, "exit");
     setExit();
     }
@@ -474,7 +473,7 @@ private:
         }
 
       // wait for play to end or abort
-      //mPlayDoneSem.wait();
+      mPlayDoneSem.wait();
       //{{{  next file
       UnmapViewOfFile (fileMapFirst);
       CloseHandle (fileHandle);
@@ -540,20 +539,20 @@ private:
       free (samples);
       }
 
-    //mPlayDoneSem.notifyAll();
+    mPlayDoneSem.notifyAll();
     cLog::log (LOGINFO, "exit");
     }
   //}}}
 
   //{{{  vars
-  cFileList* mFileList;
+  cFileList* mFileList = nullptr;
 
   cSong mSong;
   bool mSongChanged = false;
   cJpegImageView* mJpegImageView = nullptr;
 
   bool mPlaying = true;
-  //cSemaphore mPlayDoneSem = "playDone";
+  cSemaphore mPlayDoneSem = "playDone";
 
   cVolumeBox* mVolumeBox = nullptr;
 

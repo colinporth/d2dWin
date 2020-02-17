@@ -106,10 +106,10 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
   // draw stuff centred at playFrame
 
+    std::lock_guard<std::mutex> lockGuard (mSong.getMutex());
+
     if (!mSong.getNumFrames()) // no frames yet, give up
       return;
-
-    std::lock_guard<std::mutex> lockGuard (mSong.getMutex());
 
     auto playFrame = mSong.getPlayFrame();
 
@@ -240,7 +240,7 @@ private:
       //{{{  draw bitmap for frame
       bool mark;
       bool silence;
-      float values[2];
+      float powerValues[2];
       float peakValues[2];
 
       if (mFrameStep == 1) {
@@ -248,37 +248,38 @@ private:
         mark = mSong.mFrames[frame]->hasTitle();
         silence = mSong.mFrames[frame]->isSilent();
 
-        auto powerValues = mSong.mFrames[frame]->getPowerValues();
-        auto peakValues = mSong.mFrames[frame]->getPeakValues();
+        auto powerValuesPtr = mSong.mFrames[frame]->getPowerValues();
+        auto peakValuesPtr = mSong.mFrames[frame]->getPeakValues();
         for (auto i = 0; i < 2; i++) {
-          values[i] = *powerValues++;
-          peakValues[i] = *peakValues++;
+          powerValues[i] = *powerValuesPtr++;
+          peakValues[i] = *peakValuesPtr++;
           }
         }
       else {
         // sum mFrameStep frames, mFrameStep aligned
         silence = false;
         mark = false;
-        for (auto i = 0; i < 2; i++)
-          values[i] = 0.f;
-
+        for (auto i = 0; i < 2; i++) {
+          powerValues[i] = 0.f;
+          peakValues[i] = 0.f;
+          }
         auto alignedFrame = frame - (frame % mFrameStep);
         auto toSumFrame = std::min (alignedFrame + mFrameStep, rightFrame);
         for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
           mark |= mSong.mFrames[sumFrame]->hasTitle();
           silence |= mSong.mFrames[sumFrame]->isSilent();
-          auto powerValues = mSong.mFrames[sumFrame]->getPowerValues();
+          auto powerValuesPtr = mSong.mFrames[sumFrame]->getPowerValues();
           for (auto i = 0; i < 2; i++)
-            values[i] += *powerValues++;
+            powerValues[i] += *powerValuesPtr++;
           }
 
         for (auto i = 0; i < 2; i++)
-          values[i] /= toSumFrame - alignedFrame + 1;
+          powerValues[i] /= toSumFrame - alignedFrame + 1;
         }
 
       float srcIndex = float((frame / mFrameStep) & mBitmapMask);
-      bitmapRect = { srcIndex, mSrcWaveCentre - (values[0] * valueScale),
-                     srcIndex + 1.f, mSrcWaveCentre + (values[1] * valueScale) };
+      bitmapRect = { srcIndex, mSrcWaveCentre - (powerValues[0] * valueScale),
+                     srcIndex + 1.f, mSrcWaveCentre + (powerValues[1] * valueScale) };
       mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
 
       bitmapRect = { srcIndex, mSrcPeakCentre - (peakValues[0] * valueScale),
@@ -514,6 +515,7 @@ private:
       dc->FillOpacityMask (mBitmap, mWindow->getLightGreyBrush(), dstRect, srcRect);
       }
       //}}}
+    dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     //{{{  draw playFrame
     auto powerValues = mSong.mFrames[playFrame]->getPeakValues();
@@ -521,8 +523,6 @@ private:
                 mRect.left + ((dstPlay+1.f) * mFrameWidth)+1.f, mDstWaveCentre + (*powerValues * valueScale) };
     dc->FillRectangle (dstRect, mWindow->getGreenBrush());
     //}}}
-
-    dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
     }
   //}}}
   //{{{
@@ -821,7 +821,7 @@ private:
   uint32_t mBitmapWidth = 0;
   uint32_t mBitmapMask = 0;
   ID2D1BitmapRenderTarget* mBitmapTarget = nullptr;
-  ID2D1Bitmap* mBitmap;
+  ID2D1Bitmap* mBitmap = nullptr;
 
   IDWriteTextFormat* mTimeTextFormat = nullptr;
   //}}}
