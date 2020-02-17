@@ -243,8 +243,8 @@ private:
         int getFailed = 0;
         int seqNum = 0;
         while (!getExit() && !mSongChanged) {
-          auto msSinceStart = duration_cast<milliseconds>(getNowDayLight() - mSong.getBaseTimePoint());
-          if (msSinceStart.count() - (seqNum * 6400) > 10000) {
+          auto basedMs = duration_cast<milliseconds>(getNowDayLight() - mSong.getBaseTimePoint());
+          if (basedMs.count() - (seqNum * 6400) > 10000) {
             // get hls seqNum chunk, about 100k bytes for 128kps stream
             if (http.get (host, path + '-' + dec(mSong.getBaseSeqNum()+seqNum) + ".ts") == 200) {
               getFailed = 0;
@@ -257,7 +257,7 @@ private:
                 //  add aacFrame from aacFrames to song
                 auto numSamples = decode.frameToSamples (samples);
                 if (numSamples) {
-                  // copy single aacFrame and save to frame
+                  // copy single aacFrame to aacFrame, add to song which owns it
                   int aacFrameLen = decode.getFrameLen();
                   auto aacFrame = (uint8_t*)malloc (aacFrameLen);
                   memcpy (aacFrame, decode.getFramePtr(), aacFrameLen);
@@ -275,8 +275,7 @@ private:
               }
             else {
               getFailed++;
-              mLoadStr = "failed " + dec(getFailed) + " seq " + dec(seqNum) +
-                         " late " + dec(msSinceStart.count() - (seqNum * 6400));
+              mLoadStr = "late " + dec(getFailed) + " " + dec(seqNum) + " " + dec(basedMs.count() - (seqNum * 6400));
               cLog::log (LOGERROR, mLoadStr);
               Sleep (200);
               }
