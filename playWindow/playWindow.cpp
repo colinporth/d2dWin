@@ -39,9 +39,8 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (streaming) {
-      add (new cTitleBox (this, 200.f,20.f, mBaseStr), 0.f,40.f);
-      add (new cTitleBox (this, 200.f,20.f, mNowStr), 0.f,60.f);
-      add (new cTitleBox (this, 600.f,20.f, mDebugStr), 0.f,80.f);
+      add (new cTitleBox (this, 200.f,20.f, mBaseStr), 0.f,0.f);
+      add (new cTitleBox (this, 500.f,20.f, mLoadStr), 0.f,20.f);
 
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
       //thread ([=]() { icyThread (name); }).detach();
@@ -205,7 +204,7 @@ private:
       cWinSockHttp http;
       host = http.getRedirect (host, m3u8Path);
       if (http.getContent()) {
-        //{{{  parse m3u8 for startSeqNum, startTimePoint
+        //{{{  parse m3u8 for baseSeqNum, baseTimePoint
         // point to #EXT-X-MEDIA-SEQUENCE: sequence num
         char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
         const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
@@ -228,10 +227,7 @@ private:
 
         http.freeContent();
 
-        mBaseStr =
-          "base: " + date::format ("%T", floor<seconds>(getNowDayLight())) +
-          " first:" + date::format ("%T", floor<seconds>(baseTimePoint)) +
-          " seqNum: " + dec(baseSeqNum);
+        mBaseStr = "base " + date::format ("%T", floor<seconds>(baseTimePoint)) + " seqNum " + dec(baseSeqNum);
         //}}}
         mSong.init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
         mSong.setBase (baseSeqNum, baseTimePoint);
@@ -239,52 +235,52 @@ private:
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
-        auto seqNum = 0;
+        int failure = 0;
+        int seqNum = 0;
         while (!getExit() && !mSongChanged) {
-          // date, time
-          mNowStr = "now: " + date::format ("%T", floor<seconds>(getNowDayLight()));
+          auto msSinceStart = duration_cast<milliseconds>(getNowDayLight() - mSong.getBaseTimePoint());
+          if (msSinceStart.count() - (seqNum * 6400) > 10000) {
+            // get hls seqNum chunk, about 100k bytes for 128kps stream
+            const string path = "pool_904/live/uk/" + mSong.getChan() +
+                                "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
+                                "-audio=" + dec(mSong.getBitrate()) +
+                                '-' + dec(mSong.getBaseSeqNum()+seqNum) + ".ts";
+            if (http.get (host, path) == 200) {
+              cLog::log (LOGINFO, "got %d", seqNum);
+              mLoadStr = "seq " + dec(seqNum) + " at " + date::format ("%T", floor<seconds>(getNowDayLight()));
+              cLog::log (LOGINFO, "got %d", seqNum);
 
-          milliseconds msSinceStart = duration_cast<milliseconds>(getNowDayLight() - mSong.getBaseTimePoint());
-          mDebugStr = "chunks:" + dec(seqNum) +
-                      " frames:" + dec(mSong.getNumFrames()) +
-                      " t1:" + frac(seqNum * 6.4f, 6,2,' ') +
-                      " t2:" + frac((int)(msSinceStart.count())/1000.f,6,2,' ');
+              auto aacFrames = http.getContent();
+              auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
+              while (decode.parseFrame (aacFrames, aacFramesEnd)) {
+                //  add aacFrame from aacFrames to song
+                auto numSamples = decode.frameToSamples (samples);
+                if (numSamples) {
+                  // copy single aacFrame and save to frame
+                  int aacFrameLen = decode.getFrameLen();
+                  auto aacFrame = (uint8_t*)malloc (aacFrameLen);
+                  memcpy (aacFrame, decode.getFramePtr(), aacFrameLen);
 
-          // get hls seqNum chunk, about 100k bytes for 128kps stream
-          const string path = "pool_904/live/uk/" + mSong.getChan() +
-                              "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
-                              "-audio=" + dec(mSong.getBitrate()) +
-                              '-' + dec(mSong.getBaseSeqNum()+seqNum) + ".ts";
-          if (http.get (host, path) == 200) {
-            cLog::log (LOGINFO, "got %d", seqNum);
-            auto aacFrames = http.getContent();
-            auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
-
-            while (decode.parseFrame (aacFrames, aacFramesEnd)) {
-              //  add aacFrame from aacFrames to song
-              auto numSamples = decode.frameToSamples (samples);
-              if (numSamples) {
-                // copy single aacFrame and save to frame
-                int aacFrameLen = decode.getFrameLen();
-                auto aacFrame = (uint8_t*)malloc (aacFrameLen);
-                memcpy (aacFrame, decode.getFramePtr(), aacFrameLen);
-
-                // frame fixup aacHE sampleRate, samplesPerFrame
-                mSong.setSampleRate (decode.getSampleRate());
-                mSong.setSamplesPerFrame (decode.getNumSamples());
-                if (mSong.addFrame (true, aacFrame, aacFrameLen, mSong.getNumFrames()+1, numSamples, samples))
-                  thread ([=](){ playThread (true); }).detach();
-                changed();
+                  // frame fixup aacHE sampleRate, samplesPerFrame
+                  mSong.setSampleRate (decode.getSampleRate());
+                  mSong.setSamplesPerFrame (decode.getNumSamples());
+                  if (mSong.addFrame (true, aacFrame, aacFrameLen, mSong.getNumFrames()+1, numSamples, samples))
+                    thread ([=](){ playThread (true); }).detach();
+                  changed();
+                  }
+                aacFrames += decode.getNextFrameOffset();
                 }
-              aacFrames += decode.getNextFrameOffset();
+              http.freeContent();
+              seqNum++;
               }
-            http.freeContent();
-            seqNum++;
+            else {
+              failure++;
+              cLog::log (LOGERROR, "failure %d %d", seqNum, failure);
+              mLoadStr = " *** failed " + dec(failure) + " seq " + dec(seqNum) + " late " + dec (msSinceStart.count() - (seqNum * 6400));
+              Sleep (100);
+              }
             }
-          else {// wait for next hls chunk, !!! should be timed to wall clock !!!!
-            cLog::log (LOGERROR, "failed %d", seqNum);
-            Sleep (6000);
-            }
+          Sleep (10);
           }
         free (samples);
         }
@@ -531,7 +527,7 @@ private:
           changed();
           }
         else
-          Sleep (10);
+          Sleep (100);
         }
 
       device->stop();
@@ -558,8 +554,7 @@ private:
   string mLastTitleStr;
 
   string mBaseStr;
-  string mNowStr;
-  string mDebugStr;
+  string mLoadStr;
   //}}}
   };
 
