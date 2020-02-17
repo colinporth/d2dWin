@@ -201,7 +201,7 @@ private:
   //}}}
 
   //{{{
-  void drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame, float valueScale) {
+  void drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame) {
 
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     cRect bitmapRect;
@@ -242,27 +242,32 @@ private:
       bool silence;
       float powerValues[2];
       float peakValues[2];
+      float srcIndex = float((frame / mFrameStep) & mBitmapMask);
 
       if (mFrameStep == 1) {
-        // simple case
+        //{{{  simple case, draw peak and power scaled to maxPeak
+        float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
         mark = mSong.mFrames[frame]->hasTitle();
         silence = mSong.mFrames[frame]->isSilent();
 
         auto powerValuesPtr = mSong.mFrames[frame]->getPowerValues();
         auto peakValuesPtr = mSong.mFrames[frame]->getPeakValues();
         for (auto i = 0; i < 2; i++) {
-          powerValues[i] = *powerValuesPtr++;
-          peakValues[i] = *peakValuesPtr++;
+          powerValues[i] = *powerValuesPtr++ * valueScale;
+          peakValues[i] = *peakValuesPtr++ * valueScale;
           }
+
+        bitmapRect = { srcIndex, mSrcPeakCentre - peakValues[0], srcIndex + 1.f, mSrcPeakCentre + peakValues[1] };
+        mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
         }
+        //}}}
       else {
-        // sum mFrameStep frames, mFrameStep aligned
+        //{{{  sum mFrameStep frames, mFrameStep aligned, just draw power scaled to maxPower
+        float valueScale = mWaveHeight / 2.f / mSong.getMaxPowerValue();
         silence = false;
         mark = false;
-        for (auto i = 0; i < 2; i++) {
+        for (auto i = 0; i < 2; i++)
           powerValues[i] = 0.f;
-          peakValues[i] = 0.f;
-          }
         auto alignedFrame = frame - (frame % mFrameStep);
         auto toSumFrame = std::min (alignedFrame + mFrameStep, rightFrame);
         for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
@@ -270,20 +275,14 @@ private:
           silence |= mSong.mFrames[sumFrame]->isSilent();
           auto powerValuesPtr = mSong.mFrames[sumFrame]->getPowerValues();
           for (auto i = 0; i < 2; i++)
-            powerValues[i] += *powerValuesPtr++;
+            powerValues[i] += *powerValuesPtr++ * valueScale;
           }
 
         for (auto i = 0; i < 2; i++)
           powerValues[i] /= toSumFrame - alignedFrame + 1;
         }
-
-      float srcIndex = float((frame / mFrameStep) & mBitmapMask);
-      bitmapRect = { srcIndex, mSrcWaveCentre - (powerValues[0] * valueScale),
-                     srcIndex + 1.f, mSrcWaveCentre + (powerValues[1] * valueScale) };
-      mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
-
-      bitmapRect = { srcIndex, mSrcPeakCentre - (peakValues[0] * valueScale),
-                     srcIndex + 1.f, mSrcPeakCentre + (peakValues[1] * valueScale) };
+        //}}}
+      bitmapRect = { srcIndex, mSrcWaveCentre - powerValues[0], srcIndex + 1.f, mSrcWaveCentre + powerValues[1] };
       mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
 
       if (silence) {
@@ -360,8 +359,6 @@ private:
   //{{{
   void drawWave (ID2D1DeviceContext* dc, int playFrame) {
 
-    float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
-
     // calc leftFrame,rightFrame
     auto leftFrame = playFrame - (((getWidthInt() + mFrameWidth) / 2) * mFrameStep) / mFrameWidth;
     auto rightFrame = playFrame + (((getWidthInt() + mFrameWidth) / 2) * mFrameStep) / mFrameWidth;
@@ -374,7 +371,7 @@ private:
       // overlap
       if (leftFrame < mBitmapFirstFrame) {
         //{{{  draw new bitmap leftFrames
-        drawBitmapFrames (leftFrame, mBitmapFirstFrame, playFrame, rightFrame, valueScale);
+        drawBitmapFrames (leftFrame, mBitmapFirstFrame, playFrame, rightFrame);
 
         mBitmapFirstFrame = leftFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
@@ -383,7 +380,7 @@ private:
         //}}}
       if (rightFrame > mBitmapLastFrame) {
         //{{{  draw new bitmap rightFrames
-        drawBitmapFrames (mBitmapLastFrame, rightFrame, playFrame, rightFrame, valueScale);
+        drawBitmapFrames (mBitmapLastFrame, rightFrame, playFrame, rightFrame);
 
         mBitmapLastFrame = rightFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
@@ -393,7 +390,7 @@ private:
       }
     else {
       //{{{  no overlap, draw all bitmap frames
-      drawBitmapFrames (leftFrame, rightFrame, playFrame, rightFrame, valueScale);
+      drawBitmapFrames (leftFrame, rightFrame, playFrame, rightFrame);
 
       mBitmapFirstFrame = leftFrame;
       mBitmapLastFrame = rightFrame;
@@ -518,7 +515,9 @@ private:
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     //{{{  draw playFrame
+    float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
     auto powerValues = mSong.mFrames[playFrame]->getPeakValues();
+
     dstRect = { mRect.left + (dstPlay * mFrameWidth)-1.f, mDstWaveCentre - (*powerValues++ * valueScale),
                 mRect.left + ((dstPlay+1.f) * mFrameWidth)+1.f, mDstWaveCentre + (*powerValues * valueScale) };
     dc->FillRectangle (dstRect, mWindow->getGreenBrush());
