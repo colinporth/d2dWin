@@ -11,6 +11,9 @@ using namespace std;
 //{{{
 cSong::~cSong() {
 
+  for (auto frame : mFrames)
+    delete (frame);
+
   mFrames.clear();
   }
 //}}}
@@ -83,6 +86,9 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   // reset frames
   mPlayFrame = 0;
   mTotalFrames = 0;
+
+  for (auto frame : mFrames)
+    delete (frame);
   mFrames.clear();
 
   // reset maxValue

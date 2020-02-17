@@ -35,6 +35,7 @@ public:
 
       if (mAlloced)
         free (mPtr);
+
       free (mPowerValues);
       free (mPeakPowerValues);
       free (mFreqValues);

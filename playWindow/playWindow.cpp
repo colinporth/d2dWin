@@ -514,13 +514,13 @@ private:
       device->start();
       while (!getExit() && (streaming || (mSong.getPlayFrame() < mSong.getLastFrame()))) {
         if (mPlaying && mSong.hasSomeFrames()) {
-          cLog::log (LOGINFO, "process frame:%d", mSong.getPlayFrame());
+          //cLog::log (LOGINFO, "process frame:%d", mSong.getPlayFrame());
           device->process ([&](float*& srcSamples, int& numSrcSamples,
                                int numDstSamplesLeft, int numDstSamples) mutable noexcept {
             // lambda callback - load srcSamples
             lock_guard<mutex> lockGuard (mSong.getMutex());
-            cLog::log (LOGINFO, " - callback for src:%d dst:%d:%d",
-                                mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
+            //cLog::log (LOGINFO, " - callback for src:%d dst:%d:%d",
+                                //mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
             if (mSong.isFramePtrSamples())
               srcSamples = (float*)mSong.getPlayFramePtr();
             else {
