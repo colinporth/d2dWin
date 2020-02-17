@@ -103,7 +103,7 @@ void cD2dWindow::initialise (const string& title, int width, int height, bool fu
 
     // renderThread
     thread ([=]() {
-      // lambda renderThread
+      //{{{  render lambda
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
       cLog::setThreadName ("rend");
 
@@ -118,8 +118,8 @@ void cD2dWindow::initialise (const string& title, int width, int height, bool fu
           }
         else {
           mCountDown = mChangeCountDown;
-
           mTimePoint = system_clock::now();
+
           mDeviceContext->BeginDraw();
           mDeviceContext->Clear (ColorF (ColorF::Black));
           onDraw (mDeviceContext.Get());
@@ -136,7 +136,9 @@ void cD2dWindow::initialise (const string& title, int width, int height, bool fu
 
       cLog::log (LOGINFO, "exit");
       CoUninitialize();
-      }).detach();
+      }
+      //}}}
+      ).detach();
     }
   }
 //}}}

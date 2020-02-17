@@ -82,6 +82,8 @@ public:
   std::mutex& getMutex() { return mMutex; }
 
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
+
+  bool hasSomeFrames() { return !mFrames.empty(); }
   bool isFramePtrSamples() { return mFrameType == cAudioDecode::eWav; }
 
   int getNumChannels() { return mNumChannels; }
@@ -137,8 +139,7 @@ public:
   //}}}
 
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
-  bool addFrame (bool mapped, uint8_t* stream, int frameLen,
-                 int estimatedTotalFrames, int samplesPerFrame, float* samples);
+  bool addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples);
 
   void prevSilence();
   void nextSilence();

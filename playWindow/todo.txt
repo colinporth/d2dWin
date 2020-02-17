@@ -22,7 +22,6 @@ hls, shoutcast
   - channel change
   - bitrate change
   - go back in time
-  - broadcast clocktime display
 
 command line invocation
 - web sites
@@ -44,16 +43,4 @@ play
 editing
 - mute marking
 - save with edits
-- compress to aaa
-
-// timePoint snippets
-auto timePointTz = date::make_zoned (date::current_zone(), mTimePoint);
-mCurTimeStr = date::format (kTimeFormatStr, floor<chrono::seconds>(datePoint));
-
-mStartDatePoint = date::floor<date::days>(mStartTimePoint);
-const auto seconds = chrono::duration_cast<chrono::seconds>(mStartTimePoint - mStartDatePoint);
-
-uint32_t startFrame = uint32_t((uint32_t(seconds.count()) - kStartTimeSecondsOffset) * kFramesPerSecond);
-auto datePoint = floor<date::days>(timePoint);
-auto timeOfDay = date::make_time (chrono::duration_cast<chrono::milliseconds>(timePoint - datePoint));
-mCurDateStr = date::format (kTimeFormatStr, floor<chrono::seconds>(timePoint));
+- compress to aac

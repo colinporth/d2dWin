@@ -384,7 +384,7 @@ public:
         }
       }
 
-    WaitForSingleObject (mEventHandle, INFINITE); 
+    WaitForSingleObject (mEventHandle, INFINITE);
     }
   //}}}
   //{{{
@@ -400,7 +400,7 @@ public:
         mAudioRenderClient->GetBuffer (numSamplesAvailable, &data);
         if (data) {
           cAudioBuffer audioBuffer = { reinterpret_cast<float*>(data), numSamplesAvailable, mMixFormat.Format.nChannels };
-          loadDstCallback(audioBuffer);
+          loadDstCallback (audioBuffer);
           mAudioRenderClient->ReleaseBuffer (numSamplesAvailable, 0);
           }
         }

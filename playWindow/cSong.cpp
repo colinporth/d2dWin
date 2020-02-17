@@ -66,23 +66,26 @@ void cSong::setPlayFrame (int frame) {
 void cSong::incPlayFrame (int frames) { setPlayFrame (mPlayFrame + frames); }
 void cSong::incPlaySec (int secs) { incPlayFrame (secs * mSampleRate / mSamplesPerFrame); }
 
-//std::mutex mMutex;
 //{{{
 void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate) {
 
   lock_guard<mutex> lockGuard (mMutex);
 
+  // new id for any cache
   mId++;
 
+  // reset frame type
+  mFrameType = frameType;
+  mNumChannels = numChannels;
+  mSamplesPerFrame = samplesPerFrame;
+  mSampleRate = sampleRate;
+
+  // reset frames
   mPlayFrame = 0;
   mTotalFrames = 0;
   mFrames.clear();
 
-  mFrameType = frameType;
-  mNumChannels = numChannels;
-  mSampleRate = sampleRate;
-  mSamplesPerFrame = samplesPerFrame;
-
+  // reset maxValue
   mMaxPowerValue = kMinPowerValue;
   mMaxPeakPowerValue = kMinPowerValue;
 
@@ -94,13 +97,8 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   }
 //}}}
 //{{{
-bool cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int estimatedTotalFrames, int samplesPerFrame, float* samples) {
+bool cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples) {
 // return true if enough frames added to start playing, streamLen only used to estimate totalFrames
-
-  lock_guard<mutex> lockGuard (mMutex);
-
-  mSamplesPerFrame = samplesPerFrame;
-  mTotalFrames = estimatedTotalFrames;
 
   // sum of squares channel power
   auto powerValues = (float*)malloc (mNumChannels * 4);
@@ -125,6 +123,7 @@ bool cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int estimatedT
     mMaxPeakPowerValue = max (mMaxPeakPowerValue, peakPowerValues[chan]);
     }
 
+  // ??? inside lock ????
   kiss_fftr (fftrConfig, timeBuf, freqBuf);
 
   auto freqValues = (float*)malloc (kMaxFreq * 4);
@@ -142,10 +141,15 @@ bool cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int estimatedT
     lumaValues[kMaxSpectrum - freq - 1] = value > 255 ? 255 : uint8_t(value);
     }
 
+  lock_guard<mutex> lockGuard (mMutex);
+
+  // totalFrames can be a changing estimate for file, or increasing value for streaming
+  mTotalFrames = totalFrames;
+  mSamplesPerFrame = samplesPerFrame;
   mFrames.push_back (new cFrame (mapped, stream, frameLen, powerValues, peakPowerValues, freqValues, lumaValues));
 
-  auto frameNum = getLastFrame();
   // calc silent window
+  auto frameNum = getLastFrame();
   if (mFrames[frameNum]->isSilent()) {
     auto window = kSilentWindowFrames;
     auto windowFrame = frameNum - 1;
@@ -180,6 +184,7 @@ void cSong::nextSilence() {
   }
 //}}}
 
+// private
 //{{{
 int cSong::skipPrev (int fromFrame, bool silent) {
 
