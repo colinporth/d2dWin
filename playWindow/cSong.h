@@ -21,11 +21,9 @@ public:
     static constexpr float kSilentThreshold = 0.05f;
     //{{{
     cFrame (bool alloced, uint8_t* ptr, uint32_t len,
-            float* powerValues, float* peakPowerValues,
-            float* freqValues, uint8_t* lumaValues) :
+            float* powerValues, float* peakValues, float* freqValues, uint8_t* lumaValues) :
         mPtr(ptr), mLen(len), mAlloced(alloced),
-        mPowerValues(powerValues), mPeakPowerValues(peakPowerValues),
-        mFreqValues(freqValues), mFreqLuma(lumaValues) {
+        mPowerValues(powerValues), mPeakValues(peakValues), mFreqValues(freqValues), mFreqLuma(lumaValues) {
 
       mSilent = isSilentThreshold();
       }
@@ -37,7 +35,7 @@ public:
         free (mPtr);
 
       free (mPowerValues);
-      free (mPeakPowerValues);
+      free (mPeakValues);
       free (mFreqValues);
       free (mFreqLuma);
       }
@@ -48,7 +46,7 @@ public:
     int getLen() { return mLen; }
 
     float* getPowerValues() { return mPowerValues;  }
-    float* getPeakPowerValues() { return mPeakPowerValues;  }
+    float* getPeakValues() { return mPeakValues;  }
     float* getFreqValues() { return mFreqValues; }
     uint8_t* getFreqLuma() { return mFreqLuma; }
 
@@ -69,7 +67,7 @@ public:
     bool mAlloced;
 
     float* mPowerValues;
-    float* mPeakPowerValues;
+    float* mPeakValues;
     float* mFreqValues;
     uint8_t* mFreqLuma;
 
@@ -94,7 +92,7 @@ public:
   int getMaxSamplesPerFrame() { return kMaxSamplesPerFrame; }
 
   float getMaxPowerValue() { return mMaxPowerValue; }
-  float getMaxPeakPowerValue() { return mMaxPeakPowerValue; }
+  float getMaxPeakValue() { return mMaxPeakValue; }
   float getMaxFreqValue() { return mMaxFreqValue; }
   int getNumFreq() { return kMaxFreq; }
   int getNumFreqLuma() { return kMaxSpectrum; }
@@ -140,7 +138,7 @@ public:
   //}}}
 
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
-  bool addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples);
+  void addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples);
 
   void prevSilence();
   void nextSilence();
@@ -164,7 +162,7 @@ private:
   int mTotalFrames = 0;
 
   float mMaxPowerValue = 0.f;
-  float mMaxPeakPowerValue = 0.f;
+  float mMaxPeakValue = 0.f;
 
   float mMaxFreqValues[kMaxFreq];
   float mMaxFreqValue = 0.f;

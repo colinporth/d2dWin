@@ -249,10 +249,10 @@ private:
         silence = mSong.mFrames[frame]->isSilent();
 
         auto powerValues = mSong.mFrames[frame]->getPowerValues();
-        auto peakPowerValues = mSong.mFrames[frame]->getPeakPowerValues();
+        auto peakValues = mSong.mFrames[frame]->getPeakValues();
         for (auto i = 0; i < 2; i++) {
           values[i] = *powerValues++;
-          peakValues[i] = *peakPowerValues++;
+          peakValues[i] = *peakValues++;
           }
         }
       else {
@@ -359,7 +359,7 @@ private:
   //{{{
   void drawWave (ID2D1DeviceContext* dc, int playFrame) {
 
-    float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakPowerValue();
+    float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
 
     // calc leftFrame,rightFrame
     auto leftFrame = playFrame - (((getWidthInt() + mFrameWidth) / 2) * mFrameStep) / mFrameWidth;
@@ -516,7 +516,7 @@ private:
       //}}}
 
     //{{{  draw playFrame
-    auto powerValues = mSong.mFrames[playFrame]->getPeakPowerValues();
+    auto powerValues = mSong.mFrames[playFrame]->getPeakValues();
     dstRect = { mRect.left + (dstPlay * mFrameWidth)-1.f, mDstWaveCentre - (*powerValues++ * valueScale),
                 mRect.left + ((dstPlay+1.f) * mFrameWidth)+1.f, mDstWaveCentre + (*powerValues * valueScale) };
     dc->FillRectangle (dstRect, mWindow->getGreenBrush());

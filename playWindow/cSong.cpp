@@ -93,7 +93,7 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
 
   // reset maxValue
   mMaxPowerValue = kMinPowerValue;
-  mMaxPeakPowerValue = kMinPowerValue;
+  mMaxPeakValue = kMinPowerValue;
 
   mMaxFreqValue = 0.f;
   for (int i = 0; i < kMaxFreq; i++)
@@ -103,15 +103,15 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   }
 //}}}
 //{{{
-bool cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples) {
+void cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples) {
 // return true if enough frames added to start playing, streamLen only used to estimate totalFrames
 
   // sum of squares channel power
   auto powerValues = (float*)malloc (mNumChannels * 4);
   memset (powerValues, 0, mNumChannels * 4);
 
-  auto peakPowerValues = (float*)malloc (mNumChannels * 4);
-  memset (peakPowerValues, 0, mNumChannels * 4);
+  auto peakValues = (float*)malloc (mNumChannels * 4);
+  memset (peakValues, 0, mNumChannels * 4);
 
   for (int sample = 0; sample < samplesPerFrame; sample++) {
     timeBuf[sample] = 0;
@@ -119,14 +119,14 @@ bool cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrame
       auto value = *samples++;
       timeBuf[sample] += value;
       powerValues[chan] += value * value;
-      peakPowerValues[chan] = max (abs(peakPowerValues[chan]), value);
+      peakValues[chan] = max (abs(peakValues[chan]), value);
       }
     }
 
   for (auto chan = 0; chan < mNumChannels; chan++) {
     powerValues[chan] = sqrtf (powerValues[chan] / samplesPerFrame);
     mMaxPowerValue = max (mMaxPowerValue, powerValues[chan]);
-    mMaxPeakPowerValue = max (mMaxPeakPowerValue, peakPowerValues[chan]);
+    mMaxPeakValue = max (mMaxPeakValue, peakValues[chan]);
     }
 
   // ??? inside lock ????
@@ -152,7 +152,7 @@ bool cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrame
   // totalFrames can be a changing estimate for file, or increasing value for streaming
   mTotalFrames = totalFrames;
   mSamplesPerFrame = samplesPerFrame;
-  mFrames.push_back (new cFrame (mapped, stream, frameLen, powerValues, peakPowerValues, freqValues, lumaValues));
+  mFrames.push_back (new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues));
 
   // calc silent window
   auto frameNum = getLastFrame();
@@ -169,9 +169,6 @@ bool cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrame
       window--;
       }
     }
-
-  // return true if first frame, used to launch player
-  return frameNum == 0;
   }
 //}}}
 
@@ -194,7 +191,7 @@ void cSong::nextSilence() {
 //{{{
 int cSong::skipPrev (int fromFrame, bool silent) {
 
-  for (auto frame = fromFrame-1; frame >= 0; frame--)
+  for (int frame = fromFrame-1; frame >= 0; frame--)
     if (mFrames[frame]->isSilent() ^ silent)
       return frame;
 

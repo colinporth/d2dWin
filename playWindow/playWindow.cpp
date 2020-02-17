@@ -291,7 +291,7 @@ private:
         }
       }
 
-    mPlayDoneSem.wait();
+    //mPlayDoneSem.wait();
     cLog::log (LOGINFO, "exit");
     setExit();
     }
@@ -437,9 +437,7 @@ private:
 
         auto frameSampleBytes = frameSamples * 2 * 4;
         while (!getExit() && !mSongChanged && !songDone) {
-          if (mSong.addFrame (false, data, frameSampleBytes, fileMapSize / frameSampleBytes, frameSamples, (float*)data))
-            thread ([=](){ playThread (false); }).detach();
-
+          mSong.addFrame (false, data, frameSampleBytes, fileMapSize / frameSampleBytes, frameSamples, (float*)data);
           data += frameSampleBytes;
           changed();
           songDone = (data + frameSampleBytes) > fileMapEnd;
@@ -476,7 +474,7 @@ private:
         }
 
       // wait for play to end or abort
-      mPlayDoneSem.wait();
+      //mPlayDoneSem.wait();
       //{{{  next file
       UnmapViewOfFile (fileMapFirst);
       CloseHandle (fileHandle);
@@ -542,7 +540,7 @@ private:
       free (samples);
       }
 
-    mPlayDoneSem.notifyAll();
+    //mPlayDoneSem.notifyAll();
     cLog::log (LOGINFO, "exit");
     }
   //}}}
@@ -555,7 +553,7 @@ private:
   cJpegImageView* mJpegImageView = nullptr;
 
   bool mPlaying = true;
-  cSemaphore mPlayDoneSem = "playDone";
+  //cSemaphore mPlayDoneSem = "playDone";
 
   cVolumeBox* mVolumeBox = nullptr;
 

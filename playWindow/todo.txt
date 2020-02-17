@@ -19,8 +19,7 @@ hls, shoutcast
 - shoutcast
   - title display broken
 - hls
-  - channel change
-  - bitrate change
+  - channel,bitrate change unreliable
   - go back in time
 
 command line invocation
