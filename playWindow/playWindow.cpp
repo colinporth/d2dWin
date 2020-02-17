@@ -203,11 +203,11 @@ private:
 
     while (!getExit()) {
       mSongChanged = false;
-      const string m3u8Path = "pool_904/live/uk/" + mSong.getChan() +
-                              "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
-                              "-audio=" + dec(mSong.getBitrate()) + ".norewind.m3u8";
+      const string path = "pool_904/live/uk/" + mSong.getChan() +
+                          "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
+                          "-audio=" + dec(mSong.getBitrate());
       cWinSockHttp http;
-      host = http.getRedirect (host, m3u8Path);
+      host = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
         //{{{  parse m3u8 for baseSeqNum, baseTimePoint
         // point to #EXT-X-MEDIA-SEQUENCE: sequence num
@@ -246,11 +246,7 @@ private:
           auto msSinceStart = duration_cast<milliseconds>(getNowDayLight() - mSong.getBaseTimePoint());
           if (msSinceStart.count() - (seqNum * 6400) > 10000) {
             // get hls seqNum chunk, about 100k bytes for 128kps stream
-            const string path = "pool_904/live/uk/" + mSong.getChan() +
-                                "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
-                                "-audio=" + dec(mSong.getBitrate()) +
-                                '-' + dec(mSong.getBaseSeqNum()+seqNum) + ".ts";
-            if (http.get (host, path) == 200) {
+            if (http.get (host, path + '-' + dec(mSong.getBaseSeqNum()+seqNum) + ".ts") == 200) {
               getFailed = 0;
               mLoadStr = "got " + dec(seqNum) + " at " + date::format ("%T", floor<seconds>(getNowDayLight()));
               cLog::log (LOGINFO, mLoadStr);
