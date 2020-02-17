@@ -34,7 +34,7 @@ using namespace std;
 
 class cAppWindow : public cHls, public cD2dWindow {
 public:
-  cAppWindow (int chan, int bitrate) : cHls(chan, bitrate, getDaylightSeconds()) {}
+  cAppWindow (int chan, int bitrate) : cHls(chan, bitrate, getDayLightSeconds()) {}
   //{{{
   void run (const string& title, int width, int height) {
 

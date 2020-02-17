@@ -110,9 +110,9 @@ public:
   int getBitrate() { return mBitrate; }
   std::string getChan() { return mChan; }
 
-  bool hasTime() { return mHasTime; }
-  int getStartSeqNum() { return mStartSeqNum; }
-  std::chrono::system_clock::time_point getStartTimePoint() { return mStartTimePoint; }
+  bool hasBase() { return mHasBase; }
+  int getBaseSeqNum() { return mBaseSeqNum; }
+  std::chrono::system_clock::time_point getBaseTimePoint() { return mBaseTimePoint; }
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
@@ -128,10 +128,10 @@ public:
   void setBitrate (int bitrate) { mBitrate = bitrate; }
 
   //{{{
-  void setSequence (int startSeqNum, std::chrono::system_clock::time_point startTimePoint) {
-    mStartSeqNum = startSeqNum;
-    mStartTimePoint = startTimePoint;
-    mHasTime = true;
+  void setBase (int startSeqNum, std::chrono::system_clock::time_point startTimePoint) {
+    mBaseSeqNum = startSeqNum;
+    mBaseTimePoint = startTimePoint;
+    mHasBase = true;
     }
   //}}}
   //}}}
@@ -169,9 +169,9 @@ private:
 
   int mBitrate;
   std::string mChan;
-  bool mHasTime = false;
-  int mStartSeqNum = 0;
-  std::chrono::system_clock::time_point mStartTimePoint;
+  bool mHasBase = false;
+  int mBaseSeqNum = 0;
+  std::chrono::system_clock::time_point mBaseTimePoint;
 
 
   kiss_fftr_cfg fftrConfig;

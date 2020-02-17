@@ -22,14 +22,7 @@ public:
   void run (bool streaming, const string& title, int width, int height, const string& name) {
 
     initialise (title + " " + name, width, height, false);
-
     mSong = new cSong();
-    mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
-    add (mJpegImageView);
-
-    add (new cTitleBox (this, 200.f,20.f, mM3u8Str), 0.f,40.f);
-    add (new cTitleBox (this, 200.f,20.f, mNowStr), 0.f,60.f);
-    add (new cTitleBox (this, 600.f,20.f, mDebugStr), 0.f,80.f);
 
     add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
     add (new cClockBox (this, 40.f, mTimePoint), -135.f,35.f);
@@ -47,11 +40,19 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (streaming) {
+      add (new cTitleBox (this, 200.f,20.f, mBaseStr), 0.f,40.f);
+      add (new cTitleBox (this, 200.f,20.f, mNowStr), 0.f,60.f);
+      add (new cTitleBox (this, 600.f,20.f, mDebugStr), 0.f,80.f);
+
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
       //thread ([=]() { icyThread (name); }).detach();
       }
-    else if (!mFileList->empty())
+    else if (!mFileList->empty()) {
+      mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
+      addFront (mJpegImageView);
+
       thread ([=](){ fileThread(); }).detach();
+      }
 
     // loop till quit
     messagePump();
@@ -197,10 +198,8 @@ private:
     mSong->setChan (chan);
     mSong->setBitrate (bitrate);
 
-
     while (!getExit()) {
       mSongChanged = false;
-
       const string m3u8Path = "pool_904/live/uk/" + mSong->getChan() +
                               "/" + mSong->getChan() + ".isml/" + mSong->getChan() +
                               "-audio=" + dec(mSong->getBitrate()) + ".norewind.m3u8";
@@ -213,7 +212,7 @@ private:
         const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
         char* extSeqEnd = strchr (extSeq, '\n');
         *extSeqEnd = '\0';
-        int startSeqNum = atoi (extSeq) + 3;
+        int baseSeqNum = atoi (extSeq) + 3;
 
         // point to #EXT-X-PROGRAM-DATE-TIME: dateTime str
         const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
@@ -224,20 +223,19 @@ private:
 
         // parse ISO time format from string
         istringstream inputStream (extDateTimeString);
-        system_clock::time_point startTimePoint;
-        inputStream >> date::parse ("%FT%T", startTimePoint);
-        startTimePoint -= seconds (17);
+        system_clock::time_point baseTimePoint;
+        inputStream >> date::parse ("%FT%T", baseTimePoint);
+        baseTimePoint -= seconds (17);
 
         http.freeContent();
 
-        mM3u8Str =
-          "m3u8:" + date::format ("%D %T", floor<seconds>(system_clock::now() + seconds (getDaylightSeconds()))) +
-          " first:" + date::format ("%D %T", floor<seconds>(startTimePoint)) +
-          " seqNum:" + dec(startSeqNum);
+        mBaseStr =
+          "base: " + date::format ("%T", floor<seconds>(getNowDayLight())) +
+          " first:" + date::format ("%T", floor<seconds>(baseTimePoint)) +
+          " seqNum: " + dec(baseSeqNum);
         //}}}
-
         mSong->init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
-        mSong->setSequence (startSeqNum, startTimePoint);
+        mSong->setBase (baseSeqNum, baseTimePoint);
 
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong->getMaxSamplesPerFrame() * mSong->getNumSampleBytes());
@@ -245,20 +243,19 @@ private:
         auto seqNum = 0;
         while (!getExit() && !mSongChanged) {
           // date, time
-          auto nowTimePoint = system_clock::now() + seconds (getDaylightSeconds());
-          mNowStr = "now:" + date::format ("%D %T", floor<seconds>(nowTimePoint));
+          mNowStr = "now: " + date::format ("%T", floor<seconds>(getNowDayLight()));
 
-          milliseconds durationSinceStart = duration_cast<milliseconds>(nowTimePoint - mSong->getStartTimePoint());
+          milliseconds msSinceStart = duration_cast<milliseconds>(getNowDayLight() - mSong->getBaseTimePoint());
           mDebugStr = "chunks:" + dec(seqNum) +
                       " frames:" + dec(mSong->getNumFrames()) +
                       " t1:" + frac(seqNum * 6.4f, 6,2,' ') +
-                      " t2:" + frac((int)(durationSinceStart.count())/1000.f,6,2,' ');
+                      " t2:" + frac((int)(msSinceStart.count())/1000.f,6,2,' ');
 
           // get hls seqNum chunk, about 100k bytes for 128kps stream
           const string path = "pool_904/live/uk/" + mSong->getChan() +
                               "/" + mSong->getChan() + ".isml/" + mSong->getChan() +
                               "-audio=" + dec(mSong->getBitrate()) +
-                              '-' + dec(mSong->getStartSeqNum()+seqNum) + ".ts";
+                              '-' + dec(mSong->getBaseSeqNum()+seqNum) + ".ts";
           if (http.get (host, path) == 200) {
             cLog::log (LOGINFO, "got %d", seqNum);
             auto aacFrames = http.getContent();
@@ -561,7 +558,7 @@ private:
 
   string mLastTitleStr;
 
-  string mM3u8Str;
+  string mBaseStr;
   string mNowStr;
   string mDebugStr;
   //}}}

@@ -148,10 +148,10 @@ public:
     drawWave (dc, playFrame);
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
-    if (mSong->hasTime()) {
+    if (mSong->hasBase()) {
       //{{{  add base time to frame
-      auto startDatePoint = date::floor<date::days>(mSong->getStartTimePoint());
-      auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mSong->getStartTimePoint() - startDatePoint);
+      auto startDatePoint = date::floor<date::days>(mSong->getBaseTimePoint());
+      auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mSong->getBaseTimePoint() - startDatePoint);
       uint64_t framesBase = (seconds.count() * mSong->getSampleRate()) / mSong->getSamplesPerFrame();
       drawTime (dc, " " + frameString (framesBase + playFrame) +
                     " " + frameString (framesBase + mSong->getTotalFrames()));

@@ -99,7 +99,7 @@ void cD2dWindow::initialise (const string& title, int width, int height, bool fu
 
     TIME_ZONE_INFORMATION timeZoneInfo;
     if (GetTimeZoneInformation (&timeZoneInfo) == TIME_ZONE_ID_DAYLIGHT)
-      mDaylightSeconds = -timeZoneInfo.DaylightBias * 60;
+      mDayLightSeconds = -timeZoneInfo.DaylightBias * 60;
 
     // renderThread
     thread ([=]() {

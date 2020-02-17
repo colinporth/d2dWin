@@ -25,7 +25,7 @@ public:
     //auto timePointTz = date::make_zoned (date::current_zone(), mTimePoint);
     auto timePoint = mTimePoint;
     if (mApplyDaylight)
-      timePoint += std::chrono::seconds (mWindow->getDaylightSeconds());
+      timePoint += std::chrono::seconds (mWindow->getDayLightSeconds());
     auto datePoint = floor<date::days>(timePoint);
     auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::milliseconds>(timePoint - datePoint));
 

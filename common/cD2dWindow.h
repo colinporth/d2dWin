@@ -415,7 +415,9 @@ public:
   bool getMouseDown() { return mMouseDown; }
   bool getTimedMenuOn() { return mTimedMenuOn; }
 
-  int getDaylightSeconds() { return mDaylightSeconds; }
+  std::chrono::system_clock::time_point getNow() { return mTimePoint; }
+  std::chrono::system_clock::time_point getNowDayLight() { return mTimePoint + std::chrono::seconds (mDayLightSeconds); }
+  int getDayLightSeconds() { return mDayLightSeconds; }
 
   bool getFullScreen() { return mFullScreen; }
 
@@ -435,15 +437,14 @@ public:
   LRESULT wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lparam);
   void messagePump();
 
-  std::chrono::system_clock::time_point mTimePoint;
-
 protected:
   virtual bool onKey (int key) = 0;
   virtual bool onKeyUp (int key) { return false; }
 
   // exposed for simple boxes
+  std::chrono::system_clock::time_point mTimePoint;
+  int mDayLightSeconds = 0;
   float mRenderTime = 0;
-  int mDaylightSeconds = 0;
 
 private:
   void createDirect2d();

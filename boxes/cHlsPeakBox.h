@@ -124,7 +124,7 @@ public:
     double leftSample = mHls->getPlaySample() - (getCentreX() + mAnimation)*samplesPerPix;
     //{{{  draw clock
     //auto timePointTz = date::make_zoned (date::current_zone(), mTimePoint);
-    auto timePoint = mHls->mPlayTimePoint + std::chrono::seconds (mWindow->getDaylightSeconds());
+    auto timePoint = mHls->mPlayTimePoint + std::chrono::seconds (mWindow->getDayLightSeconds());
     auto datePoint = floor<date::days>(timePoint);
     auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::milliseconds>(timePoint - datePoint));
 
@@ -160,8 +160,8 @@ public:
                   //mWindow->getDarkGreyBrush(), 2.f);
     //}}}
 
-    auto timeOfDay1 = date::make_time (std::chrono::duration_cast<std::chrono::milliseconds>(mWindow->mTimePoint - datePoint));
-    auto timeDiff = std::chrono::duration_cast<std::chrono::seconds>(mWindow->mTimePoint - timePoint).count();
+    auto timeOfDay1 = date::make_time (std::chrono::duration_cast<std::chrono::milliseconds>(mWindow->getNow() - datePoint));
+    auto timeDiff = std::chrono::duration_cast<std::chrono::seconds>(mWindow->getNow() - timePoint).count();
     if (timeDiff < 60) {
       //{{{  draw clock seconds
       auto secRadius = radius * 0.85f;
