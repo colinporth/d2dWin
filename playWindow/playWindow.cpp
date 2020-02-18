@@ -13,7 +13,6 @@
 #include "cAudioDecode.h"
 
 using namespace std;
-using namespace chrono;
 //}}}
 
 class cAppWindow : public cD2dWindow {
@@ -224,9 +223,9 @@ private:
 
         // parse ISO time format from string
         istringstream inputStream (extDateTimeString);
-        system_clock::time_point baseTimePoint;
+        chrono::system_clock::time_point baseTimePoint;
         inputStream >> date::parse ("%FT%T", baseTimePoint);
-        baseTimePoint -= seconds (17);
+        baseTimePoint -= chrono::seconds (17);
 
         http.freeContent();
 
@@ -244,7 +243,8 @@ private:
             // get hls seqNum chunk, about 100k bytes for 128kps stream
             mSong.setHlsLoading();
             if (http.get (host, path + '-' + dec(mSong.getHlsSeqNum()) + ".ts") == 200) {
-              cLog::log (LOGINFO, "got " + dec(mSong.getHlsBasedSeqNum()) + " at " + date::format ("%T", floor<seconds>(getNowDayLight())));
+              cLog::log (LOGINFO, "got " + dec(mSong.getHlsBasedSeqNum()) +
+                                  " at " + date::format ("%T", chrono::floor<chrono::seconds>(getNowDayLight())));
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
