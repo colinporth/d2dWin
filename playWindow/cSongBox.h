@@ -19,23 +19,21 @@ public:
 
     // time display font
     mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 20.f, L"en-us",
-      &mLeftTimeTextFormat);
-    mLeftTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
+      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 25.f, L"en-us",
+      &mSmallTimeTextFormat);
 
     mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 35.f, L"en-us",
-      &mRightTimeTextFormat);
-    mRightTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 40.f, L"en-us",
+      &mBigTimeTextFormat);
     }
   //}}}
   //{{{
   virtual ~cSongBox() {
 
-    if (mLeftTimeTextFormat)
-      mLeftTimeTextFormat->Release();
-    if (mRightTimeTextFormat)
-      mRightTimeTextFormat->Release();
+    if (mSmallTimeTextFormat)
+      mSmallTimeTextFormat->Release();
+    if (mBigTimeTextFormat)
+      mBigTimeTextFormat->Release();
 
     if (mBitmapTarget)
       mBitmapTarget->Release();
@@ -161,20 +159,16 @@ public:
     drawFreq (dc, playFrame);
 
     if (!mSong.hasBaseTime())
-      drawTime (dc, "", frameString (playFrame) + " " + frameString (mSong.getTotalFrames()));
+      drawTime (dc, "", frameString (playFrame), frameString (mSong.getTotalFrames()));
     else {
       //{{{  draw with baseTime
       auto startDatePoint = date::floor<date::days>(mSong.getBaseTimePoint());
       auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mSong.getBaseTimePoint() - startDatePoint);
       uint64_t framesBase = (seconds.count() * mSong.getSampleRate()) / mSong.getSamplesPerFrame();
 
-      drawTime (dc, frameString (framesBase),
-                    frameString (framesBase + playFrame) + " " + frameString (framesBase + mSong.getTotalFrames()));
+      drawTime (dc, frameString (framesBase), frameString (framesBase + playFrame), frameString (framesBase + mSong.getTotalFrames()));
       }
       //}}}
-
-    if (mSong.getHlsLoading()) 
-      drawLoading (dc);
     }
   //}}}
 
@@ -563,34 +557,6 @@ private:
     }
   //}}}
   //{{{
-  void drawTime (ID2D1DeviceContext* dc, const std::string& leftString, const std::string& rightString) {
-
-    if (!leftString.empty() && mLeftTimeTextFormat) {
-      IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (
-        std::wstring (leftString.begin(), leftString.end()).data(), (uint32_t)leftString.size(),
-        mLeftTimeTextFormat, getWidth(), getHeight(), &textLayout);
-
-      if (textLayout) {
-        dc->DrawTextLayout (getBL() - cPoint(0.f,20.f), textLayout, mWindow->getWhiteBrush());
-        textLayout->Release();
-        }
-      }
-
-    if (mRightTimeTextFormat) {
-      IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (
-        std::wstring (rightString.begin(), rightString.end()).data(), (uint32_t)rightString.size(),
-        mRightTimeTextFormat, getWidth(), getHeight(), &textLayout);
-
-      if (textLayout) {
-        dc->DrawTextLayout (getBL() - cPoint(0.f,35.f), textLayout, mWindow->getWhiteBrush());
-        textLayout->Release();
-        }
-      }
-    }
-  //}}}
-  //{{{
   void drawOverview (ID2D1DeviceContext* dc, int playFrame) {
 
     float valueScale = mOverviewHeight / 2.f / mSong.getMaxPowerValue();
@@ -791,10 +757,38 @@ private:
     }
   //}}}
   //{{{
-  void drawLoading (ID2D1DeviceContext* dc) {
+  void drawTime (ID2D1DeviceContext* dc, const std::string& first, const std::string& play, const std::string& last) {
 
-    cRect dstRect = { mRect.right - 150.f, mRect.bottom - 4.0f, mRect.right, mRect.bottom };
-    dc->FillRectangle (dstRect, mSong.getHlsLate() ? mWindow->getRedBrush() : mWindow->getGreenBrush());
+    IDWriteTextLayout* textLayout;
+
+    mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
+    mWindow->getDwriteFactory()->CreateTextLayout (
+      std::wstring (first.begin(), first.end()).data(), (uint32_t)first.size(),
+      mSmallTimeTextFormat, getWidth(), mSmallTimeTextFormat->GetFontSize(), &textLayout);
+    if (textLayout) {
+      dc->DrawTextLayout (getBL() + cPoint(0.f,-mSmallTimeTextFormat->GetFontSize()), textLayout, mWindow->getWhiteBrush());
+      textLayout->Release();
+      }
+
+    mBigTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_CENTER);
+    mWindow->getDwriteFactory()->CreateTextLayout (
+      std::wstring (play.begin(), play.end()).data(), (uint32_t)play.size(),
+      mBigTimeTextFormat, getWidth(), mBigTimeTextFormat->GetFontSize(), &textLayout);
+    if (textLayout) {
+      dc->DrawTextLayout (getBL() + cPoint(0.f,-mBigTimeTextFormat->GetFontSize()), textLayout, mWindow->getWhiteBrush());
+      textLayout->Release();
+      }
+
+    mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+    mWindow->getDwriteFactory()->CreateTextLayout (
+      std::wstring (last.begin(), last.end()).data(), (uint32_t)last.size(),
+      mSmallTimeTextFormat, getWidth(), mSmallTimeTextFormat->GetFontSize(), &textLayout);
+    if (textLayout) {
+       dc->DrawTextLayout (getBL() + cPoint(0.f,-mSmallTimeTextFormat->GetFontSize()), textLayout,
+                           !mSong.getHlsLoading() ? mWindow->getWhiteBrush() :
+                             mSong.getHlsLate() ? mWindow->getRedBrush() : mWindow->getGreenBrush());
+      textLayout->Release();
+      }
     }
   //}}}
 
@@ -856,7 +850,7 @@ private:
   ID2D1BitmapRenderTarget* mBitmapTarget = nullptr;
   ID2D1Bitmap* mBitmap = nullptr;
 
-  IDWriteTextFormat* mLeftTimeTextFormat = nullptr;
-  IDWriteTextFormat* mRightTimeTextFormat = nullptr;
+  IDWriteTextFormat* mSmallTimeTextFormat = nullptr;
+  IDWriteTextFormat* mBigTimeTextFormat = nullptr;
   //}}}
   };
