@@ -31,9 +31,9 @@
 
 using namespace Microsoft::WRL;
 using namespace D2D1;
-using namespace std;
 #include "cD2dWindow.h"
 
+using namespace std;
 using namespace chrono;
 //}}}
 
@@ -140,6 +140,17 @@ void cD2dWindow::initialise (const string& title, int width, int height, bool fu
       //}}}
       ).detach();
     }
+  }
+//}}}
+
+//{{{
+system_clock::time_point cD2dWindow::getNow() {
+  return system_clock::now();
+  }
+//}}}
+//{{{
+system_clock::time_point cD2dWindow::getNowDayLight() {
+  return system_clock::now() + seconds (mDayLightSeconds);
   }
 //}}}
 

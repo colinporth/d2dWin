@@ -90,16 +90,16 @@ protected:
       case 0x0d: mSongChanged = true; changed(); break; // enter - play file
 
       // crude chan,bitrate change
-      case  '1': mSongChanged = true; mSong.setChan ("bbc_radio_one"); break;
-      case  '2': mSongChanged = true; mSong.setChan ("bbc_radio_two"); break;
-      case  '3': mSongChanged = true; mSong.setChan ("bbc_radio_three"); break;
-      case  '4': mSongChanged = true; mSong.setChan ("bbc_radio_fourfm"); break;
-      case  '5': mSongChanged = true; mSong.setChan ("bbc_radio_five_live"); break;
-      case  '6': mSongChanged = true; mSong.setChan ("bbc_6music"); break;
-      case  '7': mSongChanged = true; mSong.setBitrate (48000); break;
-      case  '8': mSongChanged = true; mSong.setBitrate (96000); break;
-      case  '9': mSongChanged = true; mSong.setBitrate (128000); break;
-      case  '0': mSongChanged = true; mSong.setBitrate (320000); break;
+      case  '1': mSongChanged = true; mSong.setHlsChan ("bbc_radio_one"); break;
+      case  '2': mSongChanged = true; mSong.setHlsChan ("bbc_radio_two"); break;
+      case  '3': mSongChanged = true; mSong.setHlsChan ("bbc_radio_three"); break;
+      case  '4': mSongChanged = true; mSong.setHlsChan ("bbc_radio_fourfm"); break;
+      case  '5': mSongChanged = true; mSong.setHlsChan ("bbc_radio_five_live"); break;
+      case  '6': mSongChanged = true; mSong.setHlsChan ("bbc_6music"); break;
+      case  '7': mSongChanged = true; mSong.setHlsBitrate (48000); break;
+      case  '8': mSongChanged = true; mSong.setHlsBitrate (96000); break;
+      case  '9': mSongChanged = true; mSong.setHlsBitrate (128000); break;
+      case  '0': mSongChanged = true; mSong.setHlsBitrate (320000); break;
 
       default  : cLog::log (LOGINFO, "key %x", key);
       }
@@ -196,14 +196,14 @@ private:
   // - host is redirected, assumes bbc radio aac, 48000 sampleaRate
 
     cLog::setThreadName ("hls ");
-    mSong.setChan (chan);
-    mSong.setBitrate (bitrate);
+    mSong.setHlsChan (chan);
+    mSong.setHlsBitrate (bitrate);
 
     while (!getExit()) {
       mSongChanged = false;
-      const string path = "pool_904/live/uk/" + mSong.getChan() +
-                          "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
-                          "-audio=" + dec(mSong.getBitrate());
+      const string path = "pool_904/live/uk/" + mSong.getHlsChan() +
+                          "/" + mSong.getHlsChan() + ".isml/" + mSong.getHlsChan() +
+                          "-audio=" + dec(mSong.getHlsBitrate());
       cWinSockHttp http;
       host = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
@@ -240,7 +240,7 @@ private:
 
         while (!getExit() && !mSongChanged) {
           auto hlsOffset = mSong.getHlsOffsetMs (getNowDayLight());
-          if ((hlsOffset > 10000) && (hlsOffset < 64000)) {
+          if ((hlsOffset > 10000) && (hlsOffset < 64000)) { // no than more 64 seconds ahead, 10 hls chunks
             // get hls seqNum chunk, about 100k bytes for 128kps stream
             mSong.setHlsLoading();
             if (http.get (host, path + '-' + dec(mSong.getHlsSeqNum()) + ".ts") == 200) {
@@ -268,13 +268,15 @@ private:
               mSong.incHlsSeqNum();
               }
             else {
-              //{{{  debug
+              //{{{  get failed, inc late count, back off for 200ms
               mSong.incHlsLate();
-              cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(mSong.getHlsBasedSeqNum()));
               changed();
-              //}}}
+
+              cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(mSong.getHlsBasedSeqNum()));
+
               Sleep (200);
               }
+              //}}}
             }
           Sleep (50);
           }

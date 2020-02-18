@@ -111,8 +111,8 @@ public:
   int getPlayFrameLen();
 
   // optional info
-  int getBitrate() { return mBitrate; }
-  std::string getChan() { return mChan; }
+  int getHlsBitrate() { return mHlsBitrate; }
+  std::string getHlsChan() { return mHlsChan; }
 
   bool hasHlsBaseTime() { return mHasHlsBaseTime; }
   std::chrono::system_clock::time_point getHlsBaseTimePoint() { return mHlsBaseTimePoint; }
@@ -133,8 +133,8 @@ public:
 
   void setTitle (const std::string& title);
 
-  void setChan (const std::string& chan) { mChan = chan; }
-  void setBitrate (int bitrate) { mBitrate = bitrate; }
+  void setHlsChan (const std::string& chan) { mHlsChan = chan; }
+  void setHlsBitrate (int bitrate) { mHlsBitrate = bitrate; }
 
   void setHlsBase (int startSeqNum, std::chrono::system_clock::time_point startTimePoint);
   void setHlsLoading() { mHlsLoading = true; }
@@ -174,8 +174,8 @@ private:
   float mMaxFreqValues[kMaxFreq];
   float mMaxFreqValue = 0.f;
 
-  int mBitrate;
-  std::string mChan;
+  int mHlsBitrate;
+  std::string mHlsChan;
 
   bool mHasHlsBaseTime = false;
   int mHlsBaseSeqNum = 0;

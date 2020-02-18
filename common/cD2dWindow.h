@@ -415,8 +415,8 @@ public:
   bool getMouseDown() { return mMouseDown; }
   bool getTimedMenuOn() { return mTimedMenuOn; }
 
-  std::chrono::system_clock::time_point getNow() { return mTimePoint; }
-  std::chrono::system_clock::time_point getNowDayLight() { return mTimePoint + std::chrono::seconds (mDayLightSeconds); }
+  std::chrono::system_clock::time_point getNow();
+  std::chrono::system_clock::time_point getNowDayLight();
   int getDayLightSeconds() { return mDayLightSeconds; }
 
   bool getFullScreen() { return mFullScreen; }
