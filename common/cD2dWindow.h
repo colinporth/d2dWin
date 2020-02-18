@@ -51,9 +51,6 @@ const float kLineHeight = 20.f;
 
 class cD2dWindow : public iChange {
 public:
-  static cD2dWindow* mD2dWindow;
-  static void getTimeOfDay (struct timeval* tp, struct timezone* tzp);
-
   //{{{
   class cBox {
   public:
@@ -368,20 +365,6 @@ public:
     };
   //}}}
 
-  ~cD2dWindow();
-
-  void initialise (const std::string& title, int width, int height, bool fullScreen);
-  cBox* add (cBox* box, cPoint pos);
-  cBox* add (cBox* box, float x, float y);
-  cBox* add (cBox* box);
-  cBox* addBelow (cBox* box);
-  cBox* addFront (cBox* box);
-  cBox* addFront (cBox* box, float x, float y);
-  void removeBox (cBox* box);
-
-  // iChanged
-  void changed() { mCountDown = 0; }
-
   //{{{  gets
   ID3D11Device* getD3d11Device() { return mD3device.Get(); }
   ID2D1DeviceContext* getDc() { return mDeviceContext.Get(); }
@@ -432,12 +415,30 @@ public:
   void setChangeCountDown (int countDown) { mChangeCountDown = countDown; }
   //}}}
 
+  void init (const std::string& title, int width, int height, bool fullScreen);
+
+  cBox* add (cBox* box, cPoint pos);
+  cBox* add (cBox* box, float x, float y);
+  cBox* add (cBox* box);
+  cBox* addBelow (cBox* box);
+  cBox* addFront (cBox* box);
+  cBox* addFront (cBox* box, float x, float y);
+  void removeBox (cBox* box);
+
+  // iChanged
+  void changed() { mCountDown = 0; }
+
   void onResize();
 
   LRESULT wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lparam);
-  void messagePump();
+
+  static cD2dWindow* getD2dWindow() { return mD2dWindow; };
 
 protected:
+  ~cD2dWindow();
+
+  void messagePump();
+
   virtual bool onKey (int key) = 0;
   virtual bool onKeyUp (int key) { return false; }
 
@@ -449,8 +450,6 @@ private:
   void createDeviceResources();
   void createSizedResources();
 
-  void updateClockTime();
-
   bool onMouseProx (bool inClient, cPoint pos);
   bool onMouseWheel (int delta, cPoint pos);
   bool onMouseDown (bool right, cPoint pos);
@@ -460,6 +459,8 @@ private:
   void onResize (ID2D1DeviceContext* dc);
 
   // vars
+  static cD2dWindow* mD2dWindow;
+
   HWND mHWND = 0;
   bool mExit = false;
 

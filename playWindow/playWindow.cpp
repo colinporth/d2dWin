@@ -23,7 +23,7 @@ public:
   //{{{
   void run (bool streaming, const string& title, int width, int height, const string& name) {
 
-    initialise (title + " " + name, width, height, false);
+    init (title + " " + name, width, height, false);
 
     add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
@@ -39,8 +39,8 @@ public:
     if (streaming) {
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,0.f);
 
-      add (new cBmpBox (this, 60.f, 60.f, r3x80, 3, mChan, mChanChanged), 0.f,0);
-      add (new cBmpBox (this, 60.f, 60.f, r4x80, 4, mChan, mChanChanged), 62.f,0);
+      add (new cBmpBox (this, 40.f, 40.f, r3x80, 3, mChan, mChanChanged), 0.f,0);
+      add (new cBmpBox (this, 40.f, 40.f, r4x80, 4, mChan, mChanChanged), 41.f,0);
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
 
       //thread ([=]() { icyThread (name); }).detach();
@@ -495,8 +495,8 @@ private:
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
     // wait for some frames to set sampleRate
-    while (!mSong.hasSomeFrames())
-      Sleep (100);
+    while (!mSong.getSampleRate())
+      Sleep (10);
 
     auto device = getDefaultAudioOutputDevice();
     if (device) {

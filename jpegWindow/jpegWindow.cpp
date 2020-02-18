@@ -27,7 +27,7 @@ public:
   //{{{
   void run (const string& title, int width, int height, string name) {
 
-    initialise (title, width, height, kFullScreen);
+    init (title, width, height, kFullScreen);
     add (new cClockBox (this, 50.f), -110.f,-120.f);
     add (new cCalendarBox (this, 190.f,150.f), -190.f-120.f,-150.f);
     add (new cLogBox (this, 200.f,0.f, true), -200.f,0);

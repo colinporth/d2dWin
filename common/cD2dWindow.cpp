@@ -44,7 +44,7 @@ cD2dWindow* cD2dWindow::mD2dWindow = NULL;
 //{{{
 LRESULT CALLBACK WndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lparam) {
 
-  return cD2dWindow::mD2dWindow->wndProc (hWnd, msg, wparam, lparam);
+  return cD2dWindow::getD2dWindow()->wndProc (hWnd, msg, wparam, lparam);
   }
 //}}}
 
@@ -60,7 +60,7 @@ cD2dWindow::~cD2dWindow() {
 //}}}
 
 //{{{
-void cD2dWindow::initialise (const string& title, int width, int height, bool fullScreen) {
+void cD2dWindow::init (const string& title, int width, int height, bool fullScreen) {
 
   mD2dWindow = this;
 

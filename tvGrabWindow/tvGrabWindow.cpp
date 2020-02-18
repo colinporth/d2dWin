@@ -19,7 +19,7 @@ public:
   //{{{
   void run (const string& title, int width, int height, const string& param, const string& rootName) {
 
-    initialise (title, width, height, false);
+    init (title, width, height, false);
     setChangeCountDown (4);
     add (new cLogBox (this, 200.f,0, true), 0,200.f)->setPin (false);
 
