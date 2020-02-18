@@ -39,7 +39,7 @@ public:
   void run (const string& title, int width, int height) {
 
     initialise (title, width, height, false);
-    add (new cCalendarBox (this, 190.f,160.f, mTimePoint), -190.f - 24.f,0);
+    add (new cCalendarBox (this, 190.f,160.f), -190.f - 24.f,0);
     add (new cHlsDotsBox (this, 18.f,60.f, this), -24.f, 0);
     add (new cHlsPeakBox (this, 0,0, this));
 

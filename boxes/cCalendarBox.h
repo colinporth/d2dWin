@@ -8,14 +8,14 @@
 class cCalendarBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cCalendarBox (cD2dWindow* window, float width, float height, std::chrono::system_clock::time_point& timePoint) :
-      cBox("date", window, width, height), mTimePoint(timePoint) {}
+  cCalendarBox (cD2dWindow* window, float width, float height) :
+      cBox("date", window, width, height) {}
   //}}}
 
   void onDraw (ID2D1DeviceContext* dc) {
 
     const float kRoundWidth = 5.f;
-    auto datePoint = date::floor<date::days>(mTimePoint);
+    auto datePoint = date::floor<date::days>(mWindow->getNowDayLight());
     dc->FillRoundedRectangle (D2D1::RoundedRect (mRect, kRoundWidth,kRoundWidth), mWindow->getBlackBrush());
     auto r = cRect (mRect.left+kRoundWidth, mRect.top+kRoundWidth,
                     mRect.right-2.f*kRoundWidth, mRect.bottom-2.f*kRoundWidth);
@@ -101,7 +101,4 @@ public:
     p.y += kLineHeight;
     //}}}
     }
-
-private:
-  std::chrono::system_clock::time_point& mTimePoint;
   };

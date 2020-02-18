@@ -9,10 +9,8 @@
 class cClockBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cClockBox (cD2dWindow* window, float radius, std::chrono::system_clock::time_point& timePoint,
-             bool applyDaylight = true, bool showSubSec = false)
-      : cBox("clock", window, radius*2, radius*2), mTimePoint(timePoint),
-        mApplyDaylight(applyDaylight),  mShowSubSec(showSubSec) {}
+  cClockBox (cD2dWindow* window, float radius, bool showSubSec = false)
+      : cBox("clock", window, radius*2, radius*2), mShowSubSec(showSubSec) {}
   //}}}
 
   //{{{
@@ -23,9 +21,7 @@ public:
     dc->DrawEllipse (D2D1::Ellipse (getCentre(), radius,radius), mWindow->getWhiteBrush(), 2.f);
 
     //auto timePointTz = date::make_zoned (date::current_zone(), mTimePoint);
-    auto timePoint = mTimePoint;
-    if (mApplyDaylight)
-      timePoint += std::chrono::seconds (mWindow->getDayLightSeconds());
+    auto timePoint = mWindow->getNowDayLight();
     auto datePoint = floor<date::days>(timePoint);
     auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::milliseconds>(timePoint - datePoint));
 
@@ -67,7 +63,5 @@ public:
 private:
   const float kPi = 3.14159265358979323846f;
 
-  std::chrono::system_clock::time_point& mTimePoint;
-  bool mApplyDaylight;
   bool mShowSubSec;
   };

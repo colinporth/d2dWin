@@ -23,8 +23,8 @@ public:
 
     initialise (title + " " + name, width, height, false);
 
-    add (new cCalendarBox (this, 190.f,150.f, mTimePoint), -190.f,0.f);
-    add (new cClockBox (this, 40.f, mTimePoint), -135.f,35.f);
+    add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
+    add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong), 0.f,0.f);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
 

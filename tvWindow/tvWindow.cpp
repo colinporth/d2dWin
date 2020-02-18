@@ -24,7 +24,7 @@ public:
 
     initialise (title, width, height, false);
     add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
-    add (new cClockBox (this, 40.f, mTimePoint), -84.f,2.f);
+    add (new cClockBox (this, 40.f), -84.f,2.f);
 
     int frequency = atoi (rootOrFrequency.c_str());
     if (frequency) {

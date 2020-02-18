@@ -118,13 +118,13 @@ void cD2dWindow::initialise (const string& title, int width, int height, bool fu
           }
         else {
           mCountDown = mChangeCountDown;
-          mTimePoint = system_clock::now();
+          system_clock::time_point timePoint = system_clock::now();
 
           mDeviceContext->BeginDraw();
           mDeviceContext->Clear (ColorF (ColorF::Black));
           onDraw (mDeviceContext.Get());
           mDeviceContext->EndDraw();
-          mRenderTime = duration_cast<milliseconds>(system_clock::now() - mTimePoint).count() / 1000.f;
+          mRenderTime = duration_cast<milliseconds>(system_clock::now() - timePoint).count() / 1000.f;
 
           if (mSwapChain->Present (1, 0) == DXGI_ERROR_DEVICE_REMOVED) {
             mSwapChain = nullptr;

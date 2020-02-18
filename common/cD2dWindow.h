@@ -441,9 +441,7 @@ protected:
   virtual bool onKey (int key) = 0;
   virtual bool onKeyUp (int key) { return false; }
 
-  // exposed for simple boxes
-  std::chrono::system_clock::time_point mTimePoint;
-  int mDayLightSeconds = 0;
+  // exposed for simple box ui
   float mRenderTime = 0;
 
 private:
@@ -464,6 +462,7 @@ private:
   // vars
   HWND mHWND = 0;
   bool mExit = false;
+
   //{{{  resources
   // device independent resources
   Microsoft::WRL::ComPtr<ID2D1Factory1> mD2D1Factory;
@@ -536,4 +535,5 @@ private:
   uint32_t mCursorDown = 50;
   uint32_t mCursorCountDown = 50;
   //}}}
+  int mDayLightSeconds = 0;
   };
