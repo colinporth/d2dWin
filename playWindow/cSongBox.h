@@ -23,7 +23,7 @@ public:
       &mSmallTimeTextFormat);
 
     mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 40.f, L"en-us",
+      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 45.f, L"en-us",
       &mBigTimeTextFormat);
     }
   //}}}
@@ -158,12 +158,12 @@ public:
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
 
-    if (!mSong.hasBaseTime())
+    if (!mSong.hasHlsBaseTime())
       drawTime (dc, "", frameString (playFrame), frameString (mSong.getTotalFrames()));
     else {
       //{{{  draw with baseTime
-      auto startDatePoint = date::floor<date::days>(mSong.getBaseTimePoint());
-      auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mSong.getBaseTimePoint() - startDatePoint);
+      auto startDatePoint = date::floor<date::days>(mSong.getHlsBaseTimePoint());
+      auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mSong.getHlsBaseTimePoint() - startDatePoint);
       uint64_t framesBase = (seconds.count() * mSong.getSampleRate()) / mSong.getSamplesPerFrame();
 
       drawTime (dc, frameString (framesBase), frameString (framesBase + playFrame), frameString (framesBase + mSong.getTotalFrames()));

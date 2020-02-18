@@ -29,7 +29,7 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   mSamplesPerFrame = samplesPerFrame;
   mSampleRate = sampleRate;
 
-  mSeqNum = 0;
+  mHlsSeqNum = 0;
 
   clearFrames (0);
 
@@ -142,8 +142,8 @@ int cSong::getPlayFrameLen() {
 
 //{{{
 int cSong::getHlsOffsetMs (chrono::system_clock::time_point now) {
-  auto basedMs = chrono::duration_cast<chrono::milliseconds>(now - getBaseTimePoint());
-  return int (basedMs.count()) - (getBasedSeqNum() * 6400);
+  auto basedMs = chrono::duration_cast<chrono::milliseconds>(now - getHlsBaseTimePoint());
+  return int (basedMs.count()) - (getHlsBasedSeqNum() * 6400);
   }
 //}}}
 
@@ -161,10 +161,10 @@ void cSong::setTitle (const string& title) {
   }
 //}}}
 //{{{
-void cSong::setBase (int startSeqNum, chrono::system_clock::time_point startTimePoint) {
-  mBaseSeqNum = startSeqNum;
-  mBaseTimePoint = startTimePoint;
-  mHasBaseTime = true;
+void cSong::setHlsBase (int startSeqNum, chrono::system_clock::time_point startTimePoint) {
+  mHlsBaseSeqNum = startSeqNum;
+  mHlsBaseTimePoint = startTimePoint;
+  mHasHlsBaseTime = true;
   }
 //}}}
 
@@ -173,7 +173,7 @@ void cSong::setBase (int startSeqNum, chrono::system_clock::time_point startTime
 bool cSong::incPlayFrame (int frames) {
 
   int newFrame = mPlayFrame + frames;
-  if (!mHasBaseTime || (newFrame >= 0)) {
+  if (!mHasHlsBaseTime || (newFrame >= 0)) {
     // simple case
     setPlayFrame (newFrame);
     return false;
@@ -185,9 +185,9 @@ bool cSong::incPlayFrame (int frames) {
 
     cLog::log (LOGINFO, "back to %d, chunks:%d frame:%d", newFrame, chunks, frameInChunk);
 
-    mBaseSeqNum = 0;
-    mBaseSeqNum = mBaseSeqNum - chunks;
-    mBaseTimePoint = mBaseTimePoint - chrono::milliseconds (chunks * 6400);
+    mHlsBaseSeqNum = 0;
+    mHlsBaseSeqNum = mHlsBaseSeqNum - chunks;
+    mHlsBaseTimePoint = mHlsBaseTimePoint - chrono::milliseconds (chunks * 6400);
     clearFrames (frameInChunk);
 
     //return false;
@@ -201,9 +201,8 @@ bool cSong::incPlaySec (int secs) {
   }
 //}}}
 //{{{
-void cSong::incSeqNum() {
-// might need lock
-  mSeqNum++;
+void cSong::incHlsSeqNum() {
+  mHlsSeqNum++;
   }
 //}}}
 

@@ -233,7 +233,7 @@ private:
         //mBaseStr = "base " + date::format ("%T", floor<seconds>(baseTimePoint)) + " seqNum " + dec(baseSeqNum);
         //}}}
         mSong.init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
-        mSong.setBase (baseSeqNum, baseTimePoint);
+        mSong.setHlsBase (baseSeqNum, baseTimePoint);
 
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
@@ -243,10 +243,10 @@ private:
           if ((hlsOffset > 10000) && (hlsOffset < 64000)) {
             // get hls seqNum chunk, about 100k bytes for 128kps stream
             mSong.setHlsLoading();
-            if (http.get (host, path + '-' + dec(mSong.getSeqNum()) + ".ts") == 200) {
+            if (http.get (host, path + '-' + dec(mSong.getHlsSeqNum()) + ".ts") == 200) {
               //{{{  debug
               mSong.setHlsLoadingOk();
-              cLog::log (LOGINFO, "got " + dec(mSong.getBasedSeqNum()) + " at " + date::format ("%T", floor<seconds>(getNowDayLight())));
+              cLog::log (LOGINFO, "got " + dec(mSong.getHlsBasedSeqNum()) + " at " + date::format ("%T", floor<seconds>(getNowDayLight())));
               //}}}
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
@@ -268,12 +268,12 @@ private:
                 aacFrames += decode.getNextFrameOffset();
                 }
               http.freeContent();
-              mSong.incSeqNum();
+              mSong.incHlsSeqNum();
               }
             else {
               //{{{  debug
               mSong.incHlsLate();
-              cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(mSong.getBasedSeqNum()));
+              cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(mSong.getHlsBasedSeqNum()));
               //}}}
               Sleep (200);
               }
