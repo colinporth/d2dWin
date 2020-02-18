@@ -121,9 +121,11 @@ public:
   int getHlsBaseSeqNum() { return mHlsBaseSeqNum; }
   int getHlsBasedSeqNum() { return mHlsSeqNum; }
 
+  uint64_t getHlsBaseFrame();
+  int getHlsOffsetMs (std::chrono::system_clock::time_point now);
+
   int getHlsLate() { return mHlsLate; }
   int getHlsLoading() { return mHlsLoading; }
-  int getHlsOffsetMs (std::chrono::system_clock::time_point now);
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
@@ -182,6 +184,9 @@ private:
   int mHlsBaseSeqNum = 0;
   int mHlsSeqNum = 0;
   std::chrono::system_clock::time_point mHlsBaseTimePoint;
+  std::chrono::system_clock::time_point mHlsBaseDatePoint;
+  uint64_t mHlsBaseFrame = 0;
+
   int mHlsLate = 0;
   bool mHlsLoading = false;
 

@@ -6,6 +6,7 @@
 #include "cSong.h"
 
 using namespace std;
+using namespace chrono;
 //}}}
 
 //{{{
@@ -137,8 +138,13 @@ int cSong::getPlayFrameLen() {
 //}}}
 
 //{{{
-int cSong::getHlsOffsetMs (chrono::system_clock::time_point now) {
-  auto basedMs = chrono::duration_cast<chrono::milliseconds>(now - getHlsBaseTimePoint());
+uint64_t cSong::getHlsBaseFrame() {
+  return mHlsBaseFrame;
+  }
+//}}}
+//{{{
+int cSong::getHlsOffsetMs (system_clock::time_point now) {
+  auto basedMs = duration_cast<milliseconds>(now - getHlsBaseTimePoint());
   return int (basedMs.count()) - (getHlsBasedSeqNum() * 6400);
   }
 //}}}
@@ -157,10 +163,17 @@ void cSong::setTitle (const string& title) {
   }
 //}}}
 //{{{
-void cSong::setHlsBase (int startSeqNum, chrono::system_clock::time_point startTimePoint) {
+void cSong::setHlsBase (int startSeqNum, system_clock::time_point startTimePoint) {
+
   mHlsBaseSeqNum = startSeqNum;
   mHlsBaseTimePoint = startTimePoint;
+  mHlsBaseDatePoint = date::floor<date::days>(mHlsBaseTimePoint);
+
+  uint64_t msSinceMidnight = (duration_cast<milliseconds>(mHlsBaseTimePoint - mHlsBaseDatePoint)).count();
+  mHlsBaseFrame = (msSinceMidnight * mSampleRate) / mSamplesPerFrame / 1000;
+
   mHlsSeqNum = 0;
+
   mHasHlsBase = true;
   }
 //}}}
@@ -185,7 +198,7 @@ bool cSong::incPlayFrame (int frames) {
 
     mHlsSeqNum = 0;
     mHlsBaseSeqNum = mHlsBaseSeqNum - chunks;
-    mHlsBaseTimePoint = mHlsBaseTimePoint - chrono::milliseconds (chunks * 6400);
+    mHlsBaseTimePoint = mHlsBaseTimePoint - milliseconds (chunks * 6400);
     clearFrames();
     mPlayFrame = frameInChunk;
 
