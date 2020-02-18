@@ -19,18 +19,23 @@ public:
 
     // time display font
     mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 50.f, L"en-us",
-      &mTimeTextFormat);
+      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 20.f, L"en-us",
+      &mLeftTimeTextFormat);
+    mLeftTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
 
-    if (mTimeTextFormat)
-      mTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+    mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
+      DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 35.f, L"en-us",
+      &mRightTimeTextFormat);
+    mRightTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
     }
   //}}}
   //{{{
   virtual ~cSongBox() {
 
-    if (mTimeTextFormat)
-      mTimeTextFormat->Release();
+    if (mLeftTimeTextFormat)
+      mLeftTimeTextFormat->Release();
+    if (mRightTimeTextFormat)
+      mRightTimeTextFormat->Release();
 
     if (mBitmapTarget)
       mBitmapTarget->Release();
@@ -111,6 +116,12 @@ public:
     if (!mSong.getNumFrames()) // no frames yet, give up
       return;
 
+    if (mSong.getId() != mSongLastId) {
+      mBitmapFramesOk = false;
+      mBitmapOverviewOk = false;
+      mSongLastId = mSong.getId();
+      }
+
     auto playFrame = mSong.getPlayFrame();
 
     // src bitmap explicit layout
@@ -148,17 +159,19 @@ public:
     drawWave (dc, playFrame);
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
-    if (mSong.hasBase()) {
-      //{{{  add base time to frame
+
+    if (!mSong.hasBaseTime())
+      drawTime (dc, "", frameString (playFrame) + " " + frameString (mSong.getTotalFrames()));
+    else {
+      //{{{  draw with baseTime
       auto startDatePoint = date::floor<date::days>(mSong.getBaseTimePoint());
       auto seconds = std::chrono::duration_cast<std::chrono::seconds>(mSong.getBaseTimePoint() - startDatePoint);
       uint64_t framesBase = (seconds.count() * mSong.getSampleRate()) / mSong.getSamplesPerFrame();
-      drawTime (dc, " " + frameString (framesBase + playFrame) +
-                    " " + frameString (framesBase + mSong.getTotalFrames()));
+
+      drawTime (dc, frameString (framesBase),
+                    frameString (framesBase + playFrame) + " " + frameString (framesBase + mSong.getTotalFrames()));
       }
       //}}}
-    else
-      drawTime (dc, frameString (playFrame) + " " + frameString (mSong.getTotalFrames()));
     }
   //}}}
 
@@ -167,21 +180,22 @@ private:
   std::string frameString (uint64_t frame) {
 
     if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
-      uint64_t frameHs = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
+      uint64_t hundredthSeconds = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
 
-      uint64_t hs = frameHs % 100;
+      uint64_t subSeconds = hundredthSeconds % 100;
 
-      frameHs /= 100;
-      uint64_t secs = frameHs % 60;
+      hundredthSeconds /= 100;
+      uint64_t seconds = hundredthSeconds % 60;
 
-      frameHs /= 60;
-      uint64_t mins = frameHs % 60;
+      hundredthSeconds /= 60;
+      uint64_t minutes = hundredthSeconds % 60;
 
-      frameHs /= 60;
-      uint64_t hours = frameHs % 60;
+      hundredthSeconds /= 60;
+      uint64_t hours = hundredthSeconds % 60;
 
-      std::string str (hours ? (dec (hours) + ':' + dec (mins, 2, '0')) : dec (mins));
-      return str + ':' + dec(secs, 2, '0') + ':' + dec(hs, 2, '0');
+      return hours > 0? (dec (hours) + ':' + dec (minutes, 2, '0') + ':' + dec(seconds, 2, '0')) :
+               (minutes > 0 ? (dec (minutes) + ':' + dec(seconds, 2, '0') + ':' + dec(subSeconds, 2, '0')) :
+                 (dec(seconds) + ':' + dec(subSeconds, 2, '0')));
       }
     else
       return ("--:--:--");
@@ -546,16 +560,28 @@ private:
     }
   //}}}
   //{{{
-  void drawTime (ID2D1DeviceContext* dc, const std::string& str) {
+  void drawTime (ID2D1DeviceContext* dc, const std::string& leftString, const std::string& rightString) {
 
-    if (mTimeTextFormat) {
+    if (!leftString.empty() && mLeftTimeTextFormat) {
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
-        std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-        mTimeTextFormat, getWidth(), getHeight(), &textLayout);
+        std::wstring (leftString.begin(), leftString.end()).data(), (uint32_t)leftString.size(),
+        mLeftTimeTextFormat, getWidth(), getHeight(), &textLayout);
 
       if (textLayout) {
-        dc->DrawTextLayout (getBL() - cPoint(0.f, 50.f), textLayout, mWindow->getWhiteBrush());
+        dc->DrawTextLayout (getBL() - cPoint(0.f,20.f), textLayout, mWindow->getWhiteBrush());
+        textLayout->Release();
+        }
+      }
+
+    if (mRightTimeTextFormat) {
+      IDWriteTextLayout* textLayout;
+      mWindow->getDwriteFactory()->CreateTextLayout (
+        std::wstring (rightString.begin(), rightString.end()).data(), (uint32_t)rightString.size(),
+        mRightTimeTextFormat, getWidth(), getHeight(), &textLayout);
+
+      if (textLayout) {
+        dc->DrawTextLayout (getBL() - cPoint(0.f,35.f), textLayout, mWindow->getWhiteBrush());
         textLayout->Release();
         }
       }
@@ -610,7 +636,6 @@ private:
     int totalFrames = mSong.getTotalFrames();
 
     bool forceRedraw = !mBitmapOverviewOk ||
-                       (mSong.getId() != mSongLastId) ||
                        (totalFrames > mOverviewTotalFrames) || (valueScale != mOverviewValueScale);
 
     if (forceRedraw || (numFrames > mOverviewNumFrames)) {
@@ -662,7 +687,6 @@ private:
       mOverviewNumFrames = numFrames;
       mOverviewTotalFrames = totalFrames;
       mOverviewValueScale = valueScale;
-      mSongLastId = mSong.getId();
       }
 
     // draw overview, stamping colours through alpha bitmap
@@ -822,6 +846,7 @@ private:
   ID2D1BitmapRenderTarget* mBitmapTarget = nullptr;
   ID2D1Bitmap* mBitmap = nullptr;
 
-  IDWriteTextFormat* mTimeTextFormat = nullptr;
+  IDWriteTextFormat* mLeftTimeTextFormat = nullptr;
+  IDWriteTextFormat* mRightTimeTextFormat = nullptr;
   //}}}
   };

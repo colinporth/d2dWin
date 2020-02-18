@@ -331,7 +331,7 @@
       <AdditionalDependencies>common.lib;avutil.lib;avcodec.lib;avformat.lib;swresample.lib;swscale.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions> %(AdditionalOptions)</AdditionalOptions>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
-      <AdditionalLibraryDirectories>..\x64\Release;..\..\ffmpeg\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\x64\Release avx;..\..\ffmpeg\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>true</Profile>
     </Link>
   </ItemDefinitionGroup>

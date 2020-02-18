@@ -78,8 +78,8 @@ protected:
 
       case  ' ': mPlaying = !mPlaying; break;
 
-      case 0x21: mSong.prevSilence(); changed(); break;; // page up
-      case 0x22: mSong.nextSilence(); changed(); break;; // page down
+      case 0x21: mSong.prevSilencePlayFrame(); changed(); break;; // page up
+      case 0x22: mSong.nextSilencePlayFrame(); changed(); break;; // page down
 
       case 0x25: mSong.incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
       case 0x27: mSong.incPlaySec (getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
@@ -240,17 +240,17 @@ private:
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
-        int getFailed = 0;
-        int seqNum = 0;
+        int late = 0;
         while (!getExit() && !mSongChanged) {
-          auto basedMs = duration_cast<milliseconds>(getNowDayLight() - mSong.getBaseTimePoint());
-          if (basedMs.count() - (seqNum * 6400) > 10000) {
+          auto hlsOffset = mSong.getHlsOffsetMs (getNowDayLight());
+          if ((hlsOffset > 10000) && (hlsOffset < 64000)) {
             // get hls seqNum chunk, about 100k bytes for 128kps stream
-            if (http.get (host, path + '-' + dec(mSong.getBaseSeqNum()+seqNum) + ".ts") == 200) {
-              getFailed = 0;
-              mLoadStr = "got " + dec(seqNum) + " at " + date::format ("%T", floor<seconds>(getNowDayLight()));
+            if (http.get (host, path + '-' + dec(mSong.getSeqNum()) + ".ts") == 200) {
+              //{{{  debug
+              late = 0;
+              mLoadStr = "got " + dec(mSong.getBasedSeqNum()) + " at " + date::format ("%T", floor<seconds>(getNowDayLight()));
               cLog::log (LOGINFO, mLoadStr);
-
+              //}}}
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
@@ -271,12 +271,14 @@ private:
                 aacFrames += decode.getNextFrameOffset();
                 }
               http.freeContent();
-              seqNum++;
+              mSong.incSeqNum();
               }
             else {
-              getFailed++;
-              mLoadStr = "late " + dec(getFailed) + " " + dec(seqNum) + " " + dec(basedMs.count() - (seqNum * 6400));
+              //{{{  debug
+              late++;
+              mLoadStr = "late " + dec(late) + " " + dec(mSong.getBasedSeqNum());
               cLog::log (LOGERROR, mLoadStr);
+              //}}}
               Sleep (200);
               }
             }
@@ -488,15 +490,15 @@ private:
   void playThread (bool streaming) {
 
     cLog::setThreadName ("play");
+    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-    // wait for some frames
+    // wait for some frames to set sampleRate
     while (!mSong.hasSomeFrames())
       Sleep (100);
 
     auto device = getDefaultAudioOutputDevice();
     if (device) {
       device->setSampleRate (mSong.getSampleRate());
-      SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
       cAudioDecode decode (mSong.getFrameType());
       float* samples = (mSong.getFrameType() == cAudioDecode::eWav) ?
@@ -505,14 +507,10 @@ private:
       // if not streaming should do something on end and mSongChanged
       device->start();
       while (!getExit() && (streaming || (mSong.getPlayFrame() < mSong.getLastFrame()))) {
-        if (mPlaying && mSong.hasSomeFrames()) {
-          //cLog::log (LOGINFO, "process frame:%d", mSong.getPlayFrame());
-          device->process ([&](float*& srcSamples, int& numSrcSamples,
-                               int numDstSamplesLeft, int numDstSamples) mutable noexcept {
+        if (mPlaying && (mSong.getPlayFrame() <= mSong.getLastFrame())) {
+          device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
             // lambda callback - load srcSamples
             lock_guard<mutex> lockGuard (mSong.getMutex());
-            //cLog::log (LOGINFO, " - callback for src:%d dst:%d:%d",
-                                //mSong.getSamplesPerFrame(), numDstSamplesLeft, numDstSamples);
             if (mSong.isFramePtrSamples())
               srcSamples = (float*)mSong.getPlayFramePtr();
             else {

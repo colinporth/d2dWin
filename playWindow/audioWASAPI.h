@@ -347,8 +347,7 @@ public:
     }
   //}}}
   //{{{
-  void process (const std::function<void (float*& srcSamples, int& srcSamplesLeft,
-                                          int dstSamplesLeft, int dstSamplesAvailable)>& loadSrcCallback) {
+  void process (const std::function<void (float*& srcSamples, int& srcSamplesLeft)>& loadSrcCallback) {
   // process fills dst buffer, callback asks for srcSamples
 
     if (isOutput()) {
@@ -364,7 +363,7 @@ public:
           while (dstSamplesLeft > 0) {
             // loop till dst buffer filled
             if (mSrcSamplesLeft <= 0)
-              loadSrcCallback (mSrcSamples, mSrcSamplesLeft, dstSamplesLeft, dstSamplesAvailable);
+              loadSrcCallback (mSrcSamples, mSrcSamplesLeft);
 
             auto samplesChunk = std::min (mSrcSamplesLeft, dstSamplesLeft);
             if (mSrcSamples) {

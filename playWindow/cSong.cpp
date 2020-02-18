@@ -18,64 +18,10 @@ cSong::~cSong() {
   }
 //}}}
 
-// gets
-//{{{
-int cSong::getPlayFrame() {
-  if (mPlayFrame < mFrames.size())
-    return mPlayFrame;
-  else if (!mFrames.empty())
-    return (int)mFrames.size() - 1;
-  else // startup case
-    return 0;
-  }
-//}}}
-//{{{
-uint8_t* cSong::getPlayFramePtr() {
-
-  if (mPlayFrame < mFrames.size())
-    return mFrames[mPlayFrame]->getPtr();
-  else if (!mFrames.empty())
-    return mFrames[mFrames.size()-1]->getPtr();
-
-  return nullptr;
-  }
-//}}}
-//{{{
-int cSong::getPlayFrameLen() {
-
-  if (mPlayFrame < mFrames.size())
-    return mFrames[mPlayFrame]->getLen();
-  else if (!mFrames.empty())
-    return mFrames[mFrames.size()-1]->getLen();
-
-   return 0;
-  }
-//}}}
-
-// sets
-//{{{
-void cSong::setTitle (const string& title) {
-
-  if (!mFrames.empty())
-    mFrames.back()->setTitle (title);
-  }
-//}}}
-//{{{
-void cSong::setPlayFrame (int frame) {
-  mPlayFrame = min (max (frame, 0), getLastFrame());
-  }
-//}}}
-
-void cSong::incPlayFrame (int frames) { setPlayFrame (mPlayFrame + frames); }
-void cSong::incPlaySec (int secs) { incPlayFrame (secs * mSampleRate / mSamplesPerFrame); }
-
 //{{{
 void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate) {
 
   lock_guard<mutex> lockGuard (mMutex);
-
-  // new id for any cache
-  mId++;
 
   // reset frame type
   mFrameType = frameType;
@@ -83,21 +29,9 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   mSamplesPerFrame = samplesPerFrame;
   mSampleRate = sampleRate;
 
-  // reset frames
-  mPlayFrame = 0;
-  mTotalFrames = 0;
+  mSeqNum = 0;
 
-  for (auto frame : mFrames)
-    delete (frame);
-  mFrames.clear();
-
-  // reset maxValue
-  mMaxPowerValue = kMinPowerValue;
-  mMaxPeakValue = kMinPowerValue;
-
-  mMaxFreqValue = 0.f;
-  for (int i = 0; i < kMaxFreq; i++)
-    mMaxFreqValues[i] = 0.f;
+  clearFrames (0);
 
   fftrConfig = kiss_fftr_alloc (samplesPerFrame, 0, 0, 0);
   }
@@ -172,15 +106,116 @@ void cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrame
   }
 //}}}
 
+// gets
 //{{{
-void cSong::prevSilence() {
+int cSong::getPlayFrame() {
+  if (mPlayFrame < mFrames.size())
+    return mPlayFrame;
+  else if (!mFrames.empty())
+    return (int)mFrames.size() - 1;
+  else // startup case
+    return 0;
+  }
+//}}}
+//{{{
+uint8_t* cSong::getPlayFramePtr() {
+
+  if (mPlayFrame < mFrames.size())
+    return mFrames[mPlayFrame]->getPtr();
+  else if (!mFrames.empty())
+    return mFrames[mFrames.size()-1]->getPtr();
+
+  return nullptr;
+  }
+//}}}
+//{{{
+int cSong::getPlayFrameLen() {
+
+  if (mPlayFrame < mFrames.size())
+    return mFrames[mPlayFrame]->getLen();
+  else if (!mFrames.empty())
+    return mFrames[mFrames.size()-1]->getLen();
+
+   return 0;
+  }
+//}}}
+
+//{{{
+int cSong::getHlsOffsetMs (chrono::system_clock::time_point now) {
+  auto basedMs = chrono::duration_cast<chrono::milliseconds>(now - getBaseTimePoint());
+  return int (basedMs.count()) - (getBasedSeqNum() * 6400);
+  }
+//}}}
+
+// sets
+//{{{
+void cSong::setPlayFrame (int frame) {
+  mPlayFrame = min (max (frame, 0), getLastFrame());
+  }
+//}}}
+//{{{
+void cSong::setTitle (const string& title) {
+
+  if (!mFrames.empty())
+    mFrames.back()->setTitle (title);
+  }
+//}}}
+//{{{
+void cSong::setBase (int startSeqNum, chrono::system_clock::time_point startTimePoint) {
+  mBaseSeqNum = startSeqNum;
+  mBaseTimePoint = startTimePoint;
+  mHasBaseTime = true;
+  }
+//}}}
+
+// incs
+//{{{
+bool cSong::incPlayFrame (int frames) {
+
+  int newFrame = mPlayFrame + frames;
+  if (!mHasBaseTime || (newFrame >= 0)) {
+    // simple case
+    setPlayFrame (newFrame);
+    return false;
+    }
+  else {
+    const int framesPerChunk = 150;
+    int chunks = (-newFrame + 149) / framesPerChunk;
+    int frameInChunk = framesPerChunk + (newFrame % framesPerChunk);
+
+    cLog::log (LOGINFO, "back to %d, chunks:%d frame:%d", newFrame, chunks, frameInChunk);
+
+    mBaseSeqNum = 0;
+    mBaseSeqNum = mBaseSeqNum - chunks;
+    mBaseTimePoint = mBaseTimePoint - chrono::milliseconds (chunks * 6400);
+    clearFrames (frameInChunk);
+
+    //return false;
+    return true;
+    }
+  }
+//}}}
+//{{{
+bool cSong::incPlaySec (int secs) {
+  return incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame);
+  }
+//}}}
+//{{{
+void cSong::incSeqNum() {
+// might need lock
+  mSeqNum++;
+  }
+//}}}
+
+//{{{
+void cSong::prevSilencePlayFrame() {
   mPlayFrame = skipPrev (mPlayFrame, false);
   mPlayFrame = skipPrev (mPlayFrame, true);
   mPlayFrame = skipPrev (mPlayFrame, false);
   }
 //}}}
 //{{{
-void cSong::nextSilence() {
+void cSong::nextSilencePlayFrame() {
   mPlayFrame = skipNext (mPlayFrame, true);
   mPlayFrame = skipNext (mPlayFrame, false);
   mPlayFrame = skipNext (mPlayFrame, true);
@@ -188,6 +223,29 @@ void cSong::nextSilence() {
 //}}}
 
 // private
+//{{{
+void cSong::clearFrames (int playFrame) {
+
+  // new id for any cache
+  mId++;
+
+  // reset frames
+  mPlayFrame = playFrame;
+  mTotalFrames = 0;
+
+  for (auto frame : mFrames)
+    delete (frame);
+  mFrames.clear();
+
+  // reset maxValue
+  mMaxPowerValue = kMinPowerValue;
+  mMaxPeakValue = kMinPowerValue;
+
+  mMaxFreqValue = 0.f;
+  for (int i = 0; i < kMaxFreq; i++)
+    mMaxFreqValues[i] = 0.f;
+  }
+//}}}
 //{{{
 int cSong::skipPrev (int fromFrame, bool silent) {
 

@@ -77,6 +77,9 @@ public:
   //}}}
   virtual ~cSong();
 
+  void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
+  void addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples);
+
   //{{{  gets
   std::mutex& getMutex() { return mMutex; }
 
@@ -111,45 +114,45 @@ public:
   int getBitrate() { return mBitrate; }
   std::string getChan() { return mChan; }
 
-  bool hasBase() { return mHasBase; }
-  int getBaseSeqNum() { return mBaseSeqNum; }
+  bool hasBaseTime() { return mHasBaseTime; }
   std::chrono::system_clock::time_point getBaseTimePoint() { return mBaseTimePoint; }
+
+  int getSeqNum() { return mBaseSeqNum + mSeqNum; }
+  int getBaseSeqNum() { return mBaseSeqNum; }
+  int getBasedSeqNum() { return mSeqNum; }
+
+  int getHlsOffsetMs (std::chrono::system_clock::time_point now);
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
   void setSamplesPerFrame (int samplePerFrame) { mSamplesPerFrame = samplePerFrame; }
 
   void setPlayFrame (int frame);
-  void incPlayFrame (int frames);
-  void incPlaySec (int secs);
 
   void setTitle (const std::string& title);
 
   void setChan (const std::string& chan) { mChan = chan; }
   void setBitrate (int bitrate) { mBitrate = bitrate; }
 
-  //{{{
-  void setBase (int startSeqNum, std::chrono::system_clock::time_point startTimePoint) {
-    mBaseSeqNum = startSeqNum;
-    mBaseTimePoint = startTimePoint;
-    mHasBase = true;
-    }
-  //}}}
+  void setBase (int startSeqNum, std::chrono::system_clock::time_point startTimePoint);
   //}}}
 
-  void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
-  void addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples);
+  // incs
+  bool incPlayFrame (int frames);
+  bool incPlaySec (int secs);
+  void incSeqNum();
 
-  void prevSilence();
-  void nextSilence();
+  void prevSilencePlayFrame();
+  void nextSilencePlayFrame();
 
   std::vector<cFrame*> mFrames;
 
 private:
+  void clearFrames (int playFrane);
   int skipPrev (int fromFrame, bool silent);
   int skipNext (int fromFrame, bool silent);
 
-  // private vars
+  //{{{  private vars
   std::mutex mMutex;
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
 
@@ -169,12 +172,14 @@ private:
 
   int mBitrate;
   std::string mChan;
-  bool mHasBase = false;
-  int mBaseSeqNum = 0;
-  std::chrono::system_clock::time_point mBaseTimePoint;
 
+  bool mHasBaseTime = false;
+  int mBaseSeqNum = 0;
+  int mSeqNum = 0;
+  std::chrono::system_clock::time_point mBaseTimePoint;
 
   kiss_fftr_cfg fftrConfig;
   kiss_fft_scalar timeBuf[cSong::kMaxSamplesPerFrame];
   kiss_fft_cpx freqBuf[cSong::kMaxFreq];
+  //}}}
   };
