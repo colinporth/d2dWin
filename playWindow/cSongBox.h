@@ -50,10 +50,10 @@ public:
     cLog::log (LOGINFO, "cSongBox::layout %d %d %d %d", mRect.left, mRect.top, mRect.right, mRect.bottom);
 
     // invalidate frame bitmap
-    mBitmapFramesOk = false;
+    mFramesBitmapOk = false;
 
     // invalidate overview bitmap
-    mBitmapOverviewOk = false;
+    mOverviewBitmapOk = false;
     }
   //}}}
   //{{{
@@ -115,8 +115,8 @@ public:
       return;
 
     if (mSong.getId() != mSongLastId) {
-      mBitmapFramesOk = false;
-      mBitmapOverviewOk = false;
+      mFramesBitmapOk = false;
+      mOverviewBitmapOk = false;
       mSongLastId = mSong.getId();
       }
 
@@ -348,8 +348,8 @@ private:
       cLog::log (LOGINFO, "reallocBitmap %d %d", bitmapHeight, mBitmapTarget ? mBitmapTarget->GetSize().height : -1);
 
       // invalidate bitmap caches
-      mBitmapFramesOk = false;
-      mBitmapOverviewOk = false;
+      mFramesBitmapOk = false;
+      mOverviewBitmapOk = false;
 
       // release old
       if (mBitmap)
@@ -376,7 +376,7 @@ private:
     rightFrame = std::min (rightFrame, mSong.getLastFrame());
 
     mBitmapTarget->BeginDraw();
-    if (mBitmapFramesOk &&
+    if (mFramesBitmapOk &&
         (mFrameStep == mBitmapFrameStep) &&
         (rightFrame > mBitmapFirstFrame) && (leftFrame < mBitmapLastFrame)) {
       // overlap
@@ -407,7 +407,7 @@ private:
       mBitmapLastFrame = rightFrame;
       }
       //}}}
-    mBitmapFramesOk = true;
+    mFramesBitmapOk = true;
     mBitmapFrameStep = mFrameStep;
     mBitmapTarget->EndDraw();
 
@@ -604,7 +604,7 @@ private:
     int numFrames = mSong.getNumFrames();
     int totalFrames = mSong.getTotalFrames();
 
-    bool forceRedraw = !mBitmapOverviewOk ||
+    bool forceRedraw = !mOverviewBitmapOk ||
                        (totalFrames > mOverviewTotalFrames) || (valueScale != mOverviewValueScale);
 
     if (forceRedraw || (numFrames > mOverviewNumFrames)) {
@@ -652,7 +652,7 @@ private:
         //}}}
       mBitmapTarget->EndDraw();
 
-      mBitmapOverviewOk = true;
+      mOverviewBitmapOk = true;
       mOverviewNumFrames = numFrames;
       mOverviewTotalFrames = totalFrames;
       mOverviewValueScale = valueScale;
@@ -796,6 +796,35 @@ private:
   cSong& mSong;
   int mSongLastId = 0;
 
+  // zoom - 0 unity, > 0 zoomOut framesPerPix, < 0 zoomIn pixPerFrame
+  int mZoom = 0;
+  int mMinZoom = -8;
+  int mMaxZoom = 8;
+  int mFrameWidth = 1;
+  int mFrameStep = 1;
+
+  float mPressedFrame = 0.f;
+
+  bool mFramesBitmapOk = false;
+  int mBitmapFirstFrame = 0;
+  int mBitmapLastFrame = 0;
+  int mBitmapFrameStep = 1;
+
+  bool mOverviewBitmapOk = false;
+  bool mOverviewPressed = false;
+  int mOverviewNumFrames = 0;
+  int mOverviewTotalFrames = 0;
+  float mOverviewValueScale = 1.f;
+  float mOverviewLens = 0.f;
+
+  uint32_t mBitmapWidth = 0;
+  uint32_t mBitmapMask = 0;
+  ID2D1Bitmap* mBitmap = nullptr;
+  ID2D1BitmapRenderTarget* mBitmapTarget = nullptr;
+
+  IDWriteTextFormat* mSmallTimeTextFormat = nullptr;
+  IDWriteTextFormat* mBigTimeTextFormat = nullptr;
+
   // vertical layout
   float mFreqHeight = 0.f;
   float mWaveHeight = 0.f;
@@ -824,33 +853,5 @@ private:
   float mDstWaveCentre = 0.f;
   float mDstOverviewCentre = 0.f;
 
-  // zoom - 0 unity, > 0 zoomOut framesPerPix, < 0 zoomIn pixPerFrame
-  int mZoom = 0;
-  int mMinZoom = -32;
-  int mMaxZoom = 8;
-
-  int mFrameWidth = 1;
-  int mFrameStep = 1;
-  float mPressedFrame = 0.f;
-
-  bool mBitmapOverviewOk = false;
-  bool mOverviewPressed = false;
-  int mOverviewNumFrames = 0;
-  int mOverviewTotalFrames = 0;
-  float mOverviewValueScale = 1.f;
-  float mOverviewLens = 0.f;
-
-  bool mBitmapFramesOk = false;
-  int mBitmapFrameStep = 0;
-  int mBitmapFirstFrame = 0;
-  int mBitmapLastFrame = 0;
-
-  uint32_t mBitmapWidth = 0;
-  uint32_t mBitmapMask = 0;
-  ID2D1BitmapRenderTarget* mBitmapTarget = nullptr;
-  ID2D1Bitmap* mBitmap = nullptr;
-
-  IDWriteTextFormat* mSmallTimeTextFormat = nullptr;
-  IDWriteTextFormat* mBigTimeTextFormat = nullptr;
   //}}}
   };

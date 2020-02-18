@@ -244,10 +244,7 @@ private:
             // get hls seqNum chunk, about 100k bytes for 128kps stream
             mSong.setHlsLoading();
             if (http.get (host, path + '-' + dec(mSong.getHlsSeqNum()) + ".ts") == 200) {
-              //{{{  debug
-              mSong.setHlsLoadingOk();
               cLog::log (LOGINFO, "got " + dec(mSong.getHlsBasedSeqNum()) + " at " + date::format ("%T", floor<seconds>(getNowDayLight())));
-              //}}}
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
@@ -274,6 +271,7 @@ private:
               //{{{  debug
               mSong.incHlsLate();
               cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(mSong.getHlsBasedSeqNum()));
+              changed();
               //}}}
               Sleep (200);
               }

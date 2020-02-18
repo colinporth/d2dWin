@@ -138,7 +138,6 @@ public:
 
   void setHlsBase (int startSeqNum, std::chrono::system_clock::time_point startTimePoint);
   void setHlsLoading() { mHlsLoading = true; }
-  void setHlsLoadingOk() { mHlsLate = 0; mHlsLoading = false; }
   //}}}
 
   // incs

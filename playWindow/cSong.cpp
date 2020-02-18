@@ -203,6 +203,8 @@ bool cSong::incPlaySec (int secs) {
 //{{{
 void cSong::incHlsSeqNum() {
   mHlsSeqNum++;
+  mHlsLate = 0; 
+  mHlsLoading = false; 
   }
 //}}}
 
