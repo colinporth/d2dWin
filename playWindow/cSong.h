@@ -114,7 +114,7 @@ public:
   int getHlsBitrate() { return mHlsBitrate; }
   std::string getHlsChan() { return mHlsChan; }
 
-  bool hasHlsBaseTime() { return mHasHlsBaseTime; }
+  bool hasHlsBase() { return mHasHlsBase; }
   std::chrono::system_clock::time_point getHlsBaseTimePoint() { return mHlsBaseTimePoint; }
 
   int getHlsSeqNum() { return mHlsBaseSeqNum + mHlsSeqNum; }
@@ -149,10 +149,11 @@ public:
   void prevSilencePlayFrame();
   void nextSilencePlayFrame();
 
-  std::vector<cFrame*> mFrames;
+  //std::vector<cFrame*> mFrames;
+  std::deque<cFrame*> mFrames;
 
 private:
-  void clearFrames (int playFrane);
+  void clearFrames();
   int skipPrev (int fromFrame, bool silent);
   int skipNext (int fromFrame, bool silent);
 
@@ -177,7 +178,7 @@ private:
   int mHlsBitrate;
   std::string mHlsChan;
 
-  bool mHasHlsBaseTime = false;
+  bool mHasHlsBase = false;
   int mHlsBaseSeqNum = 0;
   int mHlsSeqNum = 0;
   std::chrono::system_clock::time_point mHlsBaseTimePoint;

@@ -11,10 +11,7 @@ using namespace std;
 //{{{
 cSong::~cSong() {
 
-  for (auto frame : mFrames)
-    delete (frame);
-
-  mFrames.clear();
+  clearFrames();
   }
 //}}}
 
@@ -29,9 +26,8 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   mSamplesPerFrame = samplesPerFrame;
   mSampleRate = sampleRate;
 
-  mHlsSeqNum = 0;
-
-  clearFrames (0);
+  clearFrames();
+  mHasHlsBase = false;
 
   fftrConfig = kiss_fftr_alloc (samplesPerFrame, 0, 0, 0);
   }
@@ -164,7 +160,8 @@ void cSong::setTitle (const string& title) {
 void cSong::setHlsBase (int startSeqNum, chrono::system_clock::time_point startTimePoint) {
   mHlsBaseSeqNum = startSeqNum;
   mHlsBaseTimePoint = startTimePoint;
-  mHasHlsBaseTime = true;
+  mHlsSeqNum = 0;
+  mHasHlsBase = true;
   }
 //}}}
 
@@ -173,22 +170,24 @@ void cSong::setHlsBase (int startSeqNum, chrono::system_clock::time_point startT
 bool cSong::incPlayFrame (int frames) {
 
   int newFrame = mPlayFrame + frames;
-  if (!mHasHlsBaseTime || (newFrame >= 0)) {
-    // simple case
+  if (!mHasHlsBase || (newFrame >= 0)) {
+    // simple case, clip to playFrame 0
     setPlayFrame (newFrame);
     return false;
     }
   else {
+    // allow new chunks before 0
     const int framesPerChunk = 150;
     int chunks = (-newFrame + 149) / framesPerChunk;
     int frameInChunk = framesPerChunk + (newFrame % framesPerChunk);
 
     cLog::log (LOGINFO, "back to %d, chunks:%d frame:%d", newFrame, chunks, frameInChunk);
 
-    mHlsBaseSeqNum = 0;
+    mHlsSeqNum = 0;
     mHlsBaseSeqNum = mHlsBaseSeqNum - chunks;
     mHlsBaseTimePoint = mHlsBaseTimePoint - chrono::milliseconds (chunks * 6400);
-    clearFrames (frameInChunk);
+    clearFrames();
+    mPlayFrame = frameInChunk;
 
     //return false;
     return true;
@@ -203,8 +202,8 @@ bool cSong::incPlaySec (int secs) {
 //{{{
 void cSong::incHlsSeqNum() {
   mHlsSeqNum++;
-  mHlsLate = 0; 
-  mHlsLoading = false; 
+  mHlsLate = 0;
+  mHlsLoading = false;
   }
 //}}}
 
@@ -225,13 +224,13 @@ void cSong::nextSilencePlayFrame() {
 
 // private
 //{{{
-void cSong::clearFrames (int playFrame) {
+void cSong::clearFrames() {
 
   // new id for any cache
   mId++;
 
   // reset frames
-  mPlayFrame = playFrame;
+  mPlayFrame = 0;
   mTotalFrames = 0;
 
   for (auto frame : mFrames)

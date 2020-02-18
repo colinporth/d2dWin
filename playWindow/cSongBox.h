@@ -158,7 +158,7 @@ public:
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
 
-    if (!mSong.hasHlsBaseTime())
+    if (!mSong.hasHlsBase())
       drawTime (dc, "", frameString (playFrame), frameString (mSong.getTotalFrames()));
     else {
       //{{{  draw with baseTime
