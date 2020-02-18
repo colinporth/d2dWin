@@ -35,9 +35,7 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (streaming) {
-      add (new cTitleBox (this, 200.f,20.f, mBaseStr), 0.f,0.f);
-      add (new cTitleBox (this, 500.f,20.f, mLoadStr), 0.f,20.f);
-      add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
+      add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,0.f);
 
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
       //thread ([=]() { icyThread (name); }).detach();
@@ -232,7 +230,7 @@ private:
 
         http.freeContent();
 
-        mBaseStr = "base " + date::format ("%T", floor<seconds>(baseTimePoint)) + " seqNum " + dec(baseSeqNum);
+        //mBaseStr = "base " + date::format ("%T", floor<seconds>(baseTimePoint)) + " seqNum " + dec(baseSeqNum);
         //}}}
         mSong.init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
         mSong.setBase (baseSeqNum, baseTimePoint);
@@ -240,16 +238,15 @@ private:
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
-        int late = 0;
         while (!getExit() && !mSongChanged) {
           auto hlsOffset = mSong.getHlsOffsetMs (getNowDayLight());
           if ((hlsOffset > 10000) && (hlsOffset < 64000)) {
             // get hls seqNum chunk, about 100k bytes for 128kps stream
+            mSong.setHlsLoading();
             if (http.get (host, path + '-' + dec(mSong.getSeqNum()) + ".ts") == 200) {
               //{{{  debug
-              late = 0;
-              mLoadStr = "got " + dec(mSong.getBasedSeqNum()) + " at " + date::format ("%T", floor<seconds>(getNowDayLight()));
-              cLog::log (LOGINFO, mLoadStr);
+              mSong.setHlsLoadingOk();
+              cLog::log (LOGINFO, "got " + dec(mSong.getBasedSeqNum()) + " at " + date::format ("%T", floor<seconds>(getNowDayLight())));
               //}}}
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
@@ -275,9 +272,8 @@ private:
               }
             else {
               //{{{  debug
-              late++;
-              mLoadStr = "late " + dec(late) + " " + dec(mSong.getBasedSeqNum());
-              cLog::log (LOGERROR, mLoadStr);
+              mSong.incHlsLate();
+              cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(mSong.getBasedSeqNum()));
               //}}}
               Sleep (200);
               }
@@ -551,8 +547,6 @@ private:
 
   string mLastTitleStr;
 
-  string mBaseStr;
-  string mLoadStr;
   string mDebugStr;
   //}}}
   };

@@ -137,6 +137,12 @@ public:
   void setBase (int startSeqNum, std::chrono::system_clock::time_point startTimePoint);
   //}}}
 
+  int getHlsLate() { return mHlsLate; }
+  int getHlsLoading() { return mHlsLoading; }
+  void setHlsLoading() { mHlsLoading = true; }
+  void setHlsLoadingOk() { mHlsLate = 0; mHlsLoading = false; }
+  void incHlsLate() { mHlsLate++; };
+
   // incs
   bool incPlayFrame (int frames);
   bool incPlaySec (int secs);
@@ -177,6 +183,8 @@ private:
   int mBaseSeqNum = 0;
   int mSeqNum = 0;
   std::chrono::system_clock::time_point mBaseTimePoint;
+  int mHlsLate = 0;
+  bool mHlsLoading = false;
 
   kiss_fftr_cfg fftrConfig;
   kiss_fft_scalar timeBuf[cSong::kMaxSamplesPerFrame];

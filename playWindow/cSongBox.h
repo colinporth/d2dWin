@@ -172,6 +172,9 @@ public:
                     frameString (framesBase + playFrame) + " " + frameString (framesBase + mSong.getTotalFrames()));
       }
       //}}}
+
+    if (mSong.getHlsLoading()) 
+      drawLoading (dc);
     }
   //}}}
 
@@ -785,6 +788,13 @@ private:
 
       dstRect.left = dstRect.right;
       }
+    }
+  //}}}
+  //{{{
+  void drawLoading (ID2D1DeviceContext* dc) {
+
+    cRect dstRect = { mRect.right - 150.f, mRect.bottom - 4.0f, mRect.right, mRect.bottom };
+    dc->FillRectangle (dstRect, mSong.getHlsLate() ? mWindow->getRedBrush() : mWindow->getGreenBrush());
     }
   //}}}
 
