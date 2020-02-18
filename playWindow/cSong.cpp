@@ -174,6 +174,9 @@ void cSong::setHlsBase (int startSeqNum, system_clock::time_point startTimePoint
 
   mHlsSeqNum = 0;
 
+  // should calculate 
+  mHlsFramesPerChunk = mHlsBitrate >= 128000 ? 300 : 150;
+
   mHasHlsBase = true;
   }
 //}}}
@@ -190,8 +193,8 @@ bool cSong::incPlayFrame (int frames) {
     }
   else {
     // allow new chunks before 0
-    const int framesPerChunk = 150;
-    int chunks = (-newFrame + 149) / framesPerChunk;
+    const int framesPerChunk = mHlsFramesPerChunk;
+    int chunks = (-newFrame + (mHlsFramesPerChunk-1)) / framesPerChunk;
     int frameInChunk = framesPerChunk + (newFrame % framesPerChunk);
 
     cLog::log (LOGINFO, "back to %d, chunks:%d frame:%d", newFrame, chunks, frameInChunk);

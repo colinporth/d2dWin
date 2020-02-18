@@ -12,6 +12,9 @@
 #include "audioWASAPI.h"
 #include "cAudioDecode.h"
 
+#include "../../shared/hls/r3x80.h"
+#include "../../shared/hls/r4x80.h"
+
 using namespace std;
 //}}}
 
@@ -36,7 +39,10 @@ public:
     if (streaming) {
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,0.f);
 
+      add (new cBmpBox (this, 60.f, 60.f, r3x80, 3, mChan, mChanChanged), 0.f,0);
+      add (new cBmpBox (this, 60.f, 60.f, r4x80, 4, mChan, mChanChanged), 62.f,0);
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
+
       //thread ([=]() { icyThread (name); }).detach();
       thread ([=](){ playThread (true); }).detach();
       }
@@ -231,7 +237,7 @@ private:
 
         //mBaseStr = "base " + date::format ("%T", floor<seconds>(baseTimePoint)) + " seqNum " + dec(baseSeqNum);
         //}}}
-        mSong.init (cAudioDecode::eAac, 2, bitrate <= 96000 ? 2048 : 1024, 48000);
+        mSong.init (cAudioDecode::eAac, 2, mSong.getHlsBitrate() >= 128000 ? 1024 : 2048, 48000);
         mSong.setHlsBase (baseSeqNum, baseTimePoint);
 
         cAudioDecode decode (cAudioDecode::eAac);
@@ -548,6 +554,9 @@ private:
   string mLastTitleStr;
 
   string mDebugStr;
+
+  int mChan = 0;
+  bool mChanChanged = false;
   //}}}
   };
 

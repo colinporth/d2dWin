@@ -113,6 +113,7 @@ public:
   // optional info
   int getHlsBitrate() { return mHlsBitrate; }
   std::string getHlsChan() { return mHlsChan; }
+  int getHlsFramesPerChunk() { return mHlsFramesPerChunk; }
 
   bool hasHlsBase() { return mHasHlsBase; }
   std::chrono::system_clock::time_point getHlsBaseTimePoint() { return mHlsBaseTimePoint; }
@@ -177,8 +178,9 @@ private:
   float mMaxFreqValues[kMaxFreq];
   float mMaxFreqValue = 0.f;
 
-  int mHlsBitrate;
   std::string mHlsChan;
+  int mHlsBitrate = 0;
+  int mHlsFramesPerChunk = 0;
 
   bool mHasHlsBase = false;
   int mHlsBaseSeqNum = 0;

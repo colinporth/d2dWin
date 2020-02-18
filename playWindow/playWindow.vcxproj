@@ -67,11 +67,18 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\shared\hls\r1x80.h" />
+    <ClInclude Include="..\..\shared\hls\r2x80.h" />
+    <ClInclude Include="..\..\shared\hls\r3x80.h" />
+    <ClInclude Include="..\..\shared\hls\r4x80.h" />
+    <ClInclude Include="..\..\shared\hls\r5x80.h" />
+    <ClInclude Include="..\..\shared\hls\r6x80.h" />
     <ClInclude Include="..\..\shared\net\cHttp.h" />
     <ClInclude Include="..\..\shared\net\cWinSockHttp.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
     <ClInclude Include="..\..\shared\utils\date.h" />
+    <ClInclude Include="..\boxes\cBmpBox.h" />
     <ClInclude Include="..\boxes\cCalendarBox.h" />
     <ClInclude Include="..\boxes\cClockBox.h" />
     <ClInclude Include="..\boxes\cJpegImageView.h" />

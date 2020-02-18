@@ -1,6 +1,8 @@
 // cBmpBox.h
 //{{{  includes
 #pragma once
+#include <d2d1.h>
+
 #include "../common/cD2dWindow.h"
 //}}}
 
@@ -15,7 +17,7 @@ public:
     mSizeX = *(bmp + 0x12);
     mSizeY = *(bmp + 0x16);
 
-    window->getDc()->CreateBitmap (SizeU(mSizeX, mSizeY),
+    window->getDc()->CreateBitmap (D2D1::SizeU(mSizeX, mSizeY),
                                    { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
                                    &mBitmap);
 
@@ -29,7 +31,7 @@ public:
         *linePtr++ = *bmpPtr++;
         *linePtr++ = 255;
         }
-      mBitmap->CopyFromMemory (&RectU (0, y, mSizeX, y+1), line, mSizeX*4);
+      mBitmap->CopyFromMemory (&D2D1::RectU (0, y, mSizeX, y+1), line, mSizeX*4);
       }
     free (line);
     }
