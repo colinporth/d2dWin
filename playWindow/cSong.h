@@ -103,6 +103,7 @@ public:
   int getLastFrame() { return mFrameMap.empty() ? 0 : mFrameMap.rbegin()->first;  }
   int getNumFrames() { return mFrameMap.empty() ? 0 : (mFrameMap.rbegin()->first - mFrameMap.begin()->first + 1); }
   int getTotalFrames() { return mTotalFrames; }
+  int getPlayFrame() { return mPlayFrame; }
 
   int getId() { return mId; }
 
@@ -110,9 +111,6 @@ public:
     auto it = mFrameMap.find (frame);
     return (it == mFrameMap.end()) ? nullptr : it->second;
     }
-
-  cFrame* getPlayFramePtr() { return getFramePtr (mPlayFrame); }
-  int getPlayFrame();
 
   // optional info
   int getHlsBitrate() { return mHlsBitrate; }
@@ -122,11 +120,8 @@ public:
   bool hasHlsBase() { return mHasHlsBase; }
   std::chrono::system_clock::time_point getHlsBaseTimePoint() { return mHlsBaseTimePoint; }
 
-  uint64_t getHlsBaseFrame();
-  int getHlsBaseSeqNum() { return mHlsBaseSeqNum; }
-  int getHlsBasedSeqNum() { return mHlsSeqNum; }
-  int getHlsOffsetMs (std::chrono::system_clock::time_point now);
-  int getHlsSeqNumGet (std::chrono::system_clock::time_point now, int minMs, int maxMs);
+  int getHlsSeqNum (std::chrono::system_clock::time_point now, int minMs, int maxMs, int& seqFrameNum);
+  int getHlsSeqNumOffset() { return mHlsSeqNum; }
 
   int getHlsLate() { return mHlsLate; }
   int getHlsLoading() { return mHlsLoading; }
@@ -150,8 +145,8 @@ public:
   //}}}
 
   // incs
-  bool incPlayFrame (int frames);
-  bool incPlaySec (int secs);
+  void incPlayFrame (int frames);
+  void incPlaySec (int secs);
   void incHlsLate() { mHlsLate++; };
 
   void nextHlsSeqNum();

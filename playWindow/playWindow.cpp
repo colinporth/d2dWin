@@ -247,17 +247,17 @@ private:
         //}}}
         mSong.init (cAudioDecode::eAac, 2, mSong.getHlsBitrate() >= 128000 ? 1024 : 2048, 48000);
         mSong.setHlsBase (baseSeqNum, baseTimePoint);
-        int frameNum = 0;
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
         while (!getExit() && !mSongChanged) {
-          auto seqNum = mSong.getHlsSeqNumGet (getNowDayLight(), 10000, 64000);
+          int seqFrameNum = 0;
+          auto seqNum = mSong.getHlsSeqNum (getNowDayLight(), 10000, 64000, seqFrameNum);
           if (seqNum) {
             // get hls seqNum chunk, about 100k bytes for 128kps stream
             mSong.setHlsLoading();
             if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
-              cLog::log (LOGINFO, "got " + dec(mSong.getHlsBasedSeqNum()) +
+              cLog::log (LOGINFO, "got " + dec(mSong.getHlsSeqNumOffset()) +
                                   " at " + date::format ("%T", chrono::floor<chrono::seconds>(getNowDayLight())));
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
@@ -273,7 +273,7 @@ private:
                   // frame fixup aacHE sampleRate, samplesPerFrame
                   mSong.setSampleRate (decode.getSampleRate());
                   mSong.setSamplesPerFrame (numSamples);
-                  mSong.addFrame (frameNum++, true, aacFrame, aacFrameLen, mSong.getNumFrames()+1, samples);
+                  mSong.addFrame (seqFrameNum++, true, aacFrame, aacFrameLen, mSong.getNumFrames()+1, samples);
                   changed();
                   }
                 aacFrames += decode.getNextFrameOffset();
@@ -286,7 +286,7 @@ private:
               mSong.incHlsLate();
               changed();
 
-              cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(mSong.getHlsBasedSeqNum()));
+              cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(mSong.getHlsSeqNumOffset()));
 
               Sleep (200);
               }
@@ -521,8 +521,8 @@ private:
       // !!!! if not streaming should do something better at end and mSongChanged !!!!
       // - also stop stutters
       while (!getExit() && (mSong.getStreaming() || (mSong.getPlayFrame() < mSong.getLastFrame()))) {
-        auto framePtr = mSong.getPlayFramePtr();
-        if (mPlaying && framePtr && (mSong.getPlayFrame() <= mSong.getLastFrame())) {
+        auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
+        if (mPlaying && framePtr) {
           device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
             // lambda callback - load srcSamples
             shared_lock<shared_mutex> lock (mSong.getSharedMutex());

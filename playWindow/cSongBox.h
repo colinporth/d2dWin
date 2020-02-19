@@ -159,12 +159,10 @@ public:
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
 
-    if (mSong.hasHlsBase()) {
-      auto base = mSong.getHlsBaseFrame();
-      drawTime (dc, frameString (base), frameString (base + playFrame), frameString (base + mSong.getTotalFrames()));
-      }
+    if (mSong.hasHlsBase())
+      drawTime (dc, frameString (mSong.getFirstFrame()), frameString (mSong.getPlayFrame()), frameString (mSong.getLastFrame()));
     else
-      drawTime (dc, "", frameString (playFrame), frameString (mSong.getTotalFrames()));
+      drawTime (dc, "", frameString (mSong.getPlayFrame()), frameString (mSong.getTotalFrames()));
     }
   //}}}
 
@@ -245,27 +243,30 @@ private:
     // draw bitmap as frames
     for (auto frame = fromFrame; frame < toFrame; frame += mFrameStep) {
       //{{{  draw bitmap for frame
-      bool mark;
-      bool silence;
+      bool mark = false;
+      bool silence = false;
       float powerValues[2];
       float peakValues[2];
       float srcIndex = float((frame / mFrameStep) & mBitmapMask);
 
       if (mFrameStep == 1) {
         //{{{  simple case, draw peak and power scaled to maxPeak
-        float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
-        mark = mSong.getFramePtr (frame)->hasTitle();
-        silence = mSong.getFramePtr (frame)->isSilent();
+        auto framePtr = mSong.getFramePtr (frame);
+        if (framePtr) {
+          float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
+          mark = framePtr->hasTitle();
+          silence = framePtr->isSilent();
 
-        auto powerValuesPtr = mSong.getFramePtr (frame)->getPowerValues();
-        auto peakValuesPtr = mSong.getFramePtr (frame)->getPeakValues();
-        for (auto i = 0; i < 2; i++) {
-          powerValues[i] = *powerValuesPtr++ * valueScale;
-          peakValues[i] = *peakValuesPtr++ * valueScale;
+          auto powerValuesPtr = framePtr->getPowerValues();
+          auto peakValuesPtr =  framePtr->getPeakValues();
+          for (auto i = 0; i < 2; i++) {
+            powerValues[i] = *powerValuesPtr++ * valueScale;
+            peakValues[i] = *peakValuesPtr++ * valueScale;
+            }
+
+          bitmapRect = { srcIndex, mSrcPeakCentre - peakValues[0], srcIndex + 1.f, mSrcPeakCentre + peakValues[1] };
+          mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
           }
-
-        bitmapRect = { srcIndex, mSrcPeakCentre - peakValues[0], srcIndex + 1.f, mSrcPeakCentre + peakValues[1] };
-        mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
         }
         //}}}
       else {
@@ -273,16 +274,21 @@ private:
         float valueScale = mWaveHeight / 2.f / mSong.getMaxPowerValue();
         silence = false;
         mark = false;
+
         for (auto i = 0; i < 2; i++)
           powerValues[i] = 0.f;
+
         auto alignedFrame = frame - (frame % mFrameStep);
         auto toSumFrame = std::min (alignedFrame + mFrameStep, rightFrame);
         for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
-          mark |= mSong.getFramePtr (sumFrame)->hasTitle();
-          silence |= mSong.getFramePtr (sumFrame)->isSilent();
-          auto powerValuesPtr = mSong.getFramePtr (sumFrame)->getPowerValues();
-          for (auto i = 0; i < 2; i++)
-            powerValues[i] += *powerValuesPtr++ * valueScale;
+          auto framePtr = mSong.getFramePtr (sumFrame);
+          if (framePtr) {
+            mark |= framePtr->hasTitle();
+            silence |= framePtr->isSilent();
+            auto powerValuesPtr = framePtr->getPowerValues();
+            for (auto i = 0; i < 2; i++)
+              powerValues[i] += *powerValuesPtr++ * valueScale;
+            }
           }
 
         for (auto i = 0; i < 2; i++)
@@ -314,18 +320,24 @@ private:
 
     if (mFrameStep == 1) {
       for (auto frame = fromFrame; frame < toFrame; frame += mFrameStep) {
-        uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
-        D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
-        mBitmap->CopyFromMemory (&bitmapRectU, mSong.getFramePtr (frame)->getFreqLuma() + freqOffset, 1);
+        auto framePtr = mSong.getFramePtr (frame);
+        if (framePtr) {
+          uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
+          D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
+          mBitmap->CopyFromMemory (&bitmapRectU, framePtr->getFreqLuma() + freqOffset, 1);
+          }
         }
       }
     else {
       // align to mFrameStep, could sum as well
       auto alignedFromFrame = fromFrame - (fromFrame % mFrameStep);
       for (auto frame = alignedFromFrame; frame < toFrame; frame += mFrameStep) {
-        uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
-        D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
-        mBitmap->CopyFromMemory (&bitmapRectU, mSong.getFramePtr (frame)->getFreqLuma() + freqOffset, 1);
+        auto framePtr = mSong.getFramePtr (frame);
+        if (framePtr) {
+          uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
+          D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
+          mBitmap->CopyFromMemory (&bitmapRectU, framePtr->getFreqLuma() + freqOffset, 1);
+          }
         }
       }
     }
@@ -522,12 +534,15 @@ private:
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     //{{{  draw playFrame
-    float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
-    auto powerValues = mSong.getFramePtr (playFrame)->getPeakValues();
+    auto framePtr = mSong.getFramePtr (playFrame);
+    if (framePtr) {
+      float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
+      auto powerValues = mSong.getFramePtr (playFrame)->getPeakValues();
 
-    dstRect = { mRect.left + (dstPlay * mFrameWidth)-1.f, mDstWaveCentre - (*powerValues++ * valueScale),
-                mRect.left + ((dstPlay+1.f) * mFrameWidth)+1.f, mDstWaveCentre + (*powerValues * valueScale) };
-    dc->FillRectangle (dstRect, mWindow->getGreenBrush());
+      dstRect = { mRect.left + (dstPlay * mFrameWidth)-1.f, mDstWaveCentre - (*powerValues++ * valueScale),
+                  mRect.left + ((dstPlay+1.f) * mFrameWidth)+1.f, mDstWaveCentre + (*powerValues * valueScale) };
+      dc->FillRectangle (dstRect, mWindow->getGreenBrush());
+      }
     //}}}
     }
   //}}}
@@ -538,15 +553,18 @@ private:
       auto valueScale = mOverviewHeight / mSong.getMaxFreqValue();
       auto maxFreqIndex = std::min (getWidthInt()/2, mSong.getNumFreq());
 
-      cRect dstRect = { 0.f,0.f, 0.f,mRect.bottom };
-      auto freq = mSong.getFramePtr (playFrame)->getFreqValues();
-      for (auto i = 0; i < maxFreqIndex; i++) {
-        auto value =  freq[i] * valueScale;
-        if (value > 1.f)  {
-          dstRect.left = mRect.left + (i*2);
-          dstRect.right = dstRect.left + 2;
-          dstRect.top = mRect.bottom - value;
-          dc->FillRectangle (dstRect, mWindow->getYellowBrush());
+      auto framePtr = mSong.getFramePtr (playFrame);
+      if (framePtr) {
+        auto freq = framePtr->getFreqValues();
+        cRect dstRect = { 0.f,0.f, 0.f,mRect.bottom };
+        for (auto i = 0; i < maxFreqIndex; i++) {
+          auto value =  freq[i] * valueScale;
+          if (value > 1.f)  {
+            dstRect.left = mRect.left + (i*2);
+            dstRect.right = dstRect.left + 2;
+            dstRect.top = mRect.bottom - value;
+            dc->FillRectangle (dstRect, mWindow->getYellowBrush());
+            }
           }
         }
       }
@@ -622,26 +640,32 @@ private:
           break;
 
         if (forceRedraw || (frame >= mOverviewNumFrames)) {
-          float* powerValues = mSong.getFramePtr (frame)->getPowerValues();
-          float leftValue = *powerValues++;
-          float rightValue = *powerValues;
-          if (frame < toFrame) {
-            int numSummedFrames = 1;
-            frame++;
-            while (frame < toFrame) {
-              auto powerValues = mSong.getFramePtr (frame)->getPowerValues();
-              leftValue += *powerValues++;
-              rightValue += *powerValues;
-              numSummedFrames++;
+          auto framePtr = mSong.getFramePtr (frame);
+          if (framePtr) {
+            float* powerValues = framePtr->getPowerValues();
+            float leftValue = *powerValues++;
+            float rightValue = *powerValues;
+            if (frame < toFrame) {
+              int numSummedFrames = 1;
               frame++;
+              while (frame < toFrame) {
+                framePtr = mSong.getFramePtr (frame);
+                if (framePtr) {
+                  auto powerValues = framePtr->getPowerValues();
+                  leftValue += *powerValues++;
+                  rightValue += *powerValues;
+                  numSummedFrames++;
+                  }
+                frame++;
+                }
+              leftValue /= numSummedFrames;
+              rightValue /= numSummedFrames;
               }
-            leftValue /= numSummedFrames;
-            rightValue /= numSummedFrames;
-            }
 
-          cRect bitmapRect = { (float)x, mSrcOverviewCentre - (leftValue * valueScale) - 2.f,
-                               x+1.f, mSrcOverviewCentre + (rightValue * valueScale) + 2.f };
-          mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
+            cRect bitmapRect = { (float)x, mSrcOverviewCentre - (leftValue * valueScale) - 2.f,
+                                 x+1.f, mSrcOverviewCentre + (rightValue * valueScale) + 2.f };
+            mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
+            }
           }
 
         frame = toFrame;
@@ -664,12 +688,15 @@ private:
     dc->FillOpacityMask (mBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
 
     //  draw playFrame
-    dstRect = { mRect.left + playFrameX, mDstOverviewTop,
-                mRect.left + playFrameX+1.f, mDstOverviewTop + mOverviewHeight };
-    auto powerValues = mSong.getFramePtr (playFrame)->getPowerValues();
-    dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
-    dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
-    dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
+    auto framePtr = mSong.getFramePtr (playFrame);
+    if (framePtr) {
+      auto powerValues = framePtr->getPowerValues();
+      dstRect = { mRect.left + playFrameX, mDstOverviewTop,
+                  mRect.left + playFrameX+1.f, mDstOverviewTop + mOverviewHeight };
+      dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
+      dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
+      dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
+      }
 
     // after playFrame
     srcRect = { playFrameX+1.f, mSrcOverviewTop,  getWidth(), mSrcOverviewTop + mOverviewHeight };

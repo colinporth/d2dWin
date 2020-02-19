@@ -108,8 +108,9 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
     auto windowFrame = frameNum - 1;
     while ((window >= 0) && (windowFrame >= 0)) {
       // walk backwards looking for no silence
-      if (!getFramePtr (windowFrame)->isSilentThreshold()) {
-        getFramePtr (frameNum)->setSilent (false);
+      auto windowFramePtr = getFramePtr (windowFrame);
+      if (windowFramePtr && !windowFramePtr->isSilentThreshold()) {
+        framePtr->setSilent (false);
         break;
         }
       windowFrame--;
@@ -121,34 +122,19 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
 // gets
 //{{{
-int cSong::getPlayFrame() {
+int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int maxMs, int& seqFrameNum) {
 
-  if (mPlayFrame <= getLastFrame())
-    return mPlayFrame;
-
-  return getLastFrame();
-  }
-//}}}
-
-//{{{
-uint64_t cSong::getHlsBaseFrame() {
-  return mHlsBaseFrame;
-  }
-//}}}
-//{{{
-int cSong::getHlsOffsetMs (system_clock::time_point now) {
   auto basedMs = duration_cast<milliseconds>(now - getHlsBaseTimePoint());
-  return int (basedMs.count()) - (getHlsBasedSeqNum() * 6400);
-  }
-//}}}
-//{{{
-int cSong::getHlsSeqNumGet (system_clock::time_point now, int minMs, int maxMs) {
+  auto hlsOffset =  int (basedMs.count()) - (getHlsSeqNumOffset() * 6400);
 
-  auto hlsOffset = getHlsOffsetMs (now);
-  if ((hlsOffset > minMs) && (hlsOffset < maxMs))
+  if ((hlsOffset > minMs) && (hlsOffset < maxMs)) {
+    seqFrameNum = mHlsBaseFrame + (mHlsSeqNum * mHlsFramesPerChunk);
     return mHlsBaseSeqNum + mHlsSeqNum;
-  else
+    }
+  else {
+    seqFrameNum = 0;
     return 0;
+    }
   }
 //}}}
 
@@ -176,7 +162,7 @@ void cSong::setHlsBase (int startSeqNum, system_clock::time_point startTimePoint
 
   uint64_t msSinceMidnight = (duration_cast<milliseconds>(mHlsBaseTimePoint - mHlsBaseDatePoint)).count();
   mHlsBaseFrame = (msSinceMidnight * mSampleRate) / mSamplesPerFrame / 1000;
-
+  mPlayFrame = mHlsBaseFrame;
   mHlsSeqNum = 0;
 
   // should calculate
@@ -188,36 +174,19 @@ void cSong::setHlsBase (int startSeqNum, system_clock::time_point startTimePoint
 
 // incs
 //{{{
-bool cSong::incPlayFrame (int frames) {
+void cSong::incPlayFrame (int frames) {
 
   int newFrame = mPlayFrame + frames;
-  if (!mHasHlsBase || (newFrame >= 0)) {
+  if (!mHasHlsBase || (newFrame >= 0))
     // simple case, clip to playFrame 0
     setPlayFrame (newFrame);
-    return false;
-    }
-  else {
-    // allow new chunks before 0
-    const int framesPerChunk = mHlsFramesPerChunk;
-    int chunks = (-newFrame + (mHlsFramesPerChunk-1)) / framesPerChunk;
-    int frameInChunk = framesPerChunk + (newFrame % framesPerChunk);
-
-    cLog::log (LOGINFO, "back to %d, chunks:%d frame:%d", newFrame, chunks, frameInChunk);
-
-    mHlsSeqNum = 0;
-    mHlsBaseSeqNum = mHlsBaseSeqNum - chunks;
-    mHlsBaseTimePoint = mHlsBaseTimePoint - milliseconds (chunks * 6400);
-    clearFrames();
-    mPlayFrame = frameInChunk;
-
-    //return false;
-    return true;
-    }
+  else
+    mPlayFrame += frames;
   }
 //}}}
 //{{{
-bool cSong::incPlaySec (int secs) {
-  return incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame);
+void cSong::incPlaySec (int secs) {
+  incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame);
   }
 //}}}
 
