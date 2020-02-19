@@ -80,7 +80,7 @@ public:
 
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
 
-  bool hasSomeFrames() { return !mFrames.empty(); }
+  bool hasSomeFrames() { return !mFrameMap.empty(); }
   bool hasSamples() { return mFrameType == cAudioDecode::eWav; }
 
   int getNumChannels() { return mNumChannels; }
@@ -99,16 +99,20 @@ public:
   int getNumFreq() { return kMaxFreq; }
   int getNumFreqLuma() { return kMaxSpectrum; }
 
-  int getFirstFrame() { return 0; }
-  int getLastFrame() { return (int)mFrames.size() - 1;  }
-  int getNumFrames() { return (int)mFrames.size(); }
+  int getFirstFrame() { return mFrameMap.empty() ? 0 : mFrameMap.begin()->first; }
+  int getLastFrame() { return mFrameMap.empty() ? 0 : mFrameMap.rbegin()->first;  }
+  int getNumFrames() { return mFrameMap.empty() ? 0 : (mFrameMap.rbegin()->first - mFrameMap.begin()->first + 1); }
   int getTotalFrames() { return mTotalFrames; }
 
   int getId() { return mId; }
 
-  int getPlayFrame();
-  cFrame* getFramePtr (int frame) { return (frame < mFrames.size()) ? mFrames[frame] : nullptr; }
+  cFrame* getFramePtr (int frame) {
+    auto it = mFrameMap.find (frame);
+    return (it == mFrameMap.end()) ? nullptr : it->second;
+    }
+
   cFrame* getPlayFramePtr() { return getFramePtr (mPlayFrame); }
+  int getPlayFrame();
 
   // optional info
   int getHlsBitrate() { return mHlsBitrate; }
@@ -167,7 +171,7 @@ private:
   std::map<int,cFrame*> mFrameMap;
   //{{{  private vars
   //std::vector<cFrame*> mFrames;
-  std::deque<cFrame*> mFrames;
+  //std::deque<cFrame*> mFrames;
 
   bool mStreaming = false;
 

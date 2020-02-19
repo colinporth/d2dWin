@@ -121,6 +121,7 @@ public:
       }
 
     auto playFrame = mSong.getPlayFrame();
+    cLog::log (LOGINFO, "%d %d", playFrame, mSong.getNumFrames());
 
     // src bitmap explicit layout
     mWaveHeight = 100.f;

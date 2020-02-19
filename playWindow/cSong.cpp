@@ -96,17 +96,20 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
   // totalFrames can be a changing estimate for file, or increasing value for streaming
   mTotalFrames = totalFrames;
-  mFrames.push_back (new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues));
+  //mFrames.push_back (new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues));
+  mFrameMap.insert (map<int,cFrame*>::value_type (
+    frame, new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues)));
 
   // calc silent window
   auto frameNum = getLastFrame();
-  if (mFrames[frameNum]->isSilent()) {
+  auto framePtr = getFramePtr (frameNum);
+  if (framePtr && framePtr->isSilent()) {
     auto window = kSilentWindowFrames;
     auto windowFrame = frameNum - 1;
     while ((window >= 0) && (windowFrame >= 0)) {
       // walk backwards looking for no silence
-      if (!mFrames[windowFrame]->isSilentThreshold()) {
-        mFrames[frameNum]->setSilent (false);
+      if (!getFramePtr (windowFrame)->isSilentThreshold()) {
+        getFramePtr (frameNum)->setSilent (false);
         break;
         }
       windowFrame--;
@@ -120,12 +123,10 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 //{{{
 int cSong::getPlayFrame() {
 
-  if (mPlayFrame < mFrames.size())
+  if (mPlayFrame <= getLastFrame())
     return mPlayFrame;
-  else if (mFrames.empty())
-    return 0;
-  else
-    return (int)mFrames.size() - 1;
+
+  return getLastFrame();
   }
 //}}}
 
@@ -160,8 +161,8 @@ void cSong::setPlayFrame (int frame) {
 //{{{
 void cSong::setTitle (const string& title) {
 
-  if (!mFrames.empty())
-    mFrames.back()->setTitle (title);
+  //if (!hasFrames())
+  //  mFrames.back()->setTitle (title);
   }
 //}}}
 //{{{
@@ -255,9 +256,9 @@ void cSong::clearFrames() {
   mPlayFrame = 0;
   mTotalFrames = 0;
 
-  for (auto frame : mFrames)
-    delete (frame);
-  mFrames.clear();
+  for (auto frame : mFrameMap)
+    delete (frame.second);
+  mFrameMap.clear();
 
   // reset maxValue
   mMaxPowerValue = kMinPowerValue;
@@ -272,7 +273,7 @@ void cSong::clearFrames() {
 int cSong::skipPrev (int fromFrame, bool silent) {
 
   for (int frame = fromFrame-1; frame >= 0; frame--)
-    if (mFrames[frame]->isSilent() ^ silent)
+    if (getFramePtr (frame)->isSilent() ^ silent)
       return frame;
 
   return fromFrame;
@@ -282,7 +283,7 @@ int cSong::skipPrev (int fromFrame, bool silent) {
 int cSong::skipNext (int fromFrame, bool silent) {
 
   for (int frame = fromFrame; frame < getNumFrames(); frame++)
-    if (mFrames[frame]->isSilent() ^ silent)
+    if (getFramePtr (frame)->isSilent() ^ silent)
       return frame;
 
   return fromFrame;
