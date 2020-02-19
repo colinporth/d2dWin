@@ -239,7 +239,7 @@ private:
         //}}}
         mSong.init (cAudioDecode::eAac, 2, mSong.getHlsBitrate() >= 128000 ? 1024 : 2048, 48000);
         mSong.setHlsBase (baseSeqNum, baseTimePoint);
-
+        int frameNum = 0;
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
@@ -264,8 +264,8 @@ private:
 
                   // frame fixup aacHE sampleRate, samplesPerFrame
                   mSong.setSampleRate (decode.getSampleRate());
-                  mSong.setSamplesPerFrame (decode.getNumSamples());
-                  mSong.addFrame (true, aacFrame, aacFrameLen, mSong.getNumFrames()+1, numSamples, samples);
+                  mSong.setSamplesPerFrame (numSamples);
+                  mSong.addFrame (frameNum++, true, aacFrame, aacFrameLen, mSong.getNumFrames()+1, samples);
                   changed();
                   }
                 aacFrames += decode.getNextFrameOffset();
@@ -310,6 +310,7 @@ private:
     uint8_t* buffer = bufferFirst;
 
     bool firstTime = true;
+    int frameNum = 0;
     cAudioDecode decode (cAudioDecode::eAac);
     float* samples = nullptr;
 
@@ -383,8 +384,8 @@ private:
 
               // frame fixup aacHE sampleRate, samplesPerFrame
               mSong.setSampleRate (decode.getSampleRate());
-              mSong.setSamplesPerFrame (decode.getNumSamples());
-              mSong.addFrame (true, frame, framelen, mSong.getNumFrames()+1, numSamples, samples);
+              mSong.setSamplesPerFrame (numSamples);
+              mSong.addFrame (frameNum++, true, frame, framelen, mSong.getNumFrames()+1, samples);
               changed();
               }
             }
@@ -423,6 +424,7 @@ private:
       if (cAudioDecode::mJpegPtr) // should delete old jpegImage, but we have memory to waste
         mJpegImageView->setImage (new cJpegImage (cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen));
 
+      int frameNum = 0;
       bool songDone = false;
       auto fileMapPtr = fileMapFirst;
       if (frameType == cAudioDecode::eWav) {
@@ -436,7 +438,7 @@ private:
 
         auto frameSampleBytes = frameSamples * 2 * 4;
         while (!getExit() && !mSongChanged && !songDone) {
-          mSong.addFrame (false, data, frameSampleBytes, fileMapSize / frameSampleBytes, frameSamples, (float*)data);
+          mSong.addFrame (frameNum++, false, data, frameSampleBytes, fileMapSize / frameSampleBytes, (float*)data);
           data += frameSampleBytes;
           changed();
           songDone = (data + frameSampleBytes) > fileMapEnd;
@@ -456,10 +458,10 @@ private:
               if (numSamples) {
                 // frame fixup aacHE sampleRate, samplesPerFrame
                 mSong.setSampleRate (decode.getSampleRate());
-                mSong.setSamplesPerFrame (decode.getNumSamples());
+                mSong.setSamplesPerFrame (numSamples);
                 int numFrames = mSong.getNumFrames();
                 int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
-                mSong.addFrame (false, decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, numSamples, samples);
+                mSong.addFrame (frameNum++, false, decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, samples);
                 changed();
                 }
               }

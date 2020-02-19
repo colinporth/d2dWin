@@ -316,7 +316,6 @@ int cAudioDecode::frameToSamples (float* samples) {
       break;
 
     if ((ret != AVERROR(EAGAIN)) && (mAvFrame->nb_samples > 0)) {
-      mNumSamples = mAvFrame->nb_samples;
       mSampleRate = mAvFrame->sample_rate;
 
       //  covert planar avFrame->data to interleaved float samples

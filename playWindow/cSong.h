@@ -78,7 +78,7 @@ public:
   virtual ~cSong();
 
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
-  void addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples);
+  void addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples);
 
   //{{{  gets
   std::mutex& getMutex() { return mMutex; }

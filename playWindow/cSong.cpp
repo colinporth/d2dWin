@@ -30,11 +30,11 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   clearFrames();
   mHasHlsBase = false;
 
-  fftrConfig = kiss_fftr_alloc (samplesPerFrame, 0, 0, 0);
+  fftrConfig = kiss_fftr_alloc (mSamplesPerFrame, 0, 0, 0);
   }
 //}}}
 //{{{
-void cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrames, int samplesPerFrame, float* samples) {
+void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples) {
 // return true if enough frames added to start playing, streamLen only used to estimate totalFrames
 
   // sum of squares channel power
@@ -44,7 +44,7 @@ void cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrame
   auto peakValues = (float*)malloc (mNumChannels * 4);
   memset (peakValues, 0, mNumChannels * 4);
 
-  for (int sample = 0; sample < samplesPerFrame; sample++) {
+  for (int sample = 0; sample < mSamplesPerFrame; sample++) {
     timeBuf[sample] = 0;
     for (auto chan = 0; chan < mNumChannels; chan++) {
       auto value = *samples++;
@@ -55,7 +55,7 @@ void cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrame
     }
 
   for (auto chan = 0; chan < mNumChannels; chan++) {
-    powerValues[chan] = sqrtf (powerValues[chan] / samplesPerFrame);
+    powerValues[chan] = sqrtf (powerValues[chan] / mSamplesPerFrame);
     mMaxPowerValue = max (mMaxPowerValue, powerValues[chan]);
     mMaxPeakValue = max (mMaxPeakValue, peakValues[chan]);
     }
@@ -82,7 +82,6 @@ void cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrame
 
   // totalFrames can be a changing estimate for file, or increasing value for streaming
   mTotalFrames = totalFrames;
-  mSamplesPerFrame = samplesPerFrame;
   mFrames.push_back (new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues));
 
   // calc silent window
@@ -215,6 +214,7 @@ void cSong::nextHlsSeqNum() {
   }
 //}}}
 
+// actions
 //{{{
 void cSong::prevSilencePlayFrame() {
   mPlayFrame = skipPrev (mPlayFrame, false);

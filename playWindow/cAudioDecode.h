@@ -18,7 +18,6 @@ public:
   // gets
   eFrameType getFrameType() { return mFrameType; }
   int getSampleRate() { return mSampleRate; }
-  int getNumSamples() { return mNumSamples; }
 
   uint8_t* getFramePtr() { return mFramePtr; }
   int getFrameLen() { return mFrameLen; }
@@ -45,7 +44,6 @@ private:
 
   eFrameType mFrameType = eUnknown;
   int mSampleRate = 0;
-  int mNumSamples = 0;
 
   AVCodecContext* mContext = nullptr;
   AVPacket mAvPacket;
