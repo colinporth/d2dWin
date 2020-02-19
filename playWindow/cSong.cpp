@@ -106,34 +106,13 @@ void cSong::addFrame (bool mapped, uint8_t* stream, int frameLen, int totalFrame
 // gets
 //{{{
 int cSong::getPlayFrame() {
+
   if (mPlayFrame < mFrames.size())
     return mPlayFrame;
-  else if (!mFrames.empty())
-    return (int)mFrames.size() - 1;
-  else // startup case
+  else if (mFrames.empty())
     return 0;
-  }
-//}}}
-//{{{
-uint8_t* cSong::getPlayFramePtr() {
-
-  if (mPlayFrame < mFrames.size())
-    return mFrames[mPlayFrame]->getPtr();
-  else if (!mFrames.empty())
-    return mFrames[mFrames.size()-1]->getPtr();
-
-  return nullptr;
-  }
-//}}}
-//{{{
-int cSong::getPlayFrameLen() {
-
-  if (mPlayFrame < mFrames.size())
-    return mFrames[mPlayFrame]->getLen();
-  else if (!mFrames.empty())
-    return mFrames[mFrames.size()-1]->getLen();
-
-   return 0;
+  else
+    return (int)mFrames.size() - 1;
   }
 //}}}
 
@@ -146,6 +125,16 @@ uint64_t cSong::getHlsBaseFrame() {
 int cSong::getHlsOffsetMs (system_clock::time_point now) {
   auto basedMs = duration_cast<milliseconds>(now - getHlsBaseTimePoint());
   return int (basedMs.count()) - (getHlsBasedSeqNum() * 6400);
+  }
+//}}}
+//{{{
+int cSong::getHlsSeqNumGet (system_clock::time_point now, int minMs, int maxMs) {
+
+  auto hlsOffset = getHlsOffsetMs (now);
+  if ((hlsOffset > minMs) && (hlsOffset < maxMs))
+    return mHlsBaseSeqNum + mHlsSeqNum;
+  else
+    return 0;
   }
 //}}}
 
@@ -165,6 +154,8 @@ void cSong::setTitle (const string& title) {
 //{{{
 void cSong::setHlsBase (int startSeqNum, system_clock::time_point startTimePoint) {
 
+  mStreaming = true;
+
   mHlsBaseSeqNum = startSeqNum;
   mHlsBaseTimePoint = startTimePoint;
   mHlsBaseDatePoint = date::floor<date::days>(mHlsBaseTimePoint);
@@ -174,7 +165,7 @@ void cSong::setHlsBase (int startSeqNum, system_clock::time_point startTimePoint
 
   mHlsSeqNum = 0;
 
-  // should calculate 
+  // should calculate
   mHlsFramesPerChunk = mHlsBitrate >= 128000 ? 300 : 150;
 
   mHasHlsBase = true;
@@ -215,8 +206,9 @@ bool cSong::incPlaySec (int secs) {
   return incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame);
   }
 //}}}
+
 //{{{
-void cSong::incHlsSeqNum() {
+void cSong::nextHlsSeqNum() {
   mHlsSeqNum++;
   mHlsLate = 0;
   mHlsLoading = false;

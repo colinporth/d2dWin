@@ -12,6 +12,16 @@ sizing window flashing, short and crashes
 
 filelist broken
 
+play
+- clean up frame not loaded yet to be random access
+- more buttons
+- play on off
+- stutter when stopped
+- play region marking
+
+boxes
+- callbacks, onhit to bmpBox first
+
 jpeg tag
  - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
 
@@ -21,7 +31,8 @@ hls, shoutcast
 - hls
   - channel,bitrate change unreliable
   - go back in time
-
+    - change to map
+    - frame references since midnight
 command line invocation
 - web sites
 - hls file list
@@ -32,12 +43,6 @@ direct2d
 - investigate src coordinates to subpixel accuracy
 - investigate bitmapbrush with alpha
   - gradient brush for waveform
-
-play
-- more buttons
-- play on off
-- stutter when stopped
-- play region marking
 
 editing
 - mute marking

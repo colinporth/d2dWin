@@ -21,7 +21,7 @@ using namespace std;
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (bool streaming, const string& title, int width, int height, const string& name) {
+  void run (const string& title, int width, int height, const string& name) {
 
     init (title + " " + name, width, height, false);
 
@@ -36,7 +36,7 @@ public:
     // last box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
-    if (streaming) {
+    if (name.empty()) {
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,0.f);
 
       add (new cBmpBox (this, 40.f, 40.f, r3x80, 3, mChan, mChanChanged), 0.f,0);
@@ -44,7 +44,7 @@ public:
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
 
       //thread ([=]() { icyThread (name); }).detach();
-      thread ([=](){ playThread (true); }).detach();
+      thread ([=](){ playThread(); }).detach();
       }
     else {
       mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
@@ -56,7 +56,7 @@ public:
         addFront (mJpegImageView);
 
         thread ([=](){ fileThread(); }).detach();
-        thread ([=](){ playThread (false); }).detach();
+        thread ([=](){ playThread(); }).detach();
         }
       }
 
@@ -87,8 +87,8 @@ protected:
       case 0x25: mSong.incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
       case 0x27: mSong.incPlaySec (getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
 
-      case 0x24: mSong.setPlayFrame (0); changed(); break; // home
-      case 0x23: mSong.setPlayFrame (mSong.getTotalFrames() -1); changed(); break; // end
+      case 0x24: mSong.setPlayFrame (mSong.getFirstFrame()); changed(); break; // home
+      case 0x23: mSong.setPlayFrame (mSong.getLastFrame()); changed(); break; // end
 
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
@@ -244,11 +244,11 @@ private:
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
         while (!getExit() && !mSongChanged) {
-          auto hlsOffset = mSong.getHlsOffsetMs (getNowDayLight());
-          if ((hlsOffset > 10000) && (hlsOffset < 64000)) { // no than more 64 seconds ahead, 10 hls chunks
+          auto seqNum = mSong.getHlsSeqNumGet (getNowDayLight(), 10000, 64000);
+          if (seqNum) {
             // get hls seqNum chunk, about 100k bytes for 128kps stream
             mSong.setHlsLoading();
-            if (http.get (host, path + '-' + dec(mSong.getHlsSeqNum()) + ".ts") == 200) {
+            if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
               cLog::log (LOGINFO, "got " + dec(mSong.getHlsBasedSeqNum()) +
                                   " at " + date::format ("%T", chrono::floor<chrono::seconds>(getNowDayLight())));
               auto aacFrames = http.getContent();
@@ -271,7 +271,7 @@ private:
                 aacFrames += decode.getNextFrameOffset();
                 }
               http.freeContent();
-              mSong.incHlsSeqNum();
+              mSong.nextHlsSeqNum();
               }
             else {
               //{{{  get failed, inc late count, back off for 200ms
@@ -369,6 +369,7 @@ private:
           int sampleRate;
           auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
           mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
+          mSong.setStreaming();
           samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
           }
 
@@ -489,34 +490,37 @@ private:
     }
   //}}}
   //{{{
-  void playThread (bool streaming) {
+  void playThread() {
 
     cLog::setThreadName ("play");
-    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-    // wait for some frames to set sampleRate
+    // wait for valid sampleRate to decalre audioDevice
     while (!mSong.getSampleRate())
       Sleep (10);
+
+    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
     auto device = getDefaultAudioOutputDevice();
     if (device) {
       device->setSampleRate (mSong.getSampleRate());
 
       cAudioDecode decode (mSong.getFrameType());
-      float* samples = (mSong.getFrameType() == cAudioDecode::eWav) ?
-                         nullptr : (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
+      float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxSamplesBytes());
 
-      // if not streaming should do something on end and mSongChanged
       device->start();
-      while (!getExit() && (streaming || (mSong.getPlayFrame() < mSong.getLastFrame()))) {
-        if (mPlaying && (mSong.getPlayFrame() <= mSong.getLastFrame())) {
+
+      // !!!! if not streaming should do something better at end and mSongChanged !!!!
+      // - also stop stutters
+      while (!getExit() && (mSong.getStreaming() || (mSong.getPlayFrame() < mSong.getLastFrame()))) {
+        auto framePtr = mSong.getPlayFramePtr();
+        if (mPlaying && framePtr && (mSong.getPlayFrame() <= mSong.getLastFrame())) {
           device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
             // lambda callback - load srcSamples
             lock_guard<mutex> lockGuard (mSong.getMutex());
-            if (mSong.isFramePtrSamples())
-              srcSamples = (float*)mSong.getPlayFramePtr();
+            if (mSong.hasSamples())
+              srcSamples = (float*)framePtr->getPtr();
             else {
-              decode.setFrame (mSong.getPlayFramePtr(), mSong.getPlayFrameLen());
+              decode.setFrame (framePtr->getPtr(), framePtr->getLen());
               decode.frameToSamples (samples);
               srcSamples = samples;
               }
@@ -574,7 +578,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
   if (numArgs > 1)
-    appWindow.run (false, "playWindow", 800, 480, wcharToString (args[1]));
+    appWindow.run ("playWindow", 800, 480, wcharToString (args[1]));
   else {
     //{{{  urls
     //const string url = "http://stream.wqxr.org/wqxr.aac";
@@ -585,7 +589,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
     //}}}
     const string url = "http://stream.wqxr.org/js-stream.aac";
-    appWindow.run (true, "playWindow", 800, 480, url);
+    appWindow.run ("playWindow", 800, 480, "");
     }
 
   CoUninitialize();

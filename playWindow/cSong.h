@@ -82,17 +82,21 @@ public:
 
   //{{{  gets
   std::mutex& getMutex() { return mMutex; }
+  bool getStreaming() { return mStreaming; }
 
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
 
   bool hasSomeFrames() { return !mFrames.empty(); }
-  bool isFramePtrSamples() { return mFrameType == cAudioDecode::eWav; }
+  bool hasSamples() { return mFrameType == cAudioDecode::eWav; }
 
   int getNumChannels() { return mNumChannels; }
   int getNumSampleBytes() { return mNumChannels * sizeof(float); }
+
   int getSampleRate() { return mSampleRate; }
   int getSamplesPerFrame() { return mSamplesPerFrame; }
   int getMaxSamplesPerFrame() { return kMaxSamplesPerFrame; }
+
+  int getMaxSamplesBytes() { return getMaxSamplesPerFrame() * getNumSampleBytes(); }
 
   float getMaxPowerValue() { return mMaxPowerValue; }
   float getMaxPeakValue() { return mMaxPeakValue; }
@@ -100,15 +104,16 @@ public:
   int getNumFreq() { return kMaxFreq; }
   int getNumFreqLuma() { return kMaxSpectrum; }
 
+  int getFirstFrame() { return 0; }
+  int getLastFrame() { return (int)mFrames.size() - 1;  }
   int getNumFrames() { return (int)mFrames.size(); }
-  int getLastFrame() { return getNumFrames() - 1;  }
   int getTotalFrames() { return mTotalFrames; }
 
   int getId() { return mId; }
 
   int getPlayFrame();
-  uint8_t* getPlayFramePtr();
-  int getPlayFrameLen();
+  cFrame* getFramePtr (int frame) { return (frame < mFrames.size()) ? mFrames[frame] : nullptr; }
+  cFrame* getPlayFramePtr() { return getFramePtr (mPlayFrame); }
 
   // optional info
   int getHlsBitrate() { return mHlsBitrate; }
@@ -118,12 +123,11 @@ public:
   bool hasHlsBase() { return mHasHlsBase; }
   std::chrono::system_clock::time_point getHlsBaseTimePoint() { return mHlsBaseTimePoint; }
 
-  int getHlsSeqNum() { return mHlsBaseSeqNum + mHlsSeqNum; }
+  uint64_t getHlsBaseFrame();
   int getHlsBaseSeqNum() { return mHlsBaseSeqNum; }
   int getHlsBasedSeqNum() { return mHlsSeqNum; }
-
-  uint64_t getHlsBaseFrame();
   int getHlsOffsetMs (std::chrono::system_clock::time_point now);
+  int getHlsSeqNumGet (std::chrono::system_clock::time_point now, int minMs, int maxMs);
 
   int getHlsLate() { return mHlsLate; }
   int getHlsLoading() { return mHlsLoading; }
@@ -134,26 +138,27 @@ public:
 
   void setPlayFrame (int frame);
 
+  // streaming
   void setTitle (const std::string& title);
+  void setStreaming() { mStreaming = true; }
 
+  // hls
   void setHlsChan (const std::string& chan) { mHlsChan = chan; }
   void setHlsBitrate (int bitrate) { mHlsBitrate = bitrate; }
-
   void setHlsBase (int startSeqNum, std::chrono::system_clock::time_point startTimePoint);
+
   void setHlsLoading() { mHlsLoading = true; }
   //}}}
 
   // incs
   bool incPlayFrame (int frames);
   bool incPlaySec (int secs);
-  void incHlsSeqNum();
   void incHlsLate() { mHlsLate++; };
+
+  void nextHlsSeqNum();
 
   void prevSilencePlayFrame();
   void nextSilencePlayFrame();
-
-  //std::vector<cFrame*> mFrames;
-  std::deque<cFrame*> mFrames;
 
 private:
   void clearFrames();
@@ -161,6 +166,11 @@ private:
   int skipNext (int fromFrame, bool silent);
 
   //{{{  private vars
+  //std::vector<cFrame*> mFrames;
+  std::deque<cFrame*> mFrames;
+
+  bool mStreaming = false;
+
   std::mutex mMutex;
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
 

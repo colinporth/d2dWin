@@ -2,7 +2,6 @@
 //{{{  includes
 #pragma once
 #include "../common/cD2dWindow.h"
-//#include "../../date/tz.h"
 //}}}
 
 class cCalendarBox : public cD2dWindow::cBox {

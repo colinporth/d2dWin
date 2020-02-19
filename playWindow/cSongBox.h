@@ -253,11 +253,11 @@ private:
       if (mFrameStep == 1) {
         //{{{  simple case, draw peak and power scaled to maxPeak
         float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
-        mark = mSong.mFrames[frame]->hasTitle();
-        silence = mSong.mFrames[frame]->isSilent();
+        mark = mSong.getFramePtr (frame)->hasTitle();
+        silence = mSong.getFramePtr (frame)->isSilent();
 
-        auto powerValuesPtr = mSong.mFrames[frame]->getPowerValues();
-        auto peakValuesPtr = mSong.mFrames[frame]->getPeakValues();
+        auto powerValuesPtr = mSong.getFramePtr (frame)->getPowerValues();
+        auto peakValuesPtr = mSong.getFramePtr (frame)->getPeakValues();
         for (auto i = 0; i < 2; i++) {
           powerValues[i] = *powerValuesPtr++ * valueScale;
           peakValues[i] = *peakValuesPtr++ * valueScale;
@@ -277,9 +277,9 @@ private:
         auto alignedFrame = frame - (frame % mFrameStep);
         auto toSumFrame = std::min (alignedFrame + mFrameStep, rightFrame);
         for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
-          mark |= mSong.mFrames[sumFrame]->hasTitle();
-          silence |= mSong.mFrames[sumFrame]->isSilent();
-          auto powerValuesPtr = mSong.mFrames[sumFrame]->getPowerValues();
+          mark |= mSong.getFramePtr (sumFrame)->hasTitle();
+          silence |= mSong.getFramePtr (sumFrame)->isSilent();
+          auto powerValuesPtr = mSong.getFramePtr (sumFrame)->getPowerValues();
           for (auto i = 0; i < 2; i++)
             powerValues[i] += *powerValuesPtr++ * valueScale;
           }
@@ -315,7 +315,7 @@ private:
       for (auto frame = fromFrame; frame < toFrame; frame += mFrameStep) {
         uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
         D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
-        mBitmap->CopyFromMemory (&bitmapRectU, mSong.mFrames[frame]->getFreqLuma() + freqOffset, 1);
+        mBitmap->CopyFromMemory (&bitmapRectU, mSong.getFramePtr (frame)->getFreqLuma() + freqOffset, 1);
         }
       }
     else {
@@ -324,7 +324,7 @@ private:
       for (auto frame = alignedFromFrame; frame < toFrame; frame += mFrameStep) {
         uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
         D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
-        mBitmap->CopyFromMemory (&bitmapRectU, mSong.mFrames[frame]->getFreqLuma() + freqOffset, 1);
+        mBitmap->CopyFromMemory (&bitmapRectU, mSong.getFramePtr (frame)->getFreqLuma() + freqOffset, 1);
         }
       }
     }
@@ -522,7 +522,7 @@ private:
 
     //{{{  draw playFrame
     float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
-    auto powerValues = mSong.mFrames[playFrame]->getPeakValues();
+    auto powerValues = mSong.getFramePtr (playFrame)->getPeakValues();
 
     dstRect = { mRect.left + (dstPlay * mFrameWidth)-1.f, mDstWaveCentre - (*powerValues++ * valueScale),
                 mRect.left + ((dstPlay+1.f) * mFrameWidth)+1.f, mDstWaveCentre + (*powerValues * valueScale) };
@@ -538,7 +538,7 @@ private:
       auto maxFreqIndex = std::min (getWidthInt()/2, mSong.getNumFreq());
 
       cRect dstRect = { 0.f,0.f, 0.f,mRect.bottom };
-      auto freq = mSong.mFrames[playFrame]->getFreqValues();
+      auto freq = mSong.getFramePtr (playFrame)->getFreqValues();
       for (auto i = 0; i < maxFreqIndex; i++) {
         auto value =  freq[i] * valueScale;
         if (value > 1.f)  {
@@ -621,17 +621,18 @@ private:
           break;
 
         if (forceRedraw || (frame >= mOverviewNumFrames)) {
-          float* powerValues = mSong.mFrames[frame]->getPowerValues();
+          float* powerValues = mSong.getFramePtr (frame)->getPowerValues();
           float leftValue = *powerValues++;
           float rightValue = *powerValues;
           if (frame < toFrame) {
             int numSummedFrames = 1;
             frame++;
             while (frame < toFrame) {
-              auto powerValues = mSong.mFrames[frame++]->getPowerValues();
+              auto powerValues = mSong.getFramePtr (frame)->getPowerValues();
               leftValue += *powerValues++;
               rightValue += *powerValues;
               numSummedFrames++;
+              frame++;
               }
             leftValue /= numSummedFrames;
             rightValue /= numSummedFrames;
@@ -664,7 +665,7 @@ private:
     //  draw playFrame
     dstRect = { mRect.left + playFrameX, mDstOverviewTop,
                 mRect.left + playFrameX+1.f, mDstOverviewTop + mOverviewHeight };
-    auto powerValues = mSong.mFrames[playFrame]->getPowerValues();
+    auto powerValues = mSong.getFramePtr (playFrame)->getPowerValues();
     dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
     dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
     dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
@@ -701,7 +702,7 @@ private:
     // calc lens max power
     float maxPowerValue = 0.f;
     for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
-      auto powerValues = mSong.mFrames[frame]->getPowerValues();
+      auto powerValues = mSong.getFramePtr (frame)->getPowerValues();
       maxPowerValue = std::max (maxPowerValue, *powerValues++);
       maxPowerValue = std::max (maxPowerValue, *powerValues);
       }
@@ -713,12 +714,12 @@ private:
     for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
       dstRect.right = dstRect.left + 1.f;
 
-      if (mSong.mFrames[frame]->hasTitle()) {
+      if (mSong.getFramePtr (frame)->hasTitle()) {
         //{{{  draw song title yellow bar and text
         cRect barRect = { dstRect.left-1.f, mDstOverviewTop, dstRect.left+1.f, mRect.bottom };
         dc->FillRectangle (barRect, mWindow->getYellowBrush());
 
-        auto str = mSong.mFrames[frame]->getTitle();
+        auto str = mSong.getFramePtr (frame)->getTitle();
 
         IDWriteTextLayout* textLayout;
         mWindow->getDwriteFactory()->CreateTextLayout (
@@ -730,7 +731,7 @@ private:
           }
         }
         //}}}
-      if (mSong.mFrames[frame]->isSilent()) {
+      if (mSong.getFramePtr (frame)->isSilent()) {
         //{{{  draw red silent frame
         dstRect.top = mDstOverviewCentre - 2.f;
         dstRect.bottom = mDstOverviewCentre + 2.f;
@@ -738,7 +739,7 @@ private:
         }
         //}}}
 
-      auto powerValues = mSong.mFrames[frame]->getPowerValues();
+      auto powerValues = mSong.getFramePtr (frame)->getPowerValues();
       dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
       dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
       if (frame == playFrame)
