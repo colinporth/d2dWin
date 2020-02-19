@@ -43,7 +43,15 @@ public:
       add (new cBmpBox (this, 40.f, 40.f, r4x80, 4, mChan, mChanChanged), 41.f,0);
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
 
-      //thread ([=]() { icyThread (name); }).detach();
+      //{{{  urls
+      //const string url = "http://stream.wqxr.org/wqxr.aac";
+      //const string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
+      //const string url = "http://us4.internet-radio.com:8266/";
+      //const string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";
+      //const string url = "http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac";
+      //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
+      //}}}
+      //thread ([=]() { icyThread ("http://stream.wqxr.org/js-stream.aac"); }).detach();
       thread ([=](){ playThread(); }).detach();
       }
     else {
@@ -309,8 +317,7 @@ private:
     uint8_t* bufferEnd = bufferFirst;
     uint8_t* buffer = bufferFirst;
 
-    bool firstTime = true;
-    int frameNum = 0;
+    int frameNum = -1;
     cAudioDecode decode (cAudioDecode::eAac);
     float* samples = nullptr;
 
@@ -365,8 +372,8 @@ private:
           }
           //}}}
 
-        if (firstTime) {
-          firstTime = false;
+        if (frameNum < 0) {
+          frameNum = 0;
           int sampleRate;
           auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
           mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
@@ -579,20 +586,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-  if (numArgs > 1)
-    appWindow.run ("playWindow", 800, 480, wcharToString (args[1]));
-  else {
-    //{{{  urls
-    //const string url = "http://stream.wqxr.org/wqxr.aac";
-    //const string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
-    //const string url = "http://us4.internet-radio.com:8266/";
-    //const string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";
-    //const string url = "http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac";
-    //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
-    //}}}
-    const string url = "http://stream.wqxr.org/js-stream.aac";
-    appWindow.run ("playWindow", 800, 480, "");
-    }
+  appWindow.run ("playWindow", 800, 480, (numArgs > 1) ? wcharToString (args[1]) : "");
 
   CoUninitialize();
   return 0;

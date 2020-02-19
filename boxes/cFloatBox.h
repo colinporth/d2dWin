@@ -28,11 +28,12 @@ public:
     mWindow->getDwriteFactory()->CreateTextLayout (
       std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
       mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+    if (textLayout) {
+      dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
 
-    dc->DrawTextLayout (getTL (2.f), textLayout, mWindow->getBlackBrush());
-    dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-
-    textLayout->Release();
+      textLayout->Release();
+      }
     }
 
 private:

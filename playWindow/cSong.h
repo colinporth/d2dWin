@@ -9,12 +9,6 @@
 
 class cSong {
 public:
-  constexpr static float kMinPowerValue = 0.25f;
-  constexpr static int kSilentWindowFrames = 10;
-  constexpr static int kMaxSamplesPerFrame = 2048;
-  constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1;
-  constexpr static int kMaxSpectrum = kMaxFreq;
-
   //{{{
   class cFrame {
   public:
@@ -94,13 +88,14 @@ public:
 
   int getSampleRate() { return mSampleRate; }
   int getSamplesPerFrame() { return mSamplesPerFrame; }
-  int getMaxSamplesPerFrame() { return kMaxSamplesPerFrame; }
 
+  int getMaxSamplesPerFrame() { return kMaxSamplesPerFrame; }
   int getMaxSamplesBytes() { return getMaxSamplesPerFrame() * getNumSampleBytes(); }
 
   float getMaxPowerValue() { return mMaxPowerValue; }
   float getMaxPeakValue() { return mMaxPeakValue; }
   float getMaxFreqValue() { return mMaxFreqValue; }
+
   int getNumFreq() { return kMaxFreq; }
   int getNumFreqLuma() { return kMaxSpectrum; }
 
@@ -165,6 +160,11 @@ private:
   int skipPrev (int fromFrame, bool silent);
   int skipNext (int fromFrame, bool silent);
 
+  constexpr static int kMaxSamplesPerFrame = 2048;
+  constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1;
+  constexpr static int kMaxSpectrum = kMaxFreq;
+
+  std::map<int,cFrame*> mFrameMap;
   //{{{  private vars
   //std::vector<cFrame*> mFrames;
   std::deque<cFrame*> mFrames;

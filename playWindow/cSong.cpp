@@ -9,6 +9,20 @@ using namespace std;
 using namespace chrono;
 //}}}
 
+//auto epgItemIt = mEpgItemMap.find (startTime);
+//if (epgItemIt != mEpgItemMap.end())
+//  if (title == epgItemIt->second->getTitleString())
+//    if (epgItemIt->second->getRecord())
+
+//auto epgItemIt = mEpgItemMap.find (startTime);
+//if (epgItemIt == mEpgItemMap.end())
+//  mEpgItemMap.insert (
+//    std::map<std::chrono::system_clock::time_point,cEpgItem*>::value_type (
+//      startTime, new cEpgItem (false, record, startTime, duration, title, description)));
+
+constexpr static int kSilentWindowFrames = 10;
+constexpr static float kMinPowerValue = 0.25f;
+
 //{{{
 cSong::~cSong() {
 
