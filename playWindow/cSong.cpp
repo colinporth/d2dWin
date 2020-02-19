@@ -116,9 +116,9 @@ int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int& seqFrameN
 // ****** check for load insert at loaded frame ******************
 
   int msSinceBaseTime = (int)duration_cast<milliseconds>(now - mHlsBaseTimePoint).count();
-  auto hlsOffset =  msSinceBaseTime - (mHlsSeqNum * 6400);
+  auto hlsOffset =  msSinceBaseTime - seqNumToMs (mHlsSeqNum);
   if (hlsOffset > minMs) {
-    seqFrameNum = mHlsBaseFrame + (mHlsSeqNum * mHlsFramesPerChunk);
+    seqFrameNum = seqNumToFrame (mHlsSeqNum);
     return mHlsBaseSeqNum + mHlsSeqNum;
     }
   else {
@@ -146,15 +146,19 @@ void cSong::setHlsBase (int startSeqNum, system_clock::time_point startTimePoint
 
   mStreaming = true;
 
-  mHlsBaseSeqNum = startSeqNum;
   mHlsBaseTimePoint = startTimePoint;
-  mHlsBaseDatePoint = date::floor<date::days>(mHlsBaseTimePoint);
+  auto hlsBaseDatePoint = date::floor<date::days>(mHlsBaseTimePoint);
 
-  uint64_t msSinceMidnight = duration_cast<milliseconds>(mHlsBaseTimePoint - mHlsBaseDatePoint).count();
-  mHlsBaseFrame = int((msSinceMidnight * mSampleRate) / mSamplesPerFrame / 1000);
-  int seqNumSinceMidnight = frameToSeqNum (mHlsBaseFrame);
-  mPlayFrame = mHlsBaseFrame;
-  mHlsSeqNum = 0;
+  uint64_t msSinceMidnight = duration_cast<milliseconds>(mHlsBaseTimePoint - hlsBaseDatePoint).count();
+  auto framesSinceMidnight = int((msSinceMidnight * mSampleRate) / mSamplesPerFrame / 1000);
+  mPlayFrame = framesSinceMidnight;
+
+  int frameInChunk;
+  int seqNumSinceMidnight = frameToSeqNum (framesSinceMidnight, frameInChunk);
+
+  mHlsBaseTimePoint -= milliseconds(seqNumSinceMidnight * 6400);
+  mHlsBaseSeqNum = startSeqNum - seqNumSinceMidnight;
+  mHlsSeqNum = seqNumSinceMidnight;
 
   mHasHlsBase = true;
   }
