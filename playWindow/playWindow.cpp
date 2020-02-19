@@ -252,12 +252,12 @@ private:
 
         while (!getExit() && !mSongChanged) {
           int seqFrameNum = 0;
-          auto seqNum = mSong.getHlsSeqNum (getNowDayLight(), 10000, 64000, seqFrameNum);
+          auto seqNum = mSong.getHlsSeqNum (getNowDayLight(), 10000, seqFrameNum);
           if (seqNum) {
             // get hls seqNum chunk, about 100k bytes for 128kps stream
             mSong.setHlsLoading();
             if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
-              cLog::log (LOGINFO, "got " + dec(mSong.getHlsSeqNumBaseOffset()) +
+              cLog::log (LOGINFO, "got " + dec(seqNum) +
                                   " at " + date::format ("%T", chrono::floor<chrono::seconds>(getNowDayLight())));
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
@@ -286,7 +286,7 @@ private:
               mSong.incHlsLate();
               changed();
 
-              cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(mSong.getHlsSeqNumBaseOffset()));
+              cLog::log (LOGERROR, "late " + dec(mSong.getHlsLate()) + " " + dec(seqNum));
 
               Sleep (200);
               }

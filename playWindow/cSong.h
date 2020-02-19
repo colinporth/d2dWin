@@ -104,20 +104,22 @@ public:
   int getTotalFrames() { return mTotalFrames; }
   int getPlayFrame() { return mPlayFrame; }
 
+  //{{{
   cFrame* getFramePtr (int frame) {
     auto it = mFrameMap.find (frame);
     return (it == mFrameMap.end()) ? nullptr : it->second;
     }
+  //}}}
 
   // optional info
   bool hasHlsBase() { return mHasHlsBase; }
 
   int getHlsBitrate() { return mHlsBitrate; }
   std::string getHlsChan() { return mHlsChan; }
-  int getHlsFramesPerChunk() { return mHlsFramesPerChunk; }
 
-  int getHlsSeqNum (std::chrono::system_clock::time_point now, int minMs, int maxMs, int& seqFrameNum);
-  int getHlsSeqNumBaseOffset() { return mHlsSeqNum; }
+  int getHlsSeqNum (std::chrono::system_clock::time_point now, int minMs, int& seqFrameNum);
+  int frameToSeqNum (int frame) { return frame / mHlsFramesPerChunk; }
+  int seqNumToFrame (int seqNum) { return seqNum * mHlsFramesPerChunk; }
 
   int getHlsLate() { return mHlsLate; }
   int getHlsLoading() { return mHlsLoading; }
@@ -134,7 +136,13 @@ public:
 
   // hls
   void setHlsChan (const std::string& chan) { mHlsChan = chan; }
-  void setHlsBitrate (int bitrate) { mHlsBitrate = bitrate; }
+  //{{{
+  void setHlsBitrate (int bitrate) { 
+    mHlsBitrate = bitrate; 
+    mHlsFramesPerChunk = bitrate >= 128000 ? 300 : 150;
+    }
+  //}}}
+
   void setHlsBase (int startSeqNum, std::chrono::system_clock::time_point startTimePoint);
 
   void setHlsLoading() { mHlsLoading = true; }
@@ -161,10 +169,8 @@ private:
   constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1;
   constexpr static int kMaxSpectrum = kMaxFreq;
 
-  std::map<int,cFrame*> mFrameMap;
   //{{{  private vars
-  //std::vector<cFrame*> mFrames;
-  //std::deque<cFrame*> mFrames;
+  std::map<int,cFrame*> mFrameMap;
 
   bool mStreaming = false;
 
@@ -194,7 +200,7 @@ private:
   int mHlsSeqNum = 0;
   std::chrono::system_clock::time_point mHlsBaseTimePoint;
   std::chrono::system_clock::time_point mHlsBaseDatePoint;
-  uint64_t mHlsBaseFrame = 0;
+  int mHlsBaseFrame = 0;
 
   int mHlsLate = 0;
   bool mHlsLoading = false;
