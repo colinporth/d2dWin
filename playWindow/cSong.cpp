@@ -9,17 +9,6 @@ using namespace std;
 using namespace chrono;
 //}}}
 
-//auto epgItemIt = mEpgItemMap.find (startTime);
-//if (epgItemIt != mEpgItemMap.end())
-//  if (title == epgItemIt->second->getTitleString())
-//    if (epgItemIt->second->getRecord())
-
-//auto epgItemIt = mEpgItemMap.find (startTime);
-//if (epgItemIt == mEpgItemMap.end())
-//  mEpgItemMap.insert (
-//    std::map<std::chrono::system_clock::time_point,cEpgItem*>::value_type (
-//      startTime, new cEpgItem (false, record, startTime, duration, title, description)));
-
 constexpr static int kSilentWindowFrames = 10;
 constexpr static float kMinPowerValue = 0.25f;
 
@@ -51,6 +40,8 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
 void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples) {
 // return true if enough frames added to start playing, streamLen only used to estimate totalFrames
 
+// ****** check for insert at same frame ******************
+
   // sum of squares channel power
   auto powerValues = (float*)malloc (mNumChannels * 4);
   memset (powerValues, 0, mNumChannels * 4);
@@ -74,7 +65,7 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
     mMaxPeakValue = max (mMaxPeakValue, peakValues[chan]);
     }
 
-  // ??? inside lock ????
+  // locked ???
   kiss_fftr (fftrConfig, timeBuf, freqBuf);
 
   auto freqValues = (float*)malloc (kMaxFreq * 4);
@@ -96,7 +87,6 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
   // totalFrames can be a changing estimate for file, or increasing value for streaming
   mTotalFrames = totalFrames;
-  //mFrames.push_back (new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues));
   mFrameMap.insert (map<int,cFrame*>::value_type (
     frame, new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues)));
 
@@ -123,9 +113,10 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 // gets
 //{{{
 int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int maxMs, int& seqFrameNum) {
+// ****** check for load insert at loaded frame ******************
 
-  auto basedMs = duration_cast<milliseconds>(now - getHlsBaseTimePoint());
-  auto hlsOffset =  int (basedMs.count()) - (getHlsSeqNumOffset() * 6400);
+  int msSinceBaseTime = (int)duration_cast<milliseconds>(now - mHlsBaseTimePoint).count();
+  auto hlsOffset =  msSinceBaseTime - (mHlsSeqNum * 6400);
 
   if ((hlsOffset > minMs) && (hlsOffset < maxMs)) {
     seqFrameNum = mHlsBaseFrame + (mHlsSeqNum * mHlsFramesPerChunk);

@@ -77,10 +77,9 @@ public:
   //{{{  gets
   std::shared_mutex& getSharedMutex() { return mSharedMutex; }
   bool getStreaming() { return mStreaming; }
+  int getId() { return mId; }
 
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
-
-  bool hasSomeFrames() { return !mFrameMap.empty(); }
   bool hasSamples() { return mFrameType == cAudioDecode::eWav; }
 
   int getNumChannels() { return mNumChannels; }
@@ -105,23 +104,20 @@ public:
   int getTotalFrames() { return mTotalFrames; }
   int getPlayFrame() { return mPlayFrame; }
 
-  int getId() { return mId; }
-
   cFrame* getFramePtr (int frame) {
     auto it = mFrameMap.find (frame);
     return (it == mFrameMap.end()) ? nullptr : it->second;
     }
 
   // optional info
+  bool hasHlsBase() { return mHasHlsBase; }
+
   int getHlsBitrate() { return mHlsBitrate; }
   std::string getHlsChan() { return mHlsChan; }
   int getHlsFramesPerChunk() { return mHlsFramesPerChunk; }
 
-  bool hasHlsBase() { return mHasHlsBase; }
-  std::chrono::system_clock::time_point getHlsBaseTimePoint() { return mHlsBaseTimePoint; }
-
   int getHlsSeqNum (std::chrono::system_clock::time_point now, int minMs, int maxMs, int& seqFrameNum);
-  int getHlsSeqNumOffset() { return mHlsSeqNum; }
+  int getHlsSeqNumBaseOffset() { return mHlsSeqNum; }
 
   int getHlsLate() { return mHlsLate; }
   int getHlsLoading() { return mHlsLoading; }
@@ -145,12 +141,14 @@ public:
   //}}}
 
   // incs
-  void incPlayFrame (int frames);
   void incPlaySec (int secs);
-  void incHlsLate() { mHlsLate++; };
+  void incPlayFrame (int frames);
 
+  // hls
+  void incHlsLate() { mHlsLate++; };
   void nextHlsSeqNum();
 
+  // actions
   void prevSilencePlayFrame();
   void nextSilencePlayFrame();
 
