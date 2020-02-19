@@ -80,7 +80,7 @@ protected:
   //{{{
   bool onKey (int key) {
 
-    lock_guard<mutex> lockGuard (mSong.getMutex());
+    shared_lock<shared_mutex> lock (mSong.getSharedMutex());
 
     switch (key) {
       case 0x00: break;
@@ -525,7 +525,7 @@ private:
         if (mPlaying && framePtr && (mSong.getPlayFrame() <= mSong.getLastFrame())) {
           device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
             // lambda callback - load srcSamples
-            lock_guard<mutex> lockGuard (mSong.getMutex());
+            shared_lock<shared_mutex> lock (mSong.getSharedMutex());
             if (mSong.hasSamples())
               srcSamples = (float*)framePtr->getPtr();
             else {

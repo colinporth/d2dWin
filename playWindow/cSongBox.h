@@ -59,7 +59,7 @@ public:
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
-    std::lock_guard<std::mutex> lockGuard (mSong.getMutex());
+    std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
 
     if (pos.y > mDstOverviewTop) {
       mOverviewPressed = true;
@@ -75,7 +75,7 @@ public:
   //{{{
   bool onMove (bool right, cPoint pos, cPoint inc) {
 
-    std::lock_guard<std::mutex> lockGuard (mSong.getMutex());
+    std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
 
     if (mOverviewPressed)
       mSong.setPlayFrame (int((pos.x * mSong.getTotalFrames()) / getWidth()));
@@ -109,7 +109,7 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
   // draw stuff centred at playFrame
 
-    std::lock_guard<std::mutex> lockGuard (mSong.getMutex());
+    std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
 
     if (!mSong.getNumFrames()) // no frames yet, give up
       return;

@@ -33,7 +33,7 @@ cSong::~cSong() {
 //{{{
 void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate) {
 
-  lock_guard<mutex> lockGuard (mMutex);
+  unique_lock<shared_mutex> lock (mSharedMutex);
 
   // reset frame type
   mFrameType = frameType;
@@ -92,7 +92,7 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
     lumaValues[kMaxSpectrum - freq - 1] = value > 255 ? 255 : uint8_t(value);
     }
 
-  lock_guard<mutex> lockGuard (mMutex);
+  unique_lock<shared_mutex> lock (mSharedMutex);
 
   // totalFrames can be a changing estimate for file, or increasing value for streaming
   mTotalFrames = totalFrames;

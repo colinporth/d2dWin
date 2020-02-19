@@ -33,6 +33,7 @@
 #include <thread>
 
 #include <mutex>
+#include <shared_mutex>
 //}}}
 //{{{  direct2d
 #include <d3d11.h>

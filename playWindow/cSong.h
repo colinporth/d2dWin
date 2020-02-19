@@ -75,7 +75,7 @@ public:
   void addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples);
 
   //{{{  gets
-  std::mutex& getMutex() { return mMutex; }
+  std::shared_mutex& getSharedMutex() { return mSharedMutex; }
   bool getStreaming() { return mStreaming; }
 
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
@@ -171,7 +171,7 @@ private:
 
   bool mStreaming = false;
 
-  std::mutex mMutex;
+  std::shared_mutex mSharedMutex;
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
 
   int mId = 0;
