@@ -605,8 +605,8 @@ void cD2dWindow::createSizedResources() {
   ComPtr<IDXGISurface> dxgiBackBuffer;
   mSwapChain->GetBuffer (0, IID_PPV_ARGS (&dxgiBackBuffer));
   D2D1_BITMAP_PROPERTIES1 d2d1_bitmapProperties =
-    {DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0,
-     D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW, NULL };
+    { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0,
+      D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW, NULL };
   mDeviceContext->CreateBitmapFromDxgiSurface (dxgiBackBuffer.Get(), &d2d1_bitmapProperties, &mD2dTargetBitmap);
 
   // set Direct2D render target.
