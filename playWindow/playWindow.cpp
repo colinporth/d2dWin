@@ -251,7 +251,7 @@ private:
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
         while (!getExit() && !mSongChanged) {
-          auto seqNum = mSong.getHlsSeqNum (getNowDayLight(), 10000);
+          auto seqNum = mSong.getHlsSeqNum (getNowDayLight(), 10s);
           if (seqNum) {
             // get hls seqNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, seqNum);

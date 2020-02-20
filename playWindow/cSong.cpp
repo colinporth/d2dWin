@@ -112,7 +112,7 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
 // gets
 //{{{
-int cSong::getHlsSeqNum (system_clock::time_point now, int minMs) {
+int cSong::getHlsSeqNum (system_clock::time_point now, seconds minMs) {
 
   // get playFrame seqNumOffset from baseFrame, cope with -v offset correctly
   int frameOffset = mPlayFrame - mHlsBaseFrame;
@@ -126,15 +126,13 @@ int cSong::getHlsSeqNum (system_clock::time_point now, int minMs) {
   while (true) {
     if (!getFramePtr (frame)) {
       // seqNum frame not loaded
-      auto seqNumTimePoint = mHlsBaseTimePoint + milliseconds (seqNumOffset * 6400);
-      if ((int)(duration_cast<milliseconds>(now - seqNumTimePoint)).count() > minMs)
+      auto seqNumTimePoint = mHlsBaseTimePoint + seqNumOffset * 6400ms;
+      auto nnn = duration_cast<milliseconds>(now - seqNumTimePoint);
+      if (nnn > minMs)
         // now is 10secs past chunk timePoint, it should be available
         return mHlsBaseSeqNum + seqNumOffset;
-      else {
-        // too early
-        frame = 0;
+      else
         return 0;
-        }
       }
     seqNumOffset++;
     frame += mHlsFramesPerChunk;
