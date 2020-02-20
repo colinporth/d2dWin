@@ -282,17 +282,16 @@ private:
               mSong.setHlsLoad (cSong::eHlsIdle, seqNum);
               }
             else {
-              //{{{  get failed, inc late count, back off for 200ms
+              //{{{  failed, back off for 200ms
               mSong.setHlsLoad (cSong::eHlsFailed, seqNum);
               changed();
 
               cLog::log (LOGERROR, "late " + dec(seqNum));
-
-              Sleep (200);
+              std::this_thread::sleep_for (200ms);
               }
               //}}}
             }
-          Sleep (50);
+          std::this_thread::sleep_for (50ms);
           }
         free (samples);
         }
@@ -505,7 +504,7 @@ private:
 
     // wait for valid sampleRate to decalre audioDevice
     while (!mSong.getSampleRate())
-      Sleep (10);
+      std::this_thread::sleep_for (10ms);
 
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
@@ -538,7 +537,7 @@ private:
           changed();
           }
         else
-          Sleep (100);
+          std::this_thread::sleep_for (100ms);
         }
 
       device->stop();
