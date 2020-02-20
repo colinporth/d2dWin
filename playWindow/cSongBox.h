@@ -575,9 +575,9 @@ private:
     if (!mSong.getTotalFrames())
       return;
 
+    int firstFrame = mSong.getFirstFrame();
+    float playFrameX = ((playFrame - firstFrame) * getWidth()) / mSong.getTotalFrames();
     float valueScale = mOverviewHeight / 2.f / mSong.getMaxPowerValue();
-    float playFrameX = (playFrame * getWidth()) / mSong.getTotalFrames();
-
     drawOverviewWave (dc, playFrame, playFrameX, valueScale);
 
     if (mOverviewPressed) {
@@ -621,6 +621,7 @@ private:
     int lastFrame = mSong.getLastFrame();
     int totalFrames = mSong.getTotalFrames();
 
+    cLog::log (LOGINFO, "%d %d %d %d %d", firstFrame, playFrame, lastFrame, totalFrames, mSong.getNumFrames());
     bool forceRedraw = !mOverviewBitmapOk ||
                        (valueScale != mOverviewValueScale) ||
                        (firstFrame != mOverviewFirstFrame) || (totalFrames > mOverviewTotalFrames);
