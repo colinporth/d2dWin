@@ -112,17 +112,17 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
 // gets
 //{{{
-int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int& seqFrameNum) {
+int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int& frameNum) {
 // ****** check for load insert at loaded frame ******************
 
-  int msSinceBaseTime = (int)duration_cast<milliseconds>(now - mHlsBaseTimePoint).count();
-  auto hlsOffset =  msSinceBaseTime - seqNumToMs (mHlsSeqNum);
+  int msSinceBaseTime = (int)duration_cast<milliseconds>(now - mHlsTimePointAtMidnight).count();
+  auto hlsOffset = msSinceBaseTime - seqNumToMs (mHlsSeqNumSinceMidnight);
   if (hlsOffset > minMs) {
-    seqFrameNum = seqNumToFrame (mHlsSeqNum);
-    return mHlsBaseSeqNum + mHlsSeqNum;
+    frameNum = seqNumToFrame (mHlsSeqNumSinceMidnight);
+    return mHlsSeqNumAtMidnight + mHlsSeqNumSinceMidnight;
     }
   else {
-    seqFrameNum = 0;
+    frameNum = 0;
     return 0;
     }
   }
@@ -146,19 +146,16 @@ void cSong::setHlsBase (int startSeqNum, system_clock::time_point startTimePoint
 
   mStreaming = true;
 
-  mHlsBaseTimePoint = startTimePoint;
-  auto hlsBaseDatePoint = date::floor<date::days>(mHlsBaseTimePoint);
+  auto midnightDatePoint = date::floor<date::days>(startTimePoint);
+  auto msSinceMidnight = duration_cast<milliseconds>(startTimePoint - midnightDatePoint).count();
 
-  uint64_t msSinceMidnight = duration_cast<milliseconds>(mHlsBaseTimePoint - hlsBaseDatePoint).count();
-  auto framesSinceMidnight = int((msSinceMidnight * mSampleRate) / mSamplesPerFrame / 1000);
+  auto framesSinceMidnight = msToFrames (msSinceMidnight);
   mPlayFrame = framesSinceMidnight;
 
   int frameInChunk;
-  int seqNumSinceMidnight = frameToSeqNum (framesSinceMidnight, frameInChunk);
-
-  mHlsBaseTimePoint -= milliseconds(seqNumSinceMidnight * 6400);
-  mHlsBaseSeqNum = startSeqNum - seqNumSinceMidnight;
-  mHlsSeqNum = seqNumSinceMidnight;
+  mHlsSeqNumSinceMidnight = frameToSeqNum (framesSinceMidnight, frameInChunk);
+  mHlsTimePointAtMidnight = startTimePoint - milliseconds(mHlsSeqNumSinceMidnight * 6400);
+  mHlsSeqNumAtMidnight = startSeqNum - mHlsSeqNumSinceMidnight;
 
   mHasHlsBase = true;
   }
@@ -184,7 +181,7 @@ void cSong::incPlaySec (int secs) {
 
 //{{{
 void cSong::nextHlsSeqNum() {
-  mHlsSeqNum++;
+  mHlsSeqNumSinceMidnight++;
   mHlsLate = 0;
   mHlsLoading = false;
   }

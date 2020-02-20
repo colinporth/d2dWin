@@ -118,6 +118,11 @@ public:
   std::string getHlsChan() { return mHlsChan; }
 
   int getHlsSeqNum (std::chrono::system_clock::time_point now, int minMs, int& seqFrameNum);
+
+  int getHlsLate() { return mHlsLate; }
+  int getHlsLoading() { return mHlsLoading; }
+
+  // converts
   //{{{
   int frameToSeqNum (int frame, int& frameInChunk) {
     frameInChunk = frame % mHlsFramesPerChunk;
@@ -126,9 +131,7 @@ public:
   //}}}
   int seqNumToFrame (int seqNum) { return seqNum * mHlsFramesPerChunk; }
   int seqNumToMs (int seqNum) { return seqNum * 6400; }
-
-  int getHlsLate() { return mHlsLate; }
-  int getHlsLoading() { return mHlsLoading; }
+  int msToFrames (uint64_t ms) { return int((ms * mSampleRate) / mSamplesPerFrame / 1000); }
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
@@ -202,9 +205,9 @@ private:
   int mHlsFramesPerChunk = 0;
 
   bool mHasHlsBase = false;
-  int mHlsBaseSeqNum = 0;
-  std::chrono::system_clock::time_point mHlsBaseTimePoint;
-  int mHlsSeqNum = 0;
+  std::chrono::system_clock::time_point mHlsTimePointAtMidnight;
+  int mHlsSeqNumAtMidnight = 0;
+  int mHlsSeqNumSinceMidnight = 0;
 
   int mHlsLate = 0;
   bool mHlsLoading = false;
