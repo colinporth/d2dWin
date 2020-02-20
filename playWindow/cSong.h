@@ -123,12 +123,7 @@ public:
   int getHlsLoading() { return mHlsLoading; }
 
   // converts
-  //{{{
-  int frameToSeqNum (int frame, int& frameInChunk) {
-    frameInChunk = frame % mHlsFramesPerChunk;
-    return frame / mHlsFramesPerChunk;
-    }
-  //}}}
+  int frameToSeqNum (int frame) { return frame / mHlsFramesPerChunk; }
   int seqNumToFrame (int seqNum) { return seqNum * mHlsFramesPerChunk; }
   int seqNumToMs (int seqNum) { return seqNum * 6400; }
   int msToFrames (uint64_t ms) { return int((ms * mSampleRate) / mSamplesPerFrame / 1000); }
@@ -152,9 +147,9 @@ public:
     }
   //}}}
 
-  void setHlsBase (int startSeqNum, std::chrono::system_clock::time_point startTimePoint);
+  void setHlsBase (int baseSeqNum, std::chrono::system_clock::time_point baseTimePoint);
 
-  void setHlsLoading() { mHlsLoading = true; }
+  void setHlsLoading (bool loading) { mHlsLoading = loading; }
   //}}}
 
   // incs
@@ -163,7 +158,6 @@ public:
 
   // hls
   void incHlsLate() { mHlsLate++; };
-  void nextHlsSeqNum();
 
   // actions
   void prevSilencePlayFrame();
@@ -205,9 +199,9 @@ private:
   int mHlsFramesPerChunk = 0;
 
   bool mHasHlsBase = false;
-  std::chrono::system_clock::time_point mHlsTimePointAtMidnight;
-  int mHlsSeqNumAtMidnight = 0;
-  int mHlsSeqNumSinceMidnight = 0;
+  int mHlsBaseSeqNum = 0;
+  std::chrono::system_clock::time_point mHlsBaseTimePoint;
+  int mHlsBaseFrame = 0;
 
   int mHlsLate = 0;
   bool mHlsLoading = false;

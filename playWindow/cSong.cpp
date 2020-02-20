@@ -112,18 +112,32 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
 // gets
 //{{{
-int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int& frameNum) {
-// ****** check for load insert at loaded frame ******************
+int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int& frame) {
 
-  int msSinceBaseTime = (int)duration_cast<milliseconds>(now - mHlsTimePointAtMidnight).count();
-  auto hlsOffset = msSinceBaseTime - seqNumToMs (mHlsSeqNumSinceMidnight);
-  if (hlsOffset > minMs) {
-    frameNum = seqNumToFrame (mHlsSeqNumSinceMidnight);
-    return mHlsSeqNumAtMidnight + mHlsSeqNumSinceMidnight;
-    }
-  else {
-    frameNum = 0;
-    return 0;
+  // get playFrame seqNumOffset from baseFrame, cope with -v offset correctly
+  int frameOffset = mPlayFrame - mHlsBaseFrame;
+  int seqNumOffset = (frameOffset >= 0)  ? (frameOffset / mHlsFramesPerChunk) :
+                                           -((mHlsFramesPerChunk - 1 - frameOffset) / mHlsFramesPerChunk);
+
+  frame = mHlsBaseFrame + (seqNumOffset * mHlsFramesPerChunk);
+
+  // loop until first unloaded frame on or past playFrame, return
+  // - else return no load
+  while (true) {
+    if (!getFramePtr (frame)) {
+      // seqNum frame not loaded
+      auto seqNumTimePoint = mHlsBaseTimePoint + milliseconds (seqNumOffset * 6400);
+      if ((int)(duration_cast<milliseconds>(now - seqNumTimePoint)).count() > minMs)
+        // now is 10secs past chunk timePoint, it should be available 
+        return mHlsBaseSeqNum + seqNumOffset;
+      else {
+        // too early
+        frame = 0;
+        return 0;
+        }
+      }
+    seqNumOffset++;
+    frame += mHlsFramesPerChunk;
     }
   }
 //}}}
@@ -142,21 +156,20 @@ void cSong::setTitle (const string& title) {
   }
 //}}}
 //{{{
-void cSong::setHlsBase (int startSeqNum, system_clock::time_point startTimePoint) {
+void cSong::setHlsBase (int baseSeqNum, system_clock::time_point baseTimePoint) {
+
+  unique_lock<shared_mutex> lock (mSharedMutex);
+
+  mHlsBaseSeqNum = baseSeqNum;
+  mHlsBaseTimePoint = baseTimePoint;
+
+  auto midnightDatePoint = date::floor<date::days>(baseTimePoint);
+  auto msSinceMidnight = duration_cast<milliseconds>(baseTimePoint - midnightDatePoint).count();
+  mHlsBaseFrame = msToFrames (msSinceMidnight);
+
+  mPlayFrame = mHlsBaseFrame;
 
   mStreaming = true;
-
-  auto midnightDatePoint = date::floor<date::days>(startTimePoint);
-  auto msSinceMidnight = duration_cast<milliseconds>(startTimePoint - midnightDatePoint).count();
-
-  auto framesSinceMidnight = msToFrames (msSinceMidnight);
-  mPlayFrame = framesSinceMidnight;
-
-  int frameInChunk;
-  mHlsSeqNumSinceMidnight = frameToSeqNum (framesSinceMidnight, frameInChunk);
-  mHlsTimePointAtMidnight = startTimePoint - milliseconds(mHlsSeqNumSinceMidnight * 6400);
-  mHlsSeqNumAtMidnight = startSeqNum - mHlsSeqNumSinceMidnight;
-
   mHasHlsBase = true;
   }
 //}}}
@@ -176,14 +189,6 @@ void cSong::incPlayFrame (int frames) {
 //{{{
 void cSong::incPlaySec (int secs) {
   incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame);
-  }
-//}}}
-
-//{{{
-void cSong::nextHlsSeqNum() {
-  mHlsSeqNumSinceMidnight++;
-  mHlsLate = 0;
-  mHlsLoading = false;
   }
 //}}}
 
