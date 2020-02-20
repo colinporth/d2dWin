@@ -145,7 +145,7 @@ int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int& frame) {
 // sets
 //{{{
 void cSong::setPlayFrame (int frame) {
-  mPlayFrame = min (max (frame, 0), getLastFrame());
+  mPlayFrame = min (max (frame, 0), getLastFrame()+1);
   }
 //}}}
 //{{{

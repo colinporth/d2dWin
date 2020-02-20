@@ -518,9 +518,7 @@ private:
 
       device->start();
 
-      // !!!! if not streaming should do something better at end and mSongChanged !!!!
-      // - also stop stutters
-      while (!getExit() && (mSong.getStreaming() || (mSong.getPlayFrame() < mSong.getLastFrame()))) {
+      while (!getExit() && (mSong.getStreaming() || (mSong.getPlayFrame() <= mSong.getLastFrame()))) {
         auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
         if (mPlaying && framePtr) {
           device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
@@ -544,6 +542,7 @@ private:
         }
 
       device->stop();
+
       free (samples);
       }
 
