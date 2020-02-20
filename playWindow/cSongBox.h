@@ -63,8 +63,7 @@ public:
 
     if (pos.y > mDstOverviewTop) {
       mOverviewPressed = true;
-      auto frame = int((pos.x * mSong.getTotalFrames()) / getWidth());
-      mSong.setPlayFrame (frame);
+      mSong.setPlayFrame (mSong.getFirstFrame() + int((pos.x * mSong.getTotalFrames()) / getWidth()));
       }
     else
       mPressedFrame = (float)mSong.getPlayFrame();
@@ -78,7 +77,7 @@ public:
     std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
 
     if (mOverviewPressed)
-      mSong.setPlayFrame (int((pos.x * mSong.getTotalFrames()) / getWidth()));
+      mSong.setPlayFrame (mSong.getFirstFrame() + int((pos.x * mSong.getTotalFrames()) / getWidth()));
     else {
       mPressedFrame -= (inc.x / mFrameWidth) * mFrameStep;
       mSong.setPlayFrame ((int)mPressedFrame);
@@ -578,7 +577,7 @@ private:
     int firstFrame = mSong.getFirstFrame();
     float playFrameX = ((playFrame - firstFrame) * getWidth()) / mSong.getTotalFrames();
     float valueScale = mOverviewHeight / 2.f / mSong.getMaxPowerValue();
-    drawOverviewWave (dc, playFrame, playFrameX, valueScale);
+    drawOverviewWave (dc, firstFrame, playFrame, playFrameX, valueScale);
 
     if (mOverviewPressed) {
       //{{{  animate on
@@ -611,17 +610,25 @@ private:
 
       drawOverviewLens (dc, playFrame, overviewLensCentreX, mOverviewLens-1.f);
       }
+    else {
+      //  draw playFrame
+      auto framePtr = mSong.getFramePtr (playFrame);
+      if (framePtr) {
+        auto powerValues = framePtr->getPowerValues();
+        cRect dstRect = { mRect.left + playFrameX, mDstOverviewCentre - (*powerValues++ * valueScale),
+                          mRect.left + playFrameX+1.f, mDstOverviewCentre + (*powerValues * valueScale) };
+        dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
+        }
+      }
     }
   //}}}
   //{{{
-  void drawOverviewWave (ID2D1DeviceContext* dc, int playFrame, float playFrameX, float valueScale) {
+  void drawOverviewWave (ID2D1DeviceContext* dc, int firstFrame, int playFrame, float playFrameX, float valueScale) {
   // draw Overview using bitmap cache
 
-    int firstFrame = mSong.getFirstFrame();
     int lastFrame = mSong.getLastFrame();
     int totalFrames = mSong.getTotalFrames();
 
-    cLog::log (LOGINFO, "%d %d %d %d %d", firstFrame, playFrame, lastFrame, totalFrames, mSong.getNumFrames());
     bool forceRedraw = !mOverviewBitmapOk ||
                        (valueScale != mOverviewValueScale) ||
                        (firstFrame != mOverviewFirstFrame) || (totalFrames > mOverviewTotalFrames);
@@ -697,15 +704,6 @@ private:
     dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
 
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-
-    //  draw playFrame
-    auto framePtr = mSong.getFramePtr (playFrame);
-    if (framePtr) {
-      auto powerValues = framePtr->getPowerValues();
-      dstRect = { mRect.left + playFrameX, mDstOverviewCentre - (*powerValues++ * valueScale),
-                  mRect.left + playFrameX+1.f, mDstOverviewCentre + (*powerValues * valueScale) };
-      dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
-      }
     }
   //}}}
   //{{{
@@ -732,9 +730,12 @@ private:
     // calc lens max power
     float maxPowerValue = 0.f;
     for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
-      auto powerValues = mSong.getFramePtr (frame)->getPowerValues();
-      maxPowerValue = std::max (maxPowerValue, *powerValues++);
-      maxPowerValue = std::max (maxPowerValue, *powerValues);
+      auto framePtr = mSong.getFramePtr (frame);
+      if (framePtr) {
+        auto powerValues = framePtr->getPowerValues();
+        maxPowerValue = std::max (maxPowerValue, *powerValues++);
+        maxPowerValue = std::max (maxPowerValue, *powerValues);
+        }
       }
 
     // simple draw of unzoomed waveform, no use of bitmap cache
@@ -744,39 +745,42 @@ private:
     for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
       dstRect.right = dstRect.left + 1.f;
 
-      if (mSong.getFramePtr (frame)->hasTitle()) {
-        //{{{  draw song title yellow bar and text
-        cRect barRect = { dstRect.left-1.f, mDstOverviewTop, dstRect.left+1.f, mRect.bottom };
-        dc->FillRectangle (barRect, mWindow->getYellowBrush());
+      auto framePtr = mSong.getFramePtr (frame);
+      if (framePtr) {
+        if (framePtr->hasTitle()) {
+          //{{{  draw song title yellow bar and text
+          cRect barRect = { dstRect.left-1.f, mDstOverviewTop, dstRect.left+1.f, mRect.bottom };
+          dc->FillRectangle (barRect, mWindow->getYellowBrush());
 
-        auto str = mSong.getFramePtr (frame)->getTitle();
+          auto str = framePtr->getTitle();
 
-        IDWriteTextLayout* textLayout;
-        mWindow->getDwriteFactory()->CreateTextLayout (
-          std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-          mWindow->getTextFormat(), getWidth(), mOverviewHeight, &textLayout);
-        if (textLayout) {
-          dc->DrawTextLayout (cPoint (dstRect.left+2.f, mDstOverviewTop), textLayout, mWindow->getWhiteBrush());
-          textLayout->Release();
+          IDWriteTextLayout* textLayout;
+          mWindow->getDwriteFactory()->CreateTextLayout (
+            std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+            mWindow->getTextFormat(), getWidth(), mOverviewHeight, &textLayout);
+          if (textLayout) {
+            dc->DrawTextLayout (cPoint (dstRect.left+2.f, mDstOverviewTop), textLayout, mWindow->getWhiteBrush());
+            textLayout->Release();
+            }
           }
-        }
-        //}}}
-      if (mSong.getFramePtr (frame)->isSilent()) {
-        //{{{  draw red silent frame
-        dstRect.top = mDstOverviewCentre - 2.f;
-        dstRect.bottom = mDstOverviewCentre + 2.f;
-        dc->FillRectangle (dstRect, mWindow->getRedBrush());
-        }
-        //}}}
+          //}}}
+        if (framePtr->isSilent()) {
+          //{{{  draw red silent frame
+          dstRect.top = mDstOverviewCentre - 2.f;
+          dstRect.bottom = mDstOverviewCentre + 2.f;
+          dc->FillRectangle (dstRect, mWindow->getRedBrush());
+          }
+          //}}}
 
-      auto powerValues = mSong.getFramePtr (frame)->getPowerValues();
-      dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
-      dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
-      if (frame == playFrame)
-        colour = mWindow->getWhiteBrush();
-      dc->FillRectangle (dstRect, colour);
-      if (frame == playFrame)
-        colour = mWindow->getGreyBrush();
+        auto powerValues = framePtr->getPowerValues();
+        dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
+        dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
+        if (frame == playFrame)
+          colour = mWindow->getWhiteBrush();
+        dc->FillRectangle (dstRect, colour);
+        if (frame == playFrame)
+          colour = mWindow->getGreyBrush();
+       }
 
       dstRect.left = dstRect.right;
       }
