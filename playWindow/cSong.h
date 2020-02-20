@@ -74,6 +74,7 @@ public:
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
   void addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples);
 
+  enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed } ;
   //{{{  gets
   std::shared_mutex& getSharedMutex() { return mSharedMutex; }
   bool getStreaming() { return mStreaming; }
@@ -111,16 +112,12 @@ public:
     }
   //}}}
 
-  // optional info
+  // hls
   bool hasHlsBase() { return mHasHlsBase; }
-
   int getHlsBitrate() { return mHlsBitrate; }
   std::string getHlsChan() { return mHlsChan; }
-
   int getHlsSeqNum (std::chrono::system_clock::time_point now, int minMs, int& seqFrameNum);
-
-  int getHlsLate() { return mHlsLate; }
-  int getHlsLoading() { return mHlsLoading; }
+  eHlsLoad getHlsLoad() { return mHlsLoad; }
 
   // converts
   int frameToSeqNum (int frame) { return frame / mHlsFramesPerChunk; }
@@ -149,15 +146,12 @@ public:
 
   void setHlsBase (int baseSeqNum, std::chrono::system_clock::time_point baseTimePoint);
 
-  void setHlsLoading (bool loading) { mHlsLoading = loading; }
+  void setHlsLoad (eHlsLoad hlsLoad, int seqNum);
   //}}}
 
   // incs
   void incPlaySec (int secs);
   void incPlayFrame (int frames);
-
-  // hls
-  void incHlsLate() { mHlsLate++; };
 
   // actions
   void prevSilencePlayFrame();
@@ -203,8 +197,8 @@ private:
   std::chrono::system_clock::time_point mHlsBaseTimePoint;
   int mHlsBaseFrame = 0;
 
-  int mHlsLate = 0;
-  bool mHlsLoading = false;
+  eHlsLoad mHlsLoad = eHlsIdle;
+  int eHlsFailedSeqNum = 0;
 
   kiss_fftr_cfg fftrConfig;
   kiss_fft_scalar timeBuf[cSong::kMaxSamplesPerFrame];

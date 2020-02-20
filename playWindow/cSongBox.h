@@ -808,8 +808,8 @@ private:
       mSmallTimeTextFormat, getWidth(), mSmallTimeTextFormat->GetFontSize(), &textLayout);
     if (textLayout) {
        dc->DrawTextLayout (getBL() + cPoint(0.f,-mSmallTimeTextFormat->GetFontSize()), textLayout,
-                           !mSong.getHlsLoading() ? mWindow->getWhiteBrush() :
-                             mSong.getHlsLate() ? mWindow->getRedBrush() : mWindow->getGreenBrush());
+                           (mSong.getHlsLoad() == cSong::eHlsIdle) ? mWindow->getWhiteBrush() :
+                             (mSong.getHlsLoad() == cSong::eHlsFailed) ? mWindow->getRedBrush() : mWindow->getGreenBrush());
       textLayout->Release();
       }
     }

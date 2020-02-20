@@ -128,7 +128,7 @@ int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int& frame) {
       // seqNum frame not loaded
       auto seqNumTimePoint = mHlsBaseTimePoint + milliseconds (seqNumOffset * 6400);
       if ((int)(duration_cast<milliseconds>(now - seqNumTimePoint)).count() > minMs)
-        // now is 10secs past chunk timePoint, it should be available 
+        // now is 10secs past chunk timePoint, it should be available
         return mHlsBaseSeqNum + seqNumOffset;
       else {
         // too early
@@ -171,6 +171,30 @@ void cSong::setHlsBase (int baseSeqNum, system_clock::time_point baseTimePoint) 
 
   mStreaming = true;
   mHasHlsBase = true;
+  }
+//}}}
+//{{{
+void cSong::setHlsLoad (eHlsLoad hlsLoad, int seqNum) { 
+// latch failed till success, might elaborate later
+
+  switch (hlsLoad) {
+    case eHlsLoading:
+      if (seqNum != eHlsFailedSeqNum) {
+        mHlsLoad = eHlsLoading;
+        eHlsFailedSeqNum = 0;
+        }
+      break;
+
+    case eHlsFailed:
+      mHlsLoad = eHlsFailed;
+      eHlsFailedSeqNum = seqNum;
+      break;
+
+    case eHlsIdle:
+      mHlsLoad = eHlsIdle;
+      eHlsFailedSeqNum = 0;
+      break;
+    }
   }
 //}}}
 
