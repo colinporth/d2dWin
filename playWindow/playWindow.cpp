@@ -92,8 +92,8 @@ protected:
       case 0x21: mSong.prevSilencePlayFrame(); changed(); break;; // page up
       case 0x22: mSong.nextSilencePlayFrame(); changed(); break;; // page down
 
-      case 0x25: mSong.incPlaySec (getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
-      case 0x27: mSong.incPlaySec (getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
+      case 0x25: mSong.incPlaySec (getShift() ? -300 : getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
+      case 0x27: mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
 
       case 0x24: mSong.setPlayFrame (mSong.getFirstFrame()); changed(); break; // home
       case 0x23: mSong.setPlayFrame (mSong.getLastFrame()); changed(); break; // end

@@ -3,8 +3,10 @@ main wave
 - silence not wide enough, subpixel wrong
 - mark subpixel wrong
 - check -ve clear with div
+- cache failing, esp going backwards
 
 overview
+- cache failing going backwards
 - fix gaps
 - lens dim and flashing
 
@@ -12,12 +14,19 @@ sizing window flashing, short and crashes
 
 filelist broken
 
+hls, shoutcast
+- shoutcast
+  - title display broken
+
 play
-- clean up frame not loaded yet to be random access
 - more buttons
 - play on off
-- stutter when stopped
 - play region marking
+
+editing
+- mute marking
+- save with edits
+- compress to aac
 
 boxes
 - callbacks, onhit to bmpBox first
@@ -25,14 +34,6 @@ boxes
 jpeg tag
  - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
 
-hls, shoutcast
-- shoutcast
-  - title display broken
-- hls
-  - channel,bitrate change unreliable
-  - go back in time
-    - change to map
-    - frame references since midnight
 command line invocation
 - web sites
 - hls file list
@@ -43,8 +44,3 @@ direct2d
 - investigate src coordinates to subpixel accuracy
 - investigate bitmapbrush with alpha
   - gradient brush for waveform
-
-editing
-- mute marking
-- save with edits
-- compress to aac
