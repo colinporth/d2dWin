@@ -77,10 +77,10 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
   // dodgy juicing of maxFreqValue * 4 to max Luma
   float scale = 1024.f / mMaxFreqValue;
-  auto lumaValues = (uint8_t*)malloc (kMaxSpectrum);
-  for (auto freq = 0; freq < kMaxSpectrum; freq++) {
+  auto lumaValues = (uint8_t*)malloc (kMaxFreq);
+  for (auto freq = 0; freq < kMaxFreq; freq++) {
     auto value = freqValues[freq] * scale;
-    lumaValues[kMaxSpectrum - freq - 1] = value > 255 ? 255 : uint8_t(value);
+    lumaValues[kMaxFreq - freq - 1] = value > 255 ? 255 : uint8_t(value);
     }
 
   unique_lock<shared_mutex> lock (mSharedMutex);
@@ -155,17 +155,20 @@ void cSong::setTitle (const string& title) {
   //  mFrames.back()->setTitle (title);
   }
 //}}}
+
 //{{{
 void cSong::setHlsBase (int baseSeqNum, system_clock::time_point baseTimePoint) {
+// set baseSeqNum, baseTimePoint and baseFrame (sinceMidnight)
 
   unique_lock<shared_mutex> lock (mSharedMutex);
 
   mHlsBaseSeqNum = baseSeqNum;
   mHlsBaseTimePoint = baseTimePoint;
 
-  auto midnightDatePoint = date::floor<date::days>(baseTimePoint);
-  auto msSinceMidnight = duration_cast<milliseconds>(baseTimePoint - midnightDatePoint).count();
-  mHlsBaseFrame = msToFrames (msSinceMidnight);
+  // calc hlsBaseFrame
+  auto midnightTimePoint = date::floor<date::days>(baseTimePoint);
+  uint64_t msSinceMidnight = duration_cast<milliseconds>(baseTimePoint - midnightTimePoint).count();
+  mHlsBaseFrame = int((msSinceMidnight * mSampleRate) / mSamplesPerFrame / 1000);
 
   mPlayFrame = mHlsBaseFrame;
 
@@ -174,7 +177,7 @@ void cSong::setHlsBase (int baseSeqNum, system_clock::time_point baseTimePoint) 
   }
 //}}}
 //{{{
-void cSong::setHlsLoad (eHlsLoad hlsLoad, int seqNum) { 
+void cSong::setHlsLoad (eHlsLoad hlsLoad, int seqNum) {
 // latch failed till success, might elaborate later
 
   switch (hlsLoad) {
@@ -202,10 +205,10 @@ void cSong::setHlsLoad (eHlsLoad hlsLoad, int seqNum) {
 //{{{
 void cSong::incPlayFrame (int frames) {
 
-  int newFrame = mPlayFrame + frames;
-  if (!mHasHlsBase || (newFrame >= 0))
+  int playFrame = mPlayFrame + frames;
+  if (!mHasHlsBase || (playFrame >= 0))
     // simple case, clip to playFrame 0
-    setPlayFrame (newFrame);
+    setPlayFrame (playFrame);
   else
     mPlayFrame += frames;
   }

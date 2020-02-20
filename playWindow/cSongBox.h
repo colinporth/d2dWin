@@ -572,8 +572,11 @@ private:
   //{{{
   void drawOverview (ID2D1DeviceContext* dc, int playFrame) {
 
+    if (!mSong.getTotalFrames())
+      return;
+
     float valueScale = mOverviewHeight / 2.f / mSong.getMaxPowerValue();
-    float playFrameX = (mSong.getTotalFrames() > 0) ? (playFrame * getWidth()) / mSong.getTotalFrames() : 0.f;
+    float playFrameX = (playFrame * getWidth()) / mSong.getTotalFrames();
 
     drawOverviewWave (dc, playFrame, playFrameX, valueScale);
 
@@ -614,13 +617,15 @@ private:
   void drawOverviewWave (ID2D1DeviceContext* dc, int playFrame, float playFrameX, float valueScale) {
   // draw Overview using bitmap cache
 
-    int numFrames = mSong.getNumFrames();
+    int firstFrame = mSong.getFirstFrame();
+    int lastFrame = mSong.getLastFrame();
     int totalFrames = mSong.getTotalFrames();
 
     bool forceRedraw = !mOverviewBitmapOk ||
-                       (totalFrames > mOverviewTotalFrames) || (valueScale != mOverviewValueScale);
+                       (valueScale != mOverviewValueScale) ||
+                       (firstFrame != mOverviewFirstFrame) || (totalFrames > mOverviewTotalFrames);
 
-    if (forceRedraw || (numFrames > mOverviewNumFrames)) {
+    if (forceRedraw || (lastFrame > mOverviewLastFrame)) {
       mBitmapTarget->BeginDraw();
 
       if (forceRedraw) {
@@ -631,14 +636,14 @@ private:
         mBitmapTarget->PopAxisAlignedClip();
         }
 
-      int frame = 0;
       for (auto x = 0; x < getWidthInt(); x++) {
         //{{{  iterate width
-        int toFrame = (x * totalFrames) / getWidthInt();
-        if (toFrame >= numFrames)
+        int frame = firstFrame + ((x * totalFrames) / getWidthInt());
+        int toFrame = firstFrame + (((x+1) * totalFrames) / getWidthInt());
+        if (toFrame > lastFrame)
           break;
 
-        if (forceRedraw || (frame >= mOverviewNumFrames)) {
+        if (forceRedraw || (frame >= mOverviewLastFrame)) {
           auto framePtr = mSong.getFramePtr (frame);
           if (framePtr) {
             float* powerValues = framePtr->getPowerValues();
@@ -666,16 +671,15 @@ private:
             mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
             }
           }
-
-        frame = toFrame;
         }
         //}}}
       mBitmapTarget->EndDraw();
 
       mOverviewBitmapOk = true;
-      mOverviewNumFrames = numFrames;
-      mOverviewTotalFrames = totalFrames;
       mOverviewValueScale = valueScale;
+      mOverviewFirstFrame = firstFrame;
+      mOverviewLastFrame = lastFrame;
+      mOverviewTotalFrames = totalFrames;
       }
 
     // draw overview, stamping colours through alpha bitmap
@@ -686,23 +690,21 @@ private:
     cRect dstRect = { mRect.left, mDstOverviewTop, mRect.left + playFrameX, mDstOverviewTop + mOverviewHeight };
     dc->FillOpacityMask (mBitmap, mWindow->getBlueBrush(), dstRect, srcRect);
 
-    //  draw playFrame
-    auto framePtr = mSong.getFramePtr (playFrame);
-    if (framePtr) {
-      auto powerValues = framePtr->getPowerValues();
-      dstRect = { mRect.left + playFrameX, mDstOverviewTop,
-                  mRect.left + playFrameX+1.f, mDstOverviewTop + mOverviewHeight };
-      dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
-      dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
-      dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
-      }
-
     // after playFrame
     srcRect = { playFrameX+1.f, mSrcOverviewTop,  getWidth(), mSrcOverviewTop + mOverviewHeight };
     dstRect = { mRect.left + playFrameX+1.f, mDstOverviewTop, mRect.right, mDstOverviewTop + mOverviewHeight };
     dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
 
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+
+    //  draw playFrame
+    auto framePtr = mSong.getFramePtr (playFrame);
+    if (framePtr) {
+      auto powerValues = framePtr->getPowerValues();
+      dstRect = { mRect.left + playFrameX, mDstOverviewCentre - (*powerValues++ * valueScale),
+                  mRect.left + playFrameX+1.f, mDstOverviewCentre + (*powerValues * valueScale) };
+      dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
+      }
     }
   //}}}
   //{{{
@@ -835,7 +837,8 @@ private:
 
   bool mOverviewBitmapOk = false;
   bool mOverviewPressed = false;
-  int mOverviewNumFrames = 0;
+  int mOverviewFirstFrame = 0;
+  int mOverviewLastFrame = 0;
   int mOverviewTotalFrames = 0;
   float mOverviewValueScale = 1.f;
   float mOverviewLens = 0.f;

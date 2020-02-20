@@ -97,7 +97,7 @@ public:
   float getMaxFreqValue() { return mMaxFreqValue; }
 
   int getNumFreq() { return kMaxFreq; }
-  int getNumFreqLuma() { return kMaxSpectrum; }
+  int getNumFreqLuma() { return kMaxFreq; }
 
   int getFirstFrame() { return mFrameMap.empty() ? 0 : mFrameMap.begin()->first; }
   int getLastFrame() { return mFrameMap.empty() ? 0 : mFrameMap.rbegin()->first;  }
@@ -118,12 +118,6 @@ public:
   std::string getHlsChan() { return mHlsChan; }
   int getHlsSeqNum (std::chrono::system_clock::time_point now, int minMs, int& seqFrameNum);
   eHlsLoad getHlsLoad() { return mHlsLoad; }
-
-  // converts
-  int frameToSeqNum (int frame) { return frame / mHlsFramesPerChunk; }
-  int seqNumToFrame (int seqNum) { return seqNum * mHlsFramesPerChunk; }
-  int seqNumToMs (int seqNum) { return seqNum * 6400; }
-  int msToFrames (uint64_t ms) { return int((ms * mSampleRate) / mSamplesPerFrame / 1000); }
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
@@ -164,15 +158,13 @@ private:
 
   constexpr static int kMaxSamplesPerFrame = 2048;
   constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1;
-  constexpr static int kMaxSpectrum = kMaxFreq;
 
-  //{{{  private vars
+  // vars
   std::map<int,cFrame*> mFrameMap;
-
-  bool mStreaming = false;
-
   std::shared_mutex mSharedMutex;
+
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
+  bool mStreaming = false;
 
   int mId = 0;
   int mNumChannels = 0;
@@ -188,18 +180,20 @@ private:
   float mMaxFreqValues[kMaxFreq];
   float mMaxFreqValue = 0.f;
 
+  //{{{  hls vars
   std::string mHlsChan;
   int mHlsBitrate = 0;
   int mHlsFramesPerChunk = 0;
 
   bool mHasHlsBase = false;
   int mHlsBaseSeqNum = 0;
-  std::chrono::system_clock::time_point mHlsBaseTimePoint;
   int mHlsBaseFrame = 0;
+  std::chrono::system_clock::time_point mHlsBaseTimePoint;
 
   eHlsLoad mHlsLoad = eHlsIdle;
   int eHlsFailedSeqNum = 0;
-
+  //}}}
+  //{{{  fft vars
   kiss_fftr_cfg fftrConfig;
   kiss_fft_scalar timeBuf[cSong::kMaxSamplesPerFrame];
   kiss_fft_cpx freqBuf[cSong::kMaxFreq];
