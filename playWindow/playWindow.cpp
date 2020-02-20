@@ -251,14 +251,14 @@ private:
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
         while (!getExit() && !mSongChanged) {
-          int seqFrameNum = 0;
-          auto seqNum = mSong.getHlsSeqNum (getNowDayLight(), 10000, seqFrameNum);
+          auto seqNum = mSong.getHlsSeqNum (getNowDayLight(), 10000);
           if (seqNum) {
-            // get hls seqNum chunk, about 100k bytes for 128kps stream
+            // get hls seqNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, seqNum);
             if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
               cLog::log (LOGINFO, "got " + dec(seqNum) +
                                   " at " + date::format ("%T", chrono::floor<chrono::seconds>(getNowDayLight())));
+              int seqFrameNum = mSong.getHlsFrameFromSeqNum (seqNum);
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {

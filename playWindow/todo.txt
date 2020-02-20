@@ -9,6 +9,7 @@ overview
 - cache failing going backwards
 - fix gaps
 - lens dim and flashing
+- graticules, for hls?
 
 sizing window flashing, short and crashes
 

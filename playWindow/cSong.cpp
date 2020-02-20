@@ -112,14 +112,14 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
 // gets
 //{{{
-int cSong::getHlsSeqNum (system_clock::time_point now, int minMs, int& frame) {
+int cSong::getHlsSeqNum (system_clock::time_point now, int minMs) {
 
   // get playFrame seqNumOffset from baseFrame, cope with -v offset correctly
   int frameOffset = mPlayFrame - mHlsBaseFrame;
   int seqNumOffset = (frameOffset >= 0)  ? (frameOffset / mHlsFramesPerChunk) :
                                            -((mHlsFramesPerChunk - 1 - frameOffset) / mHlsFramesPerChunk);
 
-  frame = mHlsBaseFrame + (seqNumOffset * mHlsFramesPerChunk);
+  int frame = mHlsBaseFrame + (seqNumOffset * mHlsFramesPerChunk);
 
   // loop until first unloaded frame on or past playFrame, return
   // - else return no load

@@ -116,8 +116,10 @@ public:
   bool hasHlsBase() { return mHasHlsBase; }
   int getHlsBitrate() { return mHlsBitrate; }
   std::string getHlsChan() { return mHlsChan; }
-  int getHlsSeqNum (std::chrono::system_clock::time_point now, int minMs, int& seqFrameNum);
   eHlsLoad getHlsLoad() { return mHlsLoad; }
+
+  int getHlsSeqNum (std::chrono::system_clock::time_point now, int minMs);
+  int getHlsFrameFromSeqNum (int seqNum) { return mHlsBaseFrame + (seqNum - mHlsBaseSeqNum) * mHlsFramesPerChunk; }
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
