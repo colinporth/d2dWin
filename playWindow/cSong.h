@@ -118,7 +118,7 @@ public:
   std::string getHlsChan() { return mHlsChan; }
   eHlsLoad getHlsLoad() { return mHlsLoad; }
 
-  int getHlsSeqNum (std::chrono::system_clock::time_point now, std::chrono::seconds minMs);
+  int getHlsLoadSeqNum (std::chrono::system_clock::time_point now, std::chrono::seconds secs);
   int getHlsFrameFromSeqNum (int seqNum) { return mHlsBaseFrame + (seqNum - mHlsBaseSeqNum) * mHlsFramesPerChunk; }
   //}}}
   //{{{  sets

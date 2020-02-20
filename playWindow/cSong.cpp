@@ -112,31 +112,22 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
 // gets
 //{{{
-int cSong::getHlsSeqNum (system_clock::time_point now, seconds minMs) {
+int cSong::getHlsLoadSeqNum (system_clock::time_point now, chrono::seconds secs) {
 
-  // get playFrame seqNumOffset from baseFrame, cope with -v offset correctly
+  // get offsets of playFrame from baseFrame, handle -v offsets correctly
   int frameOffset = mPlayFrame - mHlsBaseFrame;
   int seqNumOffset = (frameOffset >= 0)  ? (frameOffset / mHlsFramesPerChunk) :
                                            -((mHlsFramesPerChunk - 1 - frameOffset) / mHlsFramesPerChunk);
 
-  int frame = mHlsBaseFrame + (seqNumOffset * mHlsFramesPerChunk);
+  // slightly expensive loop until seqNum with unloaded frame or seqNum not available yet
+  while ((now - (mHlsBaseTimePoint + (seqNumOffset * 6400ms))) > secs) // seq available
+    if (!getFramePtr (mHlsBaseFrame + (seqNumOffset * mHlsFramesPerChunk))) // good seqNum to load
+      return mHlsBaseSeqNum + seqNumOffset;
+    else // already loaded, next
+      seqNumOffset++;
 
-  // loop until first unloaded frame on or past playFrame, return
-  // - else return no load
-  while (true) {
-    if (!getFramePtr (frame)) {
-      // seqNum frame not loaded
-      auto seqNumTimePoint = mHlsBaseTimePoint + seqNumOffset * 6400ms;
-      auto nnn = duration_cast<milliseconds>(now - seqNumTimePoint);
-      if (nnn > minMs)
-        // now is 10secs past chunk timePoint, it should be available
-        return mHlsBaseSeqNum + seqNumOffset;
-      else
-        return 0;
-      }
-    seqNumOffset++;
-    frame += mHlsFramesPerChunk;
-    }
+  // no seqNum available to load yet
+  return 0;
   }
 //}}}
 
