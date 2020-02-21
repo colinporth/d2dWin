@@ -12,16 +12,13 @@ public:
   //{{{
   class cFrame {
   public:
-    static constexpr float kSilentThreshold = 0.02f;
+    static constexpr float kSilentThreshold = 0.01f;
     //{{{
     cFrame (bool alloced, uint8_t* ptr, uint32_t len,
             float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
         mPtr(ptr), mLen(len), mAlloced(alloced),
         mPowerValues(powerValues), mPeakValues(peakValues),
-        mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false) {
-
-      mSilent = isSilentThreshold();
-      }
+        mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false), mSilent(false) {}
     //}}}
     //{{{
     ~cFrame() {
@@ -157,6 +154,7 @@ public:
 
 private:
   void clearFrames();
+  void checkSilentWindow (int frame);
   int skipPrev (int fromFrame, bool silent);
   int skipNext (int fromFrame, bool silent);
 

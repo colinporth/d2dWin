@@ -83,7 +83,7 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
     value *= freqScale;
     *freqValuesPtr++ = value > 255 ? 255 : uint8_t(value);
 
-    // luma crushed, reversed index for quick copyMem to bitmap later
+    // luma crushed, reversed index, for quicker copyMem to bitmap later
     value *= 4.f;
     *lumaValuesPtr-- = value > 255 ? 255 : uint8_t(value);
 
@@ -97,22 +97,7 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
   mFrameMap.insert (map<int,cFrame*>::value_type (
     frame, new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues)));
 
-  // calc silent window
-  auto framePtr = getFramePtr (frame);
-  if (framePtr && framePtr->isSilent()) {
-    auto window = kSilentWindowFrames;
-    auto windowFrame = frame - 1;
-    while ((window >= 0) && (windowFrame >= 0)) {
-      // walk backwards looking for no silence
-      auto windowFramePtr = getFramePtr (windowFrame);
-      if (windowFramePtr && !windowFramePtr->isSilentThreshold()) {
-        framePtr->setSilent (false);
-        break;
-        }
-      windowFrame--;
-      window--;
-      }
-    }
+  checkSilentWindow (frame);
   }
 //}}}
 
@@ -258,6 +243,35 @@ void cSong::clearFrames() {
   mMaxFreqValue = kMinFreqValue;
   }
 //}}}
+//{{{
+void cSong::checkSilentWindow (int frame) {
+// silent window
+
+  // walk backwards looking for continuous loaded frames quieter than silentThreshold
+  auto windowSize = 0;
+  while (true) {
+    auto framePtr = getFramePtr (frame);
+    if (framePtr && framePtr->isSilentThreshold()) {
+      windowSize++;
+      frame--;
+      }
+    else 
+      break;
+    };
+
+  if (windowSize > kSilentWindowFrames) {
+    // walk forward setting silent for continuous loaded frames quieter than silentThreshold
+    while (true) {
+      auto framePtr = getFramePtr (++frame);
+      if (framePtr && framePtr->isSilentThreshold())
+        framePtr->setSilent (true);
+      else
+        break;
+      }
+    }
+  }
+//}}}
+
 //{{{
 int cSong::skipPrev (int fromFrame, bool silent) {
 

@@ -210,14 +210,17 @@ private:
 
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     bool allFramesOk = true;
+    auto firstFrame = mSong.getFirstFrame();
+
     cRect bitmapRect;
-    if (fromFrame < 0) {  // !!! div for neg maybe wrong !!!!
-      //{{{  clear bitmap for -ve frames, allows simpler drawing logic later
+    if (fromFrame < firstFrame) {
+      //{{{  clear bitmap for -ve frames, allows simpler drawing logic later, !! not rightyet !!!
+      // / -ve wrong by one sometimes
       bitmapRect = { (float)((fromFrame / mFrameStep) & mBitmapMask), mSrcFreqTop, (float)mBitmapWidth, mSrcOverviewTop };
       mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
       mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
       mBitmapTarget->PopAxisAlignedClip();
-      fromFrame = 0;
+      fromFrame = firstFrame;
       }
       //}}}
 
@@ -390,9 +393,10 @@ private:
   void drawWave (ID2D1DeviceContext* dc, int playFrame) {
 
     // calc leftFrame,rightFrame
-    auto leftFrame = playFrame - (((getWidthInt() + mFrameWidth) / 2) * mFrameStep) / mFrameWidth;
-    auto rightFrame = playFrame + (((getWidthInt() + mFrameWidth) / 2) * mFrameStep) / mFrameWidth;
-    rightFrame = std::min (rightFrame, mSong.getLastFrame());
+    auto leftFrame = playFrame - (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
+    //std::max (playFrame - (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth, mSong.getFirstFrame());
+    auto rightFrame =
+      std::min (playFrame + (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth, mSong.getLastFrame());
 
     bool allFramesOk = true;
     mBitmapTarget->BeginDraw();

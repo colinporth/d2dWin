@@ -291,7 +291,8 @@ private:
               }
               //}}}
             }
-          this_thread::sleep_for (100ms);
+          else
+            this_thread::sleep_for (100ms);
           }
         free (samples);
         }
