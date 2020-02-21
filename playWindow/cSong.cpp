@@ -9,10 +9,10 @@ using namespace std;
 using namespace chrono;
 //}}}
 
+//
 constexpr static float kMinPowerValue = 0.25f;
 constexpr static float kMinFreqValue = 256.f;
-constexpr static float kMaxFreqValue = 1024.f;
-constexpr static int kSilentWindowFrames = 10;
+constexpr static int kSilentWindowFrames = 4;
 
 //{{{
 cSong::~cSong() {
@@ -46,6 +46,7 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
   auto powerValues = (float*)malloc (mNumChannels * 4);
   memset (powerValues, 0, mNumChannels * 4);
 
+  // peak
   auto peakValues = (float*)malloc (mNumChannels * 4);
   memset (peakValues, 0, mNumChannels * 4);
 
@@ -69,19 +70,24 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
   kiss_fftr (fftrConfig, timeBuf, freqBuf);
 
   float freqScale = 255.f / mMaxFreqValue;
+  auto freqBufPtr = freqBuf;
   auto freqValues = (uint8_t*)malloc (getNumFreqBytes());
+  auto freqValuesPtr = freqValues;
   auto lumaValues = (uint8_t*)malloc (getNumFreqBytes());
+  auto lumaValuesPtr = lumaValues + getNumFreqBytes() - 1;
   for (auto i = 0; i < getNumFreqBytes(); i++) {
-    auto value = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
+    auto value = sqrt (((*freqBufPtr).r * (*freqBufPtr).r) + ((*freqBufPtr).i * (*freqBufPtr).i));
     mMaxFreqValue = max (mMaxFreqValue, value);
 
     // freq scaled to byte, only used for display
     value *= freqScale;
-    freqValues[i] = value > 255 ? 255 : uint8_t(value);
+    *freqValuesPtr++ = value > 255 ? 255 : uint8_t(value);
 
     // luma crushed, reversed index for quick copyMem to bitmap later
     value *= 4.f;
-    lumaValues[getNumFreqBytes() - 1 - i] = value > 255 ? 255 : uint8_t(value);
+    *lumaValuesPtr-- = value > 255 ? 255 : uint8_t(value);
+
+    freqBufPtr++;
     }
 
   unique_lock<shared_mutex> lock (mSharedMutex);
@@ -92,11 +98,10 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
     frame, new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues)));
 
   // calc silent window
-  auto frameNum = getLastFrame();
-  auto framePtr = getFramePtr (frameNum);
+  auto framePtr = getFramePtr (frame);
   if (framePtr && framePtr->isSilent()) {
     auto window = kSilentWindowFrames;
-    auto windowFrame = frameNum - 1;
+    auto windowFrame = frame - 1;
     while ((window >= 0) && (windowFrame >= 0)) {
       // walk backwards looking for no silence
       auto windowFramePtr = getFramePtr (windowFrame);

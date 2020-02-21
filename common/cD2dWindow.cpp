@@ -145,7 +145,7 @@ void cD2dWindow::init (const string& title, int width, int height, bool fullScre
 
 //{{{
 system_clock::time_point cD2dWindow::getNow() {
-  return system_clock::now()  + seconds (mDayLightSeconds);
+  return system_clock::now() + seconds (mDayLightSeconds);
   }
 //}}}
 

@@ -12,7 +12,7 @@ public:
   //{{{
   class cFrame {
   public:
-    static constexpr float kSilentThreshold = 0.05f;
+    static constexpr float kSilentThreshold = 0.02f;
     //{{{
     cFrame (bool alloced, uint8_t* ptr, uint32_t len,
             float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
