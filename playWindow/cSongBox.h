@@ -205,9 +205,10 @@ private:
   //}}}
 
   //{{{
-  void drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame) {
+  bool drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame) {
 
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
+    bool allFramesOk = true;
     cRect bitmapRect;
     if (fromFrame < 0) {  // !!! div for neg maybe wrong !!!!
       //{{{  clear bitmap for -ve frames, allows simpler drawing logic later
@@ -251,21 +252,25 @@ private:
       if (mFrameStep == 1) {
         //{{{  simple case, draw peak and power scaled to maxPeak
         auto framePtr = mSong.getFramePtr (frame);
-        if (framePtr && framePtr->getPowerValues()) {
-          float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
-          mark = framePtr->hasTitle();
-          silence = framePtr->isSilent();
+        if (framePtr) {
+          if (framePtr->getPowerValues()) {
+            float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
+            mark = framePtr->hasTitle();
+            silence = framePtr->isSilent();
 
-          auto powerValuesPtr = framePtr->getPowerValues();
-          auto peakValuesPtr =  framePtr->getPeakValues();
-          for (auto i = 0; i < 2; i++) {
-            powerValues[i] = *powerValuesPtr++ * valueScale;
-            peakValues[i] = *peakValuesPtr++ * valueScale;
+            auto powerValuesPtr = framePtr->getPowerValues();
+            auto peakValuesPtr =  framePtr->getPeakValues();
+            for (auto i = 0; i < 2; i++) {
+              powerValues[i] = *powerValuesPtr++ * valueScale;
+              peakValues[i] = *peakValuesPtr++ * valueScale;
+              }
+
+            bitmapRect = { srcIndex, mSrcPeakCentre - peakValues[0], srcIndex + 1.f, mSrcPeakCentre + peakValues[1] };
+            mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
             }
-
-          bitmapRect = { srcIndex, mSrcPeakCentre - peakValues[0], srcIndex + 1.f, mSrcPeakCentre + peakValues[1] };
-          mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
           }
+        else 
+          allFramesOk = false;
         }
         //}}}
       else {
@@ -281,13 +286,17 @@ private:
         auto toSumFrame = std::min (alignedFrame + mFrameStep, rightFrame);
         for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
           auto framePtr = mSong.getFramePtr (sumFrame);
-          if (framePtr && framePtr->getPowerValues()) {
+          if (framePtr) {
             mark |= framePtr->hasTitle();
             silence |= framePtr->isSilent();
-            auto powerValuesPtr = framePtr->getPowerValues();
-            for (auto i = 0; i < 2; i++)
-              powerValues[i] += *powerValuesPtr++ * valueScale;
+            if (framePtr->getPowerValues()) {
+              auto powerValuesPtr = framePtr->getPowerValues();
+              for (auto i = 0; i < 2; i++)
+                powerValues[i] += *powerValuesPtr++ * valueScale;
+              }
             }
+          else
+            allFramesOk = false;
           }
 
         for (auto i = 0; i < 2; i++)
@@ -339,6 +348,8 @@ private:
           }
         }
       }
+
+    return allFramesOk;
     }
   //}}}
 
@@ -382,6 +393,7 @@ private:
     auto rightFrame = playFrame + (((getWidthInt() + mFrameWidth) / 2) * mFrameStep) / mFrameWidth;
     rightFrame = std::min (rightFrame, mSong.getLastFrame());
 
+    bool allFramesOk = true;
     mBitmapTarget->BeginDraw();
     if (mFramesBitmapOk &&
         (mFrameStep == mBitmapFrameStep) &&
@@ -389,7 +401,7 @@ private:
       // overlap
       if (leftFrame < mBitmapFirstFrame) {
         //{{{  draw new bitmap leftFrames
-        drawBitmapFrames (leftFrame, mBitmapFirstFrame, playFrame, rightFrame);
+        allFramesOk &= drawBitmapFrames (leftFrame, mBitmapFirstFrame, playFrame, rightFrame);
 
         mBitmapFirstFrame = leftFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
@@ -398,7 +410,7 @@ private:
         //}}}
       if (rightFrame > mBitmapLastFrame) {
         //{{{  draw new bitmap rightFrames
-        drawBitmapFrames (mBitmapLastFrame, rightFrame, playFrame, rightFrame);
+        allFramesOk &= drawBitmapFrames (mBitmapLastFrame, rightFrame, playFrame, rightFrame);
 
         mBitmapLastFrame = rightFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
@@ -408,13 +420,13 @@ private:
       }
     else {
       //{{{  no overlap, draw all bitmap frames
-      drawBitmapFrames (leftFrame, rightFrame, playFrame, rightFrame);
+      allFramesOk &= drawBitmapFrames (leftFrame, rightFrame, playFrame, rightFrame);
 
       mBitmapFirstFrame = leftFrame;
       mBitmapLastFrame = rightFrame;
       }
       //}}}
-    mFramesBitmapOk = true;
+    mFramesBitmapOk = allFramesOk;
     mBitmapFrameStep = mFrameStep;
     mBitmapTarget->EndDraw();
 
@@ -630,55 +642,64 @@ private:
 
     if (forceRedraw || (lastFrame > mOverviewLastFrame)) {
       mBitmapTarget->BeginDraw();
-
       if (forceRedraw) {
-        // clear overview bitmap
+        //{{{  clear overview bitmap
         cRect bitmapRect = { 0.f, mSrcOverviewTop, getWidth(), mSrcOverviewTop + mOverviewHeight };
         mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
         mBitmapTarget->Clear ( {0.f,0.f,0.f, 0.f} );
         mBitmapTarget->PopAxisAlignedClip();
         }
+        //}}}
 
+      bool allFramesOk = true;
       for (auto x = 0; x < getWidthInt(); x++) {
-        //{{{  iterate width
+        //{{{  iterate widget width
         int frame = firstFrame + ((x * totalFrames) / getWidthInt());
         int toFrame = firstFrame + (((x+1) * totalFrames) / getWidthInt());
         if (toFrame > lastFrame)
-          break;
+          toFrame = lastFrame+1;
 
         if (forceRedraw || (frame >= mOverviewLastFrame)) {
           auto framePtr = mSong.getFramePtr (frame);
-          if (framePtr && framePtr->getPowerValues()) {
-            float* powerValues = framePtr->getPowerValues();
-            float leftValue = *powerValues++;
-            float rightValue = *powerValues;
-            if (frame < toFrame) {
-              int numSummedFrames = 1;
-              frame++;
-              while (frame < toFrame) {
-                framePtr = mSong.getFramePtr (frame);
-                if (framePtr && framePtr->getPowerValues()) {
-                  auto powerValues = framePtr->getPowerValues();
-                  leftValue += *powerValues++;
-                  rightValue += *powerValues;
-                  numSummedFrames++;
-                  }
+          if (framePtr) {
+            if (framePtr->getPowerValues()) {
+              float* powerValues = framePtr->getPowerValues();
+              float leftValue = *powerValues++;
+              float rightValue = *powerValues;
+              if (frame < toFrame) {
+                int numSummedFrames = 1;
                 frame++;
+                while (frame < toFrame) {
+                  framePtr = mSong.getFramePtr (frame);
+                  if (framePtr) {
+                    if (framePtr->getPowerValues()) {
+                      auto powerValues = framePtr->getPowerValues();
+                      leftValue += *powerValues++;
+                      rightValue += *powerValues;
+                      numSummedFrames++;
+                      }
+                    }
+                  else
+                    allFramesOk = false;
+                  frame++;
+                  }
+                leftValue /= numSummedFrames;
+                rightValue /= numSummedFrames;
                 }
-              leftValue /= numSummedFrames;
-              rightValue /= numSummedFrames;
-              }
 
-            cRect bitmapRect = { (float)x, mSrcOverviewCentre - (leftValue * valueScale) - 2.f,
-                                 x+1.f, mSrcOverviewCentre + (rightValue * valueScale) + 2.f };
-            mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
+              cRect bitmapRect = { (float)x, mSrcOverviewCentre - (leftValue * valueScale) - 2.f,
+                                   x+1.f, mSrcOverviewCentre + (rightValue * valueScale) + 2.f };
+              mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
+              }
+            else
+              allFramesOk = false;
             }
           }
         }
         //}}}
       mBitmapTarget->EndDraw();
 
-      mOverviewBitmapOk = true;
+      mOverviewBitmapOk = allFramesOk;
       mOverviewValueScale = valueScale;
       mOverviewFirstFrame = firstFrame;
       mOverviewLastFrame = lastFrame;
