@@ -160,13 +160,13 @@ public:
     if (mSong.hasHlsBase())
       drawTime (dc, frameString (mSong.getFirstFrame()), frameString (mSong.getPlayFrame()), frameString (mSong.getLastFrame()));
     else
-      drawTime (dc, "", frameString (mSong.getPlayFrame()), frameString (mSong.getTotalFrames()));
+      drawTime (dc, L"", frameString (mSong.getPlayFrame()), frameString (mSong.getTotalFrames()));
     }
   //}}}
 
 private:
   //{{{
-  std::string frameString (uint64_t frame) {
+  std::wstring frameString (uint64_t frame) {
 
     if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
       uint64_t hundredthSeconds = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
@@ -182,12 +182,12 @@ private:
       hundredthSeconds /= 60;
       uint64_t hours = hundredthSeconds % 60;
 
-      return hours > 0? (dec (hours) + ':' + dec (minutes, 2, '0') + ':' + dec(seconds, 2, '0')) :
-               (minutes > 0 ? (dec (minutes) + ':' + dec(seconds, 2, '0') + ':' + dec(subSeconds, 2, '0')) :
-                 (dec(seconds) + ':' + dec(subSeconds, 2, '0')));
+      return (hours > 0) ? (wdec (hours) + L':' + wdec (minutes, 2, '0') + L':' + wdec(seconds, 2, '0')) :
+               ((minutes > 0) ? (wdec (minutes) + L':' + wdec(seconds, 2, '0') + L':' + wdec(subSeconds, 2, '0')) :
+                 (wdec(seconds) + L':' + wdec(subSeconds, 2, '0')));
       }
     else
-      return ("--:--:--");
+      return (L"--:--:--");
     }
   //}}}
   //{{{
@@ -782,38 +782,23 @@ private:
     }
   //}}}
   //{{{
-  void drawTime (ID2D1DeviceContext* dc, const std::string& first, const std::string& play, const std::string& last) {
+  void drawTime (ID2D1DeviceContext* dc, const std::wstring& first, const std::wstring& play, const std::wstring& last) {
 
-    IDWriteTextLayout* textLayout;
-
-    mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
-    mWindow->getDwriteFactory()->CreateTextLayout (
-      std::wstring (first.begin(), first.end()).data(), (uint32_t)first.size(),
-      mSmallTimeTextFormat, getWidth(), mSmallTimeTextFormat->GetFontSize(), &textLayout);
-    if (textLayout) {
-      dc->DrawTextLayout (getBL() + cPoint(0.f,-mSmallTimeTextFormat->GetFontSize()), textLayout, mWindow->getWhiteBrush());
-      textLayout->Release();
-      }
-
+    // big play
     mBigTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_CENTER);
-    mWindow->getDwriteFactory()->CreateTextLayout (
-      std::wstring (play.begin(), play.end()).data(), (uint32_t)play.size(),
-      mBigTimeTextFormat, getWidth(), mBigTimeTextFormat->GetFontSize(), &textLayout);
-    if (textLayout) {
-      dc->DrawTextLayout (getBL() + cPoint(0.f,-mBigTimeTextFormat->GetFontSize()), textLayout, mWindow->getWhiteBrush());
-      textLayout->Release();
-      }
+    cRect dstRect = { getBL().x, getBL().y -mBigTimeTextFormat->GetFontSize(), getWidth(), getHeight() };
+    dc->DrawText (play.data(), (uint32_t)play.size(), mBigTimeTextFormat, dstRect, mWindow->getWhiteBrush());
 
+    // small first
+    mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
+    dstRect.top = getBL().y -mSmallTimeTextFormat->GetFontSize();
+    dc->DrawText (first.data(), (uint32_t)first.size(), mSmallTimeTextFormat, dstRect, mWindow->getWhiteBrush());
+
+    // small coloured last
     mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
-    mWindow->getDwriteFactory()->CreateTextLayout (
-      std::wstring (last.begin(), last.end()).data(), (uint32_t)last.size(),
-      mSmallTimeTextFormat, getWidth(), mSmallTimeTextFormat->GetFontSize(), &textLayout);
-    if (textLayout) {
-       dc->DrawTextLayout (getBL() + cPoint(0.f,-mSmallTimeTextFormat->GetFontSize()), textLayout,
-                           (mSong.getHlsLoad() == cSong::eHlsIdle) ? mWindow->getWhiteBrush() :
-                             (mSong.getHlsLoad() == cSong::eHlsFailed) ? mWindow->getRedBrush() : mWindow->getGreenBrush());
-      textLayout->Release();
-      }
+    dc->DrawText (last.data(), (uint32_t)last.size(), mSmallTimeTextFormat, dstRect,
+                  (mSong.getHlsLoad() == cSong::eHlsIdle) ? mWindow->getWhiteBrush() :
+                    (mSong.getHlsLoad() == cSong::eHlsFailed) ? mWindow->getRedBrush() : mWindow->getGreenBrush());
     }
   //}}}
 
