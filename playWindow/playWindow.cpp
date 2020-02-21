@@ -86,9 +86,9 @@ protected:
     switch (key) {
       case 0x00: break;
       case 0x1B: return true;
-      case  'F': toggleFullScreen(); break;
+      case 'F' : toggleFullScreen(); break;
 
-      case  ' ': mPlaying = !mPlaying; break;
+      case ' ' : mPlaying = !mPlaying; break;
 
       case 0x21: mSong.prevSilencePlayFrame(); changed(); break;; // page up
       case 0x22: mSong.nextSilencePlayFrame(); changed(); break;; // page down
@@ -104,16 +104,16 @@ protected:
       case 0x0d: mSongChanged = true; changed(); break; // enter - play file
 
       // crude chan,bitrate change
-      case  '1': mSongChanged = true; mSong.setHlsChan ("bbc_radio_one"); break;
-      case  '2': mSongChanged = true; mSong.setHlsChan ("bbc_radio_two"); break;
-      case  '3': mSongChanged = true; mSong.setHlsChan ("bbc_radio_three"); break;
-      case  '4': mSongChanged = true; mSong.setHlsChan ("bbc_radio_fourfm"); break;
-      case  '5': mSongChanged = true; mSong.setHlsChan ("bbc_radio_five_live"); break;
-      case  '6': mSongChanged = true; mSong.setHlsChan ("bbc_6music"); break;
-      case  '7': mSongChanged = true; mSong.setHlsBitrate (48000); break;
-      case  '8': mSongChanged = true; mSong.setHlsBitrate (96000); break;
-      case  '9': mSongChanged = true; mSong.setHlsBitrate (128000); break;
-      case  '0': mSongChanged = true; mSong.setHlsBitrate (320000); break;
+      case '1' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_one"); break;
+      case '2' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_two"); break;
+      case '3' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_three"); break;
+      case '4' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_fourfm"); break;
+      case '5' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_five_live"); break;
+      case '6' : mSongChanged = true; mSong.setHlsChan ("bbc_6music"); break;
+      case '7' : mSongChanged = true; mSong.setHlsBitrate (48000); break;
+      case '8' : mSongChanged = true; mSong.setHlsBitrate (96000); break;
+      case '9' : mSongChanged = true; mSong.setHlsBitrate (128000); break;
+      case '0' : mSongChanged = true; mSong.setHlsBitrate (320000); break;
 
       default  : cLog::log (LOGINFO, "key %x", key);
       }
@@ -241,8 +241,6 @@ private:
         baseTimePoint -= 17s;
 
         http.freeContent();
-
-        //mBaseStr = "base " + date::format ("%T", floor<seconds>(baseTimePoint)) + " chunkNum " + dec(baseChunkNum);
         //}}}
         mSong.init (cAudioDecode::eAac, 2, mSong.getHlsBitrate() >= 128000 ? 1024 : 2048, 48000);
         mSong.setHlsBase (baseChunkNum, baseTimePoint);
@@ -256,13 +254,13 @@ private:
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
-              cLog::log (LOGINFO, "got " + dec(chunkNum) +
-                                  " at " + date::format ("%T", floor<seconds>(getNow())));
+              cLog::log (LOGINFO1, "got " + dec(chunkNum) +
+                                   " at " + date::format ("%T", floor<seconds>(getNow())));
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
-                //  add aacFrame from aacFrames to song
+                // add aacFrame from aacFrames to song
                 auto numSamples = decode.frameToSamples (samples);
                 if (numSamples) {
                   // copy single aacFrame to aacFrame, add to song which owns it
@@ -548,7 +546,7 @@ private:
     }
   //}}}
 
-  const static int kHlsPreload = 5;
+  const static int kHlsPreload = 100;
   //{{{  vars
   cFileList* mFileList = nullptr;
 
@@ -582,7 +580,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
 
   cAppWindow appWindow;
-  appWindow.run ("playWindow", 800, 480, (numArgs > 1) ? wcharToString (args[1]) : "");
+  appWindow.run ("playWindow", 800, 420, (numArgs > 1) ? wcharToString (args[1]) : "");
 
   CoUninitialize();
   return 0;

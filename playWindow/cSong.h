@@ -12,13 +12,13 @@ public:
   //{{{
   class cFrame {
   public:
-    static constexpr float kSilentThreshold = 0.01f;
+    static constexpr float kQuietThreshold = 0.01f;
     //{{{
     cFrame (bool alloced, uint8_t* ptr, uint32_t len,
             float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
         mPtr(ptr), mLen(len), mAlloced(alloced),
         mPowerValues(powerValues), mPeakValues(peakValues),
-        mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false), mSilent(false) {}
+        mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false), mSilence(false) {}
     //}}}
     //{{{
     ~cFrame() {
@@ -42,10 +42,11 @@ public:
     uint8_t* getFreqValues() { return mFreqValues; }
     uint8_t* getFreqLuma() { return mFreqLuma; }
 
+    bool isQuiet() { return mPeakValues[0] + mPeakValues[1] < kQuietThreshold; }
+
     bool isMuted() { return mMuted; }
-    bool isSilent() { return mSilent; }
-    bool isSilentThreshold() { return mPeakValues[0] + mPeakValues[1] < kSilentThreshold; }
-    void setSilent (bool silent) { mSilent = silent; }
+    bool isSilence() { return mSilence; }
+    void setSilence (bool silence) { mSilence = silence; }
 
     bool hasTitle() { return !mTitle.empty(); }
     std::string getTitle() { return mTitle; }
@@ -65,7 +66,7 @@ public:
     uint8_t* mFreqLuma;
 
     bool mMuted;
-    bool mSilent;
+    bool mSilence;
     std::string mTitle;
     };
   //}}}
@@ -104,12 +105,9 @@ public:
   int getTotalFrames() { return mTotalFrames; }
   int getPlayFrame() { return mPlayFrame; }
 
-  //{{{
   cFrame* getFramePtr (int frame) {
     auto it = mFrameMap.find (frame);
-    return (it == mFrameMap.end()) ? nullptr : it->second;
-    }
-  //}}}
+    return (it == mFrameMap.end()) ? nullptr : it->second; }
 
   // hls
   bool hasHlsBase() { return mHasHlsBase; }
@@ -154,9 +152,9 @@ public:
 
 private:
   void clearFrames();
-  void checkSilentWindow (int frame);
-  int skipPrev (int fromFrame, bool silent);
-  int skipNext (int fromFrame, bool silent);
+  void checkSilenceWindow (int frame);
+  int skipPrev (int fromFrame, bool silence);
+  int skipNext (int fromFrame, bool silence);
 
   constexpr static int kMaxSamplesPerFrame = 2048; // arbitrary frame max
   constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1; // fft max
@@ -196,7 +194,7 @@ private:
   //}}}
   //{{{  fft vars
   kiss_fftr_cfg fftrConfig;
-  kiss_fft_scalar timeBuf[cSong::kMaxSamplesPerFrame];
-  kiss_fft_cpx freqBuf[cSong::kMaxFreq];
+  kiss_fft_scalar timeBuf[kMaxSamplesPerFrame];
+  kiss_fft_cpx freqBuf[kMaxFreq];
   //}}}
   };

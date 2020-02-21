@@ -260,7 +260,7 @@ private:
           if (framePtr->getPowerValues()) {
             float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
             mark = framePtr->hasTitle();
-            silence = framePtr->isSilent();
+            silence = framePtr->isSilence();
 
             auto powerValuesPtr = framePtr->getPowerValues();
             auto peakValuesPtr =  framePtr->getPeakValues();
@@ -292,7 +292,7 @@ private:
           auto framePtr = mSong.getFramePtr (sumFrame);
           if (framePtr) {
             mark |= framePtr->hasTitle();
-            silence |= framePtr->isSilent();
+            silence |= framePtr->isSilence();
             if (framePtr->getPowerValues()) {
               auto powerValuesPtr = framePtr->getPowerValues();
               for (auto i = 0; i < 2; i++)
@@ -667,6 +667,7 @@ private:
         if (forceRedraw || (frame >= mOverviewLastFrame)) {
           auto framePtr = mSong.getFramePtr (frame);
           if (framePtr) {
+            // !!! should accumulate silence and distinguish from silence better !!!
             if (framePtr->getPowerValues()) {
               float* powerValues = framePtr->getPowerValues();
               float leftValue = *powerValues++;
@@ -774,19 +775,13 @@ private:
           dc->FillRectangle (barRect, mWindow->getYellowBrush());
 
           auto str = framePtr->getTitle();
-
-          IDWriteTextLayout* textLayout;
-          mWindow->getDwriteFactory()->CreateTextLayout (
-            std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-            mWindow->getTextFormat(), getWidth(), mOverviewHeight, &textLayout);
-          if (textLayout) {
-            dc->DrawTextLayout (cPoint (dstRect.left+2.f, mDstOverviewTop), textLayout, mWindow->getWhiteBrush());
-            textLayout->Release();
-            }
+          dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+                        { dstRect.left+2.f, mDstOverviewTop, getWidth(), mDstOverviewTop + mOverviewHeight },
+                        mWindow->getWhiteBrush());
           }
           //}}}
-        if (framePtr->isSilent()) {
-          //{{{  draw red silent frame
+        if (framePtr->isSilence()) {
+          //{{{  draw red silence
           dstRect.top = mDstOverviewCentre - 2.f;
           dstRect.bottom = mDstOverviewCentre + 2.f;
           dc->FillRectangle (dstRect, mWindow->getRedBrush());

@@ -9,10 +9,10 @@ using namespace std;
 using namespace chrono;
 //}}}
 
-//
 constexpr static float kMinPowerValue = 0.25f;
+constexpr static float kMinPeakValue = 0.25f;
 constexpr static float kMinFreqValue = 256.f;
-constexpr static int kSilentWindowFrames = 4;
+constexpr static int kSilenceWindowFrames = 4;
 
 //{{{
 cSong::~cSong() {
@@ -29,13 +29,15 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   // reset frame type
   mFrameType = frameType;
   mNumChannels = numChannels;
-  mSamplesPerFrame = samplesPerFrame;
   mSampleRate = sampleRate;
 
   clearFrames();
-  mHasHlsBase = false;
+  mTotalFrames = 0;
 
+  mSamplesPerFrame = samplesPerFrame;
   fftrConfig = kiss_fftr_alloc (mSamplesPerFrame, 0, 0, 0);
+
+  mHasHlsBase = false;
   }
 //}}}
 //{{{
@@ -69,11 +71,12 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
   // ??? lock against init fftrConfig recalc???
   kiss_fftr (fftrConfig, timeBuf, freqBuf);
 
-  float freqScale = 255.f / mMaxFreqValue;
-  auto freqBufPtr = freqBuf;
   auto freqValues = (uint8_t*)malloc (getNumFreqBytes());
-  auto freqValuesPtr = freqValues;
   auto lumaValues = (uint8_t*)malloc (getNumFreqBytes());
+  float freqScale = 255.f / mMaxFreqValue;
+
+  auto freqBufPtr = freqBuf;
+  auto freqValuesPtr = freqValues;
   auto lumaValuesPtr = lumaValues + getNumFreqBytes() - 1;
   for (auto i = 0; i < getNumFreqBytes(); i++) {
     auto value = sqrt (((*freqBufPtr).r * (*freqBufPtr).r) + ((*freqBufPtr).i * (*freqBufPtr).i));
@@ -93,11 +96,11 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
   unique_lock<shared_mutex> lock (mSharedMutex);
 
   // totalFrames can be a changing estimate for file, or increasing value for streaming
-  mTotalFrames = totalFrames;
   mFrameMap.insert (map<int,cFrame*>::value_type (
     frame, new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues)));
+  mTotalFrames = totalFrames;
 
-  checkSilentWindow (frame);
+  checkSilenceWindow (frame);
   }
 //}}}
 
@@ -238,20 +241,18 @@ void cSong::clearFrames() {
 
   // reset maxValues
   mMaxPowerValue = kMinPowerValue;
-  mMaxPeakValue = kMinPowerValue;
-
+  mMaxPeakValue = kMinPeakValue;
   mMaxFreqValue = kMinFreqValue;
   }
 //}}}
 //{{{
-void cSong::checkSilentWindow (int frame) {
-// silent window
+void cSong::checkSilenceWindow (int frame) {
 
-  // walk backwards looking for continuous loaded frames quieter than silentThreshold
+  // walk backwards looking for continuous loaded quiet frames
   auto windowSize = 0;
   while (true) {
     auto framePtr = getFramePtr (frame);
-    if (framePtr && framePtr->isSilentThreshold()) {
+    if (framePtr && framePtr->isQuiet()) {
       windowSize++;
       frame--;
       }
@@ -259,12 +260,12 @@ void cSong::checkSilentWindow (int frame) {
       break;
     };
 
-  if (windowSize > kSilentWindowFrames) {
-    // walk forward setting silent for continuous loaded frames quieter than silentThreshold
+  if (windowSize > kSilenceWindowFrames) {
+    // walk forward setting silence for continuous loaded quiet frames
     while (true) {
       auto framePtr = getFramePtr (++frame);
-      if (framePtr && framePtr->isSilentThreshold())
-        framePtr->setSilent (true);
+      if (framePtr && framePtr->isQuiet())
+        framePtr->setSilence (true);
       else
         break;
       }
@@ -273,11 +274,11 @@ void cSong::checkSilentWindow (int frame) {
 //}}}
 
 //{{{
-int cSong::skipPrev (int fromFrame, bool silent) {
+int cSong::skipPrev (int fromFrame, bool silence) {
 
   for (int frame = fromFrame-1; frame >= 0; frame--) {
     auto framePtr = getFramePtr (frame);
-    if (framePtr && (framePtr->isSilent() ^ silent))
+    if (framePtr && (framePtr->isSilence() ^ silence))
       return frame;
     }
 
@@ -285,11 +286,11 @@ int cSong::skipPrev (int fromFrame, bool silent) {
   }
 //}}}
 //{{{
-int cSong::skipNext (int fromFrame, bool silent) {
+int cSong::skipNext (int fromFrame, bool silence) {
 
   for (int frame = fromFrame; frame < getNumFrames(); frame++) {
     auto framePtr = getFramePtr (frame);
-    if (framePtr && (framePtr->isSilent() ^ silent))
+    if (framePtr && (framePtr->isSilence() ^ silence))
       return frame;
     }
 
