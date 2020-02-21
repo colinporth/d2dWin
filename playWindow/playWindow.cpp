@@ -222,13 +222,13 @@ private:
       cWinSockHttp http;
       host = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
-        //{{{  parse m3u8 for baseSeqNum, baseTimePoint
+        //{{{  parse m3u8 for baseChunkNum, baseTimePoint
         // point to #EXT-X-MEDIA-SEQUENCE: sequence num
         char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
         const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
         char* extSeqEnd = strchr (extSeq, '\n');
         *extSeqEnd = '\0';
-        int baseSeqNum = atoi (extSeq) + 3;
+        int baseChunkNum = atoi (extSeq) + 3;
 
         // point to #EXT-X-PROGRAM-DATE-TIME: dateTime str
         const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
@@ -245,22 +245,22 @@ private:
 
         http.freeContent();
 
-        //mBaseStr = "base " + date::format ("%T", floor<seconds>(baseTimePoint)) + " seqNum " + dec(baseSeqNum);
+        //mBaseStr = "base " + date::format ("%T", floor<seconds>(baseTimePoint)) + " chunkNum " + dec(baseChunkNum);
         //}}}
         mSong.init (cAudioDecode::eAac, 2, mSong.getHlsBitrate() >= 128000 ? 1024 : 2048, 48000);
-        mSong.setHlsBase (baseSeqNum, baseTimePoint);
+        mSong.setHlsBase (baseChunkNum, baseTimePoint);
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
         while (!getExit() && !mSongChanged) {
-          auto seqNum = mSong.getHlsLoadSeqNum (getNowDayLight(), 10s, kHlsPreload);
-          if (seqNum) {
-            // get hls seqNum chunk
-            mSong.setHlsLoad (cSong::eHlsLoading, seqNum);
-            if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
-              cLog::log (LOGINFO, "got " + dec(seqNum) +
+          auto chunkNum = mSong.getHlsLoadChunkNum (getNowDayLight(), 10s, kHlsPreload);
+          if (chunkNum) {
+            // get hls chunkNum chunk
+            mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
+            if (http.get (host, path + '-' + dec(chunkNum) + ".ts") == 200) {
+              cLog::log (LOGINFO, "got " + dec(chunkNum) +
                                   " at " + date::format ("%T", floor<seconds>(getNowDayLight())));
-              int seqFrameNum = mSong.getHlsFrameFromSeqNum (seqNum);
+              int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
@@ -281,14 +281,14 @@ private:
                 aacFrames += decode.getNextFrameOffset();
                 }
               http.freeContent();
-              mSong.setHlsLoad (cSong::eHlsIdle, seqNum);
+              mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
               }
             else {
               //{{{  failed, back off for 250ms
-              mSong.setHlsLoad (cSong::eHlsFailed, seqNum);
+              mSong.setHlsLoad (cSong::eHlsFailed, chunkNum);
               changed();
 
-              cLog::log (LOGERROR, "late " + dec(seqNum));
+              cLog::log (LOGERROR, "late " + dec(chunkNum));
               this_thread::sleep_for (250ms);
               }
               //}}}

@@ -121,8 +121,8 @@ public:
   std::string getHlsChan() { return mHlsChan; }
   eHlsLoad getHlsLoad() { return mHlsLoad; }
 
-  int getHlsLoadSeqNum (std::chrono::system_clock::time_point now, std::chrono::seconds secs, int preload);
-  int getHlsFrameFromSeqNum (int seqNum) { return mHlsBaseFrame + (seqNum - mHlsBaseSeqNum) * mHlsFramesPerChunk; }
+  int getHlsLoadChunkNum (std::chrono::system_clock::time_point now, std::chrono::seconds secs, int preload);
+  int getHlsFrameFromChunkNum (int chunkNum) { return mHlsBaseFrame + (chunkNum - mHlsBaseChunkNum) * mHlsFramesPerChunk; }
   //}}}
   //{{{  sets
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
@@ -143,9 +143,9 @@ public:
     }
   //}}}
 
-  void setHlsBase (int baseSeqNum, std::chrono::system_clock::time_point baseTimePoint);
+  void setHlsBase (int baseChunkNum, std::chrono::system_clock::time_point baseTimePoint);
 
-  void setHlsLoad (eHlsLoad hlsLoad, int seqNum);
+  void setHlsLoad (eHlsLoad hlsLoad, int chunkNum);
   //}}}
 
   // incs
@@ -189,12 +189,12 @@ private:
   int mHlsFramesPerChunk = 0;
 
   bool mHasHlsBase = false;
-  int mHlsBaseSeqNum = 0;
+  int mHlsBaseChunkNum = 0;
   int mHlsBaseFrame = 0;
   std::chrono::system_clock::time_point mHlsBaseTimePoint;
 
   eHlsLoad mHlsLoad = eHlsIdle;
-  int eHlsFailedSeqNum = 0;
+  int eHlsFailedChunkNum = 0;
   //}}}
   //{{{  fft vars
   kiss_fftr_cfg fftrConfig;

@@ -69,20 +69,19 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
   kiss_fftr (fftrConfig, timeBuf, freqBuf);
 
   float freqScale = 255.f / mMaxFreqValue;
-  float lumaScale = 1024.f / mMaxFreqValue;
   auto freqValues = (uint8_t*)malloc (kMaxFreq);
   auto lumaValues = (uint8_t*)malloc (kMaxFreq);
-  for (auto freq = 0; freq < kMaxFreq; freq++) {
-    auto value = sqrt ((freqBuf[freq].r * freqBuf[freq].r) + (freqBuf[freq].i * freqBuf[freq].i));
+  for (auto i = 0; i < kMaxFreq; i++) {
+    auto value = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
     mMaxFreqValue = max (mMaxFreqValue, value);
-
-    auto lumaValue = value * lumaScale;
-    // luma crushed a bit, reversed index for copyMem to bitmap later
-    lumaValues[kMaxFreq - freq - 1] = lumaValue > 255 ? 255 : uint8_t(lumaValue);
 
     // freq scaled to byte, only used for display
     value *= freqScale;
-    freqValues[freq] = value > 255 ? 255 : uint8_t(value);
+    freqValues[i] = value > 255 ? 255 : uint8_t(value);
+
+    // luma crushed, reversed index for quick copyMem to bitmap later
+    value *= 4.f;
+    lumaValues[kMaxFreq - 1 - i] = value > 255 ? 255 : uint8_t(value);
     }
 
   unique_lock<shared_mutex> lock (mSharedMutex);
@@ -114,27 +113,27 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
 // gets
 //{{{
-int cSong::getHlsLoadSeqNum (system_clock::time_point now, chrono::seconds secs, int preload) {
+int cSong::getHlsLoadChunkNum (system_clock::time_point now, chrono::seconds secs, int preload) {
 
   // get offsets of playFrame from baseFrame, handle -v offsets correctly
   int frameOffset = mPlayFrame - mHlsBaseFrame;
-  int seqNumOffset = (frameOffset >= 0)  ? (frameOffset / mHlsFramesPerChunk) :
-                                           -((mHlsFramesPerChunk - 1 - frameOffset) / mHlsFramesPerChunk);
+  int chunkNumOffset = (frameOffset >= 0)  ? (frameOffset / mHlsFramesPerChunk) :
+                                             -((mHlsFramesPerChunk - 1 - frameOffset) / mHlsFramesPerChunk);
 
-  // loop until seqNum with unloaded frame, seqNum not available yet, or preload ahead of playFrame loaded
+  // loop until chunkNum with unloaded frame, chunkNum not available yet, or preload ahead of playFrame loaded
   int loaded = 0;
-  while ((loaded < preload) && ((now - (mHlsBaseTimePoint + (seqNumOffset * 6400ms))) > secs))
-    // seqNum chunk should be available
-    if (!getFramePtr (mHlsBaseFrame + (seqNumOffset * mHlsFramesPerChunk)))
-      // not loaded, return seqNum to load
-      return mHlsBaseSeqNum + seqNumOffset;
+  while ((loaded < preload) && ((now - (mHlsBaseTimePoint + (chunkNumOffset * 6400ms))) > secs))
+    // chunkNum chunk should be available
+    if (!getFramePtr (mHlsBaseFrame + (chunkNumOffset * mHlsFramesPerChunk)))
+      // not loaded, return chunkNum to load
+      return mHlsBaseChunkNum + chunkNumOffset;
     else {
       // already loaded, next
       loaded++;
-      seqNumOffset++;
+      chunkNumOffset++;
       }
 
-  // return 0, no seqNum available to load
+  // return 0, no chunkNum available to load
   return 0;
   }
 //}}}
@@ -154,12 +153,12 @@ void cSong::setTitle (const string& title) {
 //}}}
 
 //{{{
-void cSong::setHlsBase (int baseSeqNum, system_clock::time_point baseTimePoint) {
-// set baseSeqNum, baseTimePoint and baseFrame (sinceMidnight)
+void cSong::setHlsBase (int baseChunkNum, system_clock::time_point baseTimePoint) {
+// set baseChunkNum, baseTimePoint and baseFrame (sinceMidnight)
 
   unique_lock<shared_mutex> lock (mSharedMutex);
 
-  mHlsBaseSeqNum = baseSeqNum;
+  mHlsBaseChunkNum = baseChunkNum;
   mHlsBaseTimePoint = baseTimePoint;
 
   // calc hlsBaseFrame
@@ -174,25 +173,25 @@ void cSong::setHlsBase (int baseSeqNum, system_clock::time_point baseTimePoint) 
   }
 //}}}
 //{{{
-void cSong::setHlsLoad (eHlsLoad hlsLoad, int seqNum) {
+void cSong::setHlsLoad (eHlsLoad hlsLoad, int chunkNum) {
 // latch failed till success, might elaborate later
 
   switch (hlsLoad) {
     case eHlsLoading:
-      if (seqNum != eHlsFailedSeqNum) {
+      if (chunkNum != eHlsFailedChunkNum) {
         mHlsLoad = eHlsLoading;
-        eHlsFailedSeqNum = 0;
+        eHlsFailedChunkNum = 0;
         }
       break;
 
     case eHlsFailed:
       mHlsLoad = eHlsFailed;
-      eHlsFailedSeqNum = seqNum;
+      eHlsFailedChunkNum = chunkNum;
       break;
 
     case eHlsIdle:
       mHlsLoad = eHlsIdle;
-      eHlsFailedSeqNum = 0;
+      eHlsFailedChunkNum = 0;
       break;
     }
   }
