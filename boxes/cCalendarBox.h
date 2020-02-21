@@ -14,45 +14,44 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     const float kRoundWidth = 5.f;
-    auto datePoint = date::floor<date::days>(mWindow->getNowDayLight());
-    dc->FillRoundedRectangle (D2D1::RoundedRect (mRect, kRoundWidth,kRoundWidth), mWindow->getBlackBrush());
-    auto r = cRect (mRect.left+kRoundWidth, mRect.top+kRoundWidth,
-                    mRect.right-2.f*kRoundWidth, mRect.bottom-2.f*kRoundWidth);
-
     const float kCalendarWidth = 26.f;
-    auto yearMonthDay = date::year_month_day{datePoint};
-    auto yearMonth = yearMonthDay.year() / date::month{yearMonthDay.month()};
+
+    dc->FillRoundedRectangle (D2D1::RoundedRect (mRect, kRoundWidth,kRoundWidth), mWindow->getBlackBrush());
+    cRect rect = { mRect.left + kRoundWidth, mRect.top + kRoundWidth,
+                   mRect.right - 2.f*kRoundWidth, mRect.bottom - 2.f*kRoundWidth };
+
+    auto datePoint = date::floor<date::days>(mWindow->getNowDayLight());
+    auto yearMonthDay = date::year_month_day { datePoint };
+    auto yearMonth = yearMonthDay.year() / date::month { yearMonthDay.month() };
     auto today = yearMonthDay.day();
 
     //{{{  print month year
-    auto p = r.getTL();
-    std::wstring str = format (L"%B", yearMonth);
-    dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(),
-                  { p.x, p.y, mRect.right, mRect.bottom }, mWindow->getWhiteBrush());
+    rect = mRect;
+    auto str = format (L"%B", yearMonth);
+    dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(), rect, mWindow->getWhiteBrush());
 
     // print year
-    p.x = r.getTL().x + r.getWidth() - 45.f;
+    rect.left = mRect.right - 45.f;
     str = format (L"%Y", yearMonth);
-    dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(),
-                  { p.x, p.y, mRect.right, mRect.bottom }, mWindow->getWhiteBrush());
+    dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(), rect, mWindow->getWhiteBrush());
 
-    p.y += kLineHeight;
+    rect.top += kLineHeight;
     //}}}
     //{{{  print daysOfWeek
     auto weekDayToday = date::weekday{yearMonth / today};
     auto titleWeekDay = date::sun;
-    p.x = r.getTL().x;
+
+    rect.left = mRect.left;
     do {
       str = format (L"%a", titleWeekDay);
       str.resize (2);
-      dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(),
-                    { p.x, p.y, mRect.right, mRect.bottom },
+      dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(), rect,
                     weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGreyBrush());
 
-      p.x += kCalendarWidth;
+      rect.left += kCalendarWidth;
       } while (++titleWeekDay != date::sun);
 
-    p.y += kLineHeight;
+    rect.top += kLineHeight;
     //}}}
     //{{{  print lines
     // skip leading space
@@ -63,27 +62,24 @@ public:
     auto lastDayOfMonth = (yearMonth / date::last).day();
 
     int line = 1;
-    p.x = r.getTL().x + (weekDay - date::sun).count()*kCalendarWidth;
+    rect.left = mRect.left + (weekDay - date::sun).count()*kCalendarWidth;
     while (curDay <= lastDayOfMonth) {
       // iterate days of week
       str = format (L"%e", curDay);
-      dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(),
-                    { p.x, p.y, mRect.right, mRect.bottom },
+      dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(), rect,
                     today == curDay ? mWindow->getWhiteBrush() : mWindow->getGreyBrush());
 
       if (++weekDay == date::sun) {
         // line 6 folds back to first
         line++;
-        p.y += line <= 5 ? kLineHeight : - 4* kLineHeight;
-        p.x = r.getTL().x;
+        rect.top += line <= 5 ? kLineHeight : - 4* kLineHeight;
+        rect.left = mRect.left;
         }
       else
-        p.x += kCalendarWidth;
+        rect.left += kCalendarWidth;
 
       ++curDay;
       };
-
-    p.y += kLineHeight;
     //}}}
     }
   };
