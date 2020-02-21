@@ -6,6 +6,7 @@ main wave
 - cache failing, esp going backwards
 
 overview
+- show load graphic
 - cache failing going backwards
 - fix gaps
 - lens dim and flashing

@@ -24,42 +24,30 @@ public:
     auto yearMonth = yearMonthDay.year() / date::month{yearMonthDay.month()};
     auto today = yearMonthDay.day();
 
-    IDWriteTextLayout* textLayout;
     //{{{  print month year
     auto p = r.getTL();
-
-    std::string str = format ("%B", yearMonth);
-    mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-               mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-    dc->DrawTextLayout (p, textLayout, mWindow->getWhiteBrush());
-    textLayout->Release();
+    std::wstring str = format (L"%B", yearMonth);
+    dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+                  { p.x, p.y, mRect.right, mRect.bottom }, mWindow->getWhiteBrush());
 
     // print year
     p.x = r.getTL().x + r.getWidth() - 45.f;
-
-    str = format ("%Y", yearMonth);
-    mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-               mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-    dc->DrawTextLayout (p, textLayout, mWindow->getWhiteBrush());
-    textLayout->Release();
+    str = format (L"%Y", yearMonth);
+    dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+                  { p.x, p.y, mRect.right, mRect.bottom }, mWindow->getWhiteBrush());
 
     p.y += kLineHeight;
     //}}}
     //{{{  print daysOfWeek
-    p.x = r.getTL().x;
-
     auto weekDayToday = date::weekday{yearMonth / today};
-
     auto titleWeekDay = date::sun;
+    p.x = r.getTL().x;
     do {
-      str = format ("%a", titleWeekDay);
+      str = format (L"%a", titleWeekDay);
       str.resize (2);
-
-      mWindow->getDwriteFactory()->CreateTextLayout (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-                 mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-      dc->DrawTextLayout (p, textLayout,
-        weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGreyBrush());
-      textLayout->Release();
+      dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+                    { p.x, p.y, mRect.right, mRect.bottom },
+                    weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGreyBrush());
 
       p.x += kCalendarWidth;
       } while (++titleWeekDay != date::sun);
@@ -69,21 +57,19 @@ public:
     //{{{  print lines
     // skip leading space
     auto weekDay = date::weekday{ yearMonth / 1};
-    p.x = r.getTL().x + (weekDay - date::sun).count()*kCalendarWidth;
 
     using date::operator""_d;
     auto curDay = 1_d;
     auto lastDayOfMonth = (yearMonth / date::last).day();
 
     int line = 1;
-     while (curDay <= lastDayOfMonth) {
+    p.x = r.getTL().x + (weekDay - date::sun).count()*kCalendarWidth;
+    while (curDay <= lastDayOfMonth) {
       // iterate days of week
-      str = format ("%e", curDay);
-      mWindow->getDwriteFactory()->CreateTextLayout (
-        std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-        mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-      dc->DrawTextLayout (p, textLayout, today == curDay ? mWindow->getWhiteBrush() : mWindow->getGreyBrush());
-      textLayout->Release();
+      str = format (L"%e", curDay);
+      dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(),
+                    { p.x, p.y, mRect.right, mRect.bottom },
+                    today == curDay ? mWindow->getWhiteBrush() : mWindow->getGreyBrush());
 
       if (++weekDay == date::sun) {
         // line 6 folds back to first
