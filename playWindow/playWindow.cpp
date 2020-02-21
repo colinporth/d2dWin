@@ -16,6 +16,7 @@
 #include "../../shared/hls/r4x80.h"
 
 using namespace std;
+using namespace chrono;
 //}}}
 
 class cAppWindow : public cD2dWindow {
@@ -203,6 +204,7 @@ private:
     }
   //}}}
 
+  const static int kHlsPreload = 5;
   //{{{
   void hlsThread (string host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
@@ -237,9 +239,9 @@ private:
 
         // parse ISO time format from string
         istringstream inputStream (extDateTimeString);
-        chrono::system_clock::time_point baseTimePoint;
+        system_clock::time_point baseTimePoint;
         inputStream >> date::parse ("%FT%T", baseTimePoint);
-        baseTimePoint -= chrono::seconds (17);
+        baseTimePoint -= 17s;
 
         http.freeContent();
 
@@ -251,13 +253,13 @@ private:
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
         while (!getExit() && !mSongChanged) {
-          auto seqNum = mSong.getHlsLoadSeqNum (getNowDayLight(), 10s);
+          auto seqNum = mSong.getHlsLoadSeqNum (getNowDayLight(), 10s, kHlsPreload);
           if (seqNum) {
             // get hls seqNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, seqNum);
             if (http.get (host, path + '-' + dec(seqNum) + ".ts") == 200) {
               cLog::log (LOGINFO, "got " + dec(seqNum) +
-                                  " at " + date::format ("%T", chrono::floor<chrono::seconds>(getNowDayLight())));
+                                  " at " + date::format ("%T", floor<seconds>(getNowDayLight())));
               int seqFrameNum = mSong.getHlsFrameFromSeqNum (seqNum);
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
@@ -282,16 +284,16 @@ private:
               mSong.setHlsLoad (cSong::eHlsIdle, seqNum);
               }
             else {
-              //{{{  failed, back off for 200ms
+              //{{{  failed, back off for 250ms
               mSong.setHlsLoad (cSong::eHlsFailed, seqNum);
               changed();
 
               cLog::log (LOGERROR, "late " + dec(seqNum));
-              std::this_thread::sleep_for (200ms);
+              this_thread::sleep_for (250ms);
               }
               //}}}
             }
-          std::this_thread::sleep_for (50ms);
+          this_thread::sleep_for (100ms);
           }
         free (samples);
         }
@@ -504,7 +506,7 @@ private:
 
     // wait for valid sampleRate to decalre audioDevice
     while (!mSong.getSampleRate())
-      std::this_thread::sleep_for (10ms);
+      this_thread::sleep_for (10ms);
 
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
@@ -516,10 +518,9 @@ private:
       float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxSamplesBytes());
 
       device->start();
-
       while (!getExit() && (mSong.getStreaming() || (mSong.getPlayFrame() <= mSong.getLastFrame()))) {
         auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
-        if (mPlaying && framePtr) {
+        if (mPlaying && framePtr && framePtr->getPtr()) {
           device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
             // lambda callback - load srcSamples
             shared_lock<shared_mutex> lock (mSong.getSharedMutex());
@@ -532,16 +533,14 @@ private:
               }
             numSrcSamples = mSong.getSamplesPerFrame();
             mSong.incPlayFrame (1);
+            changed();
             });
-
-          changed();
           }
         else
-          std::this_thread::sleep_for (100ms);
+          this_thread::sleep_for (100ms);
         }
 
       device->stop();
-
       free (samples);
       }
 

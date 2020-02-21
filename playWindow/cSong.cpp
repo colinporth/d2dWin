@@ -9,8 +9,10 @@ using namespace std;
 using namespace chrono;
 //}}}
 
-constexpr static int kSilentWindowFrames = 10;
 constexpr static float kMinPowerValue = 0.25f;
+constexpr static float kMinFreqValue = 256.f;
+constexpr static float kMaxFreqValue = 1024.f;
+constexpr static int kSilentWindowFrames = 10;
 
 //{{{
 cSong::~cSong() {
@@ -40,8 +42,6 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
 void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples) {
 // return true if enough frames added to start playing, streamLen only used to estimate totalFrames
 
-// ****** check for insert at same frame ******************
-
   // sum of squares channel power
   auto powerValues = (float*)malloc (mNumChannels * 4);
   memset (powerValues, 0, mNumChannels * 4);
@@ -65,22 +65,24 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
     mMaxPeakValue = max (mMaxPeakValue, peakValues[chan]);
     }
 
-  // locked ???
+  // ??? lock against init fftrConfig recalc???
   kiss_fftr (fftrConfig, timeBuf, freqBuf);
 
-  auto freqValues = (float*)malloc (kMaxFreq * 4);
-  for (auto freq = 0; freq < kMaxFreq; freq++) {
-    freqValues[freq] = sqrt ((freqBuf[freq].r * freqBuf[freq].r) + (freqBuf[freq].i * freqBuf[freq].i));
-    mMaxFreqValue = max (mMaxFreqValue, freqValues[freq]);
-    mMaxFreqValues[freq] = max (mMaxFreqValues[freq], freqValues[freq]);
-    }
-
-  // dodgy juicing of maxFreqValue * 4 to max Luma
-  float scale = 1024.f / mMaxFreqValue;
+  float freqScale = 255.f / mMaxFreqValue;
+  float lumaScale = 1024.f / mMaxFreqValue;
+  auto freqValues = (uint8_t*)malloc (kMaxFreq);
   auto lumaValues = (uint8_t*)malloc (kMaxFreq);
   for (auto freq = 0; freq < kMaxFreq; freq++) {
-    auto value = freqValues[freq] * scale;
-    lumaValues[kMaxFreq - freq - 1] = value > 255 ? 255 : uint8_t(value);
+    auto value = sqrt ((freqBuf[freq].r * freqBuf[freq].r) + (freqBuf[freq].i * freqBuf[freq].i));
+    mMaxFreqValue = max (mMaxFreqValue, value);
+
+    auto lumaValue = value * lumaScale;
+    // luma crushed a bit, reversed index for copyMem to bitmap later
+    lumaValues[kMaxFreq - freq - 1] = lumaValue > 255 ? 255 : uint8_t(lumaValue);
+
+    // freq scaled to byte, only used for display
+    value *= freqScale;
+    freqValues[freq] = value > 255 ? 255 : uint8_t(value);
     }
 
   unique_lock<shared_mutex> lock (mSharedMutex);
@@ -112,21 +114,27 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
 // gets
 //{{{
-int cSong::getHlsLoadSeqNum (system_clock::time_point now, chrono::seconds secs) {
+int cSong::getHlsLoadSeqNum (system_clock::time_point now, chrono::seconds secs, int preload) {
 
   // get offsets of playFrame from baseFrame, handle -v offsets correctly
   int frameOffset = mPlayFrame - mHlsBaseFrame;
   int seqNumOffset = (frameOffset >= 0)  ? (frameOffset / mHlsFramesPerChunk) :
                                            -((mHlsFramesPerChunk - 1 - frameOffset) / mHlsFramesPerChunk);
 
-  // slightly expensive loop until seqNum with unloaded frame or seqNum not available yet
-  while ((now - (mHlsBaseTimePoint + (seqNumOffset * 6400ms))) > secs) // seq available
-    if (!getFramePtr (mHlsBaseFrame + (seqNumOffset * mHlsFramesPerChunk))) // good seqNum to load
+  // loop until seqNum with unloaded frame, seqNum not available yet, or preload ahead of playFrame loaded
+  int loaded = 0;
+  while ((loaded < preload) && ((now - (mHlsBaseTimePoint + (seqNumOffset * 6400ms))) > secs))
+    // seqNum chunk should be available
+    if (!getFramePtr (mHlsBaseFrame + (seqNumOffset * mHlsFramesPerChunk)))
+      // not loaded, return seqNum to load
       return mHlsBaseSeqNum + seqNumOffset;
-    else // already loaded, next
+    else {
+      // already loaded, next
+      loaded++;
       seqNumOffset++;
+      }
 
-  // no seqNum available to load yet
+  // return 0, no seqNum available to load
   return 0;
   }
 //}}}
@@ -239,13 +247,11 @@ void cSong::clearFrames() {
     delete (frame.second);
   mFrameMap.clear();
 
-  // reset maxValue
+  // reset maxValues
   mMaxPowerValue = kMinPowerValue;
   mMaxPeakValue = kMinPowerValue;
 
-  mMaxFreqValue = 0.f;
-  for (int i = 0; i < kMaxFreq; i++)
-    mMaxFreqValues[i] = 0.f;
+  mMaxFreqValue = kMinFreqValue;
   }
 //}}}
 //{{{

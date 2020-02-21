@@ -15,9 +15,10 @@ public:
     static constexpr float kSilentThreshold = 0.05f;
     //{{{
     cFrame (bool alloced, uint8_t* ptr, uint32_t len,
-            float* powerValues, float* peakValues, float* freqValues, uint8_t* lumaValues) :
+            float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
         mPtr(ptr), mLen(len), mAlloced(alloced),
-        mPowerValues(powerValues), mPeakValues(peakValues), mFreqValues(freqValues), mFreqLuma(lumaValues) {
+        mPowerValues(powerValues), mPeakValues(peakValues),
+        mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false) {
 
       mSilent = isSilentThreshold();
       }
@@ -41,9 +42,10 @@ public:
 
     float* getPowerValues() { return mPowerValues;  }
     float* getPeakValues() { return mPeakValues;  }
-    float* getFreqValues() { return mFreqValues; }
+    uint8_t* getFreqValues() { return mFreqValues; }
     uint8_t* getFreqLuma() { return mFreqLuma; }
 
+    bool isMuted() { return mMuted; }
     bool isSilent() { return mSilent; }
     bool isSilentThreshold() { return mPowerValues[0] + mPowerValues[1] < kSilentThreshold; }
     void setSilent (bool silent) { mSilent = silent; }
@@ -62,9 +64,10 @@ public:
 
     float* mPowerValues;
     float* mPeakValues;
-    float* mFreqValues;
+    uint8_t* mFreqValues;
     uint8_t* mFreqLuma;
 
+    bool mMuted;
     bool mSilent;
     std::string mTitle;
     };
@@ -118,7 +121,7 @@ public:
   std::string getHlsChan() { return mHlsChan; }
   eHlsLoad getHlsLoad() { return mHlsLoad; }
 
-  int getHlsLoadSeqNum (std::chrono::system_clock::time_point now, std::chrono::seconds secs);
+  int getHlsLoadSeqNum (std::chrono::system_clock::time_point now, std::chrono::seconds secs, int preload);
   int getHlsFrameFromSeqNum (int seqNum) { return mHlsBaseFrame + (seqNum - mHlsBaseSeqNum) * mHlsFramesPerChunk; }
   //}}}
   //{{{  sets
@@ -178,8 +181,6 @@ private:
 
   float mMaxPowerValue = 0.f;
   float mMaxPeakValue = 0.f;
-
-  float mMaxFreqValues[kMaxFreq];
   float mMaxFreqValue = 0.f;
 
   //{{{  hls vars

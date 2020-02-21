@@ -4,6 +4,7 @@ main wave
 - mark subpixel wrong
 - check -ve clear with div
 - cache failing, esp going backwards
+- freqs stored as bytes
 
 overview
 - cache failing going backwards
@@ -20,9 +21,13 @@ hls, shoutcast
   - title display broken
 
 play
+- cull load ahead
+- cull silence allocs
+- don't play silence
 - more buttons
 - play on off
 - play region marking
+- reverse
 
 editing
 - mute marking
