@@ -255,7 +255,7 @@ void cSong::checkSilentWindow (int frame) {
       windowSize++;
       frame--;
       }
-    else 
+    else
       break;
     };
 
@@ -275,9 +275,11 @@ void cSong::checkSilentWindow (int frame) {
 //{{{
 int cSong::skipPrev (int fromFrame, bool silent) {
 
-  for (int frame = fromFrame-1; frame >= 0; frame--)
-    if (getFramePtr (frame)->isSilent() ^ silent)
+  for (int frame = fromFrame-1; frame >= 0; frame--) {
+    auto framePtr = getFramePtr (frame);
+    if (framePtr && (framePtr->isSilent() ^ silent))
       return frame;
+    }
 
   return fromFrame;
   }
@@ -285,9 +287,11 @@ int cSong::skipPrev (int fromFrame, bool silent) {
 //{{{
 int cSong::skipNext (int fromFrame, bool silent) {
 
-  for (int frame = fromFrame; frame < getNumFrames(); frame++)
-    if (getFramePtr (frame)->isSilent() ^ silent)
+  for (int frame = fromFrame; frame < getNumFrames(); frame++) {
+    auto framePtr = getFramePtr (frame);
+    if (framePtr && (framePtr->isSilent() ^ silent))
       return frame;
+    }
 
   return fromFrame;
   }
