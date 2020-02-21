@@ -25,35 +25,31 @@ public:
     auto yearMonth = yearMonthDay.year() / date::month { yearMonthDay.month() };
     auto today = yearMonthDay.day();
 
-    //{{{  print month year
+    // draw month
     rect = mRect;
-    auto str = format (L"%B", yearMonth);
-    dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(), rect, mWindow->getWhiteBrush());
+    auto monthStr = format (L"%B", yearMonth);
+    dc->DrawText (monthStr.data(), (uint32_t)monthStr.size(), mWindow->getTextFormat(), rect, mWindow->getWhiteBrush());
 
-    // print year
+    // draw year
     rect.left = mRect.right - 45.f;
-    str = format (L"%Y", yearMonth);
-    dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(), rect, mWindow->getWhiteBrush());
-
+    auto yearStr = format (L"%Y", yearMonth);
+    dc->DrawText (yearStr.data(), (uint32_t)yearStr.size(), mWindow->getTextFormat(), rect, mWindow->getWhiteBrush());
     rect.top += kLineHeight;
-    //}}}
-    //{{{  print daysOfWeek
-    auto weekDayToday = date::weekday{yearMonth / today};
-    auto titleWeekDay = date::sun;
 
+    // draw daysOfWeek labels
+    auto weekDayToday = date::weekday { yearMonth / today };
+    auto titleWeekDay = date::sun;
     rect.left = mRect.left;
     do {
-      str = format (L"%a", titleWeekDay);
-      str.resize (2);
-      dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(), rect,
+      auto dayStr = format (L"%a", titleWeekDay);
+      dayStr.resize (2);
+      dc->DrawText (dayStr.data(), (uint32_t)dayStr.size(), mWindow->getTextFormat(), rect,
                     weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGreyBrush());
-
       rect.left += kCalendarWidth;
       } while (++titleWeekDay != date::sun);
-
     rect.top += kLineHeight;
-    //}}}
-    //{{{  print lines
+
+    //{{{  draw lines of days
     // skip leading space
     auto weekDay = date::weekday{ yearMonth / 1};
 
@@ -65,8 +61,8 @@ public:
     rect.left = mRect.left + (weekDay - date::sun).count()*kCalendarWidth;
     while (curDay <= lastDayOfMonth) {
       // iterate days of week
-      str = format (L"%e", curDay);
-      dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getTextFormat(), rect,
+      auto numStr = format (L"%e", curDay);
+      dc->DrawText (numStr.data(), (uint32_t)numStr.size(), mWindow->getTextFormat(), rect,
                     today == curDay ? mWindow->getWhiteBrush() : mWindow->getGreyBrush());
 
       if (++weekDay == date::sun) {

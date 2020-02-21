@@ -47,7 +47,7 @@ public:
 
     bool isMuted() { return mMuted; }
     bool isSilent() { return mSilent; }
-    bool isSilentThreshold() { return mPowerValues[0] + mPowerValues[1] < kSilentThreshold; }
+    bool isSilentThreshold() { return mPeakValues[0] + mPeakValues[1] < kSilentThreshold; }
     void setSilent (bool silent) { mSilent = silent; }
 
     bool hasTitle() { return !mTitle.empty(); }

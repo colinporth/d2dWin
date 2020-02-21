@@ -25,6 +25,7 @@ public:
     mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
       DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 45.f, L"en-us",
       &mBigTimeTextFormat);
+    mBigTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_CENTER);
     }
   //}}}
   //{{{
@@ -269,7 +270,7 @@ private:
             mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
             }
           }
-        else 
+        else
           allFramesOk = false;
         }
         //}}}
@@ -805,18 +806,19 @@ private:
   //{{{
   void drawTime (ID2D1DeviceContext* dc, const std::wstring& first, const std::wstring& play, const std::wstring& last) {
 
-    // big play
-    mBigTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_CENTER);
-    cRect dstRect = { getBL().x, getBL().y -mBigTimeTextFormat->GetFontSize(), getWidth(), getHeight() };
+    // big play, centred
+    cRect dstRect = mRect;
+    dstRect.top = mRect.bottom - mBigTimeTextFormat->GetFontSize();
     dc->DrawText (play.data(), (uint32_t)play.size(), mBigTimeTextFormat, dstRect, mWindow->getWhiteBrush());
 
-    // small first
+    // small first, left
     mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
-    dstRect.top = getBL().y -mSmallTimeTextFormat->GetFontSize();
+    dstRect.top = mRect.bottom - mSmallTimeTextFormat->GetFontSize();
     dc->DrawText (first.data(), (uint32_t)first.size(), mSmallTimeTextFormat, dstRect, mWindow->getWhiteBrush());
 
-    // small coloured last
+    // small coloured last, right
     mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+    dstRect.top = mRect.bottom - mSmallTimeTextFormat->GetFontSize();
     dc->DrawText (last.data(), (uint32_t)last.size(), mSmallTimeTextFormat, dstRect,
                   (mSong.getHlsLoad() == cSong::eHlsIdle) ? mWindow->getWhiteBrush() :
                     (mSong.getHlsLoad() == cSong::eHlsFailed) ? mWindow->getRedBrush() : mWindow->getGreenBrush());
