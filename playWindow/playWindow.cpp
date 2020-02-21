@@ -206,7 +206,7 @@ private:
 
   const static int kHlsPreload = 5;
   //{{{
-  void hlsThread (string host, const string& chan, int bitrate) {
+  void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
   // - host is redirected, assumes bbc radio aac, 48000 sampleaRate
 
@@ -215,12 +215,11 @@ private:
     mSong.setHlsBitrate (bitrate);
 
     while (!getExit()) {
-      mSongChanged = false;
       const string path = "pool_904/live/uk/" + mSong.getHlsChan() +
                           "/" + mSong.getHlsChan() + ".isml/" + mSong.getHlsChan() +
                           "-audio=" + dec(mSong.getHlsBitrate());
       cWinSockHttp http;
-      host = http.getRedirect (host, path + ".norewind.m3u8");
+      auto redirectedHost = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
         //{{{  parse m3u8 for baseChunkNum, baseTimePoint
         // point to #EXT-X-MEDIA-SEQUENCE: sequence num
@@ -252,12 +251,13 @@ private:
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
+        mSongChanged = false;
         while (!getExit() && !mSongChanged) {
-          auto chunkNum = mSong.getHlsLoadChunkNum (getNowDayLight(), 10s, kHlsPreload);
+          auto chunkNum = mSong.getHlsLoadChunkNum (getNowDayLight(), 12s, kHlsPreload);
           if (chunkNum) {
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
-            if (http.get (host, path + '-' + dec(chunkNum) + ".ts") == 200) {
+            if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               cLog::log (LOGINFO, "got " + dec(chunkNum) +
                                   " at " + date::format ("%T", floor<seconds>(getNowDayLight())));
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
@@ -272,10 +272,10 @@ private:
                   auto aacFrame = (uint8_t*)malloc (aacFrameLen);
                   memcpy (aacFrame, decode.getFramePtr(), aacFrameLen);
 
-                  // frame fixup aacHE sampleRate, samplesPerFrame
+                  // frame fixup aacHE sampleRate, samplesPerFrame, !!! total estimate not right !!!
                   mSong.setSampleRate (decode.getSampleRate());
                   mSong.setSamplesPerFrame (numSamples);
-                  mSong.addFrame (seqFrameNum++, true, aacFrame, aacFrameLen, mSong.getNumFrames()+1, samples);
+                  mSong.addFrame (seqFrameNum++, true, aacFrame, aacFrameLen, mSong.getNumFrames(), samples);
                   changed();
                   }
                 aacFrames += decode.getNextFrameOffset();

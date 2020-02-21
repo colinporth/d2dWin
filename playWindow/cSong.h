@@ -99,8 +99,7 @@ public:
   float getMaxPeakValue() { return mMaxPeakValue; }
   float getMaxFreqValue() { return mMaxFreqValue; }
 
-  int getNumFreq() { return kMaxFreq; }
-  int getNumFreqLuma() { return kMaxFreq; }
+  int getNumFreqBytes() { return kMaxFreqBytes; }
 
   int getFirstFrame() { return mFrameMap.empty() ? 0 : mFrameMap.begin()->first; }
   int getLastFrame() { return mFrameMap.empty() ? 0 : mFrameMap.rbegin()->first;  }
@@ -161,8 +160,9 @@ private:
   int skipPrev (int fromFrame, bool silent);
   int skipNext (int fromFrame, bool silent);
 
-  constexpr static int kMaxSamplesPerFrame = 2048;
-  constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1;
+  constexpr static int kMaxSamplesPerFrame = 2048; // arbitrary frame max
+  constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1; // fft max
+  constexpr static int kMaxFreqBytes = 512; // arbitrary graphics max
 
   // vars
   std::map<int,cFrame*> mFrameMap;

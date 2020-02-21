@@ -182,6 +182,7 @@ private:
       hundredthSeconds /= 60;
       uint64_t hours = hundredthSeconds % 60;
 
+      // !!! must be a better formatter lib !!!
       return (hours > 0) ? (wdec (hours) + L':' + wdec (minutes, 2, '0') + L':' + wdec(seconds, 2, '0')) :
                ((minutes > 0) ? (wdec (minutes) + L':' + wdec(seconds, 2, '0') + L':' + wdec(subSeconds, 2, '0')) :
                  (wdec(seconds) + L':' + wdec(subSeconds, 2, '0')));
@@ -313,8 +314,8 @@ private:
       //}}}
 
     // copy reversed spectrum column to bitmap, clip high freqs to height
-    int freqSize = std::min (mSong.getNumFreqLuma(), (int)mFreqHeight);
-    int freqOffset = mSong.getNumFreqLuma() > (int)mFreqHeight ? mSong.getNumFreqLuma() - (int)mFreqHeight : 0;
+    int freqSize = std::min (mSong.getNumFreqBytes(), (int)mFreqHeight);
+    int freqOffset = mSong.getNumFreqBytes() > (int)mFreqHeight ? mSong.getNumFreqBytes() - (int)mFreqHeight : 0;
 
     if (mFrameStep == 1) {
       for (auto frame = fromFrame; frame < toFrame; frame += mFrameStep) {
@@ -547,13 +548,12 @@ private:
   //{{{
   void drawFreq (ID2D1DeviceContext* dc, int playFrame) {
 
-    auto maxFreqIndex = std::min (getWidthInt(), mSong.getNumFreq());
     float valueScale = 100.f / 255.f;
 
     auto framePtr = mSong.getFramePtr (playFrame);
     if (framePtr && framePtr->getFreqValues()) {
       auto freqValues = framePtr->getFreqValues();
-      for (auto i = 0; (i < maxFreqIndex) && ((i*2) < getWidthInt()); i++) {
+      for (auto i = 0; (i < mSong.getNumFreqBytes()) && ((i*2) < getWidthInt()); i++) {
         auto value =  freqValues[i] * valueScale;
         if (value > 1.f)  {
           cRect dstRect = { mRect.left + (i*2),mRect.bottom - value, mRect.left + ((i+1) * 2),mRect.bottom };

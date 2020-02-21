@@ -4,7 +4,6 @@ main wave
 - mark subpixel wrong
 - check -ve clear with div
 - cache failing, esp going backwards
-- freqs stored as bytes
 
 overview
 - cache failing going backwards
@@ -14,25 +13,34 @@ overview
 
 sizing window flashing, short and crashes
 
-filelist broken
-
 hls, shoutcast
+- hls
+  - show bitrate
+  - chan in icon
 - shoutcast
+  - show chan
   - title display broken
-
-play
-- cull load ahead
-- cull silence allocs
-- don't play silence
-- more buttons
-- play on off
-- play region marking
-- reverse
 
 editing
 - mute marking
 - save with edits
 - compress to aac
+
+play
+- stopped stutter mode
+- play region
+   - play in and out of regions rules
+  - soundtouch region
+- more buttons
+- play on off
+- reverse
+- skip keys
+  - +-second
+  - +-10 second
+  - aligned 5min, 30min, hour
+  - to graticules
+- cull silence allocs
+- ??? don't play silence/mute ???
 
 boxes
 - callbacks, onhit to bmpBox first
@@ -41,10 +49,10 @@ jpeg tag
  - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
 
 command line invocation
-- web sites
-- hls file list
-- group of files etc,
-- links to directories etc
+- shoutcast/hls/fileList choice
+- filelist broken
+- list of files
+- links to directories, files
 
 direct2d
 - investigate src coordinates to subpixel accuracy

@@ -69,9 +69,9 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
   kiss_fftr (fftrConfig, timeBuf, freqBuf);
 
   float freqScale = 255.f / mMaxFreqValue;
-  auto freqValues = (uint8_t*)malloc (kMaxFreq);
-  auto lumaValues = (uint8_t*)malloc (kMaxFreq);
-  for (auto i = 0; i < kMaxFreq; i++) {
+  auto freqValues = (uint8_t*)malloc (getNumFreqBytes());
+  auto lumaValues = (uint8_t*)malloc (getNumFreqBytes());
+  for (auto i = 0; i < getNumFreqBytes(); i++) {
     auto value = sqrt ((freqBuf[i].r * freqBuf[i].r) + (freqBuf[i].i * freqBuf[i].i));
     mMaxFreqValue = max (mMaxFreqValue, value);
 
@@ -81,7 +81,7 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
     // luma crushed, reversed index for quick copyMem to bitmap later
     value *= 4.f;
-    lumaValues[kMaxFreq - 1 - i] = value > 255 ? 255 : uint8_t(value);
+    lumaValues[getNumFreqBytes() - 1 - i] = value > 255 ? 255 : uint8_t(value);
     }
 
   unique_lock<shared_mutex> lock (mSharedMutex);
