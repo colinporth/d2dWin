@@ -169,7 +169,6 @@ private:
     return aacFramesPtr;
     }
   //}}}
-
   //{{{
   void addIcyInfo (const string& icyInfo) {
   // called by httpThread
@@ -204,7 +203,6 @@ private:
     }
   //}}}
 
-  const static int kHlsPreload = 5;
   //{{{
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
@@ -253,13 +251,13 @@ private:
 
         mSongChanged = false;
         while (!getExit() && !mSongChanged) {
-          auto chunkNum = mSong.getHlsLoadChunkNum (getNowDayLight(), 12s, kHlsPreload);
+          auto chunkNum = mSong.getHlsLoadChunkNum (getNow(), 12s, kHlsPreload);
           if (chunkNum) {
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               cLog::log (LOGINFO, "got " + dec(chunkNum) +
-                                  " at " + date::format ("%T", floor<seconds>(getNowDayLight())));
+                                  " at " + date::format ("%T", floor<seconds>(getNow())));
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
@@ -549,6 +547,7 @@ private:
     }
   //}}}
 
+  const static int kHlsPreload = 5;
   //{{{  vars
   cFileList* mFileList = nullptr;
 
@@ -571,7 +570,6 @@ private:
   };
 
 // main
-//{{{
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
@@ -579,13 +577,12 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
   av_log_set_level (AV_LOG_VERBOSE);
   av_log_set_callback (cLog::avLogCallback);
 
-  cAppWindow appWindow;
-
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
+
+  cAppWindow appWindow;
   appWindow.run ("playWindow", 800, 480, (numArgs > 1) ? wcharToString (args[1]) : "");
 
   CoUninitialize();
   return 0;
   }
-//}}}

@@ -399,7 +399,6 @@ public:
   bool getTimedMenuOn() { return mTimedMenuOn; }
 
   std::chrono::system_clock::time_point getNow();
-  std::chrono::system_clock::time_point getNowDayLight();
   int getDayLightSeconds() { return mDayLightSeconds; }
 
   bool getFullScreen() { return mFullScreen; }

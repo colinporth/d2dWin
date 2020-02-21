@@ -21,7 +21,7 @@ public:
     dc->DrawEllipse (D2D1::Ellipse (getCentre(), radius,radius), mWindow->getWhiteBrush(), 2.f);
 
     //auto timePointTz = date::make_zoned (date::current_zone(), mTimePoint);
-    auto timePoint = mWindow->getNowDayLight();
+    auto timePoint = mWindow->getNow();
     auto datePoint = floor<date::days>(timePoint);
     auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::milliseconds>(timePoint - datePoint));
 

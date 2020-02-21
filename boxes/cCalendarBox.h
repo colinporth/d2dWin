@@ -20,7 +20,7 @@ public:
     cRect rect = { mRect.left + kRoundWidth, mRect.top + kRoundWidth,
                    mRect.right - 2.f*kRoundWidth, mRect.bottom - 2.f*kRoundWidth };
 
-    auto datePoint = date::floor<date::days>(mWindow->getNowDayLight());
+    auto datePoint = date::floor<date::days>(mWindow->getNow());
     auto yearMonthDay = date::year_month_day { datePoint };
     auto yearMonth = yearMonthDay.year() / date::month { yearMonthDay.month() };
     auto today = yearMonthDay.day();
