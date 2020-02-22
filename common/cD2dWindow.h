@@ -6,6 +6,7 @@
 
 #include <deque>
 #include <chrono>
+#include <functional>
 
 #include "../../shared/utils/date.h"
 #include "../../shared/utils/utils.h"
@@ -55,8 +56,10 @@ public:
   class cBox {
   public:
     //{{{
-    cBox (std::string name, cD2dWindow* window, float width, float height)
-        : mName(name), mWindow(window), mLayoutWidth(width), mLayoutHeight(height) {
+    cBox (std::string name, cD2dWindow* window, float width, float height,
+          std::function<void (cBox* box)> hitCallback = [](cBox*) noexcept {} )
+        : mName(name), mWindow(window), mLayoutWidth(width), mLayoutHeight(height),
+          mHitCallback (std::move(hitCallback)) {
       mWindow->changed();
       }
     //}}}
@@ -292,6 +295,7 @@ public:
     float mLayoutY = 0;
 
     cRect mRect = { 0.f };
+    std::function<void (cBox* box)> mHitCallback;
     };
   //}}}
   //{{{
@@ -418,8 +422,8 @@ public:
 
   cBox* add (cBox* box, cPoint pos);
   cBox* add (cBox* box, float x, float y);
-  cBox* add (cBox* box);
-  cBox* addBelow (cBox* box);
+  cBox* addRight (cBox* box, float offset = 1.0f);
+  cBox* addBelow (cBox* box, float offset = 1.0f);
   cBox* addFront (cBox* box);
   cBox* addFront (cBox* box, float x, float y);
   void removeBox (cBox* box);

@@ -32,9 +32,9 @@ public:
     add (new cCalendarBox (this, 190.f,150.f), -190.f-120.f,-150.f);
     add (new cLogBox (this, 100.f,0.f, true), 0.f,0.f);
 
-    add (new cImageSetView (this, 0.f,0.f, mImageSet));
+    add (new cImageSetView (this, 0.f,0.f, mImageSet), 0.f, 0.f);
     mJpegImageView = new cJpegImageView (this, 0.f,0.f, nullptr);
-    add (mJpegImageView);
+    add (mJpegImageView, 0.f,0.f);
 
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f);
     add (new cFloatBox (this, 50.f, kLineHeight, mRenderTime), 0.f,-kLineHeight);

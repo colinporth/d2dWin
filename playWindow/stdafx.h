@@ -57,7 +57,6 @@
 #include "../boxes/cLogBox.h"
 #include "../boxes/cBmpBox.h"
 #include "../boxes/cWindowBox.h"
-#include "../boxes/cVolumeBox.h"
 #include "../boxes/cCalendarBox.h"
 #include "../boxes/cClockBox.h"
 #include "../boxes/cIntBox.h"

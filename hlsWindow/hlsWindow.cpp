@@ -41,16 +41,16 @@ public:
     init (title, width, height, false);
     add (new cCalendarBox (this, 190.f,160.f), -190.f - 24.f,0);
     add (new cHlsDotsBox (this, 18.f,60.f, this), -24.f, 0);
-    add (new cHlsPeakBox (this, 0,0, this));
+    addRight (new cHlsPeakBox (this, 0,0, this));
 
     add (new cLogBox (this, 100.f,0, true), 0.f,0.f)->setPin (false);
 
-    add (new cBmpBox (this, 60.f, 60.f, r1x80, 1, mChan, mChanChanged));
-    add (new cBmpBox (this, 60.f, 60.f, r2x80, 2, mChan, mChanChanged), 61.f,0);
-    add (new cBmpBox (this, 60.f, 60.f, r3x80, 3, mChan, mChanChanged), 122.f,0);
-    add (new cBmpBox (this, 60.f, 60.f, r4x80, 4, mChan, mChanChanged), 183.f,0);
-    add (new cBmpBox (this, 60.f, 60.f, r5x80, 5, mChan, mChanChanged), 244.f,0);
-    add (new cBmpBox (this, 60.f, 60.f, r6x80, 6, mChan, mChanChanged), 305.f,0);
+    add (new cBmpBox (this, 60.f, 60.f, r1x80, 1, mChan, mChanChanged), 0.f,0.f);
+    addRight(new cBmpBox (this, 60.f, 60.f, r2x80, 2, mChan, mChanChanged));
+    addRight(new cBmpBox (this, 60.f, 60.f, r3x80, 3, mChan, mChanChanged));
+    addRight(new cBmpBox (this, 60.f, 60.f, r4x80, 4, mChan, mChanChanged));
+    addRight(new cBmpBox (this, 60.f, 60.f, r5x80, 5, mChan, mChanChanged));
+    addRight(new cBmpBox (this, 60.f, 60.f, r6x80, 6, mChan, mChanChanged));
     //add (new cClockBox (this, 40.f, mTimePoint), -82.f,-82.f);
 
     mVolumeBox = new cVolumeBox (this, 12.f,0, nullptr);

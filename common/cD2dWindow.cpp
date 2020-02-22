@@ -151,7 +151,6 @@ system_clock::time_point cD2dWindow::getNow() {
 
 //{{{
 cD2dWindow::cBox* cD2dWindow::add (cBox* box, cPoint pos) {
-
   mBoxes.push_back (box);
   box->setPos (pos);
   return box;
@@ -163,16 +162,20 @@ cD2dWindow::cBox* cD2dWindow::add (cBox* box, float x, float y) {
   }
 //}}}
 //{{{
-cD2dWindow::cBox* cD2dWindow::add (cBox* box) {
-  return add (box, cPoint());
+cD2dWindow::cBox* cD2dWindow::addRight (cBox* box, float offset) {
+  auto lastBox = mBoxes.back();
+  mBoxes.push_back (box);
+  if (lastBox)
+    box->setPos (lastBox->getTR() + cPoint (offset, 0.f));
+  return box;
   }
 //}}}
 //{{{
-cD2dWindow::cBox* cD2dWindow::addBelow (cBox* box) {
+cD2dWindow::cBox* cD2dWindow::addBelow (cBox* box, float offset) {
 
-  mBoxes.push_back (box);
   auto lastBox = mBoxes.back();
-  box->setPos (lastBox->getBL());
+  mBoxes.push_back (box);
+  box->setPos (lastBox->getBL() + cPoint (0.f, offset));
   return box;
   }
 //}}}

@@ -12,8 +12,12 @@
 #include "audioWASAPI.h"
 #include "cAudioDecode.h"
 
+#include "../../shared/hls/r1x80.h"
+#include "../../shared/hls/r2x80.h"
 #include "../../shared/hls/r3x80.h"
 #include "../../shared/hls/r4x80.h"
+#include "../../shared/hls/r5x80.h"
+#include "../../shared/hls/r6x80.h"
 
 using namespace std;
 using namespace chrono;
@@ -31,17 +35,49 @@ public:
     add (new cSongBox (this, 0.f,0.f, mSong), 0.f,0.f);
     add (new cLogBox (this, 100.f,0.f, true), 0.f,0.f)->setPin (false);
 
-    mVolumeBox = new cVolumeBox (this, 12.f,0.f, nullptr);
-    add (mVolumeBox, -12.f,0.f);
-
     // last box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (name.empty()) {
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,0.f);
 
-      add (new cBmpBox (this, 40.f, 40.f, r3x80, 3, mChan, mChanChanged), 0.f,0);
-      add (new cBmpBox (this, 40.f, 40.f, r4x80, 4, mChan, mChanChanged), 41.f,0);
+      //{{{  add radio 1 to 6 boxes
+      add (new cBmpBox (this, 40.f, 40.f, r1x80, 1, [&](cBox* box) mutable noexcept {
+        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+        mSong.setHlsChan ("bbc_radio_one");
+        mSongChanged = true;
+        } ), 0.f, 0.f);
+
+      addRight (new cBmpBox (this, 40.f, 40.f, r2x80, 2, [&](cBox* box) mutable noexcept {
+        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+        mSong.setHlsChan ("bbc_radio_two");
+        mSongChanged = true;
+        } ));
+
+      addRight (new cBmpBox (this, 40.f, 40.f, r3x80, 3, [&](cBox* box) mutable noexcept {
+        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+        mSong.setHlsChan ("bbc_radio_three");
+        mSongChanged = true;
+        } ));
+
+      addRight (new cBmpBox (this, 40.f, 40.f, r4x80, 4, [&](cBox* box) mutable noexcept {
+        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+        mSong.setHlsChan ("bbc_radio_fourfm");
+        mSongChanged = true;
+        } ));
+
+      addRight (new cBmpBox (this, 40.f, 40.f, r5x80, 5, [&](cBox* box) mutable noexcept {
+        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+        mSong.setHlsChan ("bbc_radio_five_live");
+        mSongChanged = true;
+        } ));
+
+      addRight (new cBmpBox (this, 40.f, 40.f, r6x80, 6, [&](cBox* box) mutable noexcept {
+        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+        mSong.setHlsChan ("bbc_6music");
+        mSongChanged = true;
+        } ));
+      //}}}
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
 
       //{{{  urls
@@ -59,7 +95,7 @@ public:
       mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
       if (!mFileList->empty()) {
         thread([=]() { mFileList->watchThread(); }).detach();
-        add (new cAppFileListBox (this, 0.f,-220.f, mFileList))->setPin (true);
+        add (new cAppFileListBox (this, 0.f,-220.f, mFileList), 0.f,0.f)->setPin (true);
 
         mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
         addFront (mJpegImageView);
@@ -546,7 +582,7 @@ private:
     }
   //}}}
 
-  const static int kHlsPreload = 100;
+  const static int kHlsPreload = 10; // about a minute
   //{{{  vars
   cFileList* mFileList = nullptr;
 
@@ -557,14 +593,8 @@ private:
   bool mPlaying = true;
   cSemaphore mPlayDoneSem = "playDone";
 
-  cVolumeBox* mVolumeBox = nullptr;
-
   string mLastTitleStr;
-
   string mDebugStr;
-
-  int mChan = 0;
-  bool mChanChanged = false;
   //}}}
   };
 
