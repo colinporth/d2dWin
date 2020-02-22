@@ -570,7 +570,6 @@ private:
 
 // main
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO, true, "", "playWindow");
   av_log_set_level (AV_LOG_VERBOSE);

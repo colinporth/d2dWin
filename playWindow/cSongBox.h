@@ -212,23 +212,13 @@ private:
     bool allFramesOk = true;
     auto firstFrame = mSong.getFirstFrame();
 
-    cRect bitmapRect;
-    if (fromFrame < firstFrame) {
-      //{{{  clear bitmap for -ve frames, allows simpler drawing logic later, !! not rightyet !!!
-      // / -ve wrong by one sometimes
-      bitmapRect = { (float)((fromFrame / mFrameStep) & mBitmapMask), mSrcFreqTop, (float)mBitmapWidth, mSrcOverviewTop };
-      mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
-      mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
-      mBitmapTarget->PopAxisAlignedClip();
-      fromFrame = firstFrame;
-      }
-      //}}}
-
-    // clear bitmap as chunks
+    // clear bitmap as chunks, !!! -ve / wrong !!!
     auto fromSrcIndex = float((fromFrame / mFrameStep) & mBitmapMask);
     auto toSrcIndex = float((toFrame / mFrameStep) & mBitmapMask);
     bool wrap = toSrcIndex <= fromSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : toSrcIndex;
+
+    cRect bitmapRect;
     //{{{  clear bitmap chunk before wrap
     bitmapRect = { fromSrcIndex, mSrcWaveTop, endSrcIndex, mSrcOverviewTop };
     mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
@@ -330,26 +320,14 @@ private:
     int freqSize = std::min (mSong.getNumFreqBytes(), (int)mFreqHeight);
     int freqOffset = mSong.getNumFreqBytes() > (int)mFreqHeight ? mSong.getNumFreqBytes() - (int)mFreqHeight : 0;
 
-    if (mFrameStep == 1) {
-      for (auto frame = fromFrame; frame < toFrame; frame += mFrameStep) {
-        auto framePtr = mSong.getFramePtr (frame);
-        if (framePtr && framePtr->getFreqLuma()) {
-          uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
-          D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
-          mBitmap->CopyFromMemory (&bitmapRectU, framePtr->getFreqLuma() + freqOffset, 1);
-          }
-        }
-      }
-    else {
-      // align to mFrameStep, could sum as well
-      auto alignedFromFrame = fromFrame - (fromFrame % mFrameStep);
-      for (auto frame = alignedFromFrame; frame < toFrame; frame += mFrameStep) {
-        auto framePtr = mSong.getFramePtr (frame);
-        if (framePtr && framePtr->getFreqLuma()) {
-          uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
-          D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
-          mBitmap->CopyFromMemory (&bitmapRectU, framePtr->getFreqLuma() + freqOffset, 1);
-          }
+    // bitmap sampled aligned to mFrameStep, !!! could sum !!!
+    auto alignedFromFrame = fromFrame - (fromFrame % mFrameStep);
+    for (auto frame = alignedFromFrame; frame < toFrame; frame += mFrameStep) {
+      auto framePtr = mSong.getFramePtr (frame);
+      if (framePtr && framePtr->getFreqLuma()) {
+        uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
+        D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
+        mBitmap->CopyFromMemory (&bitmapRectU, framePtr->getFreqLuma() + freqOffset, 1);
         }
       }
 
