@@ -30,7 +30,7 @@ public:
     init (title, width, height, kFullScreen);
     add (new cClockBox (this, 50.f), -110.f,-120.f);
     add (new cCalendarBox (this, 190.f,150.f), -190.f-120.f,-150.f);
-    add (new cLogBox (this, 200.f,0.f, true), -200.f,0);
+    add (new cLogBox (this, 100.f,0.f, true), 0.f,0.f);
 
     add (new cImageSetView (this, 0.f,0.f, mImageSet));
     mJpegImageView = new cJpegImageView (this, 0.f,0.f, nullptr);

@@ -43,7 +43,7 @@ public:
     add (new cHlsDotsBox (this, 18.f,60.f, this), -24.f, 0);
     add (new cHlsPeakBox (this, 0,0, this));
 
-    add (new cLogBox (this, 200.f,0, true), 0,200.f)->setPin (false);
+    add (new cLogBox (this, 100.f,0, true), 0.f,0.f)->setPin (false);
 
     add (new cBmpBox (this, 60.f, 60.f, r1x80, 1, mChan, mChanChanged));
     add (new cBmpBox (this, 60.f, 60.f, r2x80, 2, mChan, mChanChanged), 61.f,0);

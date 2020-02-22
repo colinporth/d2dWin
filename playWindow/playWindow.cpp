@@ -29,7 +29,7 @@ public:
     add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong), 0.f,0.f);
-    add (new cLogBox (this, 200.f,-200.f, true), 0.f,-200.f)->setPin (false);
+    add (new cLogBox (this, 100.f,0.f, true), 0.f,0.f)->setPin (false);
 
     mVolumeBox = new cVolumeBox (this, 12.f,0.f, nullptr);
     add (mVolumeBox, -12.f,0.f);

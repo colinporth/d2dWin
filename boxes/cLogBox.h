@@ -15,11 +15,9 @@ public:
 
     mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
       DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-      20.f, L"en-us",
-      &mTextFormat);
+      kTextHeight, L"en-us", &mTextFormat);
 
     window->getDc()->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::CornflowerBlue), &mBrush);
-    layout();
     }
   //}}}
   //{{{
@@ -29,11 +27,6 @@ public:
     }
   //}}}
 
-  //{{{
-  void layout() {
-    mRect = cRect (0, mLayoutHeight, mLayoutWidth, mWindow->getSize().y-12.f);
-    }
-  //}}}
   //{{{
   bool onWheel (int delta, cPoint pos)  {
 
@@ -64,89 +57,54 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    auto logWidth = 0.f;
-    auto logHeight = mWindow->getSize().y - 12.f;
-
-    auto textHeight = kSizes[cLog::getLogLevel()];
-    auto y = logHeight + (mLogScroll % int(textHeight));
-    int logLineNum = int(mLogScroll / int(textHeight));
-
     std::chrono::system_clock::time_point lastTimePoint;
 
     cLog::cLine logLine;
     unsigned lastLineIndex = 0;
-    while ((y > 20.f) && cLog::getLine (logLine, logLineNum++, lastLineIndex)) {
-      textHeight = kSizes[logLine.mLogLevel];
+    int logLineNum = int(mLogScroll / int(kTextHeight));
+    auto y = mRect.bottom + (mLogScroll % int(kTextHeight)) - 2.f;
+    while ((y > mRect.top + 20.f) && cLog::getLine (logLine, logLineNum++, lastLineIndex)) {
       mBrush->SetColor (kColours[logLine.mLogLevel]);
 
-      //{{{  draw timeElapsed interLine bar
+      // draw timeElapsed bar beneath log text
       auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(lastTimePoint - logLine.mTimePoint).count();
-      if (timeDiff < 20)
-        dc->FillRectangle (D2D1::RectF(0, y+1.f, timeDiff*10.f, y+2.f), mBrush);
+      if (timeDiff < 20) {
+        dc->FillRectangle ({ mRect.left, y-1.f, mRect.left + timeDiff*10.f, y+1.f }, mBrush);
+        y -= kTextHeight + 2.f;
+        }
       else {
         timeDiff = std::min (timeDiff, 4000ll);
-        dc->FillRectangle (D2D1::RectF(0, y+3.f, timeDiff/10.f, y+4.f), mWindow->getWhiteBrush());
-        y -= 1.f;
+        dc->FillRectangle ( { mRect.left, y-2.f, mRect.left + timeDiff/10.f, y+1.f }, mWindow->getWhiteBrush());
+        y -= kTextHeight + 3.f;
         }
-
-      lastTimePoint = logLine.mTimePoint;
-      //}}}
 
       auto datePoint = floor<date::days>(lastTimePoint);
       auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::microseconds>(lastTimePoint - datePoint));
-      auto str = wdec(timeOfDay.hours().count()) +
-                 L":" + wdec(timeOfDay.hours().count(),2,L'0') +
-                 L":" + wdec(timeOfDay.seconds().count(),2,'0') +
-                 L"." + wdec(timeOfDay.subseconds().count(),6,'0') +
+      auto str = wdec (timeOfDay.hours().count()) +
+                 L":" + wdec (timeOfDay.hours().count(), 2, L'0') +
+                 L":" + wdec (timeOfDay.seconds().count(), 2 ,L'0') +
+                 L"." + wdec (timeOfDay.subseconds().count(), 6 ,L'0') +
                  L" " + cLog::getThreadNameWstring (logLine.mThreadId) +
-                 L" " + strToWstr(logLine.mStr);
+                 L" " + strToWstr (logLine.mStr);
+      dc->DrawText (str.data(), (uint32_t)str.size(), mTextFormat,
+                   { mRect.left, y, mWindow->getWidth(), y + kTextHeight }, mBrush);
 
-      // draw text with possible trasnparent background
-      IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (str.data(), (uint32_t)str.size(), mTextFormat,
-        mWindow->getSize().x, textHeight, &textLayout);
-      textLayout->SetFontSize (textHeight, {0, (uint32_t)str.size()});
-      struct DWRITE_TEXT_METRICS textMetrics;
-      textLayout->GetMetrics (&textMetrics);
-      y -= textHeight;
-      if (mPin)
-        dc->FillRectangle (D2D1::RectF(0, y+4.f, textMetrics.width+2.f, y+4.f + textHeight),
-                           mWindow->getTransparentBgndBrush());
-      dc->DrawTextLayout (D2D1::Point2F(0,y), textLayout, mBrush);
-      textLayout->Release();
-
-      logWidth = std::max (logWidth, textMetrics.width);
-      logHeight = std::min (logHeight, float(y));
-      mLayoutWidth = logWidth;
-      mLayoutHeight = logHeight;
-
-      layout();
+      lastTimePoint = logLine.mTimePoint;
       }
-
     }
   //}}}
 
 private:
-  //{{{
-  const float kSizes[LOGMAX] = {
-    20.f, // LOGTITLE
-    16.f, // LOGNOTICE
-    16.f, // LOGERROR
-    16.f, // LOGINFO
-    15.f, // LOGINFO1
-    14.f, // LOGINFO2
-    13.f, // LOGINFO3
-    };
-  //}}}
+  constexpr static float kTextHeight = 16.f;
   //{{{
   const D2D1::ColorF kColours[LOGMAX] = {
-    {1.f, 1.f, 0.f, 1.f }, // LOGTITLE
-    {1.f, 1.f, 1.f, 1.f }, // LOGNOTICE
-    {1.f, 0.5f, 0.5f, 1.f }, // LOGERROR
-    {0.5f, 0.5f, 0.8f, 1.f }, // LOGINFO
-    {0.5f, 0.8f, 0.5f, 1.f }, // LOGINFO1
-    {1.f, 1.f, 0.2f, 1.f }, // LOGINFO2
-    {0.8f, 0.1f, 0.8f, 1.f }, // LOGINFO3
+    {  1.f,  1.f,  0.f, 1.f }, // LOGTITLE
+    {  1.f,  1.f,  1.f, 1.f }, // LOGNOTICE
+    {  1.f, 0.5f, 0.5f, 1.f }, // LOGERROR
+    { 0.5f, 0.5f, 0.8f, 1.f }, // LOGINFO
+    { 0.5f, 0.8f, 0.5f, 1.f }, // LOGINFO1
+    {  1.f,  1.f, 0.2f, 1.f }, // LOGINFO2
+    { 0.8f, 0.1f, 0.8f, 1.f }, // LOGINFO3
     };
   //}}}
 
