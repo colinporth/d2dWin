@@ -232,6 +232,7 @@ private:
     bool wrap = toSrcIndex <= fromSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : toSrcIndex;
 
+    mBitmapTarget->BeginDraw();
     cRect bitmapRect;
     //{{{  clear bitmap chunk before wrap
     bitmapRect = { fromSrcIndex, mSrcFreqTop, endSrcIndex, mSrcOverviewTop };
@@ -329,6 +330,7 @@ private:
         }
       }
       //}}}
+    mBitmapTarget->EndDraw();
 
     // copy reversed spectrum column to bitmap, clip high freqs to height
     int freqSize = std::min (mSong.getNumFreqBytes(), (int)mFreqHeight);
@@ -391,7 +393,6 @@ private:
       std::min (playFrame + (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth, mSong.getLastFrame());
 
     bool allFramesOk = true;
-    mBitmapTarget->BeginDraw();
     if (mFramesBitmapOk &&
         (mFrameStep == mBitmapFrameStep) &&
         (rightFrame > mBitmapFirstFrame) && (leftFrame < mBitmapLastFrame)) {
@@ -425,7 +426,6 @@ private:
       //}}}
     mFramesBitmapOk = allFramesOk;
     mBitmapFrameStep = mFrameStep;
-    mBitmapTarget->EndDraw();
 
     // calc bitmap wrap chunks
     float leftSrcIndex = (float)getSrcIndex (leftFrame);
