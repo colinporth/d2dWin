@@ -1,15 +1,14 @@
 main wave
 - zoom out flashing to black
-- silence not wide enough, subpixel wrong
-- mark subpixel wrong
 - check -ve clear with div
 - cache failing, esp going backwards
+- mark subpixel wrong
+- silence not wide enough, subpixel wrong
 
 overview
-- show load graphic
-- cache failing going backwards
-- fix gaps
+- cache failing with filling backwards gaps
 - lens dim and flashing
+- show load graphic
 - graticules, for hls?
 
 sizing window flashing, short and crashes

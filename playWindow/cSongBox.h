@@ -159,15 +159,29 @@ public:
     drawFreq (dc, playFrame);
 
     if (mSong.hasHlsBase())
-      drawTime (dc, frameString (mSong.getFirstFrame()), frameString (mSong.getPlayFrame()), frameString (mSong.getLastFrame()));
+      drawTime (dc, getFrameString (mSong.getFirstFrame()),
+                    getFrameString (mSong.getPlayFrame()), getFrameString (mSong.getLastFrame()));
     else
-      drawTime (dc, L"", frameString (mSong.getPlayFrame()), frameString (mSong.getTotalFrames()));
+      drawTime (dc, L"", getFrameString (mSong.getPlayFrame()), getFrameString (mSong.getTotalFrames()));
     }
   //}}}
 
 private:
   //{{{
-  std::wstring frameString (uint64_t frame) {
+  int getSrcIndex (int frame) {
+    return (frame / mFrameStep) & mBitmapMask;
+    }
+  //}}}
+  //{{{
+  int getSignedSrcIndex (int frame) {
+    if (frame >= 0)
+      return (frame / mFrameStep) & mBitmapMask;
+    else
+      return (-((mFrameStep-1 - frame) / mFrameStep)) & mBitmapMask;
+    }
+  //}}}
+  //{{{
+  std::wstring getFrameString (uint64_t frame) {
 
     if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
       uint64_t hundredthSeconds = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
@@ -212,22 +226,22 @@ private:
     bool allFramesOk = true;
     auto firstFrame = mSong.getFirstFrame();
 
-    // clear bitmap as chunks, !!! -ve / wrong !!!
-    auto fromSrcIndex = float((fromFrame / mFrameStep) & mBitmapMask);
-    auto toSrcIndex = float((toFrame / mFrameStep) & mBitmapMask);
+    // clear bitmap as chunks
+    auto fromSrcIndex = (float)getSignedSrcIndex (fromFrame);
+    auto toSrcIndex = (float)getSrcIndex (toFrame);
     bool wrap = toSrcIndex <= fromSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : toSrcIndex;
 
     cRect bitmapRect;
     //{{{  clear bitmap chunk before wrap
-    bitmapRect = { fromSrcIndex, mSrcWaveTop, endSrcIndex, mSrcOverviewTop };
+    bitmapRect = { fromSrcIndex, mSrcFreqTop, endSrcIndex, mSrcOverviewTop };
     mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
     mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
     mBitmapTarget->PopAxisAlignedClip();
     //}}}
     if (wrap) {
       //{{{  clear bitmap chunk after wrap
-      bitmapRect = { 0.f, mSrcWaveTop, toSrcIndex, mSrcOverviewTop };
+      bitmapRect = { 0.f, mSrcFreqTop, toSrcIndex, mSrcOverviewTop };
       mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
       mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
       mBitmapTarget->PopAxisAlignedClip();
@@ -241,7 +255,7 @@ private:
       bool silence = false;
       float powerValues[2];
       float peakValues[2];
-      float srcIndex = float((frame / mFrameStep) & mBitmapMask);
+      float srcIndex = (float)getSrcIndex (frame);
 
       if (mFrameStep == 1) {
         //{{{  simple case, draw peak and power scaled to maxPeak
@@ -320,12 +334,12 @@ private:
     int freqSize = std::min (mSong.getNumFreqBytes(), (int)mFreqHeight);
     int freqOffset = mSong.getNumFreqBytes() > (int)mFreqHeight ? mSong.getNumFreqBytes() - (int)mFreqHeight : 0;
 
-    // bitmap sampled aligned to mFrameStep, !!! could sum !!!
+    // bitmap sampled aligned to mFrameStep, !!! could sum !!! ?? ok if neg frame ???
     auto alignedFromFrame = fromFrame - (fromFrame % mFrameStep);
     for (auto frame = alignedFromFrame; frame < toFrame; frame += mFrameStep) {
       auto framePtr = mSong.getFramePtr (frame);
       if (framePtr && framePtr->getFreqLuma()) {
-        uint32_t bitmapIndex = (frame / mFrameStep) & mBitmapMask;
+        uint32_t bitmapIndex = getSrcIndex (frame);
         D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
         mBitmap->CopyFromMemory (&bitmapRectU, framePtr->getFreqLuma() + freqOffset, 1);
         }
@@ -414,9 +428,9 @@ private:
     mBitmapTarget->EndDraw();
 
     // calc bitmap wrap chunks
-    float leftSrcIndex = (float)((leftFrame / mFrameStep) & mBitmapMask);
-    float rightSrcIndex = (float)((rightFrame / mFrameStep) & mBitmapMask);
-    float playSrcIndex = (float)((playFrame / mFrameStep) & mBitmapMask);
+    float leftSrcIndex = (float)getSrcIndex (leftFrame);
+    float rightSrcIndex = (float)getSrcIndex (rightFrame);
+    float playSrcIndex = (float)getSrcIndex (playFrame);
 
     bool wrap = rightSrcIndex <= leftSrcIndex;
     float endSrcIndex = wrap ? float(mBitmapWidth) : rightSrcIndex;
