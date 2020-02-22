@@ -420,6 +420,7 @@ public:
 
   void init (const std::string& title, int width, int height, bool fullScreen);
 
+  cBox* add (cBox* box);
   cBox* add (cBox* box, cPoint pos);
   cBox* add (cBox* box, float x, float y);
   cBox* addRight (cBox* box, float offset = 1.0f);

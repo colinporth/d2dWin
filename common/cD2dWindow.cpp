@@ -150,6 +150,13 @@ system_clock::time_point cD2dWindow::getNow() {
 //}}}
 
 //{{{
+cD2dWindow::cBox* cD2dWindow::add (cBox* box) {
+  mBoxes.push_back (box);
+  box->setPos ({ 0.f, 0.f });
+  return box;
+  }
+//}}}
+//{{{
 cD2dWindow::cBox* cD2dWindow::add (cBox* box, cPoint pos) {
   mBoxes.push_back (box);
   box->setPos (pos);

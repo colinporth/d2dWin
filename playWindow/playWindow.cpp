@@ -32,21 +32,20 @@ public:
 
     add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
-    add (new cSongBox (this, 0.f,0.f, mSong), 0.f,0.f);
-    add (new cLogBox (this, 100.f,0.f, true), 0.f,0.f)->setPin (false);
+    add (new cSongBox (this, 0.f,0.f, mSong));
+    add (new cLogBox (this, 100.f,0.f, true))->setPin (false);
 
     // last box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (name.empty()) {
-      add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,0.f);
-
+      add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
       //{{{  add radio 1 to 6 boxes
       add (new cBmpBox (this, 40.f, 40.f, r1x80, 1, [&](cBox* box) mutable noexcept {
         shared_lock<shared_mutex> lock (mSong.getSharedMutex());
         mSong.setHlsChan ("bbc_radio_one");
         mSongChanged = true;
-        } ), 0.f, 0.f);
+        } ));
 
       addRight (new cBmpBox (this, 40.f, 40.f, r2x80, 2, [&](cBox* box) mutable noexcept {
         shared_lock<shared_mutex> lock (mSong.getSharedMutex());
