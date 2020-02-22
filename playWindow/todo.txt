@@ -43,7 +43,7 @@ play
 - ??? don't play silence/mute ???
 
 boxes
-- callbacks, onhit to bmpBox first
+- generic callback???
 
 jpeg tag
  - westwing jpeg no SOI, should manage jpegImage deletion in fileThread

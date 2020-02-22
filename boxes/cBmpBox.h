@@ -29,6 +29,7 @@ public:
 private:
   //{{{
   void init() {
+
     mSizeX = *(mBmp + 0x12);
     mSizeY = *(mBmp + 0x16);
 
@@ -48,6 +49,7 @@ private:
         }
       mBitmap->CopyFromMemory (&D2D1::RectU (0, y, mSizeX, y+1), line, mSizeX*4);
       }
+
     free (line);
     }
   //}}}
