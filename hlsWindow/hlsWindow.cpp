@@ -41,16 +41,35 @@ public:
     init (title, width, height, false);
     add (new cCalendarBox (this, 190.f,160.f), -190.f - 24.f,0);
     add (new cHlsDotsBox (this, 18.f,60.f, this), -24.f, 0);
-    addRight (new cHlsPeakBox (this, 0,0, this));
+    add (new cHlsPeakBox (this, 0,0, this));
 
     add (new cLogBox (this, 100.f,0, true), 0.f,0.f)->setPin (false);
-
-    add (new cBmpBox (this, 60.f, 60.f, r1x80, 1, mChan, mChanChanged), 0.f,0.f);
-    addRight(new cBmpBox (this, 60.f, 60.f, r2x80, 2, mChan, mChanChanged));
-    addRight(new cBmpBox (this, 60.f, 60.f, r3x80, 3, mChan, mChanChanged));
-    addRight(new cBmpBox (this, 60.f, 60.f, r4x80, 4, mChan, mChanChanged));
-    addRight(new cBmpBox (this, 60.f, 60.f, r5x80, 5, mChan, mChanChanged));
-    addRight(new cBmpBox (this, 60.f, 60.f, r6x80, 6, mChan, mChanChanged));
+    //{{{  add chan1 to 6 bmp boxes
+    add (new cBmpBox (this, 60.f, 60.f, r1x80, 1, [&](cBox* box) mutable noexcept {
+      mChan = 1; 
+      mChanChanged = true; 
+      } ));
+    addRight (new cBmpBox (this, 60.f, 60.f, r2x80, 2, [&](cBox* box) mutable noexcept {
+      mChan = 2;
+      mChanChanged = true;
+      } ));
+    addRight (new cBmpBox (this, 60.f, 60.f, r3x80, 3, [&](cBox* box) mutable noexcept {
+      mChan = 3;
+      mChanChanged = true;
+      } ));
+    addRight (new cBmpBox (this, 60.f, 60.f, r4x80, 4, [&](cBox* box) mutable noexcept {
+      mChan = 4;
+      mChanChanged = true;
+      } ));
+    addRight (new cBmpBox (this, 60.f, 60.f, r5x80, 5, [&](cBox* box) mutable noexcept {
+      mChan = 5;
+      mChanChanged = true;
+      } ));
+    addRight (new cBmpBox (this, 60.f, 60.f, r6x80, 6, [&](cBox* box) mutable noexcept {
+      mChan = 6;
+      mChanChanged = true;
+      } ));
+    //}}}
     //add (new cClockBox (this, 40.f, mTimePoint), -82.f,-82.f);
 
     mVolumeBox = new cVolumeBox (this, 12.f,0, nullptr);

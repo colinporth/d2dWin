@@ -418,7 +418,7 @@ public:
   void setChangeCountDown (int countDown) { mChangeCountDown = countDown; }
   //}}}
 
-  void init (const std::string& title, int width, int height, bool fullScreen);
+  void init (const std::string& title, int width = 1920, int height = 1080, bool fullScreen = false);
 
   cBox* add (cBox* box);
   cBox* add (cBox* box, cPoint pos);

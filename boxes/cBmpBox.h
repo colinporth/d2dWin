@@ -10,34 +10,17 @@ class cBmpBox : public cD2dWindow::cBox {
 public:
   //{{{
   cBmpBox (cD2dWindow* window, float width, float height, const uint8_t* bmp, int myValue,
-           int& value, bool& valueChanged)
-      : cBox("bmp", window, width, height), mBmp(bmp), mMyValue(myValue),
-        mValue(value), mValueChanged(valueChanged) {
-
+           std::function<void (cBox* box)> hitCallback)
+      : cBox("bmp", window, width, height, std::move(hitCallback)), mBmp(bmp), mMyValue(myValue) {
     init();
     }
   //}}}
-  //{{{
-  cBmpBox (cD2dWindow* window, float width, float height, const uint8_t* bmp, int myValue,
-           const std::function<void (cBox* box)> hitCallback)
-      : cBox("bmp", window, width, height, std::move(hitCallback)),
-        mBmp(bmp), mMyValue(myValue), mValue (mDefaultValue), mValueChanged (mDefaultValueChanged) {
-
-    init();
-    }
-  //}}}
-
   virtual ~cBmpBox() {}
 
-  //{{{
   bool onDown (bool right, cPoint pos)  {
-
-    mValue = mMyValue;
-    mValueChanged = true;
     mHitCallback (this);
     return true;
     }
-  //}}}
 
   void onDraw (ID2D1DeviceContext* dc) {
     dc->DrawBitmap (mBitmap, mRect);
@@ -71,12 +54,6 @@ private:
 
   const uint8_t* mBmp;
   int mMyValue;
-
-  int& mValue;
-  bool& mValueChanged;
-
-  int mDefaultValue = 0;;
-  bool mDefaultValueChanged = false;
 
   ID2D1Bitmap* mBitmap = nullptr;
   int mSizeX = 0;

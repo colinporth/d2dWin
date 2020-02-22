@@ -16,7 +16,6 @@ using namespace std;
 using namespace concurrency;
 //}}}
 //{{{  const
-const int kFullScreen = true;
 const int kThumbThreads = 2;
 const float kPi = 3.14159265358979323846f;
 //}}}
@@ -25,9 +24,9 @@ class cAppWindow : public cD2dWindow {
 public:
   cAppWindow() : mFileScannedSem("fileScanned") {}
   //{{{
-  void run (const string& title, int width, int height, string name) {
+  void run (const string& title, string name) {
 
-    init (title, width, height, kFullScreen);
+    init (title);
     add (new cClockBox (this, 50.f), -110.f,-120.f);
     add (new cCalendarBox (this, 190.f,150.f), -190.f-120.f,-150.f);
     add (new cLogBox (this, 100.f,0.f, true), 0.f,0.f);
@@ -802,7 +801,7 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     rootDirName = "C:/Users/colin/Pictures";
 
   cAppWindow window;
-  window.run ("jpegWindow", 1920/2, 1080/2, rootDirName);
+  window.run ("jpegWindow", rootDirName);
 
   CoUninitialize();
   }
