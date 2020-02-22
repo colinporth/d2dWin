@@ -9,9 +9,9 @@
 class cBmpBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cBmpBox (cD2dWindow* window, float width, float height, const uint8_t* bmp, int myValue,
+  cBmpBox (cD2dWindow* window, float width, float height, const uint8_t* bmp, int index,
            std::function<void (cBox* box)> hitCallback)
-      : cBox("bmp", window, width, height, std::move(hitCallback)), mBmp(bmp), mMyValue(myValue) {
+      : cBox("bmpBox", window, width, height, std::move(hitCallback)), mBmp(bmp), mIndex(index) {
     init();
     }
   //}}}
@@ -33,21 +33,23 @@ private:
     mSizeX = *(mBmp + 0x12);
     mSizeY = *(mBmp + 0x16);
 
-    mWindow->getDc()->CreateBitmap (D2D1::SizeU(mSizeX, mSizeY),
+    mWindow->getDc()->CreateBitmap ({ mSizeX, mSizeY },
                                     { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
                                     &mBitmap);
 
     auto bmpPtr = (uint8_t*)mBmp+54;
     auto line = (uint8_t*)malloc (mSizeX*4);
-    for (auto y = 0; y < mSizeY; y++) {
+    for (UINT32 y = 0; y < mSizeY; y++) {
       auto linePtr = line;
-      for (auto x = 0; x < mSizeX; x++) {
+      for (UINT32 x = 0; x < mSizeX; x++) {
         *linePtr++ = *bmpPtr++;
         *linePtr++ = *bmpPtr++;
         *linePtr++ = *bmpPtr++;
         *linePtr++ = 255;
         }
-      mBitmap->CopyFromMemory (&D2D1::RectU (0, y, mSizeX, y+1), line, mSizeX*4);
+
+      D2D1_RECT_U rectU = { 0, y, mSizeX, y+1 };
+      mBitmap->CopyFromMemory (&rectU, line, mSizeX*4);
       }
 
     free (line);
@@ -55,9 +57,9 @@ private:
   //}}}
 
   const uint8_t* mBmp;
-  int mMyValue;
+  const int mIndex;
 
+  UINT32 mSizeX = 0;
+  UINT32 mSizeY = 0;
   ID2D1Bitmap* mBitmap = nullptr;
-  int mSizeX = 0;
-  int mSizeY = 0;
   };

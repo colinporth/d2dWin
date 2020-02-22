@@ -157,7 +157,7 @@ public:
   protected:
     //{{{
     float measureText (ID2D1DeviceContext* dc, const std::string& str, IDWriteTextFormat* textFormat,
-                       const cRect& r, float textHeight) {
+                       const cRect& r, float fontSize) {
 
       IDWriteTextLayout* textLayout;
       mWindow->getDwriteFactory()->CreateTextLayout (
@@ -165,12 +165,29 @@ public:
         r.getWidth(), r.getHeight(), &textLayout);
 
       if (textLayout) {
-        textLayout->SetFontSize (textHeight, {0, (uint32_t)str.size()});
-
+        textLayout->SetFontSize (fontSize, {0, (uint32_t)str.size()});
         struct DWRITE_TEXT_METRICS textMetrics;
         textLayout->GetMetrics (&textMetrics);
         textLayout->Release();
 
+        return textMetrics.width;
+        }
+      else
+        return 0;
+      }
+    //}}}
+    //{{{
+    float measureText (ID2D1DeviceContext* dc, const std::wstring& wstr, IDWriteTextFormat* textFormat,
+                       const cRect& r, float fontSize) {
+
+      IDWriteTextLayout* textLayout;
+      mWindow->getDwriteFactory()->CreateTextLayout (wstr.data(), (uint32_t)wstr.size(), textFormat,
+                                                     r.getWidth(), r.getHeight(), &textLayout);
+      if (textLayout) {
+        textLayout->SetFontSize (fontSize, {0, (uint32_t)wstr.size()});
+        struct DWRITE_TEXT_METRICS textMetrics;
+        textLayout->GetMetrics (&textMetrics);
+        textLayout->Release();
         return textMetrics.width;
         }
       else
@@ -188,34 +205,10 @@ public:
 
       if (textLayout) {
         textLayout->SetFontSize (textHeight, {0, (uint32_t)str.size()});
-
         struct DWRITE_TEXT_METRICS textMetrics;
         textLayout->GetMetrics (&textMetrics);
-
         dc->DrawTextLayout (r.getTL(), textLayout, brush);
         textLayout->Release();
-
-        return textMetrics.width;
-        }
-      else
-        return 0;
-      }
-    //}}}
-
-    //{{{
-    float measureText (ID2D1DeviceContext* dc, const std::wstring& wstr, IDWriteTextFormat* textFormat,
-                       const cRect& r, float textHeight) {
-
-      IDWriteTextLayout* textLayout;
-      mWindow->getDwriteFactory()->CreateTextLayout (wstr.data(), (uint32_t)wstr.size(), textFormat,
-                                                     r.getWidth(), r.getHeight(), &textLayout);
-      if (textLayout) {
-        textLayout->SetFontSize (textHeight, {0, (uint32_t)wstr.size()});
-
-        struct DWRITE_TEXT_METRICS textMetrics;
-        textLayout->GetMetrics (&textMetrics);
-        textLayout->Release();
-
         return textMetrics.width;
         }
       else
@@ -231,13 +224,10 @@ public:
                                                      r.getWidth(), r.getHeight(), &textLayout);
       if (textLayout) {
         textLayout->SetFontSize (textHeight, {0, (uint32_t)wstr.size()});
-
         struct DWRITE_TEXT_METRICS textMetrics;
         textLayout->GetMetrics (&textMetrics);
-
         dc->DrawTextLayout (r.getTL(), textLayout, brush);
         textLayout->Release();
-
         return textMetrics.width;
         }
       else

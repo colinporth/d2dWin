@@ -1,6 +1,5 @@
 main wave
 - zoom out flashing to black
-- check -ve clear with div
 - cache failing, esp going backwards
 - mark subpixel wrong
 - silence not wide enough, subpixel wrong
@@ -43,7 +42,7 @@ play
 - ??? don't play silence/mute ???
 
 boxes
-- generic callback???
+- generic callbacks???
 
 jpeg tag
  - westwing jpeg no SOI, should manage jpegImage deletion in fileThread

@@ -1,11 +1,8 @@
 // cLogBox.h
-//{{{  includes
 #pragma once
-
 #include "../common/cD2dWindow.h"
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/date.h"
-//}}}
 
 class cLogBox : public cD2dWindow::cBox {
 public:

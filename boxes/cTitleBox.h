@@ -6,13 +6,10 @@
 
 class cTitleBox : public cD2dWindow::cBox {
 public:
-  //{{{
   cTitleBox (cD2dWindow* window, float width, float height, std::string& title)
-      : cBox("title", window, width, height), mTitle(title) {}
-  //}}}
+    : cBox("title", window, width, height), mTitle(title) {}
   virtual ~cTitleBox() {}
 
-  //{{{
   void onDraw (ID2D1DeviceContext* dc) {
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
@@ -22,9 +19,8 @@ public:
       dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
       dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
       textLayout->Release();
-      } 
+      }
     }
-  //}}}
 
 private:
   std::string& mTitle;
