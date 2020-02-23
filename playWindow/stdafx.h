@@ -76,4 +76,6 @@ extern "C" {
   #include "libswresample/swresample.h"
   }
 
+#include "../../shared/net/cUrl.h"
+#include "../../shared/net/cHttp.h"
 #include "../../shared/net/cWinSockHttp.h"

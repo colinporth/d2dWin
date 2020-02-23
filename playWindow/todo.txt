@@ -15,10 +15,9 @@ sizing window flashing, short and crashes
 hls, shoutcast
 - hls
   - show bitrate
-  - chan in icon
 - shoutcast
-  - show chan
-  - title display broken
+  - add channel list
+  - song title display broken
 
 editing
 - mute marking
@@ -48,7 +47,6 @@ jpeg tag
  - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
 
 command line invocation
-- shoutcast/hls/fileList choice
 - filelist broken
 - list of files
 - links to directories, files

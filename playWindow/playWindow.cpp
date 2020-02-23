@@ -39,48 +39,67 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (name.empty()) {
-      // radio 1..6 icons
-      add (new cBmpBox (this, 40.f,40.f, r1x80, 
+      //{{{  hls radio 1..6
+      add (new cBmpBox (this, 40.f,40.f, r1x80,
            [&](cBox* box) { mSong.setChan ("bbc_radio_one"); mChanged = true; } ));
+
       addRight (new cBmpBox (this, 40.f,40.f, r2x80,
                 [&](cBox* box) { mSong.setChan ("bbc_radio_two"); mChanged = true; } ));
-      addRight (new cBmpBox (this, 40.f,40.f, r3x80, 
+
+      addRight (new cBmpBox (this, 40.f,40.f, r3x80,
                 [&](cBox* box) { mSong.setChan ("bbc_radio_three"); mChanged = true; } ));
+
       addRight (new cBmpBox (this, 40.f,40.f, r4x80,
                 [&](cBox* box) { mSong.setChan ("bbc_radio_fourfm"); mChanged = true; } ));
-      addRight (new cBmpBox (this, 40.f,40.f, r5x80, 
+
+      addRight (new cBmpBox (this, 40.f,40.f, r5x80,
                 [&](cBox* box) { mSong.setChan ("bbc_radio_five_live"); mChanged = true; } ));
+
       addRight (new cBmpBox (this, 40.f,40.f, r6x80,
                 [&](cBox* box) { mSong.setChan ("bbc_6music"); mChanged = true; } ));
 
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
-
-      //{{{  urls
-      //const string url = "http://stream.wqxr.org/wqxr.aac";
-      //const string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
-      //const string url = "http://us4.internet-radio.com:8266/";
-      //const string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";
-      //const string url = "http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac";
-      //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
-      //}}}
-      //thread ([=]() { icyThread ("http://stream.wqxr.org/js-stream.aac"); }).detach();
-      thread ([=](){ playThread(); }).detach();
+      thread ([=]() { playThread(); }).detach();
       }
+      //}}}
     else {
-      mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
-      if (!mFileList->empty()) {
-        thread([=]() { mFileList->watchThread(); }).detach();
-        add (new cFileListBox (this, 0.f,-220.f, mFileList,
-             [&](cBox* box) { mChanged = true; }))->setPin (true);
+      cUrl url;
+      url.parse (name);
+      if (url.getScheme() == "http") {
+        //{{{  shoutcast
+        //{{{  urls
+        //const string url = "http://stream.wqxr.org/wqxr.aac";
+        //const string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
+        //const string url = "http://us4.internet-radio.com:8266/";
+        //const string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";
+        //const string url = "http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac";
+        //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
+        //}}}
+        mDebugStr = "shoutcast " + url.getHost() + " channel " + url.getPath();
+        add (new cTitleBox (this, 500.f,20.f, mDebugStr));
 
-        mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
-        addFront (mJpegImageView);
-
-        thread ([=](){ fileThread(); }).detach();
-        thread ([=](){ playThread(); }).detach();
+        thread ([=]() { icyThread (name); }).detach();
+        thread ([=]() { playThread(); }).detach();
         }
+        //}}}
+      else {
+        //{{{  filelist
+        mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
+        if (!mFileList->empty()) {
+          thread([=]() { mFileList->watchThread(); }).detach();
+          add (new cFileListBox (this, 0.f,-220.f, mFileList,
+               [&](cBox* box) { mChanged = true; }))->setPin (true);
+
+          mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
+          addFront (mJpegImageView);
+
+          thread ([=]() { fileThread(); }).detach();
+          thread ([=]() { playThread(); }).detach();
+          }
+        }
+        //}}}
       }
 
     // loop till quit
@@ -173,7 +192,6 @@ private:
   //}}}
   //{{{
   void addIcyInfo (const string& icyInfo) {
-  // called by httpThread
 
     cLog::log (LOGINFO1, "addIcyInfo " + icyInfo);
 
@@ -321,7 +339,7 @@ private:
     cAudioDecode decode (cAudioDecode::eAac);
     float* samples = nullptr;
 
-    cHttp::cUrl parsedUrl;
+    cUrl parsedUrl;
     parsedUrl.parse (url);
 
     cWinSockHttp http;
