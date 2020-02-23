@@ -50,6 +50,9 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
+    if (mPin)
+      dc->FillRectangle ({ 0.f,0.f, mWindow->getWidth(),mWindow->getHeight() }, mWindow->getDimBgndBrush());
+
     std::chrono::system_clock::time_point lastTimePoint;
 
     cLog::cLine logLine;

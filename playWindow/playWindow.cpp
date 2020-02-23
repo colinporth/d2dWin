@@ -29,14 +29,9 @@ public:
   void run (const string& title, int width, int height, const string& name) {
 
     init (title + " " + name, width, height, false);
-
     add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
-    add (new cLogBox (this, 100.f,0.f, true))->setPin (false);
-
-    // last box
-    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (name.empty()) {
       //{{{  hls radio 1..6
@@ -61,7 +56,6 @@ public:
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
-      thread ([=]() { playThread(); }).detach();
       }
       //}}}
     else {
@@ -81,7 +75,6 @@ public:
         add (new cTitleBox (this, 500.f,20.f, mDebugStr));
 
         thread ([=]() { icyThread (name); }).detach();
-        thread ([=]() { playThread(); }).detach();
         }
         //}}}
       else {
@@ -89,6 +82,7 @@ public:
         mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
         if (!mFileList->empty()) {
           thread([=]() { mFileList->watchThread(); }).detach();
+
           add (new cFileListBox (this, 0.f,-220.f, mFileList,
                [&](cBox* box) { mChanged = true; }))->setPin (true);
 
@@ -96,11 +90,16 @@ public:
           addFront (mJpegImageView);
 
           thread ([=]() { fileThread(); }).detach();
-          thread ([=]() { playThread(); }).detach();
           }
         }
         //}}}
       }
+    thread ([=]() { playThread(); }).detach();
+
+    add (new cLogBox (this, 100.f,0.f, true))->setPin (false);
+
+    // exit box
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     // loop till quit
     messagePump();
@@ -227,6 +226,8 @@ private:
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
   // - host is redirected, assumes bbc radio aac, 48000 sampleaRate
+
+    constexpr int kHlsPreload = 10; // about a minute
 
     cLog::setThreadName ("hls ");
     mSong.setChan (chan);
@@ -566,7 +567,6 @@ private:
     }
   //}}}
 
-  const static int kHlsPreload = 10; // about a minute
   //{{{  vars
   cFileList* mFileList = nullptr;
 

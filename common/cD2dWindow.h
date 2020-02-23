@@ -376,12 +376,13 @@ public:
   IDWriteTextFormat* getConsoleTextFormat() { return mConsoleTextFormat.Get(); }
 
   // brushes
+  ID2D1SolidColorBrush* getDimBgndBrush() { return mDimBgndBrush.Get(); }
+  ID2D1SolidColorBrush* getTransparentBgndBrush() { return mTransparentBgndBrush.Get(); }
   ID2D1SolidColorBrush* getBlackBrush() { return mBlackBrush.Get(); }
   ID2D1SolidColorBrush* getDarkGreyBrush() { return mDarkGreyBrush.Get(); }
   ID2D1SolidColorBrush* getGreyBrush() { return mGreyBrush.Get(); }
   ID2D1SolidColorBrush* getLightGreyBrush() { return mLightGreyBrush.Get(); }
   ID2D1SolidColorBrush* getWhiteBrush() { return mWhiteBrush.Get(); }
-  ID2D1SolidColorBrush* getTransparentBgndBrush() { return mTransparentBgndBrush.Get(); }
   ID2D1SolidColorBrush* getDarkBlueBrush() { return mDarkBlueBrush.Get(); }
   ID2D1SolidColorBrush* getBlueBrush() { return mBlueBrush.Get(); }
   ID2D1SolidColorBrush* getGreenBrush() { return mGreenBrush.Get(); }
@@ -486,12 +487,13 @@ private:
   Microsoft::WRL::ComPtr<IDWriteTextFormat> mTextFormat;
   Microsoft::WRL::ComPtr<IDWriteTextFormat> mConsoleTextFormat;
 
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDimBgndBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mTransparentBgndBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mBlackBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDarkGreyBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mGreyBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mLightGreyBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mWhiteBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mTransparentBgndBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDarkBlueBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mBlueBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mGreenBrush;

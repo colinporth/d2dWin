@@ -492,7 +492,7 @@ void cD2dWindow::createDirect2d() {
   // create a consoleTextFormat
   mDWriteFactory->CreateTextFormat (
     L"Consolas", NULL, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-    kConsoleHeight, L"en-us", 
+    kConsoleHeight, L"en-us",
     &mConsoleTextFormat);
 
   // create some common solidBrushes
@@ -501,6 +501,7 @@ void cD2dWindow::createDirect2d() {
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Gray), &mGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::LightGray), &mLightGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::White), &mWhiteBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black, 0.6f), &mDimBgndBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (0.1f, 0.1f, 0.1f, 0.5f), &mTransparentBgndBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Red), &mRedBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::GreenYellow), &mGreenBrush);
