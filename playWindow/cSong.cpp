@@ -37,7 +37,7 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   mSamplesPerFrame = samplesPerFrame;
   fftrConfig = kiss_fftr_alloc (mSamplesPerFrame, 0, 0, 0);
 
-  mHasHlsBase = false;
+  mHlsBaseValid = false;
   }
 //}}}
 //{{{
@@ -162,7 +162,7 @@ void cSong::setHlsBase (int baseChunkNum, system_clock::time_point baseTimePoint
   mPlayFrame = mHlsBaseFrame;
 
   mStreaming = true;
-  mHasHlsBase = true;
+  mHlsBaseValid = true;
   }
 //}}}
 //{{{
@@ -192,19 +192,116 @@ void cSong::setHlsLoad (eHlsLoad hlsLoad, int chunkNum) {
 
 // incs
 //{{{
-void cSong::incPlayFrame (int frames) {
+void cSong::incPlayFrame (int frames, bool useSelectRange) {
 
   int playFrame = mPlayFrame + frames;
-  if (!mHasHlsBase || (playFrame >= 0))
-    // simple case, clip to playFrame 0
-    setPlayFrame (playFrame);
+
+  if (useSelectRange && inSelectRange (mPlayFrame))
+    if (playFrame > mSelectLastFrame)
+      playFrame = mSelectFirstFrame;
+
+  if (hasHlsBase())
+    mPlayFrame = min (playFrame, getLastFrame()+1);
   else
-    mPlayFrame += frames;
+    mPlayFrame = min (max (playFrame, 0), getLastFrame()+1);
   }
 //}}}
 //{{{
-void cSong::incPlaySec (int secs) {
-  incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame);
+void cSong::incPlaySec (int secs, bool useSelectRange) {
+  incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame, useSelectRange);
+  }
+//}}}
+
+//{{{
+void cSong::clearSelect() {
+
+  // select
+  mSelectValid = false;
+  mSelectFirstFrame = 0;
+  mSelectLastFrame = 0;
+
+  // select editing
+  mSelectEdit = eSelectEditNone;
+  mSelectEditFrame = 0;
+  }
+//}}}
+//{{{
+void cSong::markSelect() {
+
+  // select
+  if (mSelectValid) {
+    mSelectLastFrame = mPlayFrame;
+    }
+  else {
+    mSelectValid = true;
+    mSelectFirstFrame = mPlayFrame;
+    mSelectLastFrame = mPlayFrame;
+    mSelectEdit = eSelectEditLast;
+    }
+
+  mSelectEditFrame = mPlayFrame;
+  }
+//}}}
+//{{{
+void cSong::startSelect (int frame) {
+
+  if (mSelectValid) {
+    // pick from select range
+    if (abs(frame - mSelectFirstFrame) < 2)
+      mSelectEdit = eSelectEditFirst;
+    else if (abs(frame - mSelectLastFrame) < 2)
+      mSelectEdit = eSelectEditLast;
+    else if (inSelectRange (frame))
+      mSelectEdit = eSelectEditRange;
+    }
+  else {
+    // start new select
+    mSelectValid = true;
+    mSelectFirstFrame = frame;
+    mSelectLastFrame = frame;
+
+    mSelectEdit = eSelectEditLast;
+    }
+  mSelectEditFrame = frame;
+  }
+//}}}
+//{{{
+void cSong::moveSelect (int frame) {
+
+  if (mSelectValid) {
+    switch (mSelectEdit) {
+      case eSelectEditFirst:
+        mSelectFirstFrame = frame;
+        if (mSelectFirstFrame > mSelectLastFrame) {
+          mSelectLastFrame = frame;
+          mSelectFirstFrame = mSelectLastFrame;
+          }
+        break;
+
+      case eSelectEditLast:
+        mSelectLastFrame = frame;
+        if (mSelectLastFrame < mSelectFirstFrame) {
+          mSelectFirstFrame = frame;
+          mSelectLastFrame = mSelectFirstFrame;
+          }
+        break;
+
+      case eSelectEditRange:
+        mSelectFirstFrame += frame - mSelectEditFrame;
+        mSelectLastFrame += frame - mSelectEditFrame;
+        mSelectEditFrame = frame;
+        break;
+
+      default:
+        cLog::log (LOGERROR, "moving invalid select");
+      }
+    }
+  }
+//}}}
+//{{{
+void cSong::endSelect (int frame) {
+
+  mSelectEdit = eSelectEditNone;
   }
 //}}}
 
@@ -226,6 +323,14 @@ void cSong::nextSilencePlayFrame() {
 
 // private
 //{{{
+bool cSong::inSelectRange (int frame) {
+// ignore 1 frame select range
+  return mSelectValid && 
+         (mSelectLastFrame > mSelectFirstFrame) && 
+         (frame >= mSelectFirstFrame) && (frame <= mSelectLastFrame);
+  }
+//}}}
+//{{{
 void cSong::clearFrames() {
 
   // new id for any cache
@@ -234,6 +339,7 @@ void cSong::clearFrames() {
   // reset frames
   mPlayFrame = 0;
   mTotalFrames = 0;
+  clearSelect();
 
   for (auto frame : mFrameMap)
     delete (frame.second);

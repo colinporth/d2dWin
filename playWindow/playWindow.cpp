@@ -119,35 +119,41 @@ protected:
       case 0x1B: return true;
       case 'F' : toggleFullScreen(); break;
       case 'L' : mLogBox->togglePin(); break;
+      case 'M' : mSong.markSelect(); changed(); break;
 
       case ' ' : mPlaying = !mPlaying; break;
 
       case 0x21: mSong.prevSilencePlayFrame(); changed(); break;; // page up
       case 0x22: mSong.nextSilencePlayFrame(); changed(); break;; // page down
 
-      case 0x25: mSong.incPlaySec (getShift() ? -300 : getControl() ? -10 : -1);  changed(); break; // left arrow  - 1 sec
-      case 0x27: mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1);  changed(); break; // right arrow  + 1 sec
+      case 0x25: mSong.incPlaySec (getShift() ? -300 : getControl() ? -10 : -1, false);  changed(); break; // left arrow  - 1 sec
+      case 0x27: mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);  changed(); break; // right arrow  + 1 sec
 
-      case 0x24: mSong.setPlayFrame (mSong.getFirstFrame()); changed(); break; // home
-      case 0x23: mSong.setPlayFrame (mSong.getLastFrame()); changed(); break; // end
+      case 0x24: mSong.setPlayFrame (
+        mSong.hasSelect() ? mSong.getSelectFirstFrame() : mSong.getFirstFrame()); changed(); break; // home
+      case 0x23: mSong.setPlayFrame (
+        mSong.hasSelect() ? mSong.getSelectLastFrame() : mSong.getLastFrame()); changed(); break; // end
 
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
+
+      case 0x2e: mSong.clearSelect(); changed(); break;; // delete
+
       case 0x0d: mChanged = true; changed(); break; // enter - play file
 
       // crude chan,bitrate change
-      case '1' : mChanged = true; mSong.setChan ("bbc_radio_one"); break;
-      case '2' : mChanged = true; mSong.setChan ("bbc_radio_two"); break;
-      case '3' : mChanged = true; mSong.setChan ("bbc_radio_three"); break;
-      case '4' : mChanged = true; mSong.setChan ("bbc_radio_fourfm"); break;
-      case '5' : mChanged = true; mSong.setChan ("bbc_radio_five_live"); break;
-      case '6' : mChanged = true; mSong.setChan ("bbc_6music"); break;
-      case '7' : mChanged = true; mSong.setBitrate (48000); break;
-      case '8' : mChanged = true; mSong.setBitrate (96000); break;
-      case '9' : mChanged = true; mSong.setBitrate (128000); break;
-      case '0' : mChanged = true; mSong.setBitrate (320000); break;
+      case '1' : mSong.setChan ("bbc_radio_one"); mChanged = true; break;
+      case '2' : mSong.setChan ("bbc_radio_two"); mChanged = true; break;
+      case '3' : mSong.setChan ("bbc_radio_three"); mChanged = true; break;
+      case '4' : mSong.setChan ("bbc_radio_fourfm"); mChanged = true;  break;
+      case '5' : mSong.setChan ("bbc_radio_five_live"); mChanged = true; break;
+      case '6' : mSong.setChan ("bbc_6music"); mChanged = true; break;
+      case '7' : mSong.setBitrate (48000); mChanged = true; break;
+      case '8' : mSong.setBitrate (96000); mChanged = true; break;
+      case '9' : mSong.setBitrate (128000); mChanged = true; break;
+      case '0' : mSong.setBitrate (320000); mChanged = true; break;
 
-      default  : cLog::log (LOGINFO, "key %x", key);
+      default  : cLog::log (LOGINFO, "key %x", key); mChanged = true; break;
       }
 
     return false;
@@ -553,7 +559,7 @@ private:
                 srcSamples = samples;
                 }
               numSrcSamples = mSong.getSamplesPerFrame();
-              mSong.incPlayFrame (1);
+              mSong.incPlayFrame (1, true);
               changed();
               });
             }

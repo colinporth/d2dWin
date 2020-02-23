@@ -75,7 +75,7 @@ public:
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
   void addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples);
 
-  enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed } ;
+  enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed} ;
   //{{{  gets
   std::shared_mutex& getSharedMutex() { return mSharedMutex; }
   bool getStreaming() { return mStreaming; }
@@ -109,12 +109,17 @@ public:
     auto it = mFrameMap.find (frame);
     return (it == mFrameMap.end()) ? nullptr : it->second; }
 
+  // selects
+  bool hasSelect() { return mSelectValid; }
+  int getSelectFirstFrame() { return mSelectFirstFrame; }
+  int getSelectLastFrame() { return mSelectLastFrame; }
+
   // info
   int getBitrate() { return mBitrate; }
   std::string getChan() { return mChan; }
 
   // hls
-  bool hasHlsBase() { return mHasHlsBase; }
+  bool hasHlsBase() { return mHlsBaseValid; }
   eHlsLoad getHlsLoad() { return mHlsLoad; }
 
   int getHlsLoadChunkNum (std::chrono::system_clock::time_point now, std::chrono::seconds secs, int preload);
@@ -145,15 +150,23 @@ public:
   //}}}
 
   // incs
-  void incPlaySec (int secs);
-  void incPlayFrame (int frames);
+  void incPlaySec (int secs, bool useSelectRange);
+  void incPlayFrame (int frames, bool useSelectRange);
+
+  void clearSelect();
+  void markSelect();
+  void startSelect (int frame);
+  void moveSelect (int frame);
+  void endSelect (int frame);
 
   // actions
   void prevSilencePlayFrame();
   void nextSilencePlayFrame();
 
 private:
+  bool inSelectRange (int frame);
   void clearFrames();
+
   void checkSilenceWindow (int frame);
   int skipPrev (int fromFrame, bool silence);
   int skipNext (int fromFrame, bool silence);
@@ -177,22 +190,31 @@ private:
   int mPlayFrame = 0;
   int mTotalFrames = 0;
 
+  bool mSelectValid = false;
+  int mSelectFirstFrame = 0;
+  int mSelectLastFrame = 0;
+  enum eSelectEdit { eSelectEditNone, eSelectEditFirst, eSelectEditLast, eSelectEditRange };
+  eSelectEdit mSelectEdit = eSelectEditNone;
+  int mSelectEditFrame = 0;
+
+
+  //{{{  max stuff for ui values
   float mMaxPowerValue = 0.f;
   float mMaxPeakValue = 0.f;
   float mMaxFreqValue = 0.f;
-
+  //}}}
   //{{{  hls vars
   std::string mChan;
   int mBitrate = 0;
-  int mHlsFramesPerChunk = 0;
 
-  bool mHasHlsBase = false;
+  bool mHlsBaseValid = false;
   int mHlsBaseChunkNum = 0;
   int mHlsBaseFrame = 0;
   std::chrono::system_clock::time_point mHlsBaseTimePoint;
 
-  eHlsLoad mHlsLoad = eHlsIdle;
+  int mHlsFramesPerChunk = 0;
   int eHlsFailedChunkNum = 0;
+  eHlsLoad mHlsLoad = eHlsIdle;
   //}}}
   //{{{  fft vars
   kiss_fftr_cfg fftrConfig;

@@ -63,7 +63,7 @@ public:
     cLog::cLine logLine;
     unsigned lastLineIndex = 0;
     int logLineNum = int(mLogScroll / int(kConsoleHeight));
-    std::chrono::system_clock::time_point lastTimePoint;
+    std::chrono::system_clock::time_point lastTimePoint = mWindow->getNow();
 
     // draw lines
     auto y = mWindow->getHeight() + (mLogScroll % int(kConsoleHeight)) - 2.f;
@@ -82,12 +82,12 @@ public:
         y -= kConsoleHeight + 3.f;
         }
 
-      auto datePoint = floor<date::days>(lastTimePoint);
-      auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::microseconds>(lastTimePoint - datePoint));
+      auto timeOfDay = date::make_time (std::chrono::duration_cast<std::chrono::microseconds>(
+                         logLine.mTimePoint - floor<date::days>(logLine.mTimePoint)));
       auto str = wdec (timeOfDay.hours().count()) +
                  L":" + wdec (timeOfDay.hours().count(), 2, L'0') +
-                 L":" + wdec (timeOfDay.seconds().count(), 2 ,L'0') +
-                 L"." + wdec (timeOfDay.subseconds().count(), 6 ,L'0') +
+                 L":" + wdec (timeOfDay.seconds().count(), 2, L'0') +
+                 L"." + wdec (timeOfDay.subseconds().count(), 6, L'0') +
                  L" " + cLog::getThreadNameWstring (logLine.mThreadId) +
                  L" " + strToWstr (logLine.mStr);
       dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getConsoleTextFormat(),

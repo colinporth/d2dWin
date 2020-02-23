@@ -60,11 +60,17 @@ public:
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
-    std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
-
+    //std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
     if (pos.y > mDstOverviewTop) {
+      auto frame = mSong.getFirstFrame() + int((pos.x * mSong.getTotalFrames()) / getWidth());
       mOverviewPressed = true;
-      mSong.setPlayFrame (mSong.getFirstFrame() + int((pos.x * mSong.getTotalFrames()) / getWidth()));
+      mSong.setPlayFrame (frame);
+      }
+    else if (mWindow->getControl()) {
+      mPressedFrame = mSong.getPlayFrame() + ((pos.x - (getWidth()/2.f)) * mFrameStep / mFrameWidth);
+      mSong.startSelect (int(mPressedFrame));
+      mWindow->changed();
+      cLog::log (LOGINFO, " first %d %d %d", mSong.hasSelect(), mSong.getSelectFirstFrame(), mSong.getSelectLastFrame());
       }
     else
       mPressedFrame = (float)mSong.getPlayFrame();
@@ -75,13 +81,20 @@ public:
   //{{{
   bool onMove (bool right, cPoint pos, cPoint inc) {
 
-    std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
-
+    //std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
     if (mOverviewPressed)
       mSong.setPlayFrame (mSong.getFirstFrame() + int((pos.x * mSong.getTotalFrames()) / getWidth()));
     else {
-      mPressedFrame -= (inc.x / mFrameWidth) * mFrameStep;
-      mSong.setPlayFrame ((int)mPressedFrame);
+      if (mWindow->getControl()) {
+        mPressedFrame += (inc.x / mFrameWidth) * mFrameStep;
+        mSong.moveSelect ((int)mPressedFrame);
+        mWindow->changed();
+        cLog::log (LOGINFO, "%d %d %d", mSong.hasSelect(), mSong.getSelectFirstFrame(), mSong.getSelectLastFrame());
+        }
+      else {
+        mPressedFrame -= (inc.x / mFrameWidth) * mFrameStep;
+        mSong.setPlayFrame ((int)mPressedFrame);
+        }
       }
 
     return true;
@@ -90,6 +103,7 @@ public:
   //{{{
   bool onUp (bool right, bool mouseMoved, cPoint pos) {
 
+    mSong.endSelect ((int)mPressedFrame);
     mOverviewPressed = false;
     return true;
     }
@@ -154,6 +168,7 @@ public:
     reallocBitmap (mWindow->getDc());
 
     // draw
+    drawRange (dc, playFrame);
     drawWave (dc, playFrame);
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
@@ -384,6 +399,18 @@ private:
     }
   //}}}
 
+  //{{{
+  void drawRange (ID2D1DeviceContext* dc, int playFrame) {
+
+    if (mSong.hasSelect()) {
+      auto firstx = (getWidth()/2.f) + (mSong.getSelectFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
+      auto lastx = (getWidth()/2.f) + (mSong.getSelectLastFrame() - playFrame) * mFrameWidth / mFrameStep;
+
+      cRect dstRect = { mRect.left + firstx, mDstWaveTop, mRect.left + lastx, mDstWaveTop + mWaveHeight };
+      dc->FillRectangle (dstRect, mWindow->getYellowBrush());
+      }
+    }
+  //}}}
   //{{{
   void drawWave (ID2D1DeviceContext* dc, int playFrame) {
 
