@@ -25,7 +25,7 @@ editing
 play
 - stopped stutter mode
 - play region
-   - play in and out of regions rules
+  - play in and out of regions rules
   - soundtouch region
 - more buttons
 - play on off

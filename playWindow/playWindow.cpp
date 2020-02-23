@@ -97,7 +97,7 @@ public:
       }
     thread ([=](){ playThread(); }).detach();
 
-    add (new cLogBox (this, 20.f));
+    mLogBox = add (new cLogBox (this, 20.f));
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     // loop till quit
@@ -118,6 +118,7 @@ protected:
       case 0x00: break;
       case 0x1B: return true;
       case 'F' : toggleFullScreen(); break;
+      case 'L' : mLogBox->togglePin(); break;
 
       case ' ' : mPlaying = !mPlaying; break;
 
@@ -583,6 +584,7 @@ private:
   string mLastTitleStr;
 
   string mDebugStr;
+  cBox* mLogBox = nullptr;
   //}}}
   };
 

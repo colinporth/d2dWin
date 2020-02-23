@@ -181,21 +181,21 @@ private:
     }
   //}}}
   //{{{
-  std::wstring getFrameString (uint64_t frame) {
+  std::wstring getFrameString (int frame) {
 
     if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
-      uint64_t hundredthSeconds = (frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
+      // can turn frame into seconds
+      auto value = ((uint64_t)frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
+      auto subSeconds = value % 100;
 
-      uint64_t subSeconds = hundredthSeconds % 100;
+      value /= 100;
+      auto seconds = value % 60;
 
-      hundredthSeconds /= 100;
-      uint64_t seconds = hundredthSeconds % 60;
+      value /= 60;
+      auto minutes = value % 60;
 
-      hundredthSeconds /= 60;
-      uint64_t minutes = hundredthSeconds % 60;
-
-      hundredthSeconds /= 60;
-      uint64_t hours = hundredthSeconds % 60;
+      value /= 60;
+      auto hours = value % 60;
 
       // !!! must be a better formatter lib !!!
       return (hours > 0) ? (wdec (hours) + L':' + wdec (minutes, 2, '0') + L':' + wdec(seconds, 2, '0')) :
