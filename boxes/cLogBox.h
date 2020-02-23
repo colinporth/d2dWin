@@ -7,8 +7,8 @@
 class cLogBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cLogBox(cD2dWindow* window, float width)
-      : cBox("log", window, width, 0.f) {
+  cLogBox(cD2dWindow* window, float width) : cBox("logBox", window, width, 0.f) {
+  // width is width of pick region, always full window high
 
     setPin (false);
     window->getDc()->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::CornflowerBlue), &mBrush);
@@ -21,6 +21,25 @@ public:
   //}}}
 
   //{{{
+  bool onMove (bool right, cPoint pos, cPoint inc) {
+
+    mLogScroll += (int)inc.y * (mWindow->getControl() ? 100 : 1);
+    if (mLogScroll < 0)
+      mLogScroll = 0;
+
+    return true;
+    }
+  //}}}
+  //{{{
+  bool onUp (bool right, bool mouseMoved, cPoint pos) {
+
+    if (!mouseMoved)
+      togglePin();
+
+    return true;
+    }
+  //}}}
+  //{{{
   bool onWheel (int delta, cPoint pos)  {
 
     if (getShow()) {
@@ -31,26 +50,11 @@ public:
     return false;
     }
   //}}}
-  //{{{
-  bool onMove (bool right, cPoint pos, cPoint inc) {
-
-    mLogScroll += (int)inc.y * (mWindow->getControl() ? 100 : 1);
-    if (mLogScroll < 0)
-      mLogScroll = 0;
-    return true;
-    }
-  //}}}
-  //{{{
-  bool onUp (bool right, bool mouseMoved, cPoint pos) {
-    if (!mouseMoved)
-      togglePin();
-    return true;
-    }
-  //}}}
 
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
+    // dim bgnd
     if (mPin)
       dc->FillRectangle ({ 0.f,0.f, mWindow->getWidth(),mWindow->getHeight() }, mWindow->getDimBgndBrush());
     else
@@ -61,6 +65,7 @@ public:
     int logLineNum = int(mLogScroll / int(kConsoleHeight));
     std::chrono::system_clock::time_point lastTimePoint;
 
+    // draw lines
     auto y = mWindow->getHeight() + (mLogScroll % int(kConsoleHeight)) - 2.f;
     while ((y > 20.f) && cLog::getLine (logLine, logLineNum++, lastLineIndex)) {
       mBrush->SetColor (kColours[logLine.mLogLevel]);
@@ -95,17 +100,15 @@ public:
   //}}}
 
 private:
-  //{{{
   const D2D1::ColorF kColours[LOGMAX] = {
-    {  1.f,  1.f,  0.f, 1.f }, // LOGTITLE
-    {  1.f,  1.f,  1.f, 1.f }, // LOGNOTICE
-    {  1.f, 0.5f, 0.5f, 1.f }, // LOGERROR
-    { 0.5f, 0.5f, 0.8f, 1.f }, // LOGINFO
-    { 0.5f, 0.8f, 0.5f, 1.f }, // LOGINFO1
-    {  1.f,  1.f, 0.2f, 1.f }, // LOGINFO2
-    { 0.8f, 0.1f, 0.8f, 1.f }, // LOGINFO3
+    {  1.f,  1.f,  0.f, 1.f }, // LOGTITLE  yellow
+    {  1.f,  1.f,  1.f, 1.f }, // LOGNOTICE white
+    {  1.f, 0.5f, 0.5f, 1.f }, // LOGERROR  light red
+    { 0.5f, 0.5f, 0.8f, 1.f }, // LOGINFO   light blue
+    { 0.5f, 0.8f, 0.5f, 1.f }, // LOGINFO1  greeny
+    {  1.f,  1.f, 0.2f, 1.f }, // LOGINFO2  yellowy
+    { 0.8f, 0.1f, 0.8f, 1.f }, // LOGINFO3  magenta
     };
-  //}}}
 
   int mLogScroll = 0;
 
