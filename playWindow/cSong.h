@@ -197,7 +197,6 @@ private:
   eSelectEdit mSelectEdit = eSelectEditNone;
   int mSelectEditFrame = 0;
 
-
   //{{{  max stuff for ui values
   float mMaxPowerValue = 0.f;
   float mMaxPeakValue = 0.f;
