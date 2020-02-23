@@ -134,7 +134,11 @@ int cSong::getHlsLoadChunkNum (system_clock::time_point now, chrono::seconds sec
 // sets
 //{{{
 void cSong::setPlayFrame (int frame) {
-  mPlayFrame = min (max (frame, 0), getLastFrame()+1);
+
+  if (hasHlsBase())
+    mPlayFrame = min (frame, getLastFrame()+1);
+  else
+    mPlayFrame = min (max (frame, 0), getLastFrame()+1);
   }
 //}}}
 //{{{
@@ -197,13 +201,10 @@ void cSong::incPlayFrame (int frames, bool useSelectRange) {
   int playFrame = mPlayFrame + frames;
 
   if (useSelectRange && inSelectRange (mPlayFrame))
-    if (playFrame > mSelectLastFrame)
-      playFrame = mSelectFirstFrame;
+    if (playFrame > getSelectLastFrame())
+      playFrame = getSelectFirstFrame();
 
-  if (hasHlsBase())
-    mPlayFrame = min (playFrame, getLastFrame()+1);
-  else
-    mPlayFrame = min (max (playFrame, 0), getLastFrame()+1);
+  setPlayFrame (playFrame);
   }
 //}}}
 //{{{
@@ -245,11 +246,11 @@ void cSong::markSelect() {
 //{{{
 void cSong::startSelect (int frame) {
 
-  if (mSelectValid) {
+  if (hasSelect()) {
     // pick from select range
-    if (abs(frame - mSelectFirstFrame) < 2)
+    if (abs(frame - getSelectFirstFrame()) < 2)
       mSelectEdit = eSelectEditFirst;
-    else if (abs(frame - mSelectLastFrame) < 2)
+    else if (abs(frame - getSelectLastFrame()) < 2)
       mSelectEdit = eSelectEditLast;
     else if (inSelectRange (frame))
       mSelectEdit = eSelectEditRange;
@@ -268,21 +269,21 @@ void cSong::startSelect (int frame) {
 //{{{
 void cSong::moveSelect (int frame) {
 
-  if (mSelectValid) {
+  if (hasSelect()) {
     switch (mSelectEdit) {
       case eSelectEditFirst:
         mSelectFirstFrame = frame;
-        if (mSelectFirstFrame > mSelectLastFrame) {
+        if (getSelectFirstFrame() > getSelectLastFrame()) {
           mSelectLastFrame = frame;
-          mSelectFirstFrame = mSelectLastFrame;
+          mSelectFirstFrame = getSelectLastFrame();
           }
         break;
 
       case eSelectEditLast:
         mSelectLastFrame = frame;
-        if (mSelectLastFrame < mSelectFirstFrame) {
+        if (getSelectLastFrame() < getSelectFirstFrame()) {
           mSelectFirstFrame = frame;
-          mSelectLastFrame = mSelectFirstFrame;
+          mSelectLastFrame = getSelectFirstFrame();
           }
         break;
 
@@ -325,9 +326,9 @@ void cSong::nextSilencePlayFrame() {
 //{{{
 bool cSong::inSelectRange (int frame) {
 // ignore 1 frame select range
-  return mSelectValid && 
-         (mSelectLastFrame > mSelectFirstFrame) && 
-         (frame >= mSelectFirstFrame) && (frame <= mSelectLastFrame);
+  return hasSelect() &&
+         (!getSelectMark()) &&
+         (frame >= getSelectFirstFrame()) && (frame <= getSelectLastFrame());
   }
 //}}}
 //{{{

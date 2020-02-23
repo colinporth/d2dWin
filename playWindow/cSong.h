@@ -111,6 +111,7 @@ public:
 
   // selects
   bool hasSelect() { return mSelectValid; }
+  bool getSelectMark() { return mSelectValid && (mSelectFirstFrame == mSelectLastFrame); }
   int getSelectFirstFrame() { return mSelectFirstFrame; }
   int getSelectLastFrame() { return mSelectLastFrame; }
 
@@ -193,6 +194,7 @@ private:
   bool mSelectValid = false;
   int mSelectFirstFrame = 0;
   int mSelectLastFrame = 0;
+
   enum eSelectEdit { eSelectEditNone, eSelectEditFirst, eSelectEditLast, eSelectEditRange };
   eSelectEdit mSelectEdit = eSelectEditNone;
   int mSelectEditFrame = 0;

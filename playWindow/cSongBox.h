@@ -406,7 +406,7 @@ private:
       auto firstx = (getWidth()/2.f) + (mSong.getSelectFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
 
       float lastx;
-      if (mSong.getSelectFirstFrame() == mSong.getSelectLastFrame())
+      if (mSong.getSelectMark())
         lastx = firstx + 1.f;
       else
         lastx = (getWidth()/2.f) + (mSong.getSelectLastFrame() - playFrame) * mFrameWidth / mFrameStep;
