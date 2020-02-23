@@ -109,10 +109,12 @@ public:
     auto it = mFrameMap.find (frame);
     return (it == mFrameMap.end()) ? nullptr : it->second; }
 
+  // info
+  int getBitrate() { return mBitrate; }
+  std::string getChan() { return mChan; }
+
   // hls
   bool hasHlsBase() { return mHasHlsBase; }
-  int getHlsBitrate() { return mHlsBitrate; }
-  std::string getHlsChan() { return mHlsChan; }
   eHlsLoad getHlsLoad() { return mHlsLoad; }
 
   int getHlsLoadChunkNum (std::chrono::system_clock::time_point now, std::chrono::seconds secs, int preload);
@@ -129,10 +131,10 @@ public:
   void setStreaming() { mStreaming = true; }
 
   // hls
-  void setHlsChan (const std::string& chan) { mHlsChan = chan; }
+  void setChan (const std::string& chan) { mChan = chan; }
   //{{{
-  void setHlsBitrate (int bitrate) {
-    mHlsBitrate = bitrate;
+  void setBitrate (int bitrate) {
+    mBitrate = bitrate;
     mHlsFramesPerChunk = bitrate >= 128000 ? 300 : 150;
     }
   //}}}
@@ -180,8 +182,8 @@ private:
   float mMaxFreqValue = 0.f;
 
   //{{{  hls vars
-  std::string mHlsChan;
-  int mHlsBitrate = 0;
+  std::string mChan;
+  int mBitrate = 0;
   int mHlsFramesPerChunk = 0;
 
   bool mHasHlsBase = false;

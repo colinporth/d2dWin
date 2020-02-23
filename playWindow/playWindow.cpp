@@ -39,44 +39,22 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     if (name.empty()) {
+      // radio 1..6 icons
+      add (new cBmpBox (this, 40.f,40.f, r1x80, 
+           [&](cBox* box) { mSong.setChan ("bbc_radio_one"); mChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, r2x80,
+                [&](cBox* box) { mSong.setChan ("bbc_radio_two"); mChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, r3x80, 
+                [&](cBox* box) { mSong.setChan ("bbc_radio_three"); mChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, r4x80,
+                [&](cBox* box) { mSong.setChan ("bbc_radio_fourfm"); mChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, r5x80, 
+                [&](cBox* box) { mSong.setChan ("bbc_radio_five_live"); mChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, r6x80,
+                [&](cBox* box) { mSong.setChan ("bbc_6music"); mChanged = true; } ));
+
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
-      //{{{  add radio 1 to 6 boxes
-      add (new cBmpBox (this, 40.f, 40.f, r1x80, 1, [&](cBox* box) mutable noexcept {
-        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
-        mSong.setHlsChan ("bbc_radio_one");
-        mSongChanged = true;
-        } ));
 
-      addRight (new cBmpBox (this, 40.f, 40.f, r2x80, 2, [&](cBox* box) mutable noexcept {
-        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
-        mSong.setHlsChan ("bbc_radio_two");
-        mSongChanged = true;
-        } ));
-
-      addRight (new cBmpBox (this, 40.f, 40.f, r3x80, 3, [&](cBox* box) mutable noexcept {
-        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
-        mSong.setHlsChan ("bbc_radio_three");
-        mSongChanged = true;
-        } ));
-
-      addRight (new cBmpBox (this, 40.f, 40.f, r4x80, 4, [&](cBox* box) mutable noexcept {
-        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
-        mSong.setHlsChan ("bbc_radio_fourfm");
-        mSongChanged = true;
-        } ));
-
-      addRight (new cBmpBox (this, 40.f, 40.f, r5x80, 5, [&](cBox* box) mutable noexcept {
-        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
-        mSong.setHlsChan ("bbc_radio_five_live");
-        mSongChanged = true;
-        } ));
-
-      addRight (new cBmpBox (this, 40.f, 40.f, r6x80, 6, [&](cBox* box) mutable noexcept {
-        shared_lock<shared_mutex> lock (mSong.getSharedMutex());
-        mSong.setHlsChan ("bbc_6music");
-        mSongChanged = true;
-        } ));
-      //}}}
       thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
 
       //{{{  urls
@@ -94,7 +72,8 @@ public:
       mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
       if (!mFileList->empty()) {
         thread([=]() { mFileList->watchThread(); }).detach();
-        add (new cAppFileListBox (this, 0.f,-220.f, mFileList), 0.f,0.f)->setPin (true);
+        add (new cFileListBox (this, 0.f,-220.f, mFileList,
+             [&](cBox* box) { mChanged = true; }))->setPin (true);
 
         mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
         addFront (mJpegImageView);
@@ -136,19 +115,19 @@ protected:
 
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
-      case 0x0d: mSongChanged = true; changed(); break; // enter - play file
+      case 0x0d: mChanged = true; changed(); break; // enter - play file
 
       // crude chan,bitrate change
-      case '1' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_one"); break;
-      case '2' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_two"); break;
-      case '3' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_three"); break;
-      case '4' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_fourfm"); break;
-      case '5' : mSongChanged = true; mSong.setHlsChan ("bbc_radio_five_live"); break;
-      case '6' : mSongChanged = true; mSong.setHlsChan ("bbc_6music"); break;
-      case '7' : mSongChanged = true; mSong.setHlsBitrate (48000); break;
-      case '8' : mSongChanged = true; mSong.setHlsBitrate (96000); break;
-      case '9' : mSongChanged = true; mSong.setHlsBitrate (128000); break;
-      case '0' : mSongChanged = true; mSong.setHlsBitrate (320000); break;
+      case '1' : mChanged = true; mSong.setChan ("bbc_radio_one"); break;
+      case '2' : mChanged = true; mSong.setChan ("bbc_radio_two"); break;
+      case '3' : mChanged = true; mSong.setChan ("bbc_radio_three"); break;
+      case '4' : mChanged = true; mSong.setChan ("bbc_radio_fourfm"); break;
+      case '5' : mChanged = true; mSong.setChan ("bbc_radio_five_live"); break;
+      case '6' : mChanged = true; mSong.setChan ("bbc_6music"); break;
+      case '7' : mChanged = true; mSong.setBitrate (48000); break;
+      case '8' : mChanged = true; mSong.setBitrate (96000); break;
+      case '9' : mChanged = true; mSong.setBitrate (128000); break;
+      case '0' : mChanged = true; mSong.setBitrate (320000); break;
 
       default  : cLog::log (LOGINFO, "key %x", key);
       }
@@ -158,18 +137,6 @@ protected:
   //}}}
 
 private:
-  //{{{
-  class cAppFileListBox : public cFileListBox {
-  public:
-    cAppFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList) :
-      cFileListBox (window, width, height, fileList) {}
-
-    void onHit() {
-      (dynamic_cast<cAppWindow*>(getWindow()))->mSongChanged = true;
-      }
-    };
-  //}}}
-
   //{{{
   static uint8_t* extractAacFramesFromTs (uint8_t* ts, int tsLen) {
   // extract aacFrames from ts packets, pack back into ts, gets smaller ts gets stripped
@@ -244,13 +211,13 @@ private:
   // - host is redirected, assumes bbc radio aac, 48000 sampleaRate
 
     cLog::setThreadName ("hls ");
-    mSong.setHlsChan (chan);
-    mSong.setHlsBitrate (bitrate);
+    mSong.setChan (chan);
+    mSong.setBitrate (bitrate);
 
     while (!getExit()) {
-      const string path = "pool_904/live/uk/" + mSong.getHlsChan() +
-                          "/" + mSong.getHlsChan() + ".isml/" + mSong.getHlsChan() +
-                          "-audio=" + dec(mSong.getHlsBitrate());
+      const string path = "pool_904/live/uk/" + mSong.getChan() +
+                          "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
+                          "-audio=" + dec(mSong.getBitrate());
       cWinSockHttp http;
       auto redirectedHost = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
@@ -277,13 +244,13 @@ private:
 
         http.freeContent();
         //}}}
-        mSong.init (cAudioDecode::eAac, 2, mSong.getHlsBitrate() >= 128000 ? 1024 : 2048, 48000);
+        mSong.init (cAudioDecode::eAac, 2, mSong.getBitrate() >= 128000 ? 1024 : 2048, 48000);
         mSong.setHlsBase (baseChunkNum, baseTimePoint);
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
-        mSongChanged = false;
-        while (!getExit() && !mSongChanged) {
+        mChanged = false;
+        while (!getExit() && !mChanged) {
           auto chunkNum = mSong.getHlsLoadChunkNum (getNow(), 12s, kHlsPreload);
           if (chunkNum) {
             // get hls chunkNum chunk
@@ -477,7 +444,7 @@ private:
         auto data = decode.getFramePtr();
 
         auto frameSampleBytes = frameSamples * 2 * 4;
-        while (!getExit() && !mSongChanged && !songDone) {
+        while (!getExit() && !mChanged && !songDone) {
           mSong.addFrame (frameNum++, false, data, frameSampleBytes, fileMapSize / frameSampleBytes, (float*)data);
           data += frameSampleBytes;
           changed();
@@ -491,7 +458,7 @@ private:
         cAudioDecode decode (frameType);
         auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
 
-        while (!getExit() && !mSongChanged && !songDone) {
+        while (!getExit() && !mChanged && !songDone) {
           while (decode.parseFrame (fileMapPtr, fileMapEnd)) {
             if (decode.getFrameType() == mSong.getFrameType()) {
               auto numSamples = decode.frameToSamples (samples);
@@ -520,8 +487,8 @@ private:
       UnmapViewOfFile (fileMapFirst);
       CloseHandle (fileHandle);
 
-      if (mSongChanged) // use changed fileIndex
-        mSongChanged = false;
+      if (mChanged) // use changed fileIndex
+        mChanged = false;
       else if (!mFileList->nextIndex())
         break;
       //}}}
@@ -586,7 +553,8 @@ private:
   cFileList* mFileList = nullptr;
 
   cSong mSong;
-  bool mSongChanged = false;
+  bool mChanged = false;
+
   cJpegImageView* mJpegImageView = nullptr;
 
   bool mPlaying = true;

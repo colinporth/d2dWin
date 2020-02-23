@@ -16,8 +16,8 @@ public:
       std::wstring (mTitle.begin(), mTitle.end()).data(), (uint32_t)mTitle.size(), mWindow->getTextFormat(),
                mWindow->getSize().x, mWindow->getSize().y, &textLayout);
     if (textLayout) {
-      dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
-      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+      dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+      dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
       textLayout->Release();
       }
     }

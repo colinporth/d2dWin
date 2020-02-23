@@ -206,6 +206,7 @@ private:
       return (L"--:--:--");
     }
   //}}}
+
   //{{{
   void setZoom (int zoom) {
 

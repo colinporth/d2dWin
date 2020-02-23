@@ -7,8 +7,9 @@
 class cFileListBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList) :
-      cBox ("fileList", window, width, height), mFileList(fileList) {}
+  cFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList,
+                std::function<void (cBox* box)> hitCallback) :
+      cBox ("fileList", window, width, height, std::move(hitCallback)), mFileList(fileList) {}
   //}}}
   virtual ~cFileListBox() {}
 
@@ -92,7 +93,7 @@ public:
     if (mWindow->getTimedMenuOn()) {
       if (mPressed && !mMoved) {
         mFileList->setIndex (mProxIndex);
-        onHit();
+        mHitCallback (this);
         }
 
       mPressed = false;
@@ -106,7 +107,7 @@ public:
 
   //{{{
   bool onWheel (int delta, cPoint pos)  {
-    if (mWindow->getTimedMenuOn()) 
+    if (mWindow->getTimedMenuOn())
       incScroll (-delta / 30.f);
     return true;
     }
@@ -176,7 +177,7 @@ public:
         auto p = mRect.getTL() + row.mRect.getTL();
         for (auto field = 0u; field < cFileItem::kFields; field++) {
           p.x = mRect.left + row.mRect.left + (field ? mColumn[field]-row.mTextMetrics[field].width : 2.f);
-          dc->DrawTextLayout (p, row.mTextLayout[field], row.mBrush);
+          dc->DrawTextLayout (p, row.mTextLayout[field], row.mBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
           row.mTextLayout[field]->Release();
           }
         }
@@ -184,9 +185,6 @@ public:
       }
     }
   //}}}
-
-protected:
-  virtual void onHit() = 0;
 
 private:
   const float kMinLineHeight = 16.f;

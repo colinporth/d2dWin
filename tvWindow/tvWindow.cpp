@@ -23,7 +23,7 @@ public:
   void run (string title, int width, int height, const string& rootOrFrequency) {
 
     init (title, width, height, false);
-    add (new cLogBox (this, 100.f,0.f, true), 0.f,0.f)->setPin (false);
+    add (new cLogBox (this, 100.f,0.f, true))->setPin (false);
     add (new cClockBox (this, 40.f), -84.f,2.f);
 
     int frequency = atoi (rootOrFrequency.c_str());
@@ -48,8 +48,9 @@ public:
     // fileList
     mFileList = new cFileList (frequency || rootOrFrequency.empty() ? kTvRoot : rootOrFrequency, "*.ts");
     thread([=]() { mFileList->watchThread(); }).detach();
+
     auto boxWidth = frequency ? 480.f : 0.f;
-    add (new cAppFileListBox (this, -boxWidth,0.f, mFileList), frequency ? boxWidth : 0.f, 0.f);
+    add (new cFileListBox (this, -boxWidth,0.f, mFileList, [&](cBox* box) { selectFileItem(); }));
 
     // launch file player
     if (!mFileList->empty())
@@ -99,15 +100,6 @@ protected:
   //}}}
 
 private:
-  //{{{
-  class cAppFileListBox : public cFileListBox {
-  public:
-    cAppFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList) :
-      cFileListBox (window, width, height, fileList) {}
-
-    void onHit() { (dynamic_cast<cAppWindow*>(getWindow()))->selectFileItem(); }
-    };
-  //}}}
   //{{{
   void selectFileItem() {
 

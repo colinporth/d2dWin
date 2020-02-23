@@ -1,8 +1,8 @@
 // cLogBox.h
 #pragma once
 #include "../common/cD2dWindow.h"
-#include "../../shared/utils/cLog.h"
 #include "../../shared/utils/date.h"
+#include "../../shared/utils/cLog.h"
 
 class cLogBox : public cD2dWindow::cBox {
 public:
@@ -51,6 +51,7 @@ public:
     return true;
     }
   //}}}
+
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
@@ -59,6 +60,7 @@ public:
     cLog::cLine logLine;
     unsigned lastLineIndex = 0;
     int logLineNum = int(mLogScroll / int(kTextHeight));
+
     auto y = mRect.bottom + (mLogScroll % int(kTextHeight)) - 2.f;
     while ((y > mRect.top + 20.f) && cLog::getLine (logLine, logLineNum++, lastLineIndex)) {
       mBrush->SetColor (kColours[logLine.mLogLevel]);
@@ -84,7 +86,8 @@ public:
                  L" " + cLog::getThreadNameWstring (logLine.mThreadId) +
                  L" " + strToWstr (logLine.mStr);
       dc->DrawText (str.data(), (uint32_t)str.size(), mTextFormat,
-                   { mRect.left, y, mWindow->getWidth(), y + kTextHeight }, mBrush);
+                   { mRect.left, y, mWindow->getWidth(), y + kTextHeight },
+                   mBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
 
       lastTimePoint = logLine.mTimePoint;
       }

@@ -9,9 +9,9 @@
 class cBmpBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cBmpBox (cD2dWindow* window, float width, float height, const uint8_t* bmp, int index,
+  cBmpBox (cD2dWindow* window, float width, float height, const uint8_t* bmp,
            std::function<void (cBox* box)> hitCallback)
-      : cBox("bmpBox", window, width, height, std::move(hitCallback)), mBmp(bmp), mIndex(index) {
+      : cBox("bmpBox", window, width, height, std::move(hitCallback)), mBmp(bmp) {
     init();
     }
   //}}}
@@ -57,7 +57,6 @@ private:
   //}}}
 
   const uint8_t* mBmp;
-  const int mIndex;
 
   UINT32 mSizeX = 0;
   UINT32 mSizeY = 0;
