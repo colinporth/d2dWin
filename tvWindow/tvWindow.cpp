@@ -23,7 +23,6 @@ public:
   void run (string title, int width, int height, const string& rootOrFrequency) {
 
     init (title, width, height, false);
-    add (new cLogBox (this, 100.f,0.f, true))->setPin (false);
     add (new cClockBox (this, 40.f), -84.f,2.f);
 
     int frequency = atoi (rootOrFrequency.c_str());
@@ -56,6 +55,7 @@ public:
     if (!mFileList->empty())
       mPlayFocus = addFront (new cPlayView (this, 0.f,0.f, mFileList->getCurFileItem().getFullName()));
 
+    add (new cLogBox (this, 50.f,0.f));
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     // loop till exit

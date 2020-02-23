@@ -7,9 +7,10 @@
 class cLogBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cLogBox(cD2dWindow* window, float width, float height, bool pin = false)
+  cLogBox(cD2dWindow* window, float width, float height)
       : cBox("log", window, width, height) {
 
+    setPin (false);
     window->getDc()->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::CornflowerBlue), &mBrush);
     }
   //}}}

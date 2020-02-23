@@ -96,7 +96,7 @@ public:
       }
     thread ([=]() { playThread(); }).detach();
 
-    add (new cLogBox (this, 100.f,0.f, true))->setPin (false);
+    add (new cLogBox (this, 100.f,0.f));
 
     // exit box
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);

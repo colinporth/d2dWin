@@ -21,7 +21,7 @@ public:
 
     init (title, width, height, false);
     setChangeCountDown (4);
-    add (new cLogBox (this, 100.f,0, true), 0.f,0.f)->setPin (false);
+    add (new cLogBox (this, 20.f,0));
 
     auto frequency = param.empty() ? 626 : atoi (param.c_str());
     if (frequency) {
