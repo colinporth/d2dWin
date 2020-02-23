@@ -53,6 +53,8 @@ public:
 
     if (mPin)
       dc->FillRectangle ({ 0.f,0.f, mWindow->getWidth(),mWindow->getHeight() }, mWindow->getDimBgndBrush());
+    else
+      dc->FillRectangle ({ 0.f,0.f, mWindow->getWidth(),mWindow->getHeight() }, mWindow->getTransparentBgndBrush());
 
     cLog::cLine logLine;
     unsigned lastLineIndex = 0;

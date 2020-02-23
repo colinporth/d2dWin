@@ -50,10 +50,9 @@
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/cSemaphore.h"
 
-#include "../common/cD2dWindow.h"
-
 #include "../common/cJpegImage.h"
 
+#include "../common/cD2dWindow.h"
 #include "../boxes/cLogBox.h"
 #include "../boxes/cBmpBox.h"
 #include "../boxes/cWindowBox.h"

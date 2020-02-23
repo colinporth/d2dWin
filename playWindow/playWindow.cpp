@@ -36,22 +36,22 @@ public:
     if (name.empty()) {
       //{{{  hls radio 1..6
       add (new cBmpBox (this, 40.f,40.f, r1x80,
-           [&](cBox* box) { mSong.setChan ("bbc_radio_one"); mChanged = true; } ));
+           [&](cBox* box){ mSong.setChan ("bbc_radio_one"); mChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r2x80,
-                [&](cBox* box) { mSong.setChan ("bbc_radio_two"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_radio_two"); mChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r3x80,
-                [&](cBox* box) { mSong.setChan ("bbc_radio_three"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_radio_three"); mChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r4x80,
-                [&](cBox* box) { mSong.setChan ("bbc_radio_fourfm"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_radio_fourfm"); mChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r5x80,
-                [&](cBox* box) { mSong.setChan ("bbc_radio_five_live"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_radio_five_live"); mChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r6x80,
-                [&](cBox* box) { mSong.setChan ("bbc_6music"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_6music"); mChanged = true; } ));
 
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 
@@ -74,27 +74,28 @@ public:
         mDebugStr = "shoutcast " + url.getHost() + " channel " + url.getPath();
         add (new cTitleBox (this, 500.f,20.f, mDebugStr));
 
-        thread ([=]() { icyThread (name); }).detach();
+        thread ([=](){ icyThread (name); }).detach();
         }
         //}}}
       else {
         //{{{  filelist
         mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
+
         if (!mFileList->empty()) {
-          thread([=]() { mFileList->watchThread(); }).detach();
 
           add (new cFileListBox (this, 0.f,-220.f, mFileList,
-               [&](cBox* box) { mChanged = true; }))->setPin (true);
+               [&](cBox* box){ mChanged = true; }))->setPin (true);
 
           mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
           addFront (mJpegImageView);
 
-          thread ([=]() { fileThread(); }).detach();
+          thread([=](){ mFileList->watchThread(); }).detach();
+          thread ([=](){ fileThread(); }).detach();
           }
         }
         //}}}
       }
-    thread ([=]() { playThread(); }).detach();
+    thread ([=](){ playThread(); }).detach();
 
     add (new cLogBox (this, 20.f));
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
@@ -190,7 +191,7 @@ private:
   //{{{
   void addIcyInfo (const string& icyInfo) {
 
-    cLog::log (LOGINFO1, "addIcyInfo " + icyInfo);
+    cLog::log (LOGINFO, "addIcyInfo " + icyInfo);
 
     string icysearchStr = "StreamTitle=\'";
     string searchStr = "StreamTitle=\'";
@@ -308,7 +309,7 @@ private:
               }
               //}}}
             }
-          else
+          else // no chunk available, back off for 100ms
             this_thread::sleep_for (100ms);
           }
         free (samples);
@@ -427,6 +428,7 @@ private:
       //}}}
       );
 
+    // never exits
     cLog::log (LOGINFO, "exit");
     }
   //}}}
@@ -526,57 +528,60 @@ private:
 
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-    auto device = getDefaultAudioOutputDevice();
-    if (device) {
-      device->setSampleRate (mSong.getSampleRate());
+    while (!getExit()) {
+      // loop for filelist, new song may change sampleRate
+      auto device = getDefaultAudioOutputDevice();
+      if (device) {
+        device->setSampleRate (mSong.getSampleRate());
 
-      cAudioDecode decode (mSong.getFrameType());
-      float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxSamplesBytes());
+        cAudioDecode decode (mSong.getFrameType());
+        float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxSamplesBytes());
 
-      device->start();
-      while (!getExit() && (mSong.getStreaming() || (mSong.getPlayFrame() <= mSong.getLastFrame()))) {
-        auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
-        if (mPlaying && framePtr && framePtr->getPtr()) {
-          device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
-            // lambda callback - load srcSamples
-            shared_lock<shared_mutex> lock (mSong.getSharedMutex());
-            if (mSong.hasSamples())
-              srcSamples = (float*)framePtr->getPtr();
-            else {
-              decode.setFrame (framePtr->getPtr(), framePtr->getLen());
-              decode.frameToSamples (samples);
-              srcSamples = samples;
-              }
-            numSrcSamples = mSong.getSamplesPerFrame();
-            mSong.incPlayFrame (1);
-            changed();
-            });
+        device->start();
+        while (!getExit() && (mSong.getStreaming() || (mSong.getPlayFrame() <= mSong.getLastFrame()))) {
+          auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
+          if (mPlaying && framePtr && framePtr->getPtr()) {
+            device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
+              // lambda callback - load srcSamples
+              shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+              if (mSong.hasSamples())
+                srcSamples = (float*)framePtr->getPtr();
+              else {
+                decode.setFrame (framePtr->getPtr(), framePtr->getLen());
+                decode.frameToSamples (samples);
+                srcSamples = samples;
+                }
+              numSrcSamples = mSong.getSamplesPerFrame();
+              mSong.incPlayFrame (1);
+              changed();
+              });
+            }
+          else
+            this_thread::sleep_for (100ms);
           }
-        else
-          this_thread::sleep_for (100ms);
+
+        device->stop();
+        free (samples);
         }
 
-      device->stop();
-      free (samples);
+      mPlayDoneSem.notifyAll();
       }
 
-    mPlayDoneSem.notifyAll();
     cLog::log (LOGINFO, "exit");
     }
   //}}}
 
   //{{{  vars
-  cFileList* mFileList = nullptr;
-
   cSong mSong;
+
   bool mChanged = false;
-
-  cJpegImageView* mJpegImageView = nullptr;
-
   bool mPlaying = true;
   cSemaphore mPlayDoneSem = "playDone";
 
+  cFileList* mFileList = nullptr;
+  cJpegImageView* mJpegImageView = nullptr;
   string mLastTitleStr;
+
   string mDebugStr;
   //}}}
   };

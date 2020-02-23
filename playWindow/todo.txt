@@ -10,8 +10,6 @@ overview
 - show load graphic
 - graticules, for hls?
 
-sizing window flashing, short and crashes
-
 hls, shoutcast
 - hls
   - show bitrate
@@ -40,18 +38,19 @@ play
 - cull silence allocs
 - ??? don't play silence/mute ???
 
-boxes
-- generic callbacks???
+D2dWindow
+- izing window flashing, short and crashes
+- boxes
+  - generic callbacks???
+- direct2d
+  - investigate src coordinates to subpixel accuracy
+  - investigate bitmapbrush with alpha
+    - gradient brush for waveform
+- jpeg tag
+  - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
 
-jpeg tag
- - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
 
 command line invocation
 - filelist broken
 - list of files
 - links to directories, files
-
-direct2d
-- investigate src coordinates to subpixel accuracy
-- investigate bitmapbrush with alpha
-  - gradient brush for waveform
