@@ -483,21 +483,25 @@ void cD2dWindow::createDirect2d() {
   createSizedResources();
 
   // create a textFormat
-  mDWriteFactory->CreateTextFormat (L"FreeSans", NULL,
-                                    DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-                                    kLineHeight*4.f/5.f, L"en-us",
-                                    &mTextFormat);
+  mDWriteFactory->CreateTextFormat (
+    L"FreeSans", NULL, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+    kLineHeight*4.f/5.f, L"en-us",
+    &mTextFormat);
   mTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_EMERGENCY_BREAK);
 
-  // create solid brushes
+  // create a consoleTextFormat
+  mDWriteFactory->CreateTextFormat (
+    L"Consolas", NULL, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+    kConsoleHeight, L"en-us", 
+    &mConsoleTextFormat);
+
+  // create some common solidBrushes
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black), &mBlackBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::DimGray), &mDarkGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Gray), &mGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::LightGray), &mLightGreyBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::White), &mWhiteBrush);
-
   mDeviceContext->CreateSolidColorBrush (ColorF (0.1f, 0.1f, 0.1f, 0.5f), &mTransparentBgndBrush);
-
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Red), &mRedBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::GreenYellow), &mGreenBrush);
   mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Blue), &mDarkBlueBrush);

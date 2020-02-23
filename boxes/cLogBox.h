@@ -10,16 +10,11 @@ public:
   cLogBox(cD2dWindow* window, float width, float height, bool pin = false)
       : cBox("log", window, width, height) {
 
-    mWindow->getDwriteFactory()->CreateTextFormat (L"Consolas", NULL,
-      DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-      kTextHeight, L"en-us", &mTextFormat);
-
     window->getDc()->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::CornflowerBlue), &mBrush);
     }
   //}}}
   //{{{
   virtual ~cLogBox() {
-    mTextFormat->Release();
     mBrush->Release();
     }
   //}}}
@@ -59,9 +54,9 @@ public:
 
     cLog::cLine logLine;
     unsigned lastLineIndex = 0;
-    int logLineNum = int(mLogScroll / int(kTextHeight));
+    int logLineNum = int(mLogScroll / int(kConsoleHeight));
 
-    auto y = mRect.bottom + (mLogScroll % int(kTextHeight)) - 2.f;
+    auto y = mRect.bottom + (mLogScroll % int(kConsoleHeight)) - 2.f;
     while ((y > mRect.top + 20.f) && cLog::getLine (logLine, logLineNum++, lastLineIndex)) {
       mBrush->SetColor (kColours[logLine.mLogLevel]);
 
@@ -69,12 +64,12 @@ public:
       auto timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(lastTimePoint - logLine.mTimePoint).count();
       if (timeDiff < 20) {
         dc->FillRectangle ({ mRect.left, y-1.f, mRect.left + timeDiff*10.f, y+1.f }, mBrush);
-        y -= kTextHeight + 2.f;
+        y -= kConsoleHeight + 2.f;
         }
       else {
         timeDiff = std::min (timeDiff, 4000ll);
         dc->FillRectangle ( { mRect.left, y-2.f, mRect.left + timeDiff/10.f, y+1.f }, mWindow->getWhiteBrush());
-        y -= kTextHeight + 3.f;
+        y -= kConsoleHeight + 3.f;
         }
 
       auto datePoint = floor<date::days>(lastTimePoint);
@@ -85,8 +80,8 @@ public:
                  L"." + wdec (timeOfDay.subseconds().count(), 6 ,L'0') +
                  L" " + cLog::getThreadNameWstring (logLine.mThreadId) +
                  L" " + strToWstr (logLine.mStr);
-      dc->DrawText (str.data(), (uint32_t)str.size(), mTextFormat,
-                   { mRect.left, y, mWindow->getWidth(), y + kTextHeight },
+      dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getConsoleTextFormat(),
+                   { mRect.left, y, mWindow->getWidth(), y + kConsoleHeight },
                    mBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
 
       lastTimePoint = logLine.mTimePoint;
@@ -95,7 +90,6 @@ public:
   //}}}
 
 private:
-  constexpr static float kTextHeight = 16.f;
   //{{{
   const D2D1::ColorF kColours[LOGMAX] = {
     {  1.f,  1.f,  0.f, 1.f }, // LOGTITLE
@@ -110,6 +104,5 @@ private:
 
   int mLogScroll = 0;
 
-  IDWriteTextFormat* mTextFormat = nullptr;
   ID2D1SolidColorBrush* mBrush = nullptr;
   };

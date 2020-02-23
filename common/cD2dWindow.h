@@ -49,6 +49,7 @@ inline std::string wstringToString (const std::wstring& input) {
 //}}}
 
 const float kLineHeight = 20.f;
+const float kConsoleHeight = 16.f;
 
 class cD2dWindow : public iChange {
 public:
@@ -57,7 +58,7 @@ public:
   public:
     //{{{
     cBox (std::string name, cD2dWindow* window, float width, float height,
-          std::function<void (cBox* box)> hitCallback = [](cBox*) noexcept {} )
+          std::function<void (cBox* box)> hitCallback = [](cBox*) {} )
         : mName(name), mWindow(window), mLayoutWidth(width), mLayoutHeight(height),
           mHitCallback (std::move(hitCallback)) {
       mWindow->changed();
@@ -372,6 +373,7 @@ public:
   float getHeight() { return mClientF.y; }
 
   IDWriteTextFormat* getTextFormat() { return mTextFormat.Get(); }
+  IDWriteTextFormat* getConsoleTextFormat() { return mConsoleTextFormat.Get(); }
 
   // brushes
   ID2D1SolidColorBrush* getBlackBrush() { return mBlackBrush.Get(); }
@@ -482,6 +484,7 @@ private:
 
   // useful resources
   Microsoft::WRL::ComPtr<IDWriteTextFormat> mTextFormat;
+  Microsoft::WRL::ComPtr<IDWriteTextFormat> mConsoleTextFormat;
 
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mBlackBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDarkGreyBrush;
