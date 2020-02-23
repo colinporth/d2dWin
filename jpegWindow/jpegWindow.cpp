@@ -29,7 +29,7 @@ public:
     init (title);
     add (new cClockBox (this, 50.f), -110.f,-120.f);
     add (new cCalendarBox (this, 190.f,150.f), -190.f-120.f,-150.f);
-    add (new cLogBox (this, 100.f,0.f), 0.f,0.f);
+    add (new cLogBox (this, 20.f));
 
     add (new cImageSetView (this, 0.f,0.f, mImageSet), 0.f, 0.f);
     mJpegImageView = new cJpegImageView (this, 0.f,0.f, nullptr);

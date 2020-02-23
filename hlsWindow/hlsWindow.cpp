@@ -43,7 +43,7 @@ public:
     add (new cHlsDotsBox (this, 18.f,60.f, this), -24.f, 0);
     add (new cHlsPeakBox (this, 0,0, this));
 
-    add (new cLogBox (this, 100.f,0.f));
+    add (new cLogBox (this, 20.f));
     //{{{  add chan1 to 6 bmp boxes
     add (new cBmpBox (this, 60.f, 60.f, r1x80, [&](cBox* box) mutable noexcept {
       mChan = 1;
