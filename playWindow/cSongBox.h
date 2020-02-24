@@ -125,7 +125,7 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
   // draw stuff centred at playFrame
 
-    // src bitmap explicit layout
+    //{{{  src bitmap layout
     mWaveHeight = 100.f;
     mOverviewHeight = 100.f;
     mRangeHeight = 8.f;
@@ -144,8 +144,8 @@ public:
     mSrcWaveCentre = mSrcWaveTop + (mWaveHeight/2.f);
     mSrcPeakCentre = mSrcPeakTop + (mSrcPeakHeight/2.f);
     mSrcOverviewCentre = mSrcOverviewTop + (mOverviewHeight/2.f);
-
-    // dst box explicit layout
+    //}}}
+    //{{{  dst layout
     mDstFreqTop = mRect.top;
     mDstWaveTop = mDstFreqTop + mFreqHeight;
     mDstRangeTop = mDstWaveTop + mWaveHeight;
@@ -153,10 +153,12 @@ public:
 
     mDstWaveCentre = mDstWaveTop + (mWaveHeight/2.f);
     mDstOverviewCentre = mDstOverviewTop + (mOverviewHeight/2.f);
+    //}}}
 
     // lock
     std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
-    auto playFrame = mSong.getPlayFrame();
+
+    reallocBitmap (mWindow->getDc());
 
     if (mSong.getId() != mSongLastId) {
       mFramesBitmapOk = false;
@@ -164,20 +166,21 @@ public:
       mSongLastId = mSong.getId();
       }
 
-    reallocBitmap (mWindow->getDc());
-
     // draw
-    auto leftFrame = playFrame - (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
-    auto rightFrame = playFrame + (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
-    rightFrame = std::min (rightFrame, mSong.getLastFrame());
+    auto playFrame = mSong.getPlayFrame();
+
+    // wave left right frames, clip right not left
+    auto leftWaveFrame = playFrame - (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
+    auto rightWaveFrame = playFrame + (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
+    rightWaveFrame = std::min (rightWaveFrame, mSong.getLastFrame());
+
+    drawRange (dc, playFrame, leftWaveFrame, rightWaveFrame);
 
     if (mSong.getNumFrames()) {
-      drawWave (dc, playFrame, leftFrame, rightFrame);
+      drawWave (dc, playFrame, leftWaveFrame, rightWaveFrame);
       drawOverview (dc, playFrame);
       drawFreq (dc, playFrame);
       }
-
-    drawRange (dc, playFrame, leftFrame, rightFrame);
 
     if (mSong.hasHlsBase())
       drawTime (dc, getFrameString (mSong.getFirstFrame()),
@@ -401,6 +404,31 @@ private:
   //}}}
 
   //{{{
+  void drawRange (ID2D1DeviceContext* dc, int playFrame, int leftFrame, int rightFrame) {
+
+    cRect dstRect = { mRect.left, mDstRangeTop, mRect.right, mDstRangeTop + mRangeHeight };
+    dc->FillRectangle (dstRect, mWindow->getDarkGrayBrush());
+
+    for (auto &item : mSong.getSelect().getItems()) {
+      auto firstx = (getWidth()/2.f) + (item.getFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
+      float lastx = item.getMark() ? firstx + 1.f :
+                                     (getWidth()/2.f) + (item.getLastFrame() - playFrame) * mFrameWidth / mFrameStep;
+
+      dstRect = { mRect.left + firstx, mDstRangeTop, mRect.left + lastx, mDstRangeTop + mRangeHeight };
+      dc->FillRectangle (dstRect, mWindow->getYellowBrush());
+
+      auto title = item.getTitle();
+      if (!title.empty()) {
+        mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
+        dstRect = { mRect.left + firstx + 2.f, mDstRangeTop + mRangeHeight - mWindow->getTextFormat()->GetFontSize(),
+                    mRect.right, mDstRangeTop + mRangeHeight };
+        dc->DrawText (std::wstring (title.begin(), title.end()).data(), (uint32_t)title.size(), mWindow->getTextFormat(),
+                      dstRect, mWindow->getWhiteBrush());
+        }
+      }
+    }
+  //}}}
+  //{{{
   void drawWave (ID2D1DeviceContext* dc, int playFrame, int leftFrame, int rightFrame) {
 
     bool allFramesOk = true;
@@ -453,7 +481,7 @@ private:
     //{{{  stamp playFrame mark
     auto dstPlay = playSrcIndex - leftSrcIndex + (playSrcIndex < leftSrcIndex ? endSrcIndex : 0);
     dstRect = { mRect.left + (dstPlay+0.5f) * mFrameWidth, mDstFreqTop,
-                mRect.left + ((dstPlay+0.5f) * mFrameWidth) + 1.f, mDstWaveTop + mWaveHeight };
+                mRect.left + ((dstPlay+0.5f) * mFrameWidth) + 1.f, mDstRangeTop + mRangeHeight };
     dc->FillRectangle (dstRect, mWindow->getDimGrayBrush());
     //}}}
     //{{{  stamp chunk before wrap
@@ -551,31 +579,6 @@ private:
       dc->FillRectangle (dstRect, mWindow->getGreenBrush());
       }
     //}}}
-    }
-  //}}}
-  //{{{
-  void drawRange (ID2D1DeviceContext* dc, int playFrame, int leftFrame, int rightFrame) {
-
-    cRect dstRect = { mRect.left, mDstRangeTop, mRect.right, mDstRangeTop + mRangeHeight };
-    dc->FillRectangle (dstRect, mWindow->getDarkGrayBrush());
-
-    for (auto &item : mSong.getSelect().getItems()) {
-      auto firstx = (getWidth()/2.f) + (item.getFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
-      float lastx = item.getMark() ? firstx + 1.f :
-                                     (getWidth()/2.f) + (item.getLastFrame() - playFrame) * mFrameWidth / mFrameStep;
-
-      dstRect = { mRect.left + firstx, mDstRangeTop, mRect.left + lastx, mDstRangeTop + mRangeHeight };
-      dc->FillRectangle (dstRect, mWindow->getYellowBrush());
-
-      auto title = item.getTitle();
-      if (!title.empty()) {
-        mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
-        dstRect = { mRect.left + firstx + 2.f, mDstRangeTop + mRangeHeight - mWindow->getTextFormat()->GetFontSize(),
-                    mRect.right, mDstRangeTop + mRangeHeight };
-        dc->DrawText (std::wstring (title.begin(), title.end()).data(), (uint32_t)title.size(), mWindow->getTextFormat(),
-                      dstRect, mWindow->getWhiteBrush());
-        }
-      }
     }
   //}}}
   //{{{
