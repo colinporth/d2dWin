@@ -364,8 +364,8 @@ public:
   ID3D11Device* getD3d11Device() { return mD3device.Get(); }
   ID2D1DeviceContext* getDc() { return mDeviceContext.Get(); }
 
-  ID2D1Factory1* getD2d1Factory() { return mD2D1Factory.Get(); }
-  IDWriteFactory* getDwriteFactory() { return mDWriteFactory.Get(); }
+  ID2D1Factory1* getD2d1Factory() { return mD2D1Factory; }
+  IDWriteFactory* getDwriteFactory() { return mDWriteFactory; }
 
   cPoint getCentre() { return mClientF/2.f; }
   cPoint getSize() { return mClientF; }
@@ -446,7 +446,7 @@ protected:
   float mRenderTime = 0;
 
 private:
-  void createDirect2d();
+  void createFactories();
   void createDeviceResources();
   void createSizedResources();
 
@@ -466,8 +466,8 @@ private:
 
   //{{{  resources
   // device independent resources
-  Microsoft::WRL::ComPtr<ID2D1Factory1> mD2D1Factory;
-  Microsoft::WRL::ComPtr<IDWriteFactory> mDWriteFactory;
+  ID2D1Factory1* mD2D1Factory;
+  IDWriteFactory* mDWriteFactory;
 
   // device resources
   Microsoft::WRL::ComPtr<ID3D11Device> mD3device;

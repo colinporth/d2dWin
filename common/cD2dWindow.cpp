@@ -64,6 +64,13 @@ void cD2dWindow::init (const string& title, int width, int height, bool fullScre
 
   mD2dWindow = this;
 
+  createFactories();
+  createDeviceResources();
+
+  TIME_ZONE_INFORMATION timeZoneInfo;
+  if (GetTimeZoneInformation (&timeZoneInfo) == TIME_ZONE_ID_DAYLIGHT)
+    mDayLightSeconds = -timeZoneInfo.DaylightBias * 60;
+
   //{{{
   WNDCLASSEX wndclass = { sizeof (WNDCLASSEX),
                           CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW,
@@ -95,31 +102,25 @@ void cD2dWindow::init (const string& title, int width, int height, bool fullScre
     ShowWindow (mHWND, SW_SHOWDEFAULT);
     UpdateWindow (mHWND);
 
-    createDirect2d();
-
-    TIME_ZONE_INFORMATION timeZoneInfo;
-    if (GetTimeZoneInformation (&timeZoneInfo) == TIME_ZONE_ID_DAYLIGHT)
-      mDayLightSeconds = -timeZoneInfo.DaylightBias * 60;
+    createSizedResources();
 
     // renderThread
     thread ([=]() {
-      //{{{  render lambda
+      // render lambda
       CoInitializeEx (NULL, COINIT_MULTITHREADED);
       cLog::setThreadName ("rend");
 
       // wait for target bitmap creation
-      while (mD2dTargetBitmap == nullptr)
-        Sleep (10);
+      while (!mD2dTargetBitmap)
+        this_thread::sleep_for (10ms);
 
       while (mDeviceContext && !mExit) {
-        if (mCountDown > 0) {
-          mCountDown--;
-          Sleep (10);
-          }
+        if (mCountDown-- > 0)
+          this_thread::sleep_for (10ms);
         else {
           mCountDown = mChangeCountDown;
-          system_clock::time_point timePoint = system_clock::now();
 
+          system_clock::time_point timePoint = system_clock::now();
           mDeviceContext->BeginDraw();
           mDeviceContext->Clear (ColorF (ColorF::Black));
           onDraw (mDeviceContext.Get());
@@ -133,12 +134,9 @@ void cD2dWindow::init (const string& title, int width, int height, bool fullScre
             }
           }
         }
-
       cLog::log (LOGINFO, "exit");
       CoUninitialize();
-      }
-      //}}}
-      ).detach();
+      }).detach();
     }
   }
 //}}}
@@ -465,22 +463,18 @@ void cD2dWindow::messagePump() {
 
 // private
 //{{{
-void cD2dWindow::createDirect2d() {
+void cD2dWindow::createFactories() {
 
   // create D2D1Factory
   #ifdef _DEBUG
     D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, { D2D1_DEBUG_LEVEL_INFORMATION }, mD2D1Factory.GetAddressOf());
   #else
-    D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, { D2D1_DEBUG_LEVEL_NONE }, mD2D1Factory.GetAddressOf());
-    //D2D1CreateFactory (D2D1_FACTORY_TYPE_SINGLE_THREADED, { D2D1_DEBUG_LEVEL_NONE }, mD2D1Factory.GetAddressOf());
+    D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, { D2D1_DEBUG_LEVEL_NONE }, &mD2D1Factory);
+    //D2D1CreateFactory (D2D1_FACTORY_TYPE_SINGLE_THREADED, { D2D1_DEBUG_LEVEL_NONE }, &mD2D1Factory);
   #endif
 
   // create DWriteFactory
-  DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED,
-                       __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(mDWriteFactory.GetAddressOf()));
-
-  createDeviceResources();
-  createSizedResources();
+  DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&mDWriteFactory));
 
   // create a textFormat
   mDWriteFactory->CreateTextFormat (
@@ -494,22 +488,6 @@ void cD2dWindow::createDirect2d() {
     L"Consolas", NULL, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
     kConsoleHeight, L"en-us",
     &mConsoleTextFormat);
-
-  // create some common solidBrushes
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black, 0.7f), &mDimBgndBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (0.1f,0.1f,0.1f, 0.5f), &mTransparentBgndBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black), &mBlackBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (0.2f,0.2f,0.2f), &mDarkGrayBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::DimGray), &mDimGrayBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Gray), &mGrayBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::LightGray), &mLightGrayBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::White), &mWhiteBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Red), &mRedBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::GreenYellow), &mGreenBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Blue), &mDarkBlueBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::CornflowerBlue), &mBlueBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Yellow), &mYellowBrush);
-  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Orange), &mOrangeBrush);
   }
 //}}}
 //{{{
@@ -530,11 +508,10 @@ void cD2dWindow::createDeviceResources() {
                          D3D11_CREATE_DEVICE_BGRA_SUPPORT, // optionally set debug and Direct2D compatibility flags
                          featureLevels, ARRAYSIZE(featureLevels), // list of feature levels this app can support
                          D3D11_SDK_VERSION,
-                         &mD3device,               // returns the Direct3D device created
-                         &featureLevel,            // returns feature level of device created
-                         &d3d11deviceContext) != S_OK) {             // returns the device immediate context
+                         &mD3device,                       // returns the Direct3D device created
+                         &featureLevel,                    // returns feature level of device created
+                         &d3d11deviceContext) != S_OK)    // returns the device immediate context
     cLog::log (LOGERROR, "D3D11CreateDevice - failed");
-    }
 
   cLog::log (LOGNOTICE, "D3D11CreateDevice - featureLevel %d.%d",
                          (featureLevel >> 12) & 0xF, (featureLevel >> 8) & 0xF);
@@ -550,6 +527,22 @@ void cD2dWindow::createDeviceResources() {
 
   // create D2Ddevice_context from D2D1device
   d2d1Device->CreateDeviceContext (D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &mDeviceContext);
+
+  // create some common solidBrushes
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black, 0.7f), &mDimBgndBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (0.1f,0.1f,0.1f, 0.5f), &mTransparentBgndBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Black), &mBlackBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (0.2f,0.2f,0.2f), &mDarkGrayBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::DimGray), &mDimGrayBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Gray), &mGrayBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::LightGray), &mLightGrayBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::White), &mWhiteBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Red), &mRedBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::GreenYellow), &mGreenBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Blue), &mDarkBlueBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::CornflowerBlue), &mBlueBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Yellow), &mYellowBrush);
+  mDeviceContext->CreateSolidColorBrush (ColorF (ColorF::Orange), &mOrangeBrush);
   }
 //}}}
 //{{{
