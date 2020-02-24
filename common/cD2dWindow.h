@@ -483,29 +483,29 @@ private:
   Microsoft::WRL::ComPtr<IDXGISwapChain1> mSwapChain;
   Microsoft::WRL::ComPtr<ID2D1Bitmap1> mD2dTargetBitmap;
 
-  D2D1_SIZE_U mClient;
+  D2D1_SIZE_U mClient = { 0 };
   cPoint mClientF;
 
   // useful resources
-  IDWriteTextFormat* mTextFormat;
-  IDWriteTextFormat* mConsoleTextFormat;
+  IDWriteTextFormat* mTextFormat = nullptr;
+  IDWriteTextFormat* mConsoleTextFormat = nullptr;
 
-  ID2D1SolidColorBrush* mDimBgndBrush;
-  ID2D1SolidColorBrush* mTransparentBgndBrush;
+  ID2D1SolidColorBrush* mDimBgndBrush = nullptr;
+  ID2D1SolidColorBrush* mTransparentBgndBrush = nullptr;
 
-  ID2D1SolidColorBrush* mBlackBrush;
-  ID2D1SolidColorBrush* mDarkGrayBrush;
-  ID2D1SolidColorBrush* mDimGrayBrush;
-  ID2D1SolidColorBrush* mGrayBrush;
-  ID2D1SolidColorBrush* mLightGrayBrush;
-  ID2D1SolidColorBrush* mWhiteBrush;
+  ID2D1SolidColorBrush* mBlackBrush = nullptr;
+  ID2D1SolidColorBrush* mDarkGrayBrush = nullptr;
+  ID2D1SolidColorBrush* mDimGrayBrush = nullptr;
+  ID2D1SolidColorBrush* mGrayBrush = nullptr;
+  ID2D1SolidColorBrush* mLightGrayBrush = nullptr;
+  ID2D1SolidColorBrush* mWhiteBrush = nullptr;
 
-  ID2D1SolidColorBrush* mDarkBlueBrush;
-  ID2D1SolidColorBrush* mBlueBrush;
-  ID2D1SolidColorBrush* mGreenBrush;
-  ID2D1SolidColorBrush* mRedBrush;
-  ID2D1SolidColorBrush* mYellowBrush;
-  ID2D1SolidColorBrush* mOrangeBrush;
+  ID2D1SolidColorBrush* mDarkBlueBrush = nullptr;
+  ID2D1SolidColorBrush* mBlueBrush = nullptr;
+  ID2D1SolidColorBrush* mGreenBrush = nullptr;
+  ID2D1SolidColorBrush* mRedBrush = nullptr;
+  ID2D1SolidColorBrush* mYellowBrush = nullptr;
+  ID2D1SolidColorBrush* mOrangeBrush = nullptr;
   //}}}
   //{{{  boxes
   cBox* mProxBox = nullptr;
@@ -529,8 +529,8 @@ private:
   //}}}
   //{{{  fullScreen
   bool mFullScreen = false;
-  RECT mScreenRect;
-  DWORD mScreenStyle;
+  RECT mScreenRect = { 0 };
+  DWORD mScreenStyle = 0;
   //}}}
   //{{{  render
   uint32_t mCountDown = 0;
