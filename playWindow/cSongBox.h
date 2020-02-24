@@ -168,8 +168,8 @@ public:
     reallocBitmap (mWindow->getDc());
 
     // draw
-    drawRange (dc, playFrame);
     drawWave (dc, playFrame);
+    drawRange (dc, playFrame);
     drawOverview (dc, playFrame);
     drawFreq (dc, playFrame);
 
@@ -389,31 +389,6 @@ private:
   //}}}
 
   //{{{
-  void drawRange (ID2D1DeviceContext* dc, int playFrame) {
-
-    cRect dstRect = { mRect.left, mDstWaveTop + mWaveHeight-8.f, mRect.right, mDstWaveTop + mWaveHeight };
-    dc->FillRectangle (dstRect, mWindow->getDimGrayBrush());
-
-    for (auto &item : mSong.getSelect().getItems()) {
-      auto firstx = (getWidth()/2.f) + (item.getFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
-      float lastx = item.getMark() ? firstx + 1.f :
-                                     (getWidth()/2.f) + (item.getLastFrame() - playFrame) * mFrameWidth / mFrameStep;
-
-      dstRect = { mRect.left + firstx, mDstWaveTop + mWaveHeight-8.f, mRect.left + lastx, mDstWaveTop + mWaveHeight };
-      dc->FillRectangle (dstRect, mWindow->getYellowBrush());
-
-      auto title = item.getTitle();
-      if (!title.empty()) {
-        mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
-        dstRect = { mRect.left + firstx + 2.f, mDstWaveTop + mWaveHeight-mWindow->getTextFormat()->GetFontSize(),
-                    mRect.right, mDstWaveTop + mWaveHeight };
-        dc->DrawText (std::wstring (title.begin(), title.end()).data(), (uint32_t)title.size(), mWindow->getTextFormat(),
-                      dstRect, mWindow->getWhiteBrush());
-        }
-      }
-    }
-  //}}}
-  //{{{
   void drawWave (ID2D1DeviceContext* dc, int playFrame) {
 
     // calc leftFrame,rightFrame
@@ -573,19 +548,26 @@ private:
     }
   //}}}
   //{{{
-  void drawFreq (ID2D1DeviceContext* dc, int playFrame) {
+  void drawRange (ID2D1DeviceContext* dc, int playFrame) {
 
-    float valueScale = 100.f / 255.f;
+    cRect dstRect = { mRect.left, mDstWaveTop + mWaveHeight-8.f, mRect.right, mDstWaveTop + mWaveHeight };
+    dc->FillRectangle (dstRect, mWindow->getDarkGrayBrush());
 
-    auto framePtr = mSong.getFramePtr (playFrame);
-    if (framePtr && framePtr->getFreqValues()) {
-      auto freqValues = framePtr->getFreqValues();
-      for (auto i = 0; (i < mSong.getNumFreqBytes()) && ((i*2) < getWidthInt()); i++) {
-        auto value =  freqValues[i] * valueScale;
-        if (value > 1.f)  {
-          cRect dstRect = { mRect.left + (i*2),mRect.bottom - value, mRect.left + ((i+1) * 2),mRect.bottom };
-          dc->FillRectangle (dstRect, mWindow->getYellowBrush());
-          }
+    for (auto &item : mSong.getSelect().getItems()) {
+      auto firstx = (getWidth()/2.f) + (item.getFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
+      float lastx = item.getMark() ? firstx + 1.f :
+                                     (getWidth()/2.f) + (item.getLastFrame() - playFrame) * mFrameWidth / mFrameStep;
+
+      dstRect = { mRect.left + firstx, mDstWaveTop + mWaveHeight-8.f, mRect.left + lastx, mDstWaveTop + mWaveHeight };
+      dc->FillRectangle (dstRect, mWindow->getYellowBrush());
+
+      auto title = item.getTitle();
+      if (!title.empty()) {
+        mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
+        dstRect = { mRect.left + firstx + 2.f, mDstWaveTop + mWaveHeight-mWindow->getTextFormat()->GetFontSize(),
+                    mRect.right, mDstWaveTop + mWaveHeight };
+        dc->DrawText (std::wstring (title.begin(), title.end()).data(), (uint32_t)title.size(), mWindow->getTextFormat(),
+                      dstRect, mWindow->getWhiteBrush());
         }
       }
     }
@@ -809,6 +791,24 @@ private:
        }
 
       dstRect.left = dstRect.right;
+      }
+    }
+  //}}}
+  //{{{
+  void drawFreq (ID2D1DeviceContext* dc, int playFrame) {
+
+    float valueScale = 100.f / 255.f;
+
+    auto framePtr = mSong.getFramePtr (playFrame);
+    if (framePtr && framePtr->getFreqValues()) {
+      auto freqValues = framePtr->getFreqValues();
+      for (auto i = 0; (i < mSong.getNumFreqBytes()) && ((i*2) < getWidthInt()); i++) {
+        auto value =  freqValues[i] * valueScale;
+        if (value > 1.f)  {
+          cRect dstRect = { mRect.left + (i*2),mRect.bottom - value, mRect.left + ((i+1) * 2),mRect.bottom };
+          dc->FillRectangle (dstRect, mWindow->getYellowBrush());
+          }
+        }
       }
     }
   //}}}

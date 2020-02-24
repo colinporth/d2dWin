@@ -372,25 +372,26 @@ public:
   float getWidth() { return mClientF.x; }
   float getHeight() { return mClientF.y; }
 
-  IDWriteTextFormat* getTextFormat() { return mTextFormat.Get(); }
-  IDWriteTextFormat* getConsoleTextFormat() { return mConsoleTextFormat.Get(); }
+  IDWriteTextFormat* getTextFormat() { return mTextFormat; }
+  IDWriteTextFormat* getConsoleTextFormat() { return mConsoleTextFormat; }
 
   // brushes
-  ID2D1SolidColorBrush* getDimBgndBrush() { return mDimBgndBrush.Get(); }
-  ID2D1SolidColorBrush* getTransparentBgndBrush() { return mTransparentBgndBrush.Get(); }
+  ID2D1SolidColorBrush* getDimBgndBrush() { return mDimBgndBrush; }
+  ID2D1SolidColorBrush* getTransparentBgndBrush() { return mTransparentBgndBrush; }
 
-  ID2D1SolidColorBrush* getBlackBrush() { return mBlackBrush.Get(); }
-  ID2D1SolidColorBrush* getDimGrayBrush() { return mDimGrayBrush.Get(); }
-  ID2D1SolidColorBrush* getGrayBrush() { return mGrayBrush.Get(); }
-  ID2D1SolidColorBrush* getLightGrayBrush() { return mLightGrayBrush.Get(); }
-  ID2D1SolidColorBrush* getWhiteBrush() { return mWhiteBrush.Get(); }
+  ID2D1SolidColorBrush* getBlackBrush() { return mBlackBrush; }
+  ID2D1SolidColorBrush* getDarkGrayBrush() { return mDarkGrayBrush; }
+  ID2D1SolidColorBrush* getDimGrayBrush() { return mDimGrayBrush; }
+  ID2D1SolidColorBrush* getGrayBrush() { return mGrayBrush; }
+  ID2D1SolidColorBrush* getLightGrayBrush() { return mLightGrayBrush; }
+  ID2D1SolidColorBrush* getWhiteBrush() { return mWhiteBrush; }
 
-  ID2D1SolidColorBrush* getDarkBlueBrush() { return mDarkBlueBrush.Get(); }
-  ID2D1SolidColorBrush* getBlueBrush() { return mBlueBrush.Get(); }
-  ID2D1SolidColorBrush* getGreenBrush() { return mGreenBrush.Get(); }
-  ID2D1SolidColorBrush* getRedBrush() { return mRedBrush.Get(); }
-  ID2D1SolidColorBrush* getYellowBrush() { return mYellowBrush.Get(); }
-  ID2D1SolidColorBrush* getOrangeBrush() { return mOrangeBrush.Get(); }
+  ID2D1SolidColorBrush* getDarkBlueBrush() { return mDarkBlueBrush; }
+  ID2D1SolidColorBrush* getBlueBrush() { return mBlueBrush; }
+  ID2D1SolidColorBrush* getGreenBrush() { return mGreenBrush; }
+  ID2D1SolidColorBrush* getRedBrush() { return mRedBrush; }
+  ID2D1SolidColorBrush* getYellowBrush() { return mYellowBrush; }
+  ID2D1SolidColorBrush* getOrangeBrush() { return mOrangeBrush; }
 
   bool getShift() { return mShiftKeyDown; }
   bool getControl() { return mControlKeyDown; }
@@ -486,24 +487,25 @@ private:
   cPoint mClientF;
 
   // useful resources
-  Microsoft::WRL::ComPtr<IDWriteTextFormat> mTextFormat;
-  Microsoft::WRL::ComPtr<IDWriteTextFormat> mConsoleTextFormat;
+  IDWriteTextFormat* mTextFormat;
+  IDWriteTextFormat* mConsoleTextFormat;
 
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDimBgndBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mTransparentBgndBrush;
+  ID2D1SolidColorBrush* mDimBgndBrush;
+  ID2D1SolidColorBrush* mTransparentBgndBrush;
 
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mBlackBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDimGrayBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mGrayBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mLightGrayBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mWhiteBrush;
+  ID2D1SolidColorBrush* mBlackBrush;
+  ID2D1SolidColorBrush* mDarkGrayBrush;
+  ID2D1SolidColorBrush* mDimGrayBrush;
+  ID2D1SolidColorBrush* mGrayBrush;
+  ID2D1SolidColorBrush* mLightGrayBrush;
+  ID2D1SolidColorBrush* mWhiteBrush;
 
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDarkBlueBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mBlueBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mGreenBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mRedBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mYellowBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mOrangeBrush;
+  ID2D1SolidColorBrush* mDarkBlueBrush;
+  ID2D1SolidColorBrush* mBlueBrush;
+  ID2D1SolidColorBrush* mGreenBrush;
+  ID2D1SolidColorBrush* mRedBrush;
+  ID2D1SolidColorBrush* mYellowBrush;
+  ID2D1SolidColorBrush* mOrangeBrush;
   //}}}
   //{{{  boxes
   cBox* mProxBox = nullptr;
