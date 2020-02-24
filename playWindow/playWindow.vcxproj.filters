@@ -96,5 +96,8 @@
     <ClInclude Include="..\..\shared\date\date.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\boxes\cListBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

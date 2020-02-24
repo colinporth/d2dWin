@@ -67,7 +67,7 @@ public:
       mOverviewPressed = true;
       }
 
-    else if (pos.y > mDstOverviewTop - 8.f) {
+    else if (pos.y > mDstRangeTop) {
       mPressedFrame = mSong.getPlayFrame() + ((pos.x - (getWidth()/2.f)) * mFrameStep / mFrameWidth);
       mSong.getSelect().start (int(mPressedFrame));
       mRangePressed = true;
@@ -201,8 +201,6 @@ private:
     if (frame >= 0)
       return (frame / mFrameStep) & mBitmapMask;
     else {
-
-      cLog::log (LOGINFO, "%d %d %d", frame, (mFrameStep-1 - frame), (-((mFrameStep-1 - frame) / mFrameStep)) & mBitmapMask);
       return (-((mFrameStep-1 - frame) / mFrameStep)) & mBitmapMask;
       }
     }
@@ -250,7 +248,7 @@ private:
   //{{{
   bool drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame) {
 
-    cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
+    //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     bool allFramesOk = true;
     auto firstFrame = mSong.getFirstFrame();
 
@@ -419,11 +417,10 @@ private:
 
       auto title = item.getTitle();
       if (!title.empty()) {
-        mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
         dstRect = { mRect.left + firstx + 2.f, mDstRangeTop + mRangeHeight - mWindow->getTextFormat()->GetFontSize(),
                     mRect.right, mDstRangeTop + mRangeHeight };
         dc->DrawText (std::wstring (title.begin(), title.end()).data(), (uint32_t)title.size(), mWindow->getTextFormat(),
-                      dstRect, mWindow->getWhiteBrush());
+                      dstRect, mWindow->getWhiteBrush(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
         }
       }
     }

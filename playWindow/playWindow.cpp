@@ -63,15 +63,24 @@ public:
       url.parse (name);
       if (url.getScheme() == "http") {
         //{{{  shoutcast
-        //{{{  urls
-        //const string url = "http://stream.wqxr.org/wqxr.aac";
-        //const string url = "http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac";
-        //const string url = "http://us4.internet-radio.com:8266/";
-        //const string url = "http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac";
-        //const string url = "http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac";
-        //const string url = "http://media-ice.musicradio.com:80/SmoothCountry";
-        //}}}
-        mDebugStr = "shoutcast " + url.getHost() + " channel " + url.getPath();
+        mShoutCast.push_back (name);
+        mShoutCast.push_back ("http://stream.wqxr.org/wqxr.aac");
+        mShoutCast.push_back ("http://stream.wqxr.org/js-stream.aac");
+        mShoutCast.push_back ("http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac");
+        mShoutCast.push_back ("http://us4.internet-radio.com:8266/");
+        mShoutCast.push_back ("http://tx.planetradio.co.uk/icecast.php?i=countryhits.aac");
+        mShoutCast.push_back ("http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac");
+        mShoutCast.push_back ("http://media-ice.musicradio.com:80/SmoothCountry");
+
+        add (new cListBox (this, 500.f, 300.f, mShoutCast, [&](cBox* box) {
+          auto listBox = (cListBox*)box;
+          mUrl = listBox->getString();
+          mSongChanged = true;
+          cLog::log (LOGINFO, "listBox" + listBox->getString());
+          }
+          ))->setPin (true);
+
+        //mDebugStr = "shoutcast " + url.getHost() + " channel " + url.getPath();
         add (new cTitleBox (this, 500.f,20.f, mDebugStr));
 
         thread ([=](){ icyThread (name); }).detach();
@@ -333,110 +342,122 @@ private:
 
     cLog::setThreadName ("icy ");
 
-    int icySkipCount = 0;
-    int icySkipLen = 0;
-    int icyInfoCount = 0;
-    int icyInfoLen = 0;
-    char icyInfo[255] = { 0 };
+    mUrl = url;
+    while (!getExit()) {
+      int icySkipCount = 0;
+      int icySkipLen = 0;
+      int icyInfoCount = 0;
+      int icyInfoLen = 0;
+      char icyInfo[255] = { 0 };
 
-    uint8_t bufferFirst[2048];
-    uint8_t* bufferEnd = bufferFirst;
-    uint8_t* buffer = bufferFirst;
+      uint8_t bufferFirst[2048];
+      uint8_t* bufferEnd = bufferFirst;
+      uint8_t* buffer = bufferFirst;
 
-    int frameNum = -1;
-    cAudioDecode decode (cAudioDecode::eAac);
-    float* samples = nullptr;
+      int frameNum = -1;
+      float* samples = nullptr;
 
-    cUrl parsedUrl;
-    parsedUrl.parse (url);
+      cAudioDecode decode (cAudioDecode::eAac);
 
-    cWinSockHttp http;
-    http.get (parsedUrl.getHost(), parsedUrl.getPath(), "Icy-MetaData: 1",
-      //{{{  lambda headerCallback
-      [&](const string& key, const string& value) noexcept {
-        if (key == "icy-metaint")
-          icySkipLen = stoi (value);
-        },
-      //}}}
-      //{{{  lambda dataCallback
-      [&](const uint8_t* data, int length) noexcept {
-        // cLog::log (LOGINFO, "callback %d", length);
-        if ((icyInfoCount >= icyInfoLen) && (icySkipCount + length <= icySkipLen)) {
-          //{{{  simple copy of whole body, no metaInfo
-          //cLog::log (LOGINFO1, "body simple copy len:%d", length);
+      cWinSockHttp http;
+      cUrl parsedUrl;
+      parsedUrl.parse (mUrl);
+      mSongChanged = false;
 
-          memcpy (bufferEnd, data, length);
+      http.get (parsedUrl.getHost(), parsedUrl.getPath(), "Icy-MetaData: 1",
+        //{{{  lambda headerCallback
+        [&](const string& key, const string& value) noexcept {
+          if (key == "icy-metaint")
+            icySkipLen = stoi (value);
+          },
+        //}}}
+        //{{{  lambda dataCallback
+        [&] (const uint8_t* data, int length) noexcept {
+        // return true to continue
 
-          bufferEnd += length;
-          icySkipCount += length;
-          }
-          //}}}
-        else {
-          //{{{  dumb copy for metaInfo straddling body, could be much better
-          //cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
-                                //length, icyInfoCount, icyInfoLen, icySkipCount, icySkipLen);
+          // cLog::log (LOGINFO, "callback %d", length);
+          if ((icyInfoCount >= icyInfoLen) && (icySkipCount + length <= icySkipLen)) {
+            //{{{  simple copy of whole body, no metaInfo
+            //cLog::log (LOGINFO1, "body simple copy len:%d", length);
 
-          for (int i = 0; i < length; i++) {
-            if (icyInfoCount < icyInfoLen) {
-              icyInfo [icyInfoCount] = data[i];
-              icyInfoCount++;
-              if (icyInfoCount >= icyInfoLen)
-                addIcyInfo (frameNum, icyInfo);
-              }
-            else if (icySkipCount >= icySkipLen) {
-              icyInfoLen = data[i] * 16;
-              icyInfoCount = 0;
-              icySkipCount = 0;
-              //cLog::log (LOGINFO1, "body icyInfo len:", data[i] * 16);
-              }
-            else {
-              icySkipCount++;
-              *bufferEnd = data[i];
-              bufferEnd++;
-              }
+            memcpy (bufferEnd, data, length);
+
+            bufferEnd += length;
+            icySkipCount += length;
             }
-          }
-          //}}}
-
-        if (frameNum < 0) {
-          frameNum = 0;
-          int sampleRate;
-          auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
-          mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
-          mSong.setStreaming();
-          samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
-          }
-
-        while (decode.parseFrame (buffer, bufferEnd)) {
-          if (decode.getFrameType() == mSong.getFrameType()) {
-            auto numSamples = decode.frameToSamples (samples);
-            if (numSamples) {
-              int framelen = decode.getFrameLen();
-              auto frame = (uint8_t*)malloc (framelen);
-              memcpy (frame, decode.getFramePtr(), framelen);
-
-              // frame fixup aacHE sampleRate, samplesPerFrame
-              mSong.setSampleRate (decode.getSampleRate());
-              mSong.setSamplesPerFrame (numSamples);
-              mSong.addFrame (frameNum++, true, frame, framelen, mSong.getNumFrames()+1, samples);
-              changed();
+            //}}}
+          else {
+            //{{{  dumb copy for metaInfo straddling body, could be much better
+            //cLog::log (LOGINFO1, "body split copy length:%d info:%d:%d skip:%d:%d ",
+                                  //length, icyInfoCount, icyInfoLen, icySkipCount, icySkipLen);
+            for (int i = 0; i < length; i++) {
+              if (icyInfoCount < icyInfoLen) {
+                icyInfo [icyInfoCount] = data[i];
+                icyInfoCount++;
+                if (icyInfoCount >= icyInfoLen)
+                  addIcyInfo (frameNum, icyInfo);
+                }
+              else if (icySkipCount >= icySkipLen) {
+                icyInfoLen = data[i] * 16;
+                icyInfoCount = 0;
+                icySkipCount = 0;
+                //cLog::log (LOGINFO1, "body icyInfo len:", data[i] * 16);
+                }
+              else {
+                icySkipCount++;
+                *bufferEnd = data[i];
+                bufferEnd++;
+                }
               }
+
+            return !getExit() && !mSongChanged;
             }
-          buffer += decode.getNextFrameOffset();
-          }
+            //}}}
 
-        if ((buffer > bufferFirst) && (buffer < bufferEnd)) {
-          // shuffle down last partial frame
-          auto bufferLeft = int(bufferEnd - buffer);
-          memcpy (bufferFirst, buffer, bufferLeft);
-          bufferEnd = bufferFirst + bufferLeft;
-          buffer = bufferFirst;
-          }
-        }
-      //}}}
-      );
+          if (frameNum < 0) {
+            frameNum = 0;
+            int sampleRate;
+            auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
+            mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
+            mSong.setStreaming();
+            samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
+            }
 
-    // never exits
+          while (decode.parseFrame (buffer, bufferEnd)) {
+            if (decode.getFrameType() == mSong.getFrameType()) {
+              auto numSamples = decode.frameToSamples (samples);
+              if (numSamples) {
+                int framelen = decode.getFrameLen();
+                auto frame = (uint8_t*)malloc (framelen);
+                memcpy (frame, decode.getFramePtr(), framelen);
+
+                // frame fixup aacHE sampleRate, samplesPerFrame
+                mSong.setSampleRate (decode.getSampleRate());
+                mSong.setSamplesPerFrame (numSamples);
+                mSong.addFrame (frameNum++, true, frame, framelen, mSong.getNumFrames()+1, samples);
+                changed();
+                }
+              }
+            buffer += decode.getNextFrameOffset();
+            }
+
+          if ((buffer > bufferFirst) && (buffer < bufferEnd)) {
+            // shuffle down last partial frame
+            auto bufferLeft = int(bufferEnd - buffer);
+            memcpy (bufferFirst, buffer, bufferLeft);
+            bufferEnd = bufferFirst + bufferLeft;
+            buffer = bufferFirst;
+            }
+
+          return !getExit() && !mSongChanged;
+          }
+        //}}}
+        );
+
+      free (samples);
+      cLog::log (LOGINFO, "icyThread songChanged");
+      }
+
     cLog::log (LOGINFO, "exit");
     }
   //}}}
@@ -589,6 +610,9 @@ private:
   cFileList* mFileList = nullptr;
   cJpegImageView* mJpegImageView = nullptr;
   string mLastTitleStr;
+
+  vector<string> mShoutCast;
+  string mUrl;
 
   string mDebugStr;
   cBox* mLogBox = nullptr;

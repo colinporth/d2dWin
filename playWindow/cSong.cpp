@@ -189,13 +189,11 @@ void cSong::setHlsLoad (eHlsLoad hlsLoad, int chunkNum) {
 
 // incs
 //{{{
-void cSong::incPlayFrame (int frames, bool useSelectRange) {
+void cSong::incPlayFrame (int frames, bool constrainToRange) {
 
   int playFrame = mPlayFrame + frames;
-
-  if (useSelectRange && mSelect.inRange (mPlayFrame))
-    if (playFrame > mSelect.getLastFrame())
-      playFrame = mSelect.getFirstFrame();
+  if (constrainToRange)
+    playFrame = mSelect.constrainToRange (mPlayFrame, playFrame);
 
   setPlayFrame (playFrame);
   }
@@ -205,7 +203,6 @@ void cSong::incPlaySec (int secs, bool useSelectRange) {
   incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame, useSelectRange);
   }
 //}}}
-
 
 // actions
 //{{{

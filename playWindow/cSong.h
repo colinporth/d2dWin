@@ -104,21 +104,42 @@ public:
     //}}}
 
     // gets
-    bool empty() { return mSelectItems.empty(); }
-    int getFirstFrame() { return empty() ? 0 : mSelectItems.front().getFirstFrame(); }
-    int getLastFrame() { return empty() ? 0 : mSelectItems.front().getLastFrame(); }
+    bool empty() { return mItems.empty(); }
+    int getFirstFrame() { return empty() ? 0 : mItems.front().getFirstFrame(); }
+    int getLastFrame() { return empty() ? 0 : mItems.back().getLastFrame(); }
     //{{{
     bool inRange (int frame) {
-      return !empty() && mSelectItems.front().inRange (frame);
+
+      for (auto &item : mItems)
+        if (item.inRange (frame))
+          return true;
+
+      return false;
       }
     //}}}
-    std::vector<cSelectItem>& getItems() { return mSelectItems; }
+    //{{{
+    int constrainToRange (int frame, int constrainedFrame) {
+    // if frame in a select range return frame constrained to it
+
+      for (auto &item : mItems)
+        if (item.inRange (frame))
+          if (constrainedFrame > item.getLastFrame())
+            return item.getFirstFrame();
+          else if (constrainedFrame < item.getFirstFrame())
+            return item.getFirstFrame();
+          else
+            return constrainedFrame;
+
+      return constrainedFrame;
+      }
+    //}}}
+    std::vector<cSelectItem>& getItems() { return mItems; }
 
     // actions
     //{{{
     void clearAll() {
 
-      mSelectItems.clear();
+      mItems.clear();
 
       mEdit = eEditNone;
       mEditFrame = 0;
@@ -126,7 +147,7 @@ public:
     //}}}
     //{{{
     void addMark (int frame, const std::string& title = "") {
-      addSelect (cSelectItem (cSelectItem::eLoop, frame, frame, title));
+      mItems.push_back (cSelectItem (cSelectItem::eLoop, frame, frame, title));
       mEdit = eEditLast;
       mEditFrame = frame;
       }
@@ -134,47 +155,55 @@ public:
     //{{{
     void start (int frame) {
 
-      if (empty()) {
-        addSelect (cSelectItem (cSelectItem::eLoop, frame, frame, ""));
-        mEdit = eEditLast;
-        }
-      else {
+      mEditFrame = frame;
+
+      mItemNum = (int)mItems.size();
+      for (auto &item : mItems) {
         // pick from select range
-        if (abs(frame - mSelectItems.front().getFirstFrame()) < 2)
-          mEdit = eEditFirst;
-        else if (abs(frame - mSelectItems.front().getLastFrame()) < 2)
+        if (abs(frame - item.getLastFrame()) < 2) {
           mEdit = eEditLast;
-        else if (mSelectItems.front().inRange (frame))
+          return;
+          }
+        else if (abs(frame - item.getFirstFrame()) < 2) {
+          mEdit = eEditFirst;
+          return;
+          }
+        else if (item.inRange (frame)) {
           mEdit = eEditRange;
+          return;
+          }
+        mItemNum++;
         }
 
-      mEditFrame = frame;
+      mItems.push_back (cSelectItem (cSelectItem::eLoop, frame, frame, ""));
+      mItemNum = (int)mItems.size() - 1;
+      mEdit = eEditLast;
       }
     //}}}
     //{{{
     void move (int frame) {
 
-      if (!empty()) {
+      if (mItemNum < mItems.size()) {
         switch (mEdit) {
           case eEditFirst:
-            mSelectItems.front().setFirstFrame (frame);
-            if (mSelectItems.front().getFirstFrame() > mSelectItems.front().getLastFrame()) {
-              mSelectItems.front().setLastFrame (frame);
-              mSelectItems.front().setFirstFrame (mSelectItems.front().getLastFrame());
+            mItems[mItemNum].setFirstFrame (frame);
+            if (mItems[mItemNum].getFirstFrame() > mItems[mItemNum].getLastFrame()) {
+              mItems[mItemNum].setLastFrame (frame);
+              mItems[mItemNum].setFirstFrame (mItems[mItemNum].getLastFrame());
               }
             break;
 
           case eEditLast:
-            mSelectItems.front().setLastFrame (frame);
-            if (mSelectItems.front().getLastFrame() < mSelectItems.front().getFirstFrame()) {
-              mSelectItems.front().setFirstFrame (frame);
-              mSelectItems.front().setLastFrame (mSelectItems.front().getFirstFrame());
+            mItems[mItemNum].setLastFrame (frame);
+            if (mItems[mItemNum].getLastFrame() < mItems[mItemNum].getFirstFrame()) {
+              mItems[mItemNum].setFirstFrame (frame);
+              mItems[mItemNum].setLastFrame (mItems[mItemNum].getFirstFrame());
               }
             break;
 
           case eEditRange:
-            mSelectItems.front().setFirstFrame (mSelectItems.front().getFirstFrame() + frame - mEditFrame);
-            mSelectItems.front().setLastFrame (mSelectItems.front().getLastFrame() + frame - mEditFrame);
+            mItems[mItemNum].setFirstFrame (mItems[mItemNum].getFirstFrame() + frame - mEditFrame);
+            mItems[mItemNum].setLastFrame (mItems[mItemNum].getLastFrame() + frame - mEditFrame);
             mEditFrame = frame;
             break;
 
@@ -192,17 +221,12 @@ public:
     //}}}
 
   private:
-    //{{{
-    void addSelect (cSelectItem select) {
-      mSelectItems.push_back (select);
-      }
-    //}}}
-
     enum eEdit { eEditNone, eEditFirst, eEditLast, eEditRange };
 
     eEdit mEdit = eEditNone;
     int mEditFrame = 0;
-    std::vector<cSelectItem> mSelectItems;
+    std::vector<cSelectItem> mItems;
+    int mItemNum = 0;
     };
   //}}}
   virtual ~cSong();

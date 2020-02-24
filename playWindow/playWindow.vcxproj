@@ -82,6 +82,7 @@
     <ClInclude Include="..\boxes\cCalendarBox.h" />
     <ClInclude Include="..\boxes\cClockBox.h" />
     <ClInclude Include="..\boxes\cJpegImageView.h" />
+    <ClInclude Include="..\boxes\cListBox.h" />
     <ClInclude Include="..\boxes\cLogBox.h" />
     <ClInclude Include="..\boxes\ctitlebox.h" />
     <ClInclude Include="..\boxes\cWindowBox.h" />

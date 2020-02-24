@@ -61,6 +61,7 @@
 #include "../boxes/cIntBox.h"
 #include "../boxes/cFloatBox.h"
 #include "../boxes/cTitleBox.h"
+#include "../boxes/cListBox.h"
 #include "../boxes/cJpegImageView.h"
 
 extern "C" {
