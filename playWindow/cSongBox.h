@@ -144,15 +144,13 @@ public:
     mFreqHeight = getHeight() - mWaveHeight - mOverviewHeight;
 
     mSrcPeakHeight = mWaveHeight;
-    mSrcMarkHeight = 2.f;
     mSrcSilenceHeight = 2.f;
-    mSrcHeight = mFreqHeight + mWaveHeight + mSrcPeakHeight + mSrcMarkHeight + mSrcSilenceHeight + mOverviewHeight;
+    mSrcHeight = mFreqHeight + mWaveHeight + mSrcPeakHeight + mSrcSilenceHeight + mOverviewHeight;
 
     mSrcFreqTop = 0.f;
     mSrcWaveTop = mSrcFreqTop + mFreqHeight;
     mSrcPeakTop = mSrcWaveTop + mWaveHeight;
-    mSrcMarkTop = mSrcPeakTop + mSrcPeakHeight;
-    mSrcSilenceTop = mSrcMarkTop + mSrcMarkHeight;
+    mSrcSilenceTop = mSrcPeakTop + mSrcPeakHeight;
     mSrcOverviewTop = mSrcSilenceTop + mSrcSilenceHeight;
 
     mSrcWaveCentre = mSrcWaveTop + (mWaveHeight/2.f);
@@ -162,7 +160,7 @@ public:
     // dst box explicit layout
     mDstFreqTop = mRect.top;
     mDstWaveTop = mDstFreqTop + mFreqHeight + mSrcSilenceHeight;
-    mDstOverviewTop = mDstWaveTop + mWaveHeight + mSrcMarkHeight;
+    mDstOverviewTop = mDstWaveTop + mWaveHeight;
 
     mDstWaveCentre = mDstWaveTop + (mWaveHeight/2.f);
     mDstOverviewCentre = mDstOverviewTop + (mOverviewHeight/2.f);
@@ -270,7 +268,6 @@ private:
     // draw bitmap as frames
     for (auto frame = fromFrame; frame < toFrame; frame += mFrameStep) {
       //{{{  draw bitmap for frame
-      bool mark = false;
       bool silence = false;
       float powerValues[2];
       float peakValues[2];
@@ -282,7 +279,6 @@ private:
         if (framePtr) {
           if (framePtr->getPowerValues()) {
             float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
-            mark = framePtr->hasTitle();
             silence = framePtr->isSilence();
 
             auto powerValuesPtr = framePtr->getPowerValues();
@@ -304,7 +300,6 @@ private:
         //{{{  sum mFrameStep frames, mFrameStep aligned, just draw power scaled to maxPower
         float valueScale = mWaveHeight / 2.f / mSong.getMaxPowerValue();
         silence = false;
-        mark = false;
 
         for (auto i = 0; i < 2; i++)
           powerValues[i] = 0.f;
@@ -314,7 +309,6 @@ private:
         for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
           auto framePtr = mSong.getFramePtr (sumFrame);
           if (framePtr) {
-            mark |= framePtr->hasTitle();
             silence |= framePtr->isSilence();
             if (framePtr->getPowerValues()) {
               auto powerValuesPtr = framePtr->getPowerValues();
@@ -337,13 +331,6 @@ private:
         // draw silence bitmap
         bitmapRect.top = mSrcSilenceTop;
         bitmapRect.bottom = mSrcSilenceTop + 1.f;
-        mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
-        }
-
-      if (mark) {
-        // draw song title bitmap
-        bitmapRect.top = mSrcMarkTop;
-        bitmapRect.bottom = mSrcMarkTop + 1.f;
         mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
         }
       }
@@ -407,18 +394,22 @@ private:
     cRect dstRect = { mRect.left, mDstWaveTop + mWaveHeight-8.f, mRect.right, mDstWaveTop + mWaveHeight };
     dc->FillRectangle (dstRect, mWindow->getDimGrayBrush());
 
-    auto select = mSong.getSelect();
-    for (auto item : select.getItems()) {
+    for (auto &item : mSong.getSelect().getItems()) {
       auto firstx = (getWidth()/2.f) + (item.getFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
-
-      float lastx;
-      if (item.getMark())
-        lastx = firstx + 1.f;
-      else
-        lastx = (getWidth()/2.f) + (item.getLastFrame() - playFrame) * mFrameWidth / mFrameStep;
+      float lastx = item.getMark() ? firstx + 1.f :
+                                     (getWidth()/2.f) + (item.getLastFrame() - playFrame) * mFrameWidth / mFrameStep;
 
       dstRect = { mRect.left + firstx, mDstWaveTop + mWaveHeight-8.f, mRect.left + lastx, mDstWaveTop + mWaveHeight };
       dc->FillRectangle (dstRect, mWindow->getYellowBrush());
+
+      auto title = item.getTitle();
+      if (!title.empty()) {
+        mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
+        dstRect = { mRect.left + firstx + 2.f, mDstWaveTop + mWaveHeight-mWindow->getTextFormat()->GetFontSize(),
+                    mRect.right, mDstWaveTop + mWaveHeight };
+        dc->DrawText (std::wstring (title.begin(), title.end()).data(), (uint32_t)title.size(), mWindow->getTextFormat(),
+                      dstRect, mWindow->getWhiteBrush());
+        }
       }
     }
   //}}}
@@ -497,12 +488,6 @@ private:
                 mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveCentre + 2.f, };
     dc->FillOpacityMask (mBitmap, mWindow->getRedBrush(), dstRect, srcRect);
 
-    // mark
-    srcRect = { leftSrcIndex, mSrcMarkTop, endSrcIndex, mSrcMarkTop + 1.f };
-    dstRect = { mRect.left, mDstWaveTop,
-                mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
-    dc->FillOpacityMask (mBitmap, mWindow->getYellowBrush(), dstRect, srcRect);
-
     // wave
     bool split = (playSrcIndex >= leftSrcIndex) && (playSrcIndex < endSrcIndex);
 
@@ -544,12 +529,6 @@ private:
       dstRect = { mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveCentre - 2.f,
                   mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * mFrameWidth, mDstWaveCentre + 2.f };
       dc->FillOpacityMask (mBitmap, mWindow->getRedBrush(), dstRect, srcRect);
-
-      // mark
-      srcRect = { 0.f, mSrcMarkTop,  rightSrcIndex, mSrcMarkTop + 1.f };
-      dstRect = { mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveTop,
-                  mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
-      dc->FillOpacityMask (mBitmap, mWindow->getYellowBrush(), dstRect, srcRect);
 
       // wave
       bool split = playSrcIndex < rightSrcIndex;
@@ -896,14 +875,12 @@ private:
   float mOverviewHeight = 0.f;
 
   float mSrcPeakHeight = 0.f;
-  float mSrcMarkHeight = 0.f;
   float mSrcSilenceHeight = 0.f;
 
   float mSrcFreqTop = 0.f;
   float mSrcWaveTop = 0.f;
   float mSrcPeakTop = 0.f;
   float mSrcSilenceTop = 0.f;
-  float mSrcMarkTop = 0.f;
   float mSrcOverviewTop = 0.f;
   float mSrcHeight = 0.f;
 

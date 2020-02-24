@@ -141,13 +141,6 @@ void cSong::setPlayFrame (int frame) {
     mPlayFrame = min (max (frame, 0), getLastFrame()+1);
   }
 //}}}
-//{{{
-void cSong::setTitle (const string& title) {
-
-  //if (!hasFrames())
-  //  mFrames.back()->setTitle (title);
-  }
-//}}}
 
 //{{{
 void cSong::setHlsBase (int baseChunkNum, system_clock::time_point baseTimePoint) {

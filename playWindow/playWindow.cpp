@@ -196,7 +196,7 @@ private:
     }
   //}}}
   //{{{
-  void addIcyInfo (const string& icyInfo) {
+  void addIcyInfo (int frame, const string& icyInfo) {
 
     cLog::log (LOGINFO, "addIcyInfo " + icyInfo);
 
@@ -209,7 +209,7 @@ private:
         string titleStr = icyInfo.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
         if (titleStr != mLastTitleStr) {
           cLog::log (LOGINFO1, "addIcyInfo found title = " + titleStr);
-          mSong.setTitle (titleStr);
+          mSong.getSelect().addMark (frame, titleStr);
           mLastTitleStr = titleStr;
           }
         }
@@ -380,7 +380,7 @@ private:
               icyInfo [icyInfoCount] = data[i];
               icyInfoCount++;
               if (icyInfoCount >= icyInfoLen)
-                addIcyInfo (icyInfo);
+                addIcyInfo (frameNum, icyInfo);
               }
             else if (icySkipCount >= icySkipLen) {
               icyInfoLen = data[i] * 16;

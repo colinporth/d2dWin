@@ -51,9 +51,6 @@ public:
     bool hasTitle() { return !mTitle.empty(); }
     std::string getTitle() { return mTitle; }
 
-    // set
-    void setTitle (const std::string& title) { mTitle = title; }
-
   private:
     // vars
     uint8_t* mPtr;
@@ -78,8 +75,8 @@ public:
     public:
       enum eType { eLoop, eMute };
 
-      cSelectItem(eType type, int firstFrame, int lastFrame) :
-        mType(type), mFirstFrame(firstFrame), mLastFrame(lastFrame) {}
+      cSelectItem(eType type, int firstFrame, int lastFrame, const std::string& title) :
+        mType(type), mFirstFrame(firstFrame), mLastFrame(lastFrame), mTitle(title) {}
 
       eType getType() { return mType; }
       int getFirstFrame() { return mFirstFrame; }
@@ -128,8 +125,8 @@ public:
       }
     //}}}
     //{{{
-    void addMark (int frame) {
-      addSelect (cSelectItem (cSelectItem::eLoop, frame, frame));
+    void addMark (int frame, const std::string& title = "") {
+      addSelect (cSelectItem (cSelectItem::eLoop, frame, frame, title));
       mEdit = eEditLast;
       mEditFrame = frame;
       }
@@ -138,7 +135,7 @@ public:
     void start (int frame) {
 
       if (empty()) {
-        addSelect (cSelectItem (cSelectItem::eLoop, frame, frame));
+        addSelect (cSelectItem (cSelectItem::eLoop, frame, frame, ""));
         mEdit = eEditLast;
         }
       else {
