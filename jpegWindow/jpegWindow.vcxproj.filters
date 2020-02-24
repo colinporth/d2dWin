@@ -22,9 +22,6 @@
     <ClInclude Include="..\common\cJpegImage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\date.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\iImage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -35,6 +32,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\boxes\cWindowBox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\date\date.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

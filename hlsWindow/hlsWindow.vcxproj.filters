@@ -74,9 +74,6 @@
     <ClInclude Include="..\common\cCalendarBox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\date.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\cLogBox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -88,6 +85,9 @@
     </ClInclude>
     <ClInclude Include="..\..\shared\teensyAac\huffman.h">
       <Filter>teenstAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\date\date.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -49,6 +49,9 @@
     <ClInclude Include="..\boxes\cWindowBox.h">
       <Filter>header</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\date\date.h">
+      <Filter>header</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="header">

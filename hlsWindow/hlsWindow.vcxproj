@@ -62,6 +62,7 @@
     <ClCompile Include="hlsWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\shared\date\date.h" />
     <ClInclude Include="..\..\shared\hls\hls.h" />
     <ClInclude Include="..\..\shared\net\cHttp.h" />
     <ClInclude Include="..\..\shared\net\cWinSockHttp.h" />
@@ -74,7 +75,6 @@
     <ClInclude Include="..\..\shared\teensyAac\tables.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\cWinAudio.h" />
-    <ClInclude Include="..\..\shared\utils\date.h" />
     <ClInclude Include="..\..\shared\utils\utils.h" />
     <ClInclude Include="..\common\box\cHlsDotsBox.h" />
     <ClInclude Include="..\common\box\cHlsPeakBox.h" />

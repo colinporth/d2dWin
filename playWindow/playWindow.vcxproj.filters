@@ -21,9 +21,6 @@
     <ClInclude Include="..\..\shared\utils\cSemaphore.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\date.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="..\boxes\cCalendarBox.h">
       <Filter>h</Filter>
     </ClInclude>
@@ -95,6 +92,9 @@
     </ClInclude>
     <ClInclude Include="..\..\shared\hls\r6x80.h">
       <Filter>h\bmp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\date\date.h">
+      <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

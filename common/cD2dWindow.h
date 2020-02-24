@@ -8,7 +8,7 @@
 #include <chrono>
 #include <functional>
 
-#include "../../shared/utils/date.h"
+#include "../../shared/date/date.h"
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/iChange.h"
@@ -360,6 +360,9 @@ public:
     };
   //}}}
 
+  void init (const std::string& title, int width = 1920, int height = 1080, bool fullScreen = false);
+  static cD2dWindow* getD2dWindow() { return mD2dWindow; };
+
   //{{{  gets
   ID3D11Device* getD3d11Device() { return mD3device.Get(); }
   ID2D1DeviceContext* getDc() { return mDeviceContext.Get(); }
@@ -414,8 +417,6 @@ public:
   void setChangeCountDown (int countDown) { mChangeCountDown = countDown; }
   //}}}
 
-  void init (const std::string& title, int width = 1920, int height = 1080, bool fullScreen = false);
-
   cBox* add (cBox* box);
   cBox* add (cBox* box, cPoint pos);
   cBox* add (cBox* box, float x, float y);
@@ -432,8 +433,6 @@ public:
 
   LRESULT wndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lparam);
 
-  static cD2dWindow* getD2dWindow() { return mD2dWindow; };
-
 protected:
   ~cD2dWindow();
 
@@ -442,7 +441,6 @@ protected:
   virtual bool onKey (int key) = 0;
   virtual bool onKeyUp (int key) { return false; }
 
-  // exposed for simple box ui
   float mRenderTime = 0;
 
 private:
@@ -458,7 +456,7 @@ private:
   void onDraw (ID2D1DeviceContext* dc);
   void onResize (ID2D1DeviceContext* dc);
 
-  // vars
+  // private vars
   static cD2dWindow* mD2dWindow;
 
   HWND mHWND = 0;
