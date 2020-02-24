@@ -200,9 +200,9 @@ void cSong::incPlayFrame (int frames, bool useSelectRange) {
 
   int playFrame = mPlayFrame + frames;
 
-  if (useSelectRange && inSelectRange (mPlayFrame))
-    if (playFrame > getSelectLastFrame())
-      playFrame = getSelectFirstFrame();
+  if (useSelectRange && mSelect.inRange (mPlayFrame))
+    if (playFrame > mSelect.getLastFrame())
+      playFrame = mSelect.getFirstFrame();
 
   setPlayFrame (playFrame);
   }
@@ -213,98 +213,6 @@ void cSong::incPlaySec (int secs, bool useSelectRange) {
   }
 //}}}
 
-//{{{
-void cSong::clearSelect() {
-
-  // select
-  mSelectValid = false;
-  mSelectFirstFrame = 0;
-  mSelectLastFrame = 0;
-
-  // select editing
-  mSelectEdit = eSelectEditNone;
-  mSelectEditFrame = 0;
-  }
-//}}}
-//{{{
-void cSong::markSelect() {
-
-  // select
-  if (mSelectValid) {
-    mSelectLastFrame = mPlayFrame;
-    }
-  else {
-    mSelectValid = true;
-    mSelectFirstFrame = mPlayFrame;
-    mSelectLastFrame = mPlayFrame;
-    mSelectEdit = eSelectEditLast;
-    }
-
-  mSelectEditFrame = mPlayFrame;
-  }
-//}}}
-//{{{
-void cSong::startSelect (int frame) {
-
-  if (hasSelect()) {
-    // pick from select range
-    if (abs(frame - getSelectFirstFrame()) < 2)
-      mSelectEdit = eSelectEditFirst;
-    else if (abs(frame - getSelectLastFrame()) < 2)
-      mSelectEdit = eSelectEditLast;
-    else if (inSelectRange (frame))
-      mSelectEdit = eSelectEditRange;
-    }
-  else {
-    // start new select
-    mSelectValid = true;
-    mSelectFirstFrame = frame;
-    mSelectLastFrame = frame;
-
-    mSelectEdit = eSelectEditLast;
-    }
-  mSelectEditFrame = frame;
-  }
-//}}}
-//{{{
-void cSong::moveSelect (int frame) {
-
-  if (hasSelect()) {
-    switch (mSelectEdit) {
-      case eSelectEditFirst:
-        mSelectFirstFrame = frame;
-        if (getSelectFirstFrame() > getSelectLastFrame()) {
-          mSelectLastFrame = frame;
-          mSelectFirstFrame = getSelectLastFrame();
-          }
-        break;
-
-      case eSelectEditLast:
-        mSelectLastFrame = frame;
-        if (getSelectLastFrame() < getSelectFirstFrame()) {
-          mSelectFirstFrame = frame;
-          mSelectLastFrame = getSelectFirstFrame();
-          }
-        break;
-
-      case eSelectEditRange:
-        mSelectFirstFrame += frame - mSelectEditFrame;
-        mSelectLastFrame += frame - mSelectEditFrame;
-        mSelectEditFrame = frame;
-        break;
-
-      default:
-        cLog::log (LOGERROR, "moving invalid select");
-      }
-    }
-  }
-//}}}
-//{{{
-void cSong::endSelect (int frame) {
-
-  mSelectEdit = eSelectEditNone;
-  }
-//}}}
 
 // actions
 //{{{
@@ -324,14 +232,6 @@ void cSong::nextSilencePlayFrame() {
 
 // private
 //{{{
-bool cSong::inSelectRange (int frame) {
-// ignore 1 frame select range
-  return hasSelect() &&
-         (!getSelectMark()) &&
-         (frame >= getSelectFirstFrame()) && (frame <= getSelectLastFrame());
-  }
-//}}}
-//{{{
 void cSong::clearFrames() {
 
   // new id for any cache
@@ -340,7 +240,7 @@ void cSong::clearFrames() {
   // reset frames
   mPlayFrame = 0;
   mTotalFrames = 0;
-  clearSelect();
+  mSelect.clear();
 
   for (auto frame : mFrameMap)
     delete (frame.second);

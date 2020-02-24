@@ -95,7 +95,7 @@ public:
 
       if (mTab)
         drawTab (dc, mImage->getFileName() + " - scale " + dec(mImage->getScale()) + " " + dec(mView2d.getScale()),
-                 dstRect, mWindow->getLightGreyBrush());
+                 dstRect, mWindow->getLightGrayBrush());
 
       if (mSideBar) {
         // draw sidebar

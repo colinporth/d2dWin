@@ -46,7 +46,7 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    dc->FillRectangle (mRect, mWindow->getGreyBrush());
+    dc->FillRectangle (mRect, mWindow->getGrayBrush());
     cIntBox::onDraw (dc);
     }
   //}}}
@@ -121,7 +121,7 @@ public:
   //{{{
   void onDraw (ID2D1DeviceContext* dc) {
 
-    dc->FillRectangle (mRect, mWindow->getGreyBrush());
+    dc->FillRectangle (mRect, mWindow->getGrayBrush());
     cUInt64Box::onDraw (dc);
     }
   //}}}

@@ -80,21 +80,21 @@ private:
       r.right = getWidth() * (float)(mPlayView->mVidTs->getLastLoadedPts() - mPlayView->mAnalTs->getBasePts())
                                      / (float)mPlayView->getLengthPts();
       r.top = r.bottom - ylen;
-      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
+      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGrayBrush());
 
       // draw audLastPts yellowBar
       r.bottom = r.top;
       r.top -= ylen;
       r.right = getWidth() * (float)(mPlayView->mAudTs->getLastLoadedPts() - mPlayView->mAnalTs->getBasePts())
                                     / (float)mPlayView->getLengthPts();
-      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
+      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGrayBrush());
 
       // draw playPts yellowBar
       r.bottom = r.top;
       r.top -= ylen;
       r.right = getWidth() * (float)(mPlayView->getPlayPts() - mPlayView->mAnalTs->getBasePts())
                                     / (float)mPlayView->getLengthPts();
-      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGreyBrush());
+      dc->FillRectangle (r, mPick ? mWindow->getYellowBrush() :  mWindow->getGrayBrush());
       }
     //}}}
 
@@ -227,7 +227,7 @@ private:
         mPlayView->getPlayPts(), maxY);
 
       dc->FillRectangle (RectF((getWidth()/2)-1, 0, (getWidth()/2)+1, maxY),
-                         mPin ? mWindow->getYellowBrush() : mWindow->getGreyBrush());
+                         mPin ? mWindow->getYellowBrush() : mWindow->getGrayBrush());
 
       mLayoutHeight = maxY;
       layout();

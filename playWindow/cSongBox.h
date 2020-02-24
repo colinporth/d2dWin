@@ -63,15 +63,17 @@ public:
     //std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
     if (pos.y > mDstOverviewTop) {
       auto frame = mSong.getFirstFrame() + int((pos.x * mSong.getTotalFrames()) / getWidth());
-      mOverviewPressed = true;
       mSong.setPlayFrame (frame);
+      mOverviewPressed = true;
       }
-    else if (mWindow->getControl()) {
+
+    else if (pos.y > mDstOverviewTop - 8.f) {
       mPressedFrame = mSong.getPlayFrame() + ((pos.x - (getWidth()/2.f)) * mFrameStep / mFrameWidth);
-      mSong.startSelect (int(mPressedFrame));
+      mSong.getSelect().start (int(mPressedFrame));
+      mRangePressed = true;
       mWindow->changed();
-      cLog::log (LOGINFO, " first %d %d %d", mSong.hasSelect(), mSong.getSelectFirstFrame(), mSong.getSelectLastFrame());
       }
+
     else
       mPressedFrame = (float)mSong.getPlayFrame();
 
@@ -84,17 +86,16 @@ public:
     //std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
     if (mOverviewPressed)
       mSong.setPlayFrame (mSong.getFirstFrame() + int((pos.x * mSong.getTotalFrames()) / getWidth()));
+
+    else if (mRangePressed) {
+      mPressedFrame += (inc.x / mFrameWidth) * mFrameStep;
+      mSong.getSelect().move ((int)mPressedFrame);
+      mWindow->changed();
+      }
+
     else {
-      if (mWindow->getControl()) {
-        mPressedFrame += (inc.x / mFrameWidth) * mFrameStep;
-        mSong.moveSelect ((int)mPressedFrame);
-        mWindow->changed();
-        cLog::log (LOGINFO, "%d %d %d", mSong.hasSelect(), mSong.getSelectFirstFrame(), mSong.getSelectLastFrame());
-        }
-      else {
-        mPressedFrame -= (inc.x / mFrameWidth) * mFrameStep;
-        mSong.setPlayFrame ((int)mPressedFrame);
-        }
+      mPressedFrame -= (inc.x / mFrameWidth) * mFrameStep;
+      mSong.setPlayFrame ((int)mPressedFrame);
       }
 
     return true;
@@ -103,8 +104,9 @@ public:
   //{{{
   bool onUp (bool right, bool mouseMoved, cPoint pos) {
 
-    mSong.endSelect ((int)mPressedFrame);
+    mSong.getSelect().end();
     mOverviewPressed = false;
+    mRangePressed = false;
     return true;
     }
   //}}}
@@ -402,16 +404,20 @@ private:
   //{{{
   void drawRange (ID2D1DeviceContext* dc, int playFrame) {
 
-    if (mSong.hasSelect()) {
-      auto firstx = (getWidth()/2.f) + (mSong.getSelectFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
+    cRect dstRect = { mRect.left, mDstWaveTop + mWaveHeight-8.f, mRect.right, mDstWaveTop + mWaveHeight };
+    dc->FillRectangle (dstRect, mWindow->getDimGrayBrush());
+
+    auto select = mSong.getSelect();
+    for (auto item : select.getItems()) {
+      auto firstx = (getWidth()/2.f) + (item.getFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
 
       float lastx;
-      if (mSong.getSelectMark())
+      if (item.getMark())
         lastx = firstx + 1.f;
       else
-        lastx = (getWidth()/2.f) + (mSong.getSelectLastFrame() - playFrame) * mFrameWidth / mFrameStep;
+        lastx = (getWidth()/2.f) + (item.getLastFrame() - playFrame) * mFrameWidth / mFrameStep;
 
-      cRect dstRect = { mRect.left + firstx, mDstWaveTop, mRect.left + lastx, mDstWaveTop + mWaveHeight };
+      dstRect = { mRect.left + firstx, mDstWaveTop + mWaveHeight-8.f, mRect.left + lastx, mDstWaveTop + mWaveHeight };
       dc->FillRectangle (dstRect, mWindow->getYellowBrush());
       }
     }
@@ -476,7 +482,7 @@ private:
     auto dstPlay = playSrcIndex - leftSrcIndex + (playSrcIndex < leftSrcIndex ? endSrcIndex : 0);
     dstRect = { mRect.left + (dstPlay+0.5f) * mFrameWidth, mDstFreqTop,
                 mRect.left + ((dstPlay+0.5f) * mFrameWidth) + 1.f, mDstWaveTop + mWaveHeight };
-    dc->FillRectangle (dstRect, mWindow->getDarkGreyBrush());
+    dc->FillRectangle (dstRect, mWindow->getDimGrayBrush());
     //}}}
     //{{{  stamp chunk before wrap
     // freq
@@ -517,12 +523,12 @@ private:
       srcRect = { playSrcIndex+1.f, mSrcPeakTop, endSrcIndex, mSrcPeakTop + mSrcPeakHeight };
       dstRect = { mRect.left + (playSrcIndex+1.f - leftSrcIndex) * mFrameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
-      dc->FillOpacityMask (mBitmap, mWindow->getDarkGreyBrush(), dstRect, srcRect);
+      dc->FillOpacityMask (mBitmap, mWindow->getDimGrayBrush(), dstRect, srcRect);
 
       srcRect = { playSrcIndex+1.f, mSrcWaveTop, endSrcIndex, mSrcWaveTop + mWaveHeight };
       dstRect = { mRect.left + (playSrcIndex+1.f - leftSrcIndex) * mFrameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
-      dc->FillOpacityMask (mBitmap, mWindow->getLightGreyBrush(), dstRect, srcRect);
+      dc->FillOpacityMask (mBitmap, mWindow->getLightGrayBrush(), dstRect, srcRect);
       }
     //}}}
     if (wrap) {
@@ -564,12 +570,12 @@ private:
       srcRect = { split ? playSrcIndex+1.f : 0.f, mSrcPeakTop,  rightSrcIndex, mSrcPeakTop + mSrcPeakHeight };
       dstRect = { mRect.left + (endSrcIndex - leftSrcIndex + (split ? (playSrcIndex+1.f) : 0.f)) * mFrameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
-      dc->FillOpacityMask (mBitmap, mWindow->getDarkGreyBrush(), dstRect, srcRect);
+      dc->FillOpacityMask (mBitmap, mWindow->getDimGrayBrush(), dstRect, srcRect);
 
       srcRect = { split ? playSrcIndex+1.f : 0.f, mSrcWaveTop,  rightSrcIndex, mSrcWaveTop + mWaveHeight };
       dstRect = { mRect.left + (endSrcIndex - leftSrcIndex + (split ? (playSrcIndex+1.f) : 0.f)) * mFrameWidth, mDstWaveTop,
                   mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * mFrameWidth, mDstWaveTop + mWaveHeight };
-      dc->FillOpacityMask (mBitmap, mWindow->getLightGreyBrush(), dstRect, srcRect);
+      dc->FillOpacityMask (mBitmap, mWindow->getLightGrayBrush(), dstRect, srcRect);
       }
       //}}}
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
@@ -748,7 +754,7 @@ private:
     // after playFrame
     srcRect = { playFrameX+1.f, mSrcOverviewTop,  getWidth(), mSrcOverviewTop + mOverviewHeight };
     dstRect = { mRect.left + playFrameX+1.f, mDstOverviewTop, mRect.right, mDstOverviewTop + mOverviewHeight };
-    dc->FillOpacityMask (mBitmap, mWindow->getGreyBrush(), dstRect, srcRect);
+    dc->FillOpacityMask (mBitmap, mWindow->getGrayBrush(), dstRect, srcRect);
 
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
     }
@@ -820,7 +826,7 @@ private:
           colour = mWindow->getWhiteBrush();
         dc->FillRectangle (dstRect, colour);
         if (frame == playFrame)
-          colour = mWindow->getGreyBrush();
+          colour = mWindow->getGrayBrush();
        }
 
       dstRect.left = dstRect.right;
@@ -861,6 +867,8 @@ private:
   int mFrameStep = 1;
 
   float mPressedFrame = 0.f;
+  bool mOverviewPressed = false;
+  bool mRangePressed = false;
 
   bool mFramesBitmapOk = false;
   int mBitmapFirstFrame = 0;
@@ -868,7 +876,6 @@ private:
   int mBitmapFrameStep = 1;
 
   bool mOverviewBitmapOk = false;
-  bool mOverviewPressed = false;
   int mOverviewFirstFrame = 0;
   int mOverviewLastFrame = 0;
   int mOverviewTotalFrames = 0;

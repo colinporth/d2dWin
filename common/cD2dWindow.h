@@ -248,7 +248,7 @@ public:
     //}}}
     //{{{
     void drawDebug (ID2D1DeviceContext* dc, const std::string& str, cRect& r) {
-      drawDebug (dc, str, mWindow->getGreyBrush(), r);
+      drawDebug (dc, str, mWindow->getGrayBrush(), r);
       }
     //}}}
     //{{{
@@ -380,9 +380,9 @@ public:
   ID2D1SolidColorBrush* getTransparentBgndBrush() { return mTransparentBgndBrush.Get(); }
 
   ID2D1SolidColorBrush* getBlackBrush() { return mBlackBrush.Get(); }
-  ID2D1SolidColorBrush* getDarkGreyBrush() { return mDarkGreyBrush.Get(); }
-  ID2D1SolidColorBrush* getGreyBrush() { return mGreyBrush.Get(); }
-  ID2D1SolidColorBrush* getLightGreyBrush() { return mLightGreyBrush.Get(); }
+  ID2D1SolidColorBrush* getDimGrayBrush() { return mDimGrayBrush.Get(); }
+  ID2D1SolidColorBrush* getGrayBrush() { return mGrayBrush.Get(); }
+  ID2D1SolidColorBrush* getLightGrayBrush() { return mLightGrayBrush.Get(); }
   ID2D1SolidColorBrush* getWhiteBrush() { return mWhiteBrush.Get(); }
 
   ID2D1SolidColorBrush* getDarkBlueBrush() { return mDarkBlueBrush.Get(); }
@@ -493,9 +493,9 @@ private:
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mTransparentBgndBrush;
 
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mBlackBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDarkGreyBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mGreyBrush;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mLightGreyBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDimGrayBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mGrayBrush;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mLightGrayBrush;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mWhiteBrush;
 
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> mDarkBlueBrush;

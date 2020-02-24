@@ -43,7 +43,7 @@ public:
         auto str = dec(offset);
         dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mTextFormat,
                       cRect (mRect.left, centre.y-8.f, mRect.right, centre.y +4.f),
-                      mWindow->getLightGreyBrush());
+                      mWindow->getLightGrayBrush());
         }
       }
     }

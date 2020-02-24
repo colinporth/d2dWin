@@ -54,7 +54,7 @@ public:
 
   void onDraw (ID2D1DeviceContext* dc) {
 
-    dc->FillRectangle (mRect, mWindow->getGreyBrush());
+    dc->FillRectangle (mRect, mWindow->getGrayBrush());
     cFloatBox::onDraw (dc);
     }
   };

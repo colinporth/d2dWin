@@ -166,7 +166,7 @@ private:
   void drawWooferBar (ID2D1DeviceContext* dc, cRect& r, bool selected, float value) {
 
     r.top = r.bottom - (value * getHeight() * kVolScale);
-    dc->FillRectangle (r, selected ? mBrush : mWindow->getGreyBrush());
+    dc->FillRectangle (r, selected ? mBrush : mWindow->getGrayBrush());
     }
   //}}}
 

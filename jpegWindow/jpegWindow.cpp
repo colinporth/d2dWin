@@ -630,7 +630,7 @@ private:
             mWindow->getDwriteFactory()->CreateTextLayout (wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
                        mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
             dc->DrawTextLayout (p, textLayout,
-              weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGreyBrush());
+              weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGrayBrush());
             textLayout->Release();
 
             p.x += kCalendarWidth;
@@ -654,7 +654,7 @@ private:
             mWindow->getDwriteFactory()->CreateTextLayout (
               wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
               mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-            dc->DrawTextLayout (p, textLayout, today == curDay ? mWindow->getWhiteBrush() : mWindow->getGreyBrush());
+            dc->DrawTextLayout (p, textLayout, today == curDay ? mWindow->getWhiteBrush() : mWindow->getGrayBrush());
             textLayout->Release();
 
             if (++weekDay == date::sun) {
@@ -707,7 +707,7 @@ private:
       string str = mImageSet.mDirs[0]->getDirName() + " - " +
                    dec(mImageSet.mAllocSize/1000000) + "m - " +
                    dec(mImageSet.getNumImages()) + " images";
-      drawTab (dc, str, dst, mWindow->getLightGreyBrush());
+      drawTab (dc, str, dst, mWindow->getLightGrayBrush());
       }
     //}}}
 

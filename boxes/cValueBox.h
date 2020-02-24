@@ -33,7 +33,7 @@ public:
 
   void onDraw (ID2D1DeviceContext* dc) {
     std::string str = mTitle + " " + dec (mValue);
-    dc->FillRectangle (mRect, mPick ? mWindow->getYellowBrush() : mWindow->getGreyBrush());
+    dc->FillRectangle (mRect, mPick ? mWindow->getYellowBrush() : mWindow->getGrayBrush());
     dc->DrawText (std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), mWindow->getTextFormat(),
                   mRect, mPick ? mWindow->getBlackBrush() : mWindow->getWhiteBrush());
     }

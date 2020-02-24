@@ -43,7 +43,7 @@ public:
       auto dayStr = format (L"%a", titleWeekDay);
       dayStr.resize (2);
       dc->DrawText (dayStr.data(), (uint32_t)dayStr.size(), mWindow->getTextFormat(), rect,
-                    weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGreyBrush());
+                    weekDayToday == titleWeekDay ?  mWindow->getWhiteBrush() : mWindow->getGrayBrush());
       rect.left += kCalendarWidth;
       } while (++titleWeekDay != date::sun);
     rect.top += kLineHeight;
@@ -62,7 +62,7 @@ public:
       // iterate days of week
       auto numStr = format (L"%e", curDay);
       dc->DrawText (numStr.data(), (uint32_t)numStr.size(), mWindow->getTextFormat(), rect,
-                    today == curDay ? mWindow->getWhiteBrush() : mWindow->getGreyBrush());
+                    today == curDay ? mWindow->getWhiteBrush() : mWindow->getGrayBrush());
 
       if (++weekDay == date::sun) {
         // line 6 folds back to first

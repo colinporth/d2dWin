@@ -186,7 +186,7 @@ public:
     //mRadialGradientBrush->SetRadiusX (radius);
     //mRadialGradientBrush->SetRadiusY (radius);
     //dc->FillEllipse (Ellipse (centre, radius,radius), mRadialGradientBrush);
-    dc->DrawEllipse (Ellipse (centre, radius,radius), mWindow->getGreyBrush(), 2.f);
+    dc->DrawEllipse (Ellipse (centre, radius,radius), mWindow->getGrayBrush(), 2.f);
     //}}}
     //{{{  draw samples
     centre = getCentre();
@@ -205,7 +205,7 @@ public:
         }
       if (samples) {
         if (x >= midWidth)
-          brush = mWindow->getDarkGreyBrush();
+          brush = mWindow->getDimGrayBrush();
         else if (x >= centre.x)
           brush = mDarkGreenBrush;
         auto left = *samples++ * scale;

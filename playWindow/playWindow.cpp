@@ -119,7 +119,7 @@ protected:
       case 0x1B: return true;
       case 'F' : toggleFullScreen(); break;
       case 'L' : mLogBox->togglePin(); break;
-      case 'M' : mSong.markSelect(); changed(); break;
+      case 'M' : mSong.getSelect().addMark (mSong.getPlayFrame()); changed(); break;
 
       case ' ' : mPlaying = !mPlaying; break;
 
@@ -130,14 +130,14 @@ protected:
       case 0x27: mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);  changed(); break; // right arrow  + 1 sec
 
       case 0x24: mSong.setPlayFrame (
-        mSong.hasSelect() ? mSong.getSelectFirstFrame() : mSong.getFirstFrame()); changed(); break; // home
+        mSong.getSelect().empty() ? mSong.getFirstFrame() : mSong.getSelect().getFirstFrame()); changed(); break; // home
       case 0x23: mSong.setPlayFrame (
-        mSong.hasSelect() ? mSong.getSelectLastFrame() : mSong.getLastFrame()); changed(); break; // end
+        mSong.getSelect().empty() ? mSong.getLastFrame() : mSong.getSelect().getLastFrame()); changed(); break; // end
 
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
 
-      case 0x2e: mSong.clearSelect(); changed(); break;; // delete
+      case 0x2e: mSong.getSelect().clear(); changed(); break;; // delete
 
       case 0x0d: mChanged = true; changed(); break; // enter - play file
 

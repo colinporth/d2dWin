@@ -70,12 +70,150 @@ public:
     std::string mTitle;
     };
   //}}}
+  //{{{
+  class cSelect {
+  public:
+    //{{{
+    class cSelectItem {
+    public:
+      enum eType { eLoop, eMute };
+
+      cSelectItem(eType type, int firstFrame, int lastFrame) :
+        mType(type), mFirstFrame(firstFrame), mLastFrame(lastFrame) {}
+
+      eType getType() { return mType; }
+      int getFirstFrame() { return mFirstFrame; }
+      int getLastFrame() { return mLastFrame; }
+      bool getMark() { return getFirstFrame() == getLastFrame(); }
+      std::string getTitle() { return mTitle; }
+      //{{{
+      bool inRange (int frame) {
+      // ignore 1 frame select range
+        return (mFirstFrame != mLastFrame) && (frame >= mFirstFrame) && (frame <= mLastFrame);
+        }
+      //}}}
+
+      void setType (eType type) { mType = type; }
+      void setFirstFrame (int frame) { mFirstFrame = frame; }
+      void setLastFrame (int frame) { mLastFrame = frame; }
+      void setTitle (const std::string& title) { mTitle = title; }
+
+    private:
+      eType mType;
+      int mFirstFrame = 0;
+      int mLastFrame = 0;
+      std::string mTitle;
+      };
+    //}}}
+
+    // gets
+    bool empty() { return mSelectItems.empty(); }
+    int getFirstFrame() { return empty() ? 0 : mSelectItems.front().getFirstFrame(); }
+    int getLastFrame() { return empty() ? 0 : mSelectItems.front().getLastFrame(); }
+    //{{{
+    bool inRange (int frame) {
+      return !empty() && mSelectItems.front().inRange (frame);
+      }
+    //}}}
+    std::vector<cSelectItem>& getItems() { return mSelectItems; }
+
+    // actions
+    //{{{
+    void clear() {
+
+      mSelectItems.clear();
+
+      mEdit = eEditNone;
+      mEditFrame = 0;
+      }
+    //}}}
+    //{{{
+    void addMark (int frame) {
+      addSelect (cSelectItem (cSelectItem::eLoop, frame, frame));
+      mEdit = eEditLast;
+      mEditFrame = frame;
+      }
+    //}}}
+    //{{{
+    void start (int frame) {
+
+      if (empty()) {
+        addSelect (cSelectItem (cSelectItem::eLoop, frame, frame));
+        mEdit = eEditLast;
+        }
+      else {
+        // pick from select range
+        if (abs(frame - mSelectItems.front().getFirstFrame()) < 2)
+          mEdit = eEditFirst;
+        else if (abs(frame - mSelectItems.front().getLastFrame()) < 2)
+          mEdit = eEditLast;
+        else if (mSelectItems.front().inRange (frame))
+          mEdit = eEditRange;
+        }
+
+      mEditFrame = frame;
+      }
+    //}}}
+    //{{{
+    void move (int frame) {
+
+      if (!empty()) {
+        switch (mEdit) {
+          case eEditFirst:
+            mSelectItems.front().setFirstFrame (frame);
+            if (mSelectItems.front().getFirstFrame() > mSelectItems.front().getLastFrame()) {
+              mSelectItems.front().setLastFrame (frame);
+              mSelectItems.front().setFirstFrame (mSelectItems.front().getLastFrame());
+              }
+            break;
+
+          case eEditLast:
+            mSelectItems.front().setLastFrame (frame);
+            if (mSelectItems.front().getLastFrame() < mSelectItems.front().getFirstFrame()) {
+              mSelectItems.front().setFirstFrame (frame);
+              mSelectItems.front().setLastFrame (mSelectItems.front().getFirstFrame());
+              }
+            break;
+
+          case eEditRange:
+            mSelectItems.front().setFirstFrame (mSelectItems.front().getFirstFrame() + frame - mEditFrame);
+            mSelectItems.front().setLastFrame (mSelectItems.front().getLastFrame() + frame - mEditFrame);
+            mEditFrame = frame;
+            break;
+
+          default:
+            cLog::log (LOGERROR, "moving invalid select");
+          }
+        }
+      }
+    //}}}
+    //{{{
+    void end() {
+      mEdit = eEditNone;
+      mEditFrame = 0;
+      }
+    //}}}
+
+  private:
+    //{{{
+    void addSelect (cSelectItem select) {
+      mSelectItems.push_back (select);
+      }
+    //}}}
+
+    enum eEdit { eEditNone, eEditFirst, eEditLast, eEditRange };
+
+    eEdit mEdit = eEditNone;
+    int mEditFrame = 0;
+    std::vector<cSelectItem> mSelectItems;
+    };
+  //}}}
   virtual ~cSong();
 
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
   void addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples);
 
-  enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed} ;
+  enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed };
   //{{{  gets
   std::shared_mutex& getSharedMutex() { return mSharedMutex; }
   bool getStreaming() { return mStreaming; }
@@ -105,15 +243,14 @@ public:
   int getTotalFrames() { return mTotalFrames; }
   int getPlayFrame() { return mPlayFrame; }
 
+  //{{{
   cFrame* getFramePtr (int frame) {
     auto it = mFrameMap.find (frame);
-    return (it == mFrameMap.end()) ? nullptr : it->second; }
+    return (it == mFrameMap.end()) ? nullptr : it->second;
+    }
+  //}}}
 
-  // selects
-  bool hasSelect() { return mSelectValid; }
-  bool getSelectMark() { return mSelectValid && (mSelectFirstFrame == mSelectLastFrame); }
-  int getSelectFirstFrame() { return mSelectFirstFrame; }
-  int getSelectLastFrame() { return mSelectLastFrame; }
+  cSelect& getSelect() { return mSelect; }
 
   // info
   int getBitrate() { return mBitrate; }
@@ -154,18 +291,11 @@ public:
   void incPlaySec (int secs, bool useSelectRange);
   void incPlayFrame (int frames, bool useSelectRange);
 
-  void clearSelect();
-  void markSelect();
-  void startSelect (int frame);
-  void moveSelect (int frame);
-  void endSelect (int frame);
-
   // actions
   void prevSilencePlayFrame();
   void nextSilencePlayFrame();
 
 private:
-  bool inSelectRange (int frame);
   void clearFrames();
 
   void checkSilenceWindow (int frame);
@@ -190,14 +320,7 @@ private:
 
   int mPlayFrame = 0;
   int mTotalFrames = 0;
-
-  bool mSelectValid = false;
-  int mSelectFirstFrame = 0;
-  int mSelectLastFrame = 0;
-
-  enum eSelectEdit { eSelectEditNone, eSelectEditFirst, eSelectEditLast, eSelectEditRange };
-  eSelectEdit mSelectEdit = eSelectEditNone;
-  int mSelectEditFrame = 0;
+  cSelect mSelect;
 
   //{{{  max stuff for ui values
   float mMaxPowerValue = 0.f;
