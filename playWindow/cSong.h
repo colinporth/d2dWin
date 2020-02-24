@@ -116,7 +116,7 @@ public:
 
     // actions
     //{{{
-    void clear() {
+    void clearAll() {
 
       mSelectItems.clear();
 

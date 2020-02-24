@@ -36,22 +36,22 @@ public:
     if (name.empty()) {
       //{{{  hls radio 1..6
       add (new cBmpBox (this, 40.f,40.f, r1x80,
-           [&](cBox* box){ mSong.setChan ("bbc_radio_one"); mChanged = true; } ));
+           [&](cBox* box){ mSong.setChan ("bbc_radio_one"); mSongChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r2x80,
-                [&](cBox* box){ mSong.setChan ("bbc_radio_two"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_radio_two"); mSongChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r3x80,
-                [&](cBox* box){ mSong.setChan ("bbc_radio_three"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_radio_three"); mSongChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r4x80,
-                [&](cBox* box){ mSong.setChan ("bbc_radio_fourfm"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r5x80,
-                [&](cBox* box){ mSong.setChan ("bbc_radio_five_live"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; } ));
 
       addRight (new cBmpBox (this, 40.f,40.f, r6x80,
-                [&](cBox* box){ mSong.setChan ("bbc_6music"); mChanged = true; } ));
+                [&](cBox* box){ mSong.setChan ("bbc_6music"); mSongChanged = true; } ));
 
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 
@@ -84,7 +84,7 @@ public:
         if (!mFileList->empty()) {
 
           add (new cFileListBox (this, 0.f,-220.f, mFileList,
-               [&](cBox* box){ mChanged = true; }))->setPin (true);
+               [&](cBox* box){ mSongChanged = true; }))->setPin (true);
 
           mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
           addFront (mJpegImageView);
@@ -117,6 +117,7 @@ protected:
     switch (key) {
       case 0x00: break;
       case 0x1B: return true;
+
       case 'F' : toggleFullScreen(); break;
       case 'L' : mLogBox->togglePin(); break;
       case 'M' : mSong.getSelect().addMark (mSong.getPlayFrame()); changed(); break;
@@ -137,23 +138,23 @@ protected:
       case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
       case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
 
-      case 0x2e: mSong.getSelect().clear(); changed(); break;; // delete
+      case 0x2e: mSong.getSelect().clearAll(); changed(); break;; // delete
 
-      case 0x0d: mChanged = true; changed(); break; // enter - play file
+      case 0x0d: mSongChanged = true; changed(); break; // enter - play file
 
       // crude chan,bitrate change
-      case '1' : mSong.setChan ("bbc_radio_one"); mChanged = true; break;
-      case '2' : mSong.setChan ("bbc_radio_two"); mChanged = true; break;
-      case '3' : mSong.setChan ("bbc_radio_three"); mChanged = true; break;
-      case '4' : mSong.setChan ("bbc_radio_fourfm"); mChanged = true;  break;
-      case '5' : mSong.setChan ("bbc_radio_five_live"); mChanged = true; break;
-      case '6' : mSong.setChan ("bbc_6music"); mChanged = true; break;
-      case '7' : mSong.setBitrate (48000); mChanged = true; break;
-      case '8' : mSong.setBitrate (96000); mChanged = true; break;
-      case '9' : mSong.setBitrate (128000); mChanged = true; break;
-      case '0' : mSong.setBitrate (320000); mChanged = true; break;
+      case '1' : mSong.setChan ("bbc_radio_one"); mSongChanged = true; break;
+      case '2' : mSong.setChan ("bbc_radio_two"); mSongChanged = true; break;
+      case '3' : mSong.setChan ("bbc_radio_three"); mSongChanged = true; break;
+      case '4' : mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true;  break;
+      case '5' : mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; break;
+      case '6' : mSong.setChan ("bbc_6music"); mSongChanged = true; break;
+      case '7' : mSong.setBitrate (48000); mSongChanged = true; break;
+      case '8' : mSong.setBitrate (96000); mSongChanged = true; break;
+      case '9' : mSong.setBitrate (128000); mSongChanged = true; break;
+      case '0' : mSong.setBitrate (320000); mSongChanged = true; break;
 
-      default  : cLog::log (LOGINFO, "key %x", key); mChanged = true; break;
+      default  : cLog::log (LOGINFO, "key %x", key); changed(); break;
       }
 
     return false;
@@ -274,8 +275,8 @@ private:
         cAudioDecode decode (cAudioDecode::eAac);
         float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
 
-        mChanged = false;
-        while (!getExit() && !mChanged) {
+        mSongChanged = false;
+        while (!getExit() && !mSongChanged) {
           auto chunkNum = mSong.getHlsLoadChunkNum (getNow(), 12s, kHlsPreload);
           if (chunkNum) {
             // get hls chunkNum chunk
@@ -470,7 +471,7 @@ private:
         auto data = decode.getFramePtr();
 
         auto frameSampleBytes = frameSamples * 2 * 4;
-        while (!getExit() && !mChanged && !songDone) {
+        while (!getExit() && !mSongChanged && !songDone) {
           mSong.addFrame (frameNum++, false, data, frameSampleBytes, fileMapSize / frameSampleBytes, (float*)data);
           data += frameSampleBytes;
           changed();
@@ -484,7 +485,7 @@ private:
         cAudioDecode decode (frameType);
         auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
 
-        while (!getExit() && !mChanged && !songDone) {
+        while (!getExit() && !mSongChanged && !songDone) {
           while (decode.parseFrame (fileMapPtr, fileMapEnd)) {
             if (decode.getFrameType() == mSong.getFrameType()) {
               auto numSamples = decode.frameToSamples (samples);
@@ -513,8 +514,8 @@ private:
       UnmapViewOfFile (fileMapFirst);
       CloseHandle (fileHandle);
 
-      if (mChanged) // use changed fileIndex
-        mChanged = false;
+      if (mSongChanged) // use changed fileIndex
+        mSongChanged = false;
       else if (!mFileList->nextIndex())
         break;
       //}}}
@@ -580,8 +581,8 @@ private:
 
   //{{{  vars
   cSong mSong;
+  bool mSongChanged = false;
 
-  bool mChanged = false;
   bool mPlaying = true;
   cSemaphore mPlayDoneSem = "playDone";
 

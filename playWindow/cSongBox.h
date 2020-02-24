@@ -125,23 +125,11 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
   // draw stuff centred at playFrame
 
-    std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
-
-    if (!mSong.getNumFrames()) // no frames yet, give up
-      return;
-
-    if (mSong.getId() != mSongLastId) {
-      mFramesBitmapOk = false;
-      mOverviewBitmapOk = false;
-      mSongLastId = mSong.getId();
-      }
-
-    auto playFrame = mSong.getPlayFrame();
-
     // src bitmap explicit layout
     mWaveHeight = 100.f;
     mOverviewHeight = 100.f;
-    mFreqHeight = getHeight() - mWaveHeight - mOverviewHeight;
+    mRangeHeight = 8.f;
+    mFreqHeight = getHeight() - mOverviewHeight - mRangeHeight - mWaveHeight;
 
     mSrcPeakHeight = mWaveHeight;
     mSrcSilenceHeight = 2.f;
@@ -159,19 +147,37 @@ public:
 
     // dst box explicit layout
     mDstFreqTop = mRect.top;
-    mDstWaveTop = mDstFreqTop + mFreqHeight + mSrcSilenceHeight;
-    mDstOverviewTop = mDstWaveTop + mWaveHeight;
+    mDstWaveTop = mDstFreqTop + mFreqHeight;
+    mDstRangeTop = mDstWaveTop + mWaveHeight;
+    mDstOverviewTop = mDstRangeTop + mRangeHeight;
 
     mDstWaveCentre = mDstWaveTop + (mWaveHeight/2.f);
     mDstOverviewCentre = mDstOverviewTop + (mOverviewHeight/2.f);
 
+    // lock
+    std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
+    auto playFrame = mSong.getPlayFrame();
+
+    if (mSong.getId() != mSongLastId) {
+      mFramesBitmapOk = false;
+      mOverviewBitmapOk = false;
+      mSongLastId = mSong.getId();
+      }
+
     reallocBitmap (mWindow->getDc());
 
     // draw
-    drawWave (dc, playFrame);
-    drawRange (dc, playFrame);
-    drawOverview (dc, playFrame);
-    drawFreq (dc, playFrame);
+    auto leftFrame = playFrame - (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
+    auto rightFrame = playFrame + (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
+    rightFrame = std::min (rightFrame, mSong.getLastFrame());
+
+    if (mSong.getNumFrames()) {
+      drawWave (dc, playFrame, leftFrame, rightFrame);
+      drawOverview (dc, playFrame);
+      drawFreq (dc, playFrame);
+      }
+
+    drawRange (dc, playFrame, leftFrame, rightFrame);
 
     if (mSong.hasHlsBase())
       drawTime (dc, getFrameString (mSong.getFirstFrame()),
@@ -191,8 +197,11 @@ private:
   int getSignedSrcIndex (int frame) {
     if (frame >= 0)
       return (frame / mFrameStep) & mBitmapMask;
-    else
+    else {
+
+      cLog::log (LOGINFO, "%d %d %d", frame, (mFrameStep-1 - frame), (-((mFrameStep-1 - frame) / mFrameStep)) & mBitmapMask);
       return (-((mFrameStep-1 - frame) / mFrameStep)) & mBitmapMask;
+      }
     }
   //}}}
   //{{{
@@ -238,7 +247,7 @@ private:
   //{{{
   bool drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame) {
 
-    //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
+    cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     bool allFramesOk = true;
     auto firstFrame = mSong.getFirstFrame();
 
@@ -251,14 +260,14 @@ private:
     mBitmapTarget->BeginDraw();
     cRect bitmapRect;
     //{{{  clear bitmap chunk before wrap
-    bitmapRect = { fromSrcIndex, mSrcFreqTop, endSrcIndex, mSrcOverviewTop };
+    bitmapRect = { fromSrcIndex, mSrcFreqTop, endSrcIndex, mSrcSilenceTop + mSrcSilenceHeight };
     mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
     mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
     mBitmapTarget->PopAxisAlignedClip();
     //}}}
     if (wrap) {
       //{{{  clear bitmap chunk after wrap
-      bitmapRect = { 0.f, mSrcFreqTop, toSrcIndex, mSrcOverviewTop };
+      bitmapRect = { 0.f, mSrcFreqTop, toSrcIndex, mSrcSilenceTop + mSrcSilenceHeight };
       mBitmapTarget->PushAxisAlignedClip (bitmapRect, D2D1_ANTIALIAS_MODE_ALIASED);
       mBitmapTarget->Clear ( { 0.f,0.f,0.f, 0.f } );
       mBitmapTarget->PopAxisAlignedClip();
@@ -322,10 +331,11 @@ private:
 
         for (auto i = 0; i < 2; i++)
           powerValues[i] /= toSumFrame - alignedFrame + 1;
+
+        bitmapRect = { srcIndex, mSrcWaveCentre - powerValues[0], srcIndex + 1.f, mSrcWaveCentre + powerValues[1] };
+        mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
         }
         //}}}
-      bitmapRect = { srcIndex, mSrcWaveCentre - powerValues[0], srcIndex + 1.f, mSrcWaveCentre + powerValues[1] };
-      mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
 
       if (silence) {
         // draw silence bitmap
@@ -345,10 +355,12 @@ private:
     auto alignedFromFrame = fromFrame - (fromFrame % mFrameStep);
     for (auto frame = alignedFromFrame; frame < toFrame; frame += mFrameStep) {
       auto framePtr = mSong.getFramePtr (frame);
-      if (framePtr && framePtr->getFreqLuma()) {
-        uint32_t bitmapIndex = getSrcIndex (frame);
-        D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
-        mBitmap->CopyFromMemory (&bitmapRectU, framePtr->getFreqLuma() + freqOffset, 1);
+      if (framePtr) {
+        if (framePtr->getFreqLuma()) {
+          uint32_t bitmapIndex = getSrcIndex (frame);
+          D2D1_RECT_U bitmapRectU = { bitmapIndex, 0, bitmapIndex+1, (UINT32)freqSize };
+          mBitmap->CopyFromMemory (&bitmapRectU, framePtr->getFreqLuma() + freqOffset, 1);
+          }
         }
       }
 
@@ -389,13 +401,7 @@ private:
   //}}}
 
   //{{{
-  void drawWave (ID2D1DeviceContext* dc, int playFrame) {
-
-    // calc leftFrame,rightFrame
-    auto leftFrame = playFrame - (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
-    //std::max (playFrame - (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth, mSong.getFirstFrame());
-    auto rightFrame =
-      std::min (playFrame + (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth, mSong.getLastFrame());
+  void drawWave (ID2D1DeviceContext* dc, int playFrame, int leftFrame, int rightFrame) {
 
     bool allFramesOk = true;
     if (mFramesBitmapOk &&
@@ -548,9 +554,9 @@ private:
     }
   //}}}
   //{{{
-  void drawRange (ID2D1DeviceContext* dc, int playFrame) {
+  void drawRange (ID2D1DeviceContext* dc, int playFrame, int leftFrame, int rightFrame) {
 
-    cRect dstRect = { mRect.left, mDstWaveTop + mWaveHeight-8.f, mRect.right, mDstWaveTop + mWaveHeight };
+    cRect dstRect = { mRect.left, mDstRangeTop, mRect.right, mDstRangeTop + mRangeHeight };
     dc->FillRectangle (dstRect, mWindow->getDarkGrayBrush());
 
     for (auto &item : mSong.getSelect().getItems()) {
@@ -558,14 +564,14 @@ private:
       float lastx = item.getMark() ? firstx + 1.f :
                                      (getWidth()/2.f) + (item.getLastFrame() - playFrame) * mFrameWidth / mFrameStep;
 
-      dstRect = { mRect.left + firstx, mDstWaveTop + mWaveHeight-8.f, mRect.left + lastx, mDstWaveTop + mWaveHeight };
+      dstRect = { mRect.left + firstx, mDstRangeTop, mRect.left + lastx, mDstRangeTop + mRangeHeight };
       dc->FillRectangle (dstRect, mWindow->getYellowBrush());
 
       auto title = item.getTitle();
       if (!title.empty()) {
         mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
-        dstRect = { mRect.left + firstx + 2.f, mDstWaveTop + mWaveHeight-mWindow->getTextFormat()->GetFontSize(),
-                    mRect.right, mDstWaveTop + mWaveHeight };
+        dstRect = { mRect.left + firstx + 2.f, mDstRangeTop + mRangeHeight - mWindow->getTextFormat()->GetFontSize(),
+                    mRect.right, mDstRangeTop + mRangeHeight };
         dc->DrawText (std::wstring (title.begin(), title.end()).data(), (uint32_t)title.size(), mWindow->getTextFormat(),
                       dstRect, mWindow->getWhiteBrush());
         }
@@ -872,6 +878,7 @@ private:
   // vertical layout
   float mFreqHeight = 0.f;
   float mWaveHeight = 0.f;
+  float mRangeHeight = 0.f;
   float mOverviewHeight = 0.f;
 
   float mSrcPeakHeight = 0.f;
@@ -890,10 +897,10 @@ private:
 
   float mDstFreqTop = 0.f;
   float mDstWaveTop = 0.f;
+  float mDstRangeTop = 0.f;
   float mDstOverviewTop = 0.f;
 
   float mDstWaveCentre = 0.f;
   float mDstOverviewCentre = 0.f;
-
   //}}}
   };

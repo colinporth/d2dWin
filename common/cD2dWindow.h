@@ -410,13 +410,16 @@ public:
   //}}}
   //{{{  sets
   void toggleFullScreen();
-  void setExit() { mExit = true; }
+
   void keyChanged() { mCursorDown = mCursorCountDown; }
   void cursorChanged() { mCursorDown = mCursorCountDown; }
+
+  void setExit() { mExit = true; }
   void setTimedMenuOff() { mTimedMenuOn = false; }
   void setChangeCountDown (int countDown) { mChangeCountDown = countDown; }
   //}}}
 
+  // boxes
   cBox* add (cBox* box);
   cBox* add (cBox* box, cPoint pos);
   cBox* add (cBox* box, float x, float y);

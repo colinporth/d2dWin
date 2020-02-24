@@ -233,7 +233,7 @@ void cSong::clearFrames() {
   // reset frames
   mPlayFrame = 0;
   mTotalFrames = 0;
-  mSelect.clear();
+  mSelect.clearAll();
 
   for (auto frame : mFrameMap)
     delete (frame.second);
