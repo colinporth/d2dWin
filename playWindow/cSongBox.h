@@ -246,6 +246,37 @@ private:
   //}}}
 
   //{{{
+  void reallocBitmap (ID2D1DeviceContext* dc) {
+  // fixed bitmap width for big cache, src bitmap height tracks dst box height
+
+    mBitmapWidth = 0x800; // 2048, power of 2
+    mBitmapMask =  0x7FF; // wrap mask
+
+    uint32_t bitmapHeight = (int)mSrcHeight;
+
+    if (!mBitmapTarget || (bitmapHeight != mBitmapTarget->GetSize().height)) {
+      cLog::log (LOGINFO, "reallocBitmap %d %d", bitmapHeight, mBitmapTarget ? mBitmapTarget->GetSize().height : -1);
+
+      // invalidate bitmap caches
+      mFramesBitmapOk = false;
+      mOverviewBitmapOk = false;
+
+      // release old
+      if (mBitmap)
+        mBitmap->Release();
+      if (mBitmapTarget)
+        mBitmapTarget->Release();
+
+      // wave bitmapTarget
+      D2D1_SIZE_U bitmapSizeU = { mBitmapWidth, bitmapHeight };
+      D2D1_PIXEL_FORMAT pixelFormat = { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT };
+      dc->CreateCompatibleRenderTarget (NULL, &bitmapSizeU, &pixelFormat, D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
+                                        &mBitmapTarget);
+      mBitmapTarget->GetBitmap (&mBitmap);
+      }
+    }
+  //}}}
+  //{{{
   bool drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame) {
 
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
@@ -367,38 +398,6 @@ private:
       }
 
     return allFramesOk;
-    }
-  //}}}
-
-  //{{{
-  void reallocBitmap (ID2D1DeviceContext* dc) {
-  // fixed bitmap width for big cache, src bitmap height tracks dst box height
-
-    mBitmapWidth = 0x800; // 2048, power of 2
-    mBitmapMask =  0x7FF; // wrap mask
-
-    uint32_t bitmapHeight = (int)mSrcHeight;
-
-    if (!mBitmapTarget || (bitmapHeight != mBitmapTarget->GetSize().height)) {
-      cLog::log (LOGINFO, "reallocBitmap %d %d", bitmapHeight, mBitmapTarget ? mBitmapTarget->GetSize().height : -1);
-
-      // invalidate bitmap caches
-      mFramesBitmapOk = false;
-      mOverviewBitmapOk = false;
-
-      // release old
-      if (mBitmap)
-        mBitmap->Release();
-      if (mBitmapTarget)
-        mBitmapTarget->Release();
-
-      // wave bitmapTarget
-      D2D1_SIZE_U bitmapSizeU = { mBitmapWidth, bitmapHeight };
-      D2D1_PIXEL_FORMAT pixelFormat = { DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT };
-      dc->CreateCompatibleRenderTarget (NULL, &bitmapSizeU, &pixelFormat, D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
-                                        &mBitmapTarget);
-      mBitmapTarget->GetBitmap (&mBitmap);
-      }
     }
   //}}}
 
