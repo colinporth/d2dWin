@@ -487,11 +487,10 @@ private:
         auto data = decode.getFramePtr();
 
         auto frameSampleBytes = frameSamples * 2 * 4;
-        while (!getExit() && !mSongChanged && !songDone) {
+        while (!getExit() && !mSongChanged && ((data + frameSampleBytes) <= fileMapEnd)) {
           mSong.addFrame (frameNum++, false, data, frameSampleBytes, fileMapSize / frameSampleBytes, (float*)data);
           data += frameSampleBytes;
           changed();
-          songDone = (data + frameSampleBytes) > fileMapEnd;
           }
         }
         //}}}
@@ -501,25 +500,23 @@ private:
         cAudioDecode decode (frameType);
         auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
 
-        while (!getExit() && !mSongChanged && !songDone) {
-          while (decode.parseFrame (fileMapPtr, fileMapEnd)) {
-            if (decode.getFrameType() == mSong.getFrameType()) {
-              auto numSamples = decode.frameToSamples (samples);
-              if (numSamples) {
-                // frame fixup aacHE sampleRate, samplesPerFrame
-                mSong.setSampleRate (decode.getSampleRate());
-                mSong.setSamplesPerFrame (numSamples);
-                int numFrames = mSong.getNumFrames();
-                int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
-                mSong.addFrame (frameNum++, false, decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, samples);
-                changed();
-                }
+        while (!getExit() && !mSongChanged && decode.parseFrame (fileMapPtr, fileMapEnd)) {
+          if (decode.getFrameType() == mSong.getFrameType()) {
+            auto numSamples = decode.frameToSamples (samples);
+            if (numSamples) {
+              // frame fixup aacHE sampleRate, samplesPerFrame
+              mSong.setSampleRate (decode.getSampleRate());
+              mSong.setSamplesPerFrame (numSamples);
+              int numFrames = mSong.getNumFrames();
+              int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
+              mSong.addFrame (frameNum++, false, decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, samples);
+              changed();
               }
-            fileMapPtr += decode.getNextFrameOffset();
             }
-          cLog::log (LOGINFO, "song done");
-          songDone = true;
+          fileMapPtr += decode.getNextFrameOffset();
           }
+        cLog::log (LOGINFO, "song analysed");
+
         // done
         free (samples);
         }

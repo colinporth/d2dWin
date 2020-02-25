@@ -60,12 +60,12 @@ public:
     else
       dc->FillRectangle ({ 0.f,0.f, mWindow->getWidth(),mWindow->getHeight() }, mWindow->getTransparentBgndBrush());
 
-    cLog::cLine logLine;
     unsigned lastLineIndex = 0;
     int logLineNum = int(mLogScroll / int(kConsoleHeight));
     std::chrono::system_clock::time_point lastTimePoint = mWindow->getNow();
 
     // draw lines
+    cLog::cLine logLine;
     auto y = mWindow->getHeight() + (mLogScroll % int(kConsoleHeight)) - 2.f;
     while ((y > 20.f) && cLog::getLine (logLine, logLineNum++, lastLineIndex)) {
       mBrush->SetColor (kColours[logLine.mLogLevel]);

@@ -1,8 +1,6 @@
 // cFileListBox.h
-//{{{  includes
 #pragma once
 #include "../common/cD2dWindow.h"
-//}}}
 
 class cFileListBox : public cD2dWindow::cBox {
 public:

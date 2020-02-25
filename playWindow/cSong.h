@@ -157,7 +157,7 @@ public:
 
       mEditFrame = frame;
 
-      mItemNum = (int)mItems.size();
+      mItemNum = 0;
       for (auto &item : mItems) {
         // pick from select range
         if (abs(frame - item.getLastFrame()) < 2) {
@@ -175,8 +175,8 @@ public:
         mItemNum++;
         }
 
+      // add new select item
       mItems.push_back (cSelectItem (cSelectItem::eLoop, frame, frame, ""));
-      mItemNum = (int)mItems.size() - 1;
       mEdit = eEditLast;
       }
     //}}}
@@ -344,7 +344,7 @@ private:
   int mTotalFrames = 0;
   cSelect mSelect;
 
-  //{{{  max stuff for ui 
+  //{{{  max stuff for ui
   float mMaxPowerValue = 0.f;
   float mMaxPeakValue = 0.f;
   float mMaxFreqValue = 0.f;
