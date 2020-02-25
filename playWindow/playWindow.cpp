@@ -456,6 +456,7 @@ private:
 
       free (samples);
       cLog::log (LOGINFO, "icyThread songChanged");
+      mPlayDoneSem.wait();
       }
 
     cLog::log (LOGINFO, "exit");
@@ -550,14 +551,15 @@ private:
   void playThread() {
 
     cLog::setThreadName ("play");
-
-    // wait for valid sampleRate to decalre audioDevice
-    while (!mSong.getSampleRate())
-      this_thread::sleep_for (10ms);
-
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
     while (!getExit()) {
+      // wait for valid sampleRate to declare audioDevice
+      while (mSongChanged || !mSong.getSampleRate())
+        this_thread::sleep_for (10ms);
+
+      cLog::log (LOGINFO, "new device for %d", mSong.getSampleRate());
+
       // loop for filelist, new song may change sampleRate
       auto device = getDefaultAudioOutputDevice();
       if (device) {
@@ -567,7 +569,7 @@ private:
         float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxSamplesBytes());
 
         device->start();
-        while (!getExit() && (mSong.getStreaming() || (mSong.getPlayFrame() <= mSong.getLastFrame()))) {
+        while (!getExit() && !mSongChanged) {
           auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
           if (mPlaying && framePtr && framePtr->getPtr()) {
             device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
@@ -587,12 +589,16 @@ private:
             }
           else
             this_thread::sleep_for (100ms);
+
+          if (!mSong.getStreaming() && (mSong.getPlayFrame() > mSong.getLastFrame()))
+            mSongChanged = true;
           }
 
         device->stop();
         free (samples);
         }
 
+      // play finished with song
       mPlayDoneSem.notifyAll();
       }
 

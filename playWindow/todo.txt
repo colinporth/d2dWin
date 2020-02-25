@@ -10,12 +10,11 @@ overview
 - show load graphic
 - graticules, for hls?
 
-hls, shoutcast
-- hls
-  - show bitrate
-- shoutcast
-  - add channel list
-  - song title display broken
+hls
+- show bitrate
+
+shoutcast
+- add channel list
 
 editing
 - mute marking
@@ -38,7 +37,7 @@ play
 - cull silence allocs
 - ??? don't play silence/mute ???
 
-D2dWindow
+d2dWindow
 - izing window flashing, short and crashes
 - boxes
   - generic callbacks???
@@ -50,7 +49,7 @@ D2dWindow
   - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
 
 
-command line invocation
-- filelist broken
+command line 
+- filelist directory nesting broken
 - list of files
 - links to directories, files
