@@ -69,7 +69,7 @@ public:
 
         add (new cListBox (this, 500.f, 300.f, mShoutCast, [&](cListBox* box, const std::string& string) {
           auto listBox = (cListBox*)box;
-          mSong.clear(); 
+          mSong.clear();
           mUrl = string;
           mSongChanged = true;
           cLog::log (LOGINFO, "listBox" + string);
@@ -88,7 +88,7 @@ public:
 
         if (!mFileList->empty()) {
 
-          add (new cFileListBox (this, 0.f,-220.f, mFileList, [&](cFileListBox* box, int index){ 
+          add (new cFileListBox (this, 0.f,-220.f, mFileList, [&](cFileListBox* box, int index){
             mSong.clear(); mSongChanged = true; }))->setPin (true);
 
           mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
@@ -116,8 +116,6 @@ public:
 protected:
   //{{{
   bool onKey (int key) {
-
-    shared_lock<shared_mutex> lock (mSong.getSharedMutex());
 
     switch (key) {
       case 0x00: break;

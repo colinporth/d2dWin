@@ -17,7 +17,7 @@ public:
   //}}}
 
   int getIndex() { return mItemIndex; }
-  std::string getString() { return mItems[mItemIndex]; }
+  std::string getIndexString() { return mItems[mItemIndex]; }
 
   //{{{
   bool pick (bool inClient, cPoint pos, bool& change) {
@@ -97,23 +97,23 @@ public:
       auto point = cPoint (mRect.left+2, mRect.top + 1.f - (int(mScroll) % (int)mLineHeight));
       unsigned itemNum = 0;
       for (auto &item : mItems) {
-        IDWriteTextLayout* textLayout;
+        IDWriteTextLayout* layout;
         mWindow->getDwriteFactory()->CreateTextLayout (
           std::wstring (item.begin(), item.end()).data(), (uint32_t)item.size(), mWindow->getTextFormat(),
-          mRect.getWidth(), mLineHeight, &textLayout);
+          mRect.getWidth(), mLineHeight, &layout);
 
-        if (textLayout) {
-          struct DWRITE_TEXT_METRICS textMetrics;
-          textLayout->GetMetrics (&textMetrics);
-
-          mMeasureItems[itemNum] = textMetrics.width;
-          maxWidth = std::max (textMetrics.width, maxWidth);
+        if (layout) {
+          struct DWRITE_TEXT_METRICS metrics;
+          layout->GetMetrics (&metrics);
+          mMeasureItems[itemNum] = metrics.width;
+          maxWidth = std::max (metrics.width, maxWidth);
 
           auto brush = (mTextPressed && !mMoved && (itemIndex == mPressedIndex)) ?
-            mWindow->getYellowBrush() : (itemIndex == mItemIndex) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
+            mWindow->getYellowBrush() : (itemIndex == mItemIndex) ?
+              mWindow->getWhiteBrush() : mWindow->getBlueBrush();
 
-          dc->DrawTextLayout (point, textLayout, brush);
-          textLayout->Release();
+          dc->DrawTextLayout (point, layout, brush);
+          layout->Release();
           }
 
         point.y += mLineHeight;
@@ -122,10 +122,7 @@ public:
         itemNum++;
         }
 
-      // calc bgnd for next time, slightly risky
-      mBgndRect = mRect;
-      mBgndRect.right = mRect.left + maxWidth + 4.0f;
-      mBgndRect.bottom = point.y;
+      mBgndRect = { mRect.left, mRect.top, mRect.left + maxWidth + 4.0f, point.y };
       }
     }
   //}}}
@@ -148,6 +145,7 @@ private:
 
   std::function<void (cListBox* box, const std::string& string)> mHitCallback;
   std::vector <std::string>& mItems;
+
   std::vector<float> mMeasureItems;
   int mItemIndex = -1;
 
