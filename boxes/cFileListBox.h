@@ -1,13 +1,14 @@
 // cFileListBox.h
 #pragma once
 #include "../common/cD2dWindow.h"
+#include "../../shared/utils/cFileList.h"
 
 class cFileListBox : public cD2dWindow::cBox {
 public:
   //{{{
   cFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList,
                 std::function<void (cFileListBox* box, int index)> hitCallback) :
-      cBox ("fileList", window, width, height), mHitCallback(hitCallback), mFileList(fileList) {}
+      cBox ("fileList", window, width, height), mFileList(fileList), mHitCallback(hitCallback) {}
   //}}}
   virtual ~cFileListBox() {}
 
@@ -128,7 +129,7 @@ public:
       //  }
       //}}}
 
-      float maxColumnWidth[cFileItem::kFields] = { 0.f };
+      float maxColumnWidth[cFileList::cFileItem::kFields] = { 0.f };
 
       // layout visible rows
       std::lock_guard<std::mutex> lockGuard (mMutex);
@@ -139,7 +140,7 @@ public:
         // layout row
         cRow row;
         auto& fileItem = mFileList->getFileItem (index);
-        for (auto field = 0u; field < cFileItem::kFields; field++) {
+        for (auto field = 0u; field < cFileList::cFileItem::kFields; field++) {
           auto str = fileItem.getFieldString (field);
           mWindow->getDwriteFactory()->CreateTextLayout (
             std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(), getWindow()->getTextFormat(),
@@ -161,7 +162,7 @@ public:
       //{{{  layout and draw rows
       // layout fieldStops
       mColumnsWidth = 0.f;
-      for (auto field = 0u; field < cFileItem::kFields; field++) {
+      for (auto field = 0u; field < cFileList::cFileItem::kFields; field++) {
         mColumnsWidth += maxColumnWidth[field] + textHeight/2.f;
         mColumn[field] = mColumnsWidth - 2.f;
         }
@@ -173,7 +174,7 @@ public:
       // layout,draw fields
       for (auto& row : mRowVec) {
         auto p = mRect.getTL() + row.mRect.getTL();
-        for (auto field = 0u; field < cFileItem::kFields; field++) {
+        for (auto field = 0u; field < cFileList::cFileItem::kFields; field++) {
           p.x = mRect.left + row.mRect.left + (field ? mColumn[field]-row.mTextMetrics[field].width : 2.f);
           dc->DrawTextLayout (p, row.mTextLayout[field], row.mBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
           row.mTextLayout[field]->Release();
@@ -205,22 +206,22 @@ private:
   //}}}
 
   // vars
-  std::function<void (cFileListBox* box, int index)> mHitCallback;
   cFileList* mFileList;
+  std::function<void (cFileListBox* box, int index)> mHitCallback;
 
-  std::mutex mMutex; // guard mRowVec - pick,prox,down against draw
   //{{{
   class cRow {
   public:
     cRect mRect;
-    IDWriteTextLayout* mTextLayout[cFileItem::kFields];
-    struct DWRITE_TEXT_METRICS mTextMetrics[cFileItem::kFields];
+    IDWriteTextLayout* mTextLayout[cFileList::cFileItem::kFields];
+    struct DWRITE_TEXT_METRICS mTextMetrics[cFileList::cFileItem::kFields];
     ID2D1SolidColorBrush* mBrush;
     };
   //}}}
   concurrency::concurrent_vector <cRow> mRowVec;
+  std::mutex mMutex; // guard mRowVec - pick,prox,down against draw
 
-  float mColumn[cFileItem::kFields] = { 0.f };
+  float mColumn [cFileList::cFileItem::kFields] = { 0.f };
   float mColumnsWidth = 0.f;
   float mLineHeight = 0.f;
   cRect mBgndRect;

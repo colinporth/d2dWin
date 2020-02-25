@@ -99,5 +99,11 @@
     <ClInclude Include="..\boxes\cListBox.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cFileList.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\boxes\cFileListBox.h">
+      <Filter>h</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

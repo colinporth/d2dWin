@@ -467,7 +467,7 @@ void cD2dWindow::createFactories() {
 
   // create D2D1Factory
   #ifdef _DEBUG
-    D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, { D2D1_DEBUG_LEVEL_INFORMATION }, mD2D1Factory.GetAddressOf());
+    D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, { D2D1_DEBUG_LEVEL_INFORMATION }, &mD2D1Factory);
   #else
     D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED, { D2D1_DEBUG_LEVEL_NONE }, &mD2D1Factory);
     //D2D1CreateFactory (D2D1_FACTORY_TYPE_SINGLE_THREADED, { D2D1_DEBUG_LEVEL_NONE }, &mD2D1Factory);

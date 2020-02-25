@@ -2,6 +2,7 @@ main wave
 - zoom out flashing to black
 - cache failing, esp going backwards
 - red silence not wide enough, subpixel wrong
+- wider fft window with shaping for more lower freqs
 
 overview
 - cache failing with filling backwards gaps
@@ -21,7 +22,7 @@ editing
 - compress to aac
 
 play
-- stopped stutter mode
+- stutter mode
 - play region
   - play in and out of regions rules
   - soundtouch region

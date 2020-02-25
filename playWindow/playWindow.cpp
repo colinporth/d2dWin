@@ -38,19 +38,22 @@ public:
       add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index){
         mSong.clear(); mSong.setChan ("bbc_radio_one"); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index){
-         mSong.clear(); mSong.setChan ("bbc_radio_two"); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChan ("bbc_radio_two"); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index){
-         mSong.clear(); mSong.setChan ("bbc_radio_three"); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChan ("bbc_radio_three"); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index){
-         mSong.clear(); mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index){
-         mSong.clear(); mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index){
-         mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; } ));
+
+      mBitrateStr = "48k aacHE";
+      addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr), 4.f);
 
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 
-      thread ([=]() { hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
+      thread ([=](){ hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
       }
       //}}}
     else {
@@ -67,7 +70,7 @@ public:
         mShoutCast.push_back ("http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac");
         mShoutCast.push_back ("http://media-ice.musicradio.com:80/SmoothCountry");
 
-        add (new cListBox (this, 500.f, 300.f, mShoutCast, [&](cListBox* box, const std::string& string) {
+        add (new cListBox (this, 500.f, 300.f, mShoutCast, [&](cListBox* box, const std::string& string){
           auto listBox = (cListBox*)box;
           mSong.clear();
           mUrl = string;
@@ -123,6 +126,7 @@ protected:
 
       case 'F' : toggleFullScreen(); break;
       case 'L' : mLogBox->togglePin(); break;
+
       case 'M' : mSong.getSelect().addMark (mSong.getPlayFrame()); changed(); break;
 
       case ' ' : mPlaying = !mPlaying; break;
@@ -138,12 +142,12 @@ protected:
       case 0x23: mSong.setPlayFrame (
         mSong.getSelect().empty() ? mSong.getLastFrame() : mSong.getSelect().getLastFrame()); changed(); break; // end
 
-      case 0x26: if (mFileList->prevIndex()) changed(); break; // up arrow
-      case 0x28: if (mFileList->nextIndex()) changed(); break; // down arrow
+      case 0x26: if (mFileList && mFileList->prevIndex()) changed(); break; // up arrow
+      case 0x28: if (mFileList && mFileList->nextIndex()) changed(); break; // down arrow
 
-      case 0x2e: mSong.getSelect().clearAll(); changed(); break;; // delete
+      case 0x2e: mSong.getSelect().clearAll(); changed(); break;; // delete select
 
-      case 0x0d: mSongChanged = true; changed(); break; // enter - play file
+      case 0x0d: break; // enter
 
       // crude chan,bitrate change
       case '1' : mSong.clear(); mSong.setChan ("bbc_radio_one"); mSongChanged = true; break;
@@ -152,10 +156,10 @@ protected:
       case '4' : mSong.clear(); mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true;  break;
       case '5' : mSong.clear(); mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; break;
       case '6' : mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; break;
-      case '7' : mSong.clear(); mSong.setBitrate (48000); mSongChanged = true; break;
-      case '8' : mSong.clear(); mSong.setBitrate (96000); mSongChanged = true; break;
-      case '9' : mSong.clear(); mSong.setBitrate (128000); mSongChanged = true; break;
-      case '0' : mSong.clear(); mSong.setBitrate (320000); mSongChanged = true; break;
+      case '7' : mSong.clear(); mSong.setBitrate (48000); mBitrateStr = "48k aacHE"; mSongChanged = true; break;
+      case '8' : mSong.clear(); mSong.setBitrate (96000); mBitrateStr = "96k aacHE"; mSongChanged = true; break;
+      case '9' : mSong.clear(); mSong.setBitrate (128000); mBitrateStr = "128k aac"; mSongChanged = true; break;
+      case '0' : mSong.clear(); mSong.setBitrate (320000); mBitrateStr = "320k aac"; mSongChanged = true; break;
 
       default  : cLog::log (LOGINFO, "key %x", key); changed(); break;
       }
@@ -604,10 +608,12 @@ private:
   bool mPlaying = true;
   cSemaphore mPlayDoneSem = "playDone";
 
+  string mBitrateStr;
+
   cFileList* mFileList = nullptr;
   cJpegImageView* mJpegImageView = nullptr;
-  string mLastTitleStr;
 
+  string mLastTitleStr;
   vector<string> mShoutCast;
   string mUrl;
 
@@ -625,6 +631,12 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
+
+  std::string parentName = "";
+  std::string directoryName = "C:\\Users\\colin\\Desktop\\mixed";
+  std::string pathFileStr = parentName.empty() ? directoryName : parentName + "/" + directoryName;
+  std::string wildStr = "/*";
+  std::string searchStr = pathFileStr + wildStr;
 
   cAppWindow appWindow;
   appWindow.run ("playWindow", 800, 420, (numArgs > 1) ? wcharToString (args[1]) : "");
