@@ -233,6 +233,7 @@ public:
 
   void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
   void addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples);
+  void clear();
 
   enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed };
   //{{{  gets

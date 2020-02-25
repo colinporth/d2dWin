@@ -30,14 +30,13 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   mFrameType = frameType;
   mNumChannels = numChannels;
   mSampleRate = sampleRate;
+  mSamplesPerFrame = samplesPerFrame;
+  mHlsBaseValid = false;
 
   clearFrames();
-  mTotalFrames = 0;
 
-  mSamplesPerFrame = samplesPerFrame;
+  // ??? should deallocate ???
   fftrConfig = kiss_fftr_alloc (mSamplesPerFrame, 0, 0, 0);
-
-  mHlsBaseValid = false;
   }
 //}}}
 //{{{
@@ -101,6 +100,23 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
   mTotalFrames = totalFrames;
 
   checkSilenceWindow (frame);
+  }
+//}}}
+//{{{
+void cSong::clear() {
+
+  unique_lock<shared_mutex> lock (mSharedMutex);
+
+  mFrameType = cAudioDecode::eUnknown;
+  mNumChannels = 0;
+  mSampleRate = 0;
+  mSamplesPerFrame = 0;
+  mHlsBaseValid = false;
+
+  clearFrames();
+
+  // ??? should deallocate ???
+  //fftrConfig = kiss_fftr_alloc (mSamplesPerFrame, 0, 0, 0);
   }
 //}}}
 

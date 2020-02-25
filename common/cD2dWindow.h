@@ -57,10 +57,8 @@ public:
   class cBox {
   public:
     //{{{
-    cBox (std::string name, cD2dWindow* window, float width, float height,
-          std::function<void (cBox* box)> hitCallback = [](cBox*) {} )
-        : mName(name), mWindow(window), mLayoutWidth(width), mLayoutHeight(height),
-          mHitCallback (std::move(hitCallback)) {
+    cBox (std::string name, cD2dWindow* window, float width, float height)
+        : mName(name), mWindow(window), mLayoutWidth(width), mLayoutHeight(height) {
       mWindow->changed();
       }
     //}}}
@@ -286,7 +284,6 @@ public:
     float mLayoutY = 0;
 
     cRect mRect = { 0.f };
-    std::function<void (cBox* box)> mHitCallback;
     };
   //}}}
   //{{{

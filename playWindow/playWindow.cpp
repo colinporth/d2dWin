@@ -35,23 +35,18 @@ public:
 
     if (name.empty()) {
       //{{{  hls radio 1..6
-      add (new cBmpBox (this, 40.f,40.f, 1, r1x80,
-           [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_one"); mSongChanged = true; } ));
-
-      addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80,
-                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_two"); mSongChanged = true; } ));
-
-      addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80,
-                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_three"); mSongChanged = true; } ));
-
-      addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80,
-                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true; } ));
-
-      addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80,
-                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; } ));
-
-      addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80,
-                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_6music"); mSongChanged = true; } ));
+      add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index){
+        mSong.clear(); mSong.setChan ("bbc_radio_one"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index){
+         mSong.clear(); mSong.setChan ("bbc_radio_two"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index){
+         mSong.clear(); mSong.setChan ("bbc_radio_three"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index){
+         mSong.clear(); mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index){
+         mSong.clear(); mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index){
+         mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; } ));
 
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 
@@ -74,6 +69,7 @@ public:
 
         add (new cListBox (this, 500.f, 300.f, mShoutCast, [&](cListBox* box, const std::string& string) {
           auto listBox = (cListBox*)box;
+          mSong.clear(); 
           mUrl = string;
           mSongChanged = true;
           cLog::log (LOGINFO, "listBox" + string);
@@ -92,8 +88,8 @@ public:
 
         if (!mFileList->empty()) {
 
-          add (new cFileListBox (this, 0.f,-220.f, mFileList,
-               [&](cFileListBox* box, int index){ mSongChanged = true; }))->setPin (true);
+          add (new cFileListBox (this, 0.f,-220.f, mFileList, [&](cFileListBox* box, int index){ 
+            mSong.clear(); mSongChanged = true; }))->setPin (true);
 
           mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
           addFront (mJpegImageView);
@@ -152,16 +148,16 @@ protected:
       case 0x0d: mSongChanged = true; changed(); break; // enter - play file
 
       // crude chan,bitrate change
-      case '1' : mSong.setChan ("bbc_radio_one"); mSongChanged = true; break;
-      case '2' : mSong.setChan ("bbc_radio_two"); mSongChanged = true; break;
-      case '3' : mSong.setChan ("bbc_radio_three"); mSongChanged = true; break;
-      case '4' : mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true;  break;
-      case '5' : mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; break;
-      case '6' : mSong.setChan ("bbc_6music"); mSongChanged = true; break;
-      case '7' : mSong.setBitrate (48000); mSongChanged = true; break;
-      case '8' : mSong.setBitrate (96000); mSongChanged = true; break;
-      case '9' : mSong.setBitrate (128000); mSongChanged = true; break;
-      case '0' : mSong.setBitrate (320000); mSongChanged = true; break;
+      case '1' : mSong.clear(); mSong.setChan ("bbc_radio_one"); mSongChanged = true; break;
+      case '2' : mSong.clear(); mSong.setChan ("bbc_radio_two"); mSongChanged = true; break;
+      case '3' : mSong.clear(); mSong.setChan ("bbc_radio_three"); mSongChanged = true; break;
+      case '4' : mSong.clear(); mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true;  break;
+      case '5' : mSong.clear(); mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; break;
+      case '6' : mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; break;
+      case '7' : mSong.clear(); mSong.setBitrate (48000); mSongChanged = true; break;
+      case '8' : mSong.clear(); mSong.setBitrate (96000); mSongChanged = true; break;
+      case '9' : mSong.clear(); mSong.setBitrate (128000); mSongChanged = true; break;
+      case '0' : mSong.clear(); mSong.setBitrate (320000); mSongChanged = true; break;
 
       default  : cLog::log (LOGINFO, "key %x", key); changed(); break;
       }
