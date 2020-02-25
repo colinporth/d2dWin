@@ -1,8 +1,7 @@
 main wave
 - zoom out flashing to black
 - cache failing, esp going backwards
-- mark subpixel wrong
-- silence not wide enough, subpixel wrong
+- red silence not wide enough, subpixel wrong
 
 overview
 - cache failing with filling backwards gaps
@@ -14,11 +13,11 @@ hls
 - show bitrate
 
 shoutcast
-- add channel list
+- fix channel list display and selection
 
 editing
 - mute marking
-- save with edits
+- save using labelled selects and mutes
 - compress to aac
 
 play
@@ -35,12 +34,11 @@ play
   - aligned 5min, 30min, hour
   - to graticules
 - cull silence allocs
-- ??? don't play silence/mute ???
+- skip mute
+- skip silence
 
 d2dWindow
-- izing window flashing, short and crashes
-- boxes
-  - generic callbacks???
+- sizing window flashing, short and crashes
 - direct2d
   - investigate src coordinates to subpixel accuracy
   - investigate bitmapbrush with alpha
@@ -48,8 +46,7 @@ d2dWindow
 - jpeg tag
   - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
 
-
-command line 
+command line
 - filelist directory nesting broken
 - list of files
 - links to directories, files

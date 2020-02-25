@@ -300,7 +300,7 @@ public:
   //{{{
   void setBitrate (int bitrate) {
     mBitrate = bitrate;
-    mHlsFramesPerChunk = bitrate >= 128000 ? 300 : 150;
+    mHlsFramesPerChunk = (bitrate >= 128000) ? 300 : 150;
     }
   //}}}
 
@@ -344,7 +344,7 @@ private:
   int mTotalFrames = 0;
   cSelect mSelect;
 
-  //{{{  max stuff for ui values
+  //{{{  max stuff for ui 
   float mMaxPowerValue = 0.f;
   float mMaxPeakValue = 0.f;
   float mMaxFreqValue = 0.f;
