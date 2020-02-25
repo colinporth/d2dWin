@@ -91,7 +91,7 @@ public:
                  L" " + cLog::getThreadNameWstring (logLine.mThreadId) +
                  L" " + strToWstr (logLine.mStr);
       dc->DrawText (str.data(), (uint32_t)str.size(), mWindow->getConsoleTextFormat(),
-                   { 0.f, y, mWindow->getWidth(), y + kConsoleHeight },
+                   { 0.f, y, mWindow->getWidth(), y + kConsoleHeight + 4.f},
                    mBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
 
       lastTimePoint = logLine.mTimePoint;

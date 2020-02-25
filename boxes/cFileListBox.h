@@ -8,8 +8,8 @@ class cFileListBox : public cD2dWindow::cBox {
 public:
   //{{{
   cFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList,
-                std::function<void (cBox* box)> hitCallback) :
-      cBox ("fileList", window, width, height, std::move(hitCallback)), mFileList(fileList) {}
+                std::function<void (cFileListBox* box, int index)> hitCallback) :
+      cBox ("fileList", window, width, height), mHitCallback(hitCallback), mFileList(fileList) {}
   //}}}
   virtual ~cFileListBox() {}
 
@@ -93,7 +93,7 @@ public:
     if (mWindow->getTimedMenuOn()) {
       if (mPressed && !mMoved) {
         mFileList->setIndex (mProxIndex);
-        mHitCallback (this);
+        mHitCallback (this, mProxIndex);
         }
 
       mPressed = false;
@@ -207,6 +207,7 @@ private:
   //}}}
 
   // vars
+  std::function<void (cFileListBox* box, int index)> mHitCallback;
   cFileList* mFileList;
 
   std::mutex mMutex; // guard mRowVec - pick,prox,down against draw

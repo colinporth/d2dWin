@@ -49,7 +49,7 @@ public:
     thread([=]() { mFileList->watchThread(); }).detach();
 
     auto boxWidth = frequency ? 480.f : 0.f;
-    add (new cFileListBox (this, -boxWidth,0.f, mFileList, [&](cBox* box) { selectFileItem(); }));
+    add (new cFileListBox (this, -boxWidth,0.f, mFileList, [&](cFileListBox* box, int index) { selectFileItem(); }));
 
     // launch file player
     if (!mFileList->empty())

@@ -6,8 +6,8 @@ class cListBox : public cD2dWindow::cBox {
 public:
   //{{{
   cListBox (cD2dWindow* window, float width, float height, std::vector<std::string>& items,
-            std::function<void (cBox* box)> hitCallback)
-      : cBox ("list", window, width, height, std::move(hitCallback)), mItems(items) {
+            std::function<void (cListBox* box, const std::string& string)> hitCallback)
+      : cBox ("list", window, width, height), mHitCallback(hitCallback), mItems(items) {
 
     mWindow->getDwriteFactory()->CreateTextFormat (L"FreeSans", NULL,
       DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
@@ -72,8 +72,9 @@ public:
     if (mWindow->getTimedMenuOn()) {
       if (mTextPressed && !mMoved) {
         mItemIndex = mPressedIndex;
-        mHitCallback (this);
+        mHitCallback (this, mItems [mItemIndex]);
         }
+
       mTextPressed = false;
       mPressedIndex = -1;
       mMoved = false;
@@ -146,8 +147,7 @@ private:
     }
   //}}}
 
-  IDWriteTextFormat* mTextFormat = nullptr;
-
+  std::function<void (cListBox* box, const std::string& string)> mHitCallback;
   std::vector <std::string>& mItems;
   int mItemIndex = -1;
 
@@ -162,4 +162,6 @@ private:
 
   float mScroll = 0.f;
   float mScrollInc = 0.f;
+
+  IDWriteTextFormat* mTextFormat = nullptr;
   };

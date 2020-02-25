@@ -278,10 +278,10 @@ private:
     // draw bitmap as frames
     for (auto frame = fromFrame; frame < toFrame; frame += mFrameStep) {
       //{{{  draw bitmap for frame
-      bool silence = false;
-      float powerValues[2];
-      float peakValues[2];
       float srcIndex = (float)getSrcIndex (frame);
+
+      bool silence = false;
+      float powerValues[2] = { 0.f };
 
       if (mFrameStep == 1) {
         //{{{  simple case, draw peak and power scaled to maxPeak
@@ -291,8 +291,9 @@ private:
             float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
             silence = framePtr->isSilence();
 
-            auto powerValuesPtr = framePtr->getPowerValues();
+            float peakValues[2];
             auto peakValuesPtr =  framePtr->getPeakValues();
+            auto powerValuesPtr = framePtr->getPowerValues();
             for (auto i = 0; i < 2; i++) {
               powerValues[i] = *powerValuesPtr++ * valueScale;
               peakValues[i] = *peakValuesPtr++ * valueScale;
@@ -332,11 +333,11 @@ private:
 
         for (auto i = 0; i < 2; i++)
           powerValues[i] /= toSumFrame - alignedFrame + 1;
-
-        bitmapRect = { srcIndex, mSrcWaveCentre - powerValues[0], srcIndex + 1.f, mSrcWaveCentre + powerValues[1] };
-        mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
         }
         //}}}
+
+      bitmapRect = { srcIndex, mSrcWaveCentre - powerValues[0], srcIndex + 1.f, mSrcWaveCentre + powerValues[1] };
+      mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
 
       if (silence) {
         // draw silence bitmap
@@ -418,7 +419,7 @@ private:
       auto title = item.getTitle();
       if (!title.empty()) {
         dstRect = { mRect.left + firstx + 2.f, mDstRangeTop + mRangeHeight - mWindow->getTextFormat()->GetFontSize(),
-                    mRect.right, mDstRangeTop + mRangeHeight };
+                    mRect.right, mDstRangeTop + mRangeHeight + 4.f };
         dc->DrawText (std::wstring (title.begin(), title.end()).data(), (uint32_t)title.size(), mWindow->getTextFormat(),
                       dstRect, mWindow->getWhiteBrush(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
         }

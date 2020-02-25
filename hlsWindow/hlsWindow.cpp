@@ -45,27 +45,27 @@ public:
 
     add (new cLogBox (this, 20.f));
     //{{{  add chan1 to 6 bmp boxes
-    add (new cBmpBox (this, 60.f, 60.f, r1x80, [&](cBox* box) mutable noexcept {
+    add (new cBmpBox (this, 60.f, 60.f, 1, r1x80, [&](cBmpBox* box, int index) {
       mChan = 1;
       mChanChanged = true;
       } ));
-    addRight (new cBmpBox (this, 60.f, 60.f, r2x80, [&](cBox* box) mutable noexcept {
+    addRight (new cBmpBox (this, 60.f, 60.f, 2, r2x80, [&](cBmpBox* box, int index) {
       mChan = 2;
       mChanChanged = true;
       } ));
-    addRight (new cBmpBox (this, 60.f, 60.f, r3x80, [&](cBox* box) mutable noexcept {
+    addRight (new cBmpBox (this, 60.f, 60.f, 3, r3x80, [&](cBmpBox* box, int index) {
       mChan = 3;
       mChanChanged = true;
       } ));
-    addRight (new cBmpBox (this, 60.f, 60.f, r4x80, [&](cBox* box) mutable noexcept {
+    addRight (new cBmpBox (this, 60.f, 60.f, 4, r4x80, [&](cBmpBox* box, int index) {
       mChan = 4;
       mChanChanged = true;
       } ));
-    addRight (new cBmpBox (this, 60.f, 60.f, r5x80, [&](cBox* box) mutable noexcept {
+    addRight (new cBmpBox (this, 60.f, 60.f, 5, r5x80, [&](cBmpBox* box, int index) {
       mChan = 5;
       mChanChanged = true;
       } ));
-    addRight (new cBmpBox (this, 60.f, 60.f, r6x80, [&](cBox* box) mutable noexcept {
+    addRight (new cBmpBox (this, 60.f, 60.f, 6, r6x80, [&](cBmpBox* box, int index) {
       mChan = 6;
       mChanChanged = true;
       } ));

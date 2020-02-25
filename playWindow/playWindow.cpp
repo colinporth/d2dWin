@@ -35,23 +35,23 @@ public:
 
     if (name.empty()) {
       //{{{  hls radio 1..6
-      add (new cBmpBox (this, 40.f,40.f, r1x80,
-           [&](cBox* box){ mSong.setChan ("bbc_radio_one"); mSongChanged = true; } ));
+      add (new cBmpBox (this, 40.f,40.f, 1, r1x80,
+           [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_one"); mSongChanged = true; } ));
 
-      addRight (new cBmpBox (this, 40.f,40.f, r2x80,
-                [&](cBox* box){ mSong.setChan ("bbc_radio_two"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80,
+                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_two"); mSongChanged = true; } ));
 
-      addRight (new cBmpBox (this, 40.f,40.f, r3x80,
-                [&](cBox* box){ mSong.setChan ("bbc_radio_three"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80,
+                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_three"); mSongChanged = true; } ));
 
-      addRight (new cBmpBox (this, 40.f,40.f, r4x80,
-                [&](cBox* box){ mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80,
+                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true; } ));
 
-      addRight (new cBmpBox (this, 40.f,40.f, r5x80,
-                [&](cBox* box){ mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80,
+                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; } ));
 
-      addRight (new cBmpBox (this, 40.f,40.f, r6x80,
-                [&](cBox* box){ mSong.setChan ("bbc_6music"); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80,
+                [&](cBmpBox* box, int index){ mSong.setChan ("bbc_6music"); mSongChanged = true; } ));
 
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 
@@ -72,11 +72,11 @@ public:
         mShoutCast.push_back ("http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac");
         mShoutCast.push_back ("http://media-ice.musicradio.com:80/SmoothCountry");
 
-        add (new cListBox (this, 500.f, 300.f, mShoutCast, [&](cBox* box) {
+        add (new cListBox (this, 500.f, 300.f, mShoutCast, [&](cListBox* box, const std::string& string) {
           auto listBox = (cListBox*)box;
-          mUrl = listBox->getString();
+          mUrl = string;
           mSongChanged = true;
-          cLog::log (LOGINFO, "listBox" + listBox->getString());
+          cLog::log (LOGINFO, "listBox" + string);
           }
           ))->setPin (true);
 
@@ -93,7 +93,7 @@ public:
         if (!mFileList->empty()) {
 
           add (new cFileListBox (this, 0.f,-220.f, mFileList,
-               [&](cBox* box){ mSongChanged = true; }))->setPin (true);
+               [&](cFileListBox* box, int index){ mSongChanged = true; }))->setPin (true);
 
           mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
           addFront (mJpegImageView);
@@ -359,21 +359,21 @@ private:
 
       cAudioDecode decode (cAudioDecode::eAac);
 
+      mSongChanged = false;
+
       cWinSockHttp http;
       cUrl parsedUrl;
       parsedUrl.parse (mUrl);
-      mSongChanged = false;
-
       http.get (parsedUrl.getHost(), parsedUrl.getPath(), "Icy-MetaData: 1",
-        //{{{  lambda headerCallback
+        //{{{  headerCallback lambda
         [&](const string& key, const string& value) noexcept {
           if (key == "icy-metaint")
             icySkipLen = stoi (value);
           },
         //}}}
-        //{{{  lambda dataCallback
+        //{{{  dataCallback lambda
         [&] (const uint8_t* data, int length) noexcept {
-        // return true to continue
+        // return false to exit
 
           // cLog::log (LOGINFO, "callback %d", length);
           if ((icyInfoCount >= icyInfoLen) && (icySkipCount + length <= icySkipLen)) {
