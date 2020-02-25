@@ -25,7 +25,7 @@ inline std::string wcharToString (const wchar_t* input) {
     return {};
 
   std::string output;
-  output.resize (static_cast<size_t>(required_characters));
+  output.resize (static_cast<size_t>(required_characters-1));
   WideCharToMultiByte (CP_UTF8, 0, input, -1, output.data(), static_cast<int>(output.size()), nullptr, nullptr);
 
   return output;

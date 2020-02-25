@@ -2,10 +2,6 @@
 //{{{  includes
 #include "stdafx.h"
 
-// should be in stdafx.h
-#include "../../shared/utils/cFileList.h"
-#include "../boxes/cFileListBox.h"
-
 #include "cSong.h"
 #include "cSongBox.h"
 

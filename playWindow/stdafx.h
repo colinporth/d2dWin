@@ -49,6 +49,7 @@
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/cSemaphore.h"
+#include "../../shared/utils/cFileList.h"
 
 #include "../common/cJpegImage.h"
 
@@ -63,6 +64,7 @@
 #include "../boxes/cTitleBox.h"
 #include "../boxes/cListBox.h"
 #include "../boxes/cJpegImageView.h"
+#include "../boxes/cFileListBox.h"
 
 extern "C" {
   #include "libavformat/avformat.h"
@@ -79,3 +81,4 @@ extern "C" {
 #include "../../shared/net/cUrl.h"
 #include "../../shared/net/cHttp.h"
 #include "../../shared/net/cWinSockHttp.h"
+
