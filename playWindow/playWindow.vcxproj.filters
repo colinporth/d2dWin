@@ -17,9 +17,6 @@
     <ClCompile Include="..\..\shared\helixAac\fft.c">
       <Filter>helixAac</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\shared\helixAac\filefmt.c">
-      <Filter>helixAac</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\shared\helixAac\huffman.c">
       <Filter>helixAac</Filter>
     </ClCompile>
@@ -36,6 +33,24 @@
       <Filter>helixAac</Filter>
     </ClCompile>
     <ClCompile Include="..\..\shared\helixAac\sbr.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\stproc.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\tns.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\aacdec.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\aactabs.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\bitstream.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\trigtabs.c">
       <Filter>helixAac</Filter>
     </ClCompile>
     <ClCompile Include="..\..\shared\helixAac\sbrfft.c">
@@ -68,25 +83,10 @@
     <ClCompile Include="..\..\shared\helixAac\sbrtabs.c">
       <Filter>helixAac</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\shared\helixAac\stproc.c">
-      <Filter>helixAac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\shared\helixAac\tns.c">
-      <Filter>helixAac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\shared\helixAac\trigtabs.c">
-      <Filter>helixAac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\shared\helixAac\aacdec.c">
-      <Filter>helixAac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\shared\helixAac\aactabs.c">
-      <Filter>helixAac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\shared\helixAac\bitstream.c">
-      <Filter>helixAac</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\shared\helixAac\buffers.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\filefmt.c">
       <Filter>helixAac</Filter>
     </ClCompile>
   </ItemGroup>
