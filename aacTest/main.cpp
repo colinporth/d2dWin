@@ -22,19 +22,27 @@
 #include "../../shared/utils/cLog.h"
 #include "../../shared/utils/cWinAudio.h"
 
-#include "../../shared/teensyAac/cAacDecoder.h"
-
-#include "../../shared/libfaad/neaacdec.h"
+//#include "../../shared/teensyAac/cAacDecoder.h"
+//#include "../../shared/libfaad/neaacdec.h"
+#include "helixAac/aacdec.h"
 
 extern "C" {
-  #include <libavcodec/avcodec.h>
-  #include <libavformat/avformat.h>
+  #include "libavformat/avformat.h"
+  #include "libavformat/avio.h"
+  #include "libavcodec/avcodec.h"
+  #include "libavutil/audio_fifo.h"
+  #include "libavutil/avassert.h"
+  #include "libavutil/avstring.h"
+  #include "libavutil/frame.h"
+  #include "libavutil/opt.h"
+  #include "libswresample/swresample.h"
   }
 
 using namespace std;
 //}}}
 
-#define FFMPEG
+//#define FFMPEG
+#define HELIX
 //#define FAAD
 //#define TEENSY
 
@@ -139,6 +147,29 @@ int main (int argc, char *argv[]) {
       avcodec_close (mAudContext);
     if (mAudParser)
       av_parser_close (mAudParser);
+    //}}}
+  #endif
+
+  #ifdef HELIX
+    //{{{  helix
+    unsigned streamPos = 0;
+    unsigned char* srcPtr = (unsigned char*)streamBuf;
+    int bytesLeft = streamLen;
+
+    unsigned long samplerate = 0;
+    unsigned char channels = 0;
+
+    HAACDecoder h = AACInitDecoder();
+    cLog::log (LOGINFO, "HELIX");
+
+    cWinAudio audio (2, 48000);
+
+    streamPos = 0;
+    while ((bytesLeft > 0)) {
+      int res = AACDecode (h, &srcPtr, &bytesLeft, samples);
+      audio.play (2, (int16_t*)samples, 1024, 1.f);
+      }
+
     //}}}
   #endif
 

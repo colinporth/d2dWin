@@ -548,7 +548,7 @@ private:
   //}}}
   //{{{
   void playThread (bool streaming) {
-  // launched and lives per song
+  // launched and lifetime per song
 
     cLog::setThreadName ("play");
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -592,7 +592,6 @@ private:
 
         if (!streaming && (mSong.getPlayFrame() > mSong.getLastFrame()))
           mSongChanged = true;
-        cLog::log (LOGINFO, "play ticking");
         }
 
       device->stop();

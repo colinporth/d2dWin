@@ -248,17 +248,6 @@ public:
   int getSampleRate() { return mSampleRate; }
   int getSamplesPerFrame() { return mSamplesPerFrame; }
 
-  // max nums for early allocations
-  int getMaxNumSamplesPerFrame() { return kMaxNumSamplesPerFrame; }
-  int getMaxNumSampleBytes() { return kMaxNumChannels * sizeof(float); }
-  int getMaxNumFrameSamplesBytes() { return getMaxNumSamplesPerFrame() * getMaxNumSampleBytes(); }
-
-  float getMaxPowerValue() { return mMaxPowerValue; }
-  float getMaxPeakValue() { return mMaxPeakValue; }
-  float getMaxFreqValue() { return mMaxFreqValue; }
-
-  int getNumFreqBytes() { return kMaxFreqBytes; }
-
   int getFirstFrame() { return mFrameMap.empty() ? 0 : mFrameMap.begin()->first; }
   int getLastFrame() { return mFrameMap.empty() ? 0 : mFrameMap.rbegin()->first;  }
   int getNumFrames() { return mFrameMap.empty() ? 0 : (mFrameMap.rbegin()->first - mFrameMap.begin()->first + 1); }
@@ -271,8 +260,18 @@ public:
     return (it == mFrameMap.end()) ? nullptr : it->second;
     }
   //}}}
-
   cSelect& getSelect() { return mSelect; }
+
+  // max nums for early allocations
+  int getMaxNumSamplesPerFrame() { return kMaxNumSamplesPerFrame; }
+  int getMaxNumSampleBytes() { return kMaxNumChannels * sizeof(float); }
+  int getMaxNumFrameSamplesBytes() { return getMaxNumSamplesPerFrame() * getMaxNumSampleBytes(); }
+
+  // max values for ui
+  float getMaxPowerValue() { return mMaxPowerValue; }
+  float getMaxPeakValue() { return mMaxPeakValue; }
+  float getMaxFreqValue() { return mMaxFreqValue; }
+  int getNumFreqBytes() { return kMaxFreqBytes; }
 
   // info
   int getBitrate() { return mBitrate; }
@@ -281,7 +280,6 @@ public:
   // hls
   bool hasHlsBase() { return mHlsBaseValid; }
   eHlsLoad getHlsLoad() { return mHlsLoad; }
-
   int getHlsLoadChunkNum (std::chrono::system_clock::time_point now, std::chrono::seconds secs, int preload);
   int getHlsFrameFromChunkNum (int chunkNum) { return mHlsBaseFrame + (chunkNum - mHlsBaseChunkNum) * mHlsFramesPerChunk; }
   //}}}
@@ -289,12 +287,12 @@ public:
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
   void setSamplesPerFrame (int samplePerFrame) { mSamplesPerFrame = samplePerFrame; }
 
+  // playFrame
   void setPlayFrame (int frame);
+  void incPlaySec (int secs, bool useSelectRange);
+  void incPlayFrame (int frames, bool useSelectRange);
 
-  // streaming
-  void setTitle (const std::string& title);
-
-  // hls
+  // stream
   void setChan (const std::string& chan) { mChan = chan; }
   //{{{
   void setBitrate (int bitrate) {
@@ -303,14 +301,10 @@ public:
     }
   //}}}
 
-  void setHlsBase (int baseChunkNum, std::chrono::system_clock::time_point baseTimePoint);
-
+  // hls
+  void setHlsBase (int chunkNum, std::chrono::system_clock::time_point timePoint);
   void setHlsLoad (eHlsLoad hlsLoad, int chunkNum);
   //}}}
-
-  // incs
-  void incPlaySec (int secs, bool useSelectRange);
-  void incPlayFrame (int frames, bool useSelectRange);
 
   // actions
   void prevSilencePlayFrame();

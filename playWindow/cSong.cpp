@@ -147,7 +147,7 @@ int cSong::getHlsLoadChunkNum (system_clock::time_point now, chrono::seconds sec
   }
 //}}}
 
-// sets
+// playsFrame
 //{{{
 void cSong::setPlayFrame (int frame) {
 
@@ -157,22 +157,39 @@ void cSong::setPlayFrame (int frame) {
     mPlayFrame = min (max (frame, 0), getLastFrame()+1);
   }
 //}}}
-
 //{{{
-void cSong::setHlsBase (int baseChunkNum, system_clock::time_point baseTimePoint) {
+void cSong::incPlayFrame (int frames, bool constrainToRange) {
+
+  int playFrame = mPlayFrame + frames;
+  if (constrainToRange)
+    playFrame = mSelect.constrainToRange (mPlayFrame, playFrame);
+
+  setPlayFrame (playFrame);
+  }
+//}}}
+//{{{
+void cSong::incPlaySec (int secs, bool useSelectRange) {
+  incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame, useSelectRange);
+  }
+//}}}
+
+// hls
+//{{{
+void cSong::setHlsBase (int chunkNum, system_clock::time_point timePoint) {
 // set baseChunkNum, baseTimePoint and baseFrame (sinceMidnight)
 
   unique_lock<shared_mutex> lock (mSharedMutex);
 
-  mHlsBaseChunkNum = baseChunkNum;
-  mHlsBaseTimePoint = baseTimePoint;
+  mHlsBaseChunkNum = chunkNum;
+  mHlsBaseTimePoint = timePoint;
 
   // calc hlsBaseFrame
-  auto midnightTimePoint = date::floor<date::days>(baseTimePoint);
-  uint64_t msSinceMidnight = duration_cast<milliseconds>(baseTimePoint - midnightTimePoint).count();
+  auto midnightTimePoint = date::floor<date::days>(timePoint);
+  uint64_t msSinceMidnight = duration_cast<milliseconds>(timePoint - midnightTimePoint).count();
   mHlsBaseFrame = int((msSinceMidnight * mSampleRate) / mSamplesPerFrame / 1000);
 
   mPlayFrame = mHlsBaseFrame;
+
   mHlsBaseValid = true;
   }
 //}}}
@@ -202,21 +219,6 @@ void cSong::setHlsLoad (eHlsLoad hlsLoad, int chunkNum) {
 //}}}
 
 // incs
-//{{{
-void cSong::incPlayFrame (int frames, bool constrainToRange) {
-
-  int playFrame = mPlayFrame + frames;
-  if (constrainToRange)
-    playFrame = mSelect.constrainToRange (mPlayFrame, playFrame);
-
-  setPlayFrame (playFrame);
-  }
-//}}}
-//{{{
-void cSong::incPlaySec (int secs, bool useSelectRange) {
-  incPlayFrame ((secs * mSampleRate) / mSamplesPerFrame, useSelectRange);
-  }
-//}}}
 
 // actions
 //{{{
