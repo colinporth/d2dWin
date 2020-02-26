@@ -165,6 +165,19 @@ protected:
 
 private:
   //{{{
+  static string getTaggedValue (uint8_t* buffer, char* tag) {
+
+    const char* tagPtr = strstr ((char*)buffer, tag);
+    const char* valuePtr = tagPtr + strlen (tag);
+    const char* endPtr = strchr (valuePtr, '\n');
+
+    const string valueString = string (valuePtr, endPtr - valuePtr);
+    cLog::log (LOGINFO, string(tagPtr, endPtr - tagPtr) + " value: " + valueString);
+
+    return valueString;
+    }
+  //}}}
+  //{{{
   static uint8_t* extractAacFramesFromTs (uint8_t* ts, int tsLen) {
   // extract aacFrames from ts packets, pack back into ts, gets smaller ts gets stripped
 
@@ -254,30 +267,16 @@ private:
       auto redirectedHost = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
         //{{{  hls m3u8 ok, parse it for baseChunkNum, baseTimePoint
-        // point to #EXT-X-MEDIA-SEQUENCE: sequence num
-        char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
-        const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
-        char* extSeqEnd = strchr (extSeq, '\n');
-        *extSeqEnd = '\0';
-        int baseChunkNum = atoi (extSeq) + 3;
+        int mediaSequence = stoi (getTaggedValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
 
-        // point to #EXT-X-PROGRAM-DATE-TIME: dateTime str
-        const auto kExtDateTime = "#EXT-X-PROGRAM-DATE-TIME:";
-        const auto extDateTime = strstr (extSeqEnd + 1, kExtDateTime) + strlen (kExtDateTime);
-        const auto extDateTimeEnd =  strstr (extDateTime + 1, "\n");
-        const auto extDateTimeString = string (extDateTime, size_t(extDateTimeEnd - extDateTime));
-        cLog::log (LOGINFO, kExtDateTime + extDateTimeString);
-
-        // parse ISO time format from string
-        istringstream inputStream (extDateTimeString);
-        system_clock::time_point baseTimePoint;
-        inputStream >> date::parse ("%FT%T", baseTimePoint);
-        baseTimePoint -= 17s;
+        istringstream inputStream (getTaggedValue (http.getContent(), "#EXT-X-PROGRAM-DATE-TIME:"));
+        system_clock::time_point programDateTimePoint;
+        inputStream >> date::parse ("%FT%T", programDateTimePoint);
 
         http.freeContent();
         //}}}
         mSong.init (cAudioDecode::eAac, 2, mSong.getBitrate() >= 128000 ? 1024 : 2048, 48000);
-        mSong.setHlsBase (baseChunkNum, baseTimePoint);
+        mSong.setHlsBase (mediaSequence, programDateTimePoint);
         cAudioDecode decode (cAudioDecode::eAac);
 
         auto player = thread ([=](){ playThread (true); });
@@ -547,26 +546,29 @@ private:
   //}}}
   //{{{
   void playThread (bool streaming) {
+  // launched and lives per song
 
     cLog::setThreadName ("play");
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-    // loop for filelist, new song may change sampleRate
     auto device = getDefaultAudioOutputDevice();
     if (device) {
       cLog::log (LOGINFO, "device @ %d", mSong.getSampleRate());
       device->setSampleRate (mSong.getSampleRate());
+      float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
+      float* silence = (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
+      memset (silence, 0, mSong.getMaxNumFrameSamplesBytes());
 
       cAudioDecode decode (mSong.getFrameType());
-      float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
 
       device->start();
       while (!getExit() && !mSongChanged) {
-        auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
-        if (mPlaying && framePtr && framePtr->getPtr()) {
-          device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
-            // lambda callback - load srcSamples
-            shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+        device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
+          // lambda callback - load srcSamples
+          shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+
+          auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
+          if (mPlaying && framePtr && framePtr->getPtr()) {
             if (mSong.hasSamples())
               srcSamples = (float*)framePtr->getPtr();
             else {
@@ -574,19 +576,24 @@ private:
               decode.frameToSamples (samples);
               srcSamples = samples;
               }
-            numSrcSamples = mSong.getSamplesPerFrame();
+            }
+          else
+            srcSamples = silence;
+
+          numSrcSamples = mSong.getSamplesPerFrame();
+
+          if (mPlaying && framePtr) {
             mSong.incPlayFrame (1, true);
             changed();
-            });
-          }
-        else
-          this_thread::sleep_for (100ms);
+            }
+          });
 
         if (!streaming && (mSong.getPlayFrame() > mSong.getLastFrame()))
           mSongChanged = true;
         }
 
       device->stop();
+      free (silence);
       free (samples);
       }
 

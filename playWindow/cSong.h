@@ -337,7 +337,7 @@ private:
   int mId = 0;
   int mNumChannels = kMaxNumChannels;
   int mSampleRate = 0;
-  int mSamplesPerFrame = kMaxNumSamplesPerFrame;
+  int mSamplesPerFrame = 0;
 
   int mPlayFrame = 0;
   int mTotalFrames = 0;
