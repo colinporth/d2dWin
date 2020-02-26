@@ -273,6 +273,8 @@ private:
         system_clock::time_point programDateTimePoint;
         inputStream >> date::parse ("%FT%T", programDateTimePoint);
 
+        programDateTimePoint -= 37s;
+
         http.freeContent();
         //}}}
         mSong.init (cAudioDecode::eAac, 2, mSong.getBitrate() >= 128000 ? 1024 : 2048, 48000);
@@ -590,6 +592,7 @@ private:
 
         if (!streaming && (mSong.getPlayFrame() > mSong.getLastFrame()))
           mSongChanged = true;
+        cLog::log (LOGINFO, "play ticking");
         }
 
       device->stop();
