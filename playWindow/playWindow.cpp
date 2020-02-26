@@ -99,7 +99,6 @@ public:
         }
         //}}}
       }
-    thread ([=](){ playThread(); }).detach();
 
     mLogBox = add (new cLogBox (this, 20.f));
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
@@ -240,17 +239,21 @@ private:
     constexpr int kHlsPreload = 10; // about a minute
 
     cLog::setThreadName ("hls ");
+
+    float* samples = (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
+
     mSong.setChan (chan);
     mSong.setBitrate (bitrate);
 
     while (!getExit()) {
+      // loop till exit
       const string path = "pool_904/live/uk/" + mSong.getChan() +
                           "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
                           "-audio=" + dec(mSong.getBitrate());
       cWinSockHttp http;
       auto redirectedHost = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
-        //{{{  parse m3u8 for baseChunkNum, baseTimePoint
+        //{{{  hls m3u8 ok, parse it for baseChunkNum, baseTimePoint
         // point to #EXT-X-MEDIA-SEQUENCE: sequence num
         char* kExtSeq = "#EXT-X-MEDIA-SEQUENCE:";
         const auto extSeq = strstr ((char*)http.getContent(), kExtSeq) + strlen (kExtSeq);
@@ -276,7 +279,8 @@ private:
         mSong.init (cAudioDecode::eAac, 2, mSong.getBitrate() >= 128000 ? 1024 : 2048, 48000);
         mSong.setHlsBase (baseChunkNum, baseTimePoint);
         cAudioDecode decode (cAudioDecode::eAac);
-        float* samples = (float*)malloc (mSong.getMaxSamplesPerFrame() * mSong.getNumSampleBytes());
+
+        auto player = thread ([=](){ playThread (true); });
 
         mSongChanged = false;
         while (!getExit() && !mSongChanged) {
@@ -311,7 +315,7 @@ private:
               mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
               }
             else {
-              //{{{  failed, back off for 250ms
+              //{{{  failed to load expected available chunk, back off for 250ms
               mSong.setHlsLoad (cSong::eHlsFailed, chunkNum);
               changed();
 
@@ -323,12 +327,13 @@ private:
           else // no chunk available, back off for 100ms
             this_thread::sleep_for (100ms);
           }
-        free (samples);
+
+        player.join();
         }
       }
 
+    free (samples);
     cLog::log (LOGINFO, "exit");
-    setExit();
     }
   //}}}
   //{{{
@@ -353,6 +358,7 @@ private:
 
       cAudioDecode decode (cAudioDecode::eAac);
 
+      thread player;
       mSongChanged = false;
 
       cWinSockHttp http;
@@ -413,8 +419,8 @@ private:
             int sampleRate;
             auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
             mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
-            mSong.setStreaming();
             samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
+            player = thread ([=](){ playThread (true); });
             }
 
           while (decode.parseFrame (buffer, bufferEnd)) {
@@ -450,7 +456,7 @@ private:
 
       free (samples);
       cLog::log (LOGINFO, "icyThread songChanged");
-      mPlayDoneSem.wait();
+      player.join();
       }
 
     cLog::log (LOGINFO, "exit");
@@ -473,6 +479,8 @@ private:
       auto frameType = cAudioDecode::parseSomeFrames (fileMapFirst, fileMapEnd, sampleRate);
       if (cAudioDecode::mJpegPtr) // should delete old jpegImage, but we have memory to waste
         mJpegImageView->setImage (new cJpegImage (cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen));
+
+      auto player = thread ([=](){ playThread (false); });
 
       int frameNum = 0;
       bool songDone = false;
@@ -522,7 +530,7 @@ private:
         }
 
       // wait for play to end or abort
-      mPlayDoneSem.wait();
+      player.join();
       //{{{  next file
       UnmapViewOfFile (fileMapFirst);
       CloseHandle (fileHandle);
@@ -530,67 +538,56 @@ private:
       if (mSongChanged) // use changed fileIndex
         mSongChanged = false;
       else if (!mFileList->nextIndex())
-        break;
+        setExit();
       //}}}
       }
 
     cLog::log (LOGINFO, "exit");
-    setExit();
     }
   //}}}
   //{{{
-  void playThread() {
+  void playThread (bool streaming) {
 
     cLog::setThreadName ("play");
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-    while (!getExit()) {
-      // wait for valid sampleRate to declare audioDevice
-      while (mSongChanged || !mSong.getSampleRate())
-        this_thread::sleep_for (10ms);
+    // loop for filelist, new song may change sampleRate
+    auto device = getDefaultAudioOutputDevice();
+    if (device) {
+      cLog::log (LOGINFO, "device @ %d", mSong.getSampleRate());
+      device->setSampleRate (mSong.getSampleRate());
 
-      cLog::log (LOGINFO, "new device for %d", mSong.getSampleRate());
+      cAudioDecode decode (mSong.getFrameType());
+      float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
 
-      // loop for filelist, new song may change sampleRate
-      auto device = getDefaultAudioOutputDevice();
-      if (device) {
-        device->setSampleRate (mSong.getSampleRate());
-
-        cAudioDecode decode (mSong.getFrameType());
-        float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxSamplesBytes());
-
-        device->start();
-        while (!getExit() && !mSongChanged) {
-          auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
-          if (mPlaying && framePtr && framePtr->getPtr()) {
-            device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
-              // lambda callback - load srcSamples
-              shared_lock<shared_mutex> lock (mSong.getSharedMutex());
-              if (mSong.hasSamples())
-                srcSamples = (float*)framePtr->getPtr();
-              else {
-                decode.setFrame (framePtr->getPtr(), framePtr->getLen());
-                decode.frameToSamples (samples);
-                srcSamples = samples;
-                }
-              numSrcSamples = mSong.getSamplesPerFrame();
-              mSong.incPlayFrame (1, true);
-              changed();
-              });
-            }
-          else
-            this_thread::sleep_for (100ms);
-
-          if (!mSong.getStreaming() && (mSong.getPlayFrame() > mSong.getLastFrame()))
-            mSongChanged = true;
+      device->start();
+      while (!getExit() && !mSongChanged) {
+        auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
+        if (mPlaying && framePtr && framePtr->getPtr()) {
+          device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
+            // lambda callback - load srcSamples
+            shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+            if (mSong.hasSamples())
+              srcSamples = (float*)framePtr->getPtr();
+            else {
+              decode.setFrame (framePtr->getPtr(), framePtr->getLen());
+              decode.frameToSamples (samples);
+              srcSamples = samples;
+              }
+            numSrcSamples = mSong.getSamplesPerFrame();
+            mSong.incPlayFrame (1, true);
+            changed();
+            });
           }
+        else
+          this_thread::sleep_for (100ms);
 
-        device->stop();
-        free (samples);
+        if (!streaming && (mSong.getPlayFrame() > mSong.getLastFrame()))
+          mSongChanged = true;
         }
 
-      // play finished with song
-      mPlayDoneSem.notifyAll();
+      device->stop();
+      free (samples);
       }
 
     cLog::log (LOGINFO, "exit");
@@ -602,7 +599,6 @@ private:
   bool mSongChanged = false;
 
   bool mPlaying = true;
-  cSemaphore mPlayDoneSem = "playDone";
 
   string mBitrateStr;
 

@@ -238,7 +238,6 @@ public:
   enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed };
   //{{{  gets
   std::shared_mutex& getSharedMutex() { return mSharedMutex; }
-  bool getStreaming() { return mStreaming; }
   int getId() { return mId; }
 
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
@@ -246,12 +245,13 @@ public:
 
   int getNumChannels() { return mNumChannels; }
   int getNumSampleBytes() { return mNumChannels * sizeof(float); }
-
   int getSampleRate() { return mSampleRate; }
   int getSamplesPerFrame() { return mSamplesPerFrame; }
 
-  int getMaxSamplesPerFrame() { return kMaxSamplesPerFrame; }
-  int getMaxSamplesBytes() { return getMaxSamplesPerFrame() * getNumSampleBytes(); }
+  // max nums for early allocations
+  int getMaxNumSamplesPerFrame() { return kMaxNumSamplesPerFrame; }
+  int getMaxNumSampleBytes() { return kMaxNumChannels * sizeof(float); }
+  int getMaxNumFrameSamplesBytes() { return getMaxNumSamplesPerFrame() * getMaxNumSampleBytes(); }
 
   float getMaxPowerValue() { return mMaxPowerValue; }
   float getMaxPeakValue() { return mMaxPeakValue; }
@@ -293,7 +293,6 @@ public:
 
   // streaming
   void setTitle (const std::string& title);
-  void setStreaming() { mStreaming = true; }
 
   // hls
   void setChan (const std::string& chan) { mChan = chan; }
@@ -324,8 +323,9 @@ private:
   int skipPrev (int fromFrame, bool silence);
   int skipNext (int fromFrame, bool silence);
 
-  constexpr static int kMaxSamplesPerFrame = 2048; // arbitrary frame max
-  constexpr static int kMaxFreq = (kMaxSamplesPerFrame / 2) + 1; // fft max
+  constexpr static int kMaxNumChannels = 2;           // arbitrary chan max
+  constexpr static int kMaxNumSamplesPerFrame = 2048; // arbitrary frame max
+  constexpr static int kMaxFreq = (kMaxNumSamplesPerFrame / 2) + 1; // fft max
   constexpr static int kMaxFreqBytes = 512; // arbitrary graphics max
 
   // vars
@@ -333,12 +333,11 @@ private:
   std::shared_mutex mSharedMutex;
 
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
-  bool mStreaming = false;
 
   int mId = 0;
-  int mNumChannels = 0;
+  int mNumChannels = kMaxNumChannels;
   int mSampleRate = 0;
-  int mSamplesPerFrame = 0;
+  int mSamplesPerFrame = kMaxNumSamplesPerFrame;
 
   int mPlayFrame = 0;
   int mTotalFrames = 0;
@@ -364,7 +363,7 @@ private:
   //}}}
   //{{{  fft vars
   kiss_fftr_cfg fftrConfig;
-  kiss_fft_scalar timeBuf[kMaxSamplesPerFrame];
+  kiss_fft_scalar timeBuf[kMaxNumSamplesPerFrame];
   kiss_fft_cpx freqBuf[kMaxFreq];
   //}}}
   };

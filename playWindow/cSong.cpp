@@ -173,8 +173,6 @@ void cSong::setHlsBase (int baseChunkNum, system_clock::time_point baseTimePoint
   mHlsBaseFrame = int((msSinceMidnight * mSampleRate) / mSamplesPerFrame / 1000);
 
   mPlayFrame = mHlsBaseFrame;
-
-  mStreaming = true;
   mHlsBaseValid = true;
   }
 //}}}

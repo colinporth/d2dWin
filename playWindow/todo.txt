@@ -10,10 +10,20 @@ overview
 - show load graphic
 - graticules, for hls?
 
+files
+- make keys 0 to 9 work
+- play next failing
+- end while analysing
+- command line
+  - list of files
+  - links to files,directories
+
 hls
+- make up down arrow work
 - show bitrate
 
 shoutcast
+- make keys 0 to 9 up down arrow work
 - fix channel list display and selection
 
 editing
@@ -46,8 +56,3 @@ d2dWindow
     - gradient brush for waveform
 - jpeg tag
   - westwing jpeg no SOI, should manage jpegImage deletion in fileThread
-
-command line
-- filelist directory nesting broken
-- list of files
-- links to directories, files
