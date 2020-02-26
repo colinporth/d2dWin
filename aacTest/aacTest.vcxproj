@@ -29,34 +29,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\shared\utils\cLog.cpp" />
     <ClCompile Include="..\..\shared\utils\cWinAudio.cpp" />
-    <ClCompile Include="helixAac\aacdec.c" />
-    <ClCompile Include="helixAac\aactabs.c" />
-    <ClCompile Include="helixAac\bitstream.c" />
-    <ClCompile Include="helixAac\buffers.c" />
-    <ClCompile Include="helixAac\dct4.c" />
-    <ClCompile Include="helixAac\decelmnt.c" />
-    <ClCompile Include="helixAac\dequant.c" />
-    <ClCompile Include="helixAac\fft.c" />
-    <ClCompile Include="helixAac\filefmt.c" />
-    <ClCompile Include="helixAac\huffman.c" />
-    <ClCompile Include="helixAac\hufftabs.c" />
-    <ClCompile Include="helixAac\imdct.c" />
-    <ClCompile Include="helixAac\noiseless.c" />
-    <ClCompile Include="helixAac\pns.c" />
-    <ClCompile Include="helixAac\sbr.c" />
-    <ClCompile Include="helixAac\sbrfft.c" />
-    <ClCompile Include="helixAac\sbrfreq.c" />
-    <ClCompile Include="helixAac\sbrhfadj.c" />
-    <ClCompile Include="helixAac\sbrhfgen.c" />
-    <ClCompile Include="helixAac\sbrhuff.c" />
-    <ClCompile Include="helixAac\sbrimdct.c" />
-    <ClCompile Include="helixAac\sbrmath.c" />
-    <ClCompile Include="helixAac\sbrqmf.c" />
-    <ClCompile Include="helixAac\sbrside.c" />
-    <ClCompile Include="helixAac\sbrtabs.c" />
-    <ClCompile Include="helixAac\stproc.c" />
-    <ClCompile Include="helixAac\tns.c" />
-    <ClCompile Include="helixAac\trigtabs.c" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -64,12 +36,6 @@
     <ClInclude Include="..\..\shared\utils\cWinAudio.h" />
     <ClInclude Include="..\..\shared\utils\iAudio.h" />
     <ClInclude Include="..\..\shared\utils\resolve.h" />
-    <ClInclude Include="helixAac\aaccommon.h" />
-    <ClInclude Include="helixAac\aacdec.h" />
-    <ClInclude Include="helixAac\assembly.h" />
-    <ClInclude Include="helixAac\bitstream.h" />
-    <ClInclude Include="helixAac\coder.h" />
-    <ClInclude Include="helixAac\sbr.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

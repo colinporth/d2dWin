@@ -218,8 +218,6 @@ void cSong::setHlsLoad (eHlsLoad hlsLoad, int chunkNum) {
   }
 //}}}
 
-// incs
-
 // actions
 //{{{
 void cSong::prevSilencePlayFrame() {

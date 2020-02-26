@@ -33,8 +33,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "playWindow", "playWindow\pl
 		{3E06EF44-C7ED-45EB-AC5C-3A0338D37D53} = {3E06EF44-C7ED-45EB-AC5C-3A0338D37D53}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "aacTest", "aacTest\aacTest.vcxproj", "{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -129,18 +127,6 @@ Global
 		{DFA05DDA-082C-40AB-8FAB-8D936C91EACA}.Release|x64.Build.0 = Release|x64
 		{DFA05DDA-082C-40AB-8FAB-8D936C91EACA}.Release|x86.ActiveCfg = Release|Win32
 		{DFA05DDA-082C-40AB-8FAB-8D936C91EACA}.Release|x86.Build.0 = Release|Win32
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.Debug|x64.ActiveCfg = Debug|x64
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.Debug|x64.Build.0 = Debug|x64
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.Debug|x86.ActiveCfg = Debug|Win32
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.Debug|x86.Build.0 = Debug|Win32
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.release avx|x64.ActiveCfg = release avx|x64
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.release avx|x64.Build.0 = release avx|x64
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.release avx|x86.ActiveCfg = Release|Win32
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.release avx|x86.Build.0 = Release|Win32
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.Release|x64.ActiveCfg = Release|x64
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.Release|x64.Build.0 = Release|x64
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.Release|x86.ActiveCfg = Release|Win32
-		{2F70BF4C-D11E-4098-8897-3CFD34CDAD20}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

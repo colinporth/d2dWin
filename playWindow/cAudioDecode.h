@@ -4,6 +4,8 @@
 extern "C" {
   #include "libavcodec/avcodec.h"
   }
+
+#include "../../shared/helixAac/aacdec.h"
 //}}}
 
 class cAudioDecode {
@@ -48,4 +50,7 @@ private:
   AVCodecContext* mContext = nullptr;
   AVPacket mAvPacket;
   AVFrame* mAvFrame = nullptr;
+
+  HAACDecoder mAacDecoder = nullptr;
+  int16_t* mSamples16 = nullptr;
   };

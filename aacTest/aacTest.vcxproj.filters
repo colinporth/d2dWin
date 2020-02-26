@@ -8,101 +8,11 @@
     <Filter Include="h">
       <UniqueIdentifier>{86ace5b1-4b2b-4ff2-b8c7-83d45798237f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="helixaac">
-      <UniqueIdentifier>{5c88d109-7ae6-42e9-9ba4-3a4922396296}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="helixaac\h">
-      <UniqueIdentifier>{3a19b72d-8265-440d-a661-1a279690b9b1}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="..\..\shared\utils\cLog.cpp" />
     <ClCompile Include="..\..\shared\utils\cWinAudio.cpp" />
-    <ClCompile Include="helixAac\dequant.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\fft.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\filefmt.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\huffman.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\hufftabs.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\imdct.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\noiseless.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\pns.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbr.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrfft.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrfreq.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrhfadj.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrhfgen.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrhuff.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrimdct.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrmath.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrqmf.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrside.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\sbrtabs.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\stproc.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\tns.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\trigtabs.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\aacdec.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\aactabs.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\bitstream.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\buffers.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\dct4.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
-    <ClCompile Include="helixAac\decelmnt.c">
-      <Filter>helixaac</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\utils\cLog.h">
@@ -116,24 +26,6 @@
     </ClInclude>
     <ClInclude Include="..\..\shared\utils\resolve.h">
       <Filter>h</Filter>
-    </ClInclude>
-    <ClInclude Include="helixAac\aaccommon.h">
-      <Filter>helixaac\h</Filter>
-    </ClInclude>
-    <ClInclude Include="helixAac\aacdec.h">
-      <Filter>helixaac\h</Filter>
-    </ClInclude>
-    <ClInclude Include="helixAac\assembly.h">
-      <Filter>helixaac\h</Filter>
-    </ClInclude>
-    <ClInclude Include="helixAac\bitstream.h">
-      <Filter>helixaac\h</Filter>
-    </ClInclude>
-    <ClInclude Include="helixAac\coder.h">
-      <Filter>helixaac\h</Filter>
-    </ClInclude>
-    <ClInclude Include="helixAac\sbr.h">
-      <Filter>helixaac\h</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

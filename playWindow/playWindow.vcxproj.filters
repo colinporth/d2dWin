@@ -5,6 +5,90 @@
     <ClCompile Include="playWindow.cpp" />
     <ClCompile Include="cAudioDecode.cpp" />
     <ClCompile Include="cSong.cpp" />
+    <ClCompile Include="..\..\shared\helixAac\dct4.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\decelmnt.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\dequant.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\fft.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\filefmt.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\huffman.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\hufftabs.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\imdct.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\noiseless.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\pns.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbr.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrfft.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrfreq.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrhfadj.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrhfgen.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrhuff.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrimdct.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrmath.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrqmf.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrside.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\sbrtabs.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\stproc.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\tns.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\trigtabs.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\aacdec.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\aactabs.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\bitstream.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\shared\helixAac\buffers.c">
+      <Filter>helixAac</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">
@@ -12,6 +96,12 @@
     </Filter>
     <Filter Include="h\bmp">
       <UniqueIdentifier>{88dfebb0-2b27-4ed0-94ea-d88300fbc5f1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="helixAac">
+      <UniqueIdentifier>{e8245ddd-ebfe-4013-ad17-5669b3185ece}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="helixAac\h">
+      <UniqueIdentifier>{c78dc3fb-3b82-4027-a0f7-bee17b429bda}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -104,6 +194,24 @@
     </ClInclude>
     <ClInclude Include="..\boxes\cFileListBox.h">
       <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\helixAac\aaccommon.h">
+      <Filter>helixAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\helixAac\aacdec.h">
+      <Filter>helixAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\helixAac\assembly.h">
+      <Filter>helixAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\helixAac\bitstream.h">
+      <Filter>helixAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\helixAac\sbr.h">
+      <Filter>helixAac\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\helixAac\coder.h">
+      <Filter>helixAac\h</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
