@@ -318,10 +318,7 @@ int cAudioDecode::frameToSamples (float* samples) {
 // decode parser frame to samples using codec context, fixup song samplerate and samplesPerFrame
 
   if (mAacDecoder) {
-    unsigned char* dataPtr = (unsigned char*)mAvPacket.data;
-    int bytesLeft = mAvPacket.size;
-
-    int res = AACDecode (mAacDecoder, &dataPtr, &bytesLeft, mSamples16);
+    int res = AACDecode (mAacDecoder, (uint8_t*)mAvPacket.data, mAvPacket.size, mSamples16);
     AACFrameInfo aacFrameInfo;
     AACGetLastFrameInfo (mAacDecoder, &aacFrameInfo);
     int numSamples = aacFrameInfo.outputSamps;
