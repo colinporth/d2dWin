@@ -324,6 +324,7 @@ int cAudioDecode::frameToSamples (float* samples) {
     AACFrameInfo aacFrameInfo;
     AACGetLastFrameInfo (mAacDecoder, &aacFrameInfo);
     int numSamples = aacFrameInfo.outputSamps;
+    mSampleRate = aacFrameInfo.sampRateOut;
 
     int16_t* srcPtr = mSamples16;
     auto dstPtr = samples;

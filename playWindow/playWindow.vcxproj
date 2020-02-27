@@ -27,21 +27,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\shared\helixAac\aacdec.c">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release avx|x64'">NotUsing</PrecompiledHeader>
+    <ClCompile Include="..\..\shared\decoders\aacdec.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release avx|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\..\shared\helixAac\sbr.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release avx|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release avx|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="cAudioDecode.cpp">
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">stdafx.h</PrecompiledHeaderFile>
@@ -84,9 +76,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\date\date.h" />
-    <ClInclude Include="..\..\shared\helixAac\aaccommon.h" />
-    <ClInclude Include="..\..\shared\helixAac\aacdec.h" />
-    <ClInclude Include="..\..\shared\helixAac\sbr.h" />
+    <ClInclude Include="..\..\shared\decoders\aacdec.h" />
     <ClInclude Include="..\..\shared\hls\r1x80.h" />
     <ClInclude Include="..\..\shared\hls\r2x80.h" />
     <ClInclude Include="..\..\shared\hls\r3x80.h" />

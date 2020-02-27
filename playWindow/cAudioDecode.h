@@ -5,7 +5,7 @@ extern "C" {
   #include "libavcodec/avcodec.h"
   }
 
-#include "../../shared/helixAac/aacdec.h"
+#include "../../shared/decoders/aacdec.h"
 //}}}
 
 class cAudioDecode {

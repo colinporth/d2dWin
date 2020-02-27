@@ -5,12 +5,7 @@
     <ClCompile Include="playWindow.cpp" />
     <ClCompile Include="cAudioDecode.cpp" />
     <ClCompile Include="cSong.cpp" />
-    <ClCompile Include="..\..\shared\helixAac\sbr.c">
-      <Filter>helixAac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\shared\helixAac\aacdec.c">
-      <Filter>helixAac</Filter>
-    </ClCompile>
+    <ClCompile Include="..\..\shared\decoders\aacdec.c" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">
@@ -18,12 +13,6 @@
     </Filter>
     <Filter Include="h\bmp">
       <UniqueIdentifier>{88dfebb0-2b27-4ed0-94ea-d88300fbc5f1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="helixAac">
-      <UniqueIdentifier>{e8245ddd-ebfe-4013-ad17-5669b3185ece}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="helixAac\h">
-      <UniqueIdentifier>{c78dc3fb-3b82-4027-a0f7-bee17b429bda}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -117,14 +106,8 @@
     <ClInclude Include="..\boxes\cFileListBox.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\helixAac\aaccommon.h">
-      <Filter>helixAac\h</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\helixAac\aacdec.h">
-      <Filter>helixAac\h</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\helixAac\sbr.h">
-      <Filter>helixAac\h</Filter>
+    <ClInclude Include="..\..\shared\decoders\aacdec.h">
+      <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
