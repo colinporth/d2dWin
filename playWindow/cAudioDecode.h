@@ -50,5 +50,4 @@ private:
   AVFrame* mAvFrame = nullptr;
 
   void* mAacDecoder = nullptr;
-  int16_t* mSamples16 = nullptr;
   };

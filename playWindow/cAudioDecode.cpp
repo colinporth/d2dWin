@@ -18,10 +18,8 @@ cAudioDecode::cAudioDecode (eFrameType frameType) {
     mContext = avcodec_alloc_context3 (codec);
     avcodec_open2 (mContext, codec, NULL);
     }
-  else if (frameType == eAac) {
+  else if (frameType == eAac) 
     mAacDecoder = AACInitDecoder();
-    mSamples16 = (int16_t*)malloc (2048 * 2 * 2);
-    }
 
   av_init_packet (&mAvPacket);
   mAvFrame = av_frame_alloc();
@@ -46,10 +44,8 @@ cAudioDecode::~cAudioDecode() {
 
   av_frame_free (&mAvFrame);
 
-  if (mAacDecoder) {
+  if (mAacDecoder) 
     AACFreeDecoder (mAacDecoder);
-    free (mSamples16);
-    }
   }
 //}}}
 
@@ -318,18 +314,8 @@ int cAudioDecode::frameToSamples (float* samples) {
 // decode parser frame to samples using codec context, fixup song samplerate and samplesPerFrame
 
   if (mAacDecoder) {
-    int res = AACDecode (mAacDecoder, (uint8_t*)mAvPacket.data, mAvPacket.size, mSamples16);
-    AACFrameInfo aacFrameInfo;
-    AACGetLastFrameInfo (mAacDecoder, &aacFrameInfo);
-    int numSamples = aacFrameInfo.outputSamps;
-    mSampleRate = aacFrameInfo.sampRateOut;
-
-    int16_t* srcPtr = mSamples16;
-    auto dstPtr = samples;
-    for (auto sample = 0; sample < numSamples; sample++)
-      *dstPtr++ = *srcPtr++ / float(0x8000);
-
-    return numSamples/2;
+    auto numSamples = AACDecode (mAacDecoder, (uint8_t*)mAvPacket.data, mAvPacket.size, samples, &mSampleRate);
+    return numSamples;
     }
   else {
      int numSamples = 0;
