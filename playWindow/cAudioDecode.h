@@ -4,8 +4,6 @@
 extern "C" {
   #include "libavcodec/avcodec.h"
   }
-
-#include "../../shared/decoders/aacdec.h"
 //}}}
 
 class cAudioDecode {
@@ -51,6 +49,6 @@ private:
   AVPacket mAvPacket;
   AVFrame* mAvFrame = nullptr;
 
-  HAACDecoder mAacDecoder = nullptr;
+  void* mAacDecoder = nullptr;
   int16_t* mSamples16 = nullptr;
   };
