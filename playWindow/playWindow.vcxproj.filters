@@ -5,8 +5,8 @@
     <ClCompile Include="playWindow.cpp" />
     <ClCompile Include="cAudioDecode.cpp" />
     <ClCompile Include="cSong.cpp" />
-    <ClCompile Include="..\..\shared\decoders\aacdec.c" />
-    <ClCompile Include="..\..\shared\decoders\miniMp3.c" />
+    <ClCompile Include="..\..\shared\decoders\miniMp3.cpp" />
+    <ClCompile Include="..\..\shared\decoders\aacdec.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">
