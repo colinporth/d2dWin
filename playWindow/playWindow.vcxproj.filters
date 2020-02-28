@@ -6,6 +6,7 @@
     <ClCompile Include="cAudioDecode.cpp" />
     <ClCompile Include="cSong.cpp" />
     <ClCompile Include="..\..\shared\decoders\aacdec.c" />
+    <ClCompile Include="..\..\shared\decoders\miniMp3.c" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">
@@ -107,6 +108,9 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\decoders\aacdec.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\miniMp3.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

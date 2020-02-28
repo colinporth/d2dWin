@@ -1,10 +1,9 @@
 // cAudioDecode.h
 #pragma once
-//{{{  includes
-extern "C" {
-  #include "libavcodec/avcodec.h"
-  }
-//}}}
+//extern "C" {
+//  #include "libavcodec/avcodec.h"
+//  }
+#include "../../shared/decoders/minimp3.h"
 
 class cAudioDecode {
 public:
@@ -31,6 +30,7 @@ public:
   // statics not quite right but being here picks up eFrameType
   static eFrameType parseSomeFrames (uint8_t* framePtr, uint8_t* frameLast, int& sampleRate);
   static eFrameType parseAllFrames (uint8_t* framePtr, uint8_t* frameLast, int& sampleRate);
+
   inline static uint8_t* mJpegPtr = nullptr;
   inline static int mJpegLen = 0;
 
@@ -45,9 +45,9 @@ private:
   eFrameType mFrameType = eUnknown;
   int mSampleRate = 0;
 
-  AVCodecContext* mContext = nullptr;
-  AVPacket mAvPacket;
-  AVFrame* mAvFrame = nullptr;
-
   void* mAacDecoder = nullptr;
+  mp3dec_t mMp3Dec;
+  //AVCodecContext* mContext = nullptr;
+  //AVPacket mAvPacket;
+  //AVFrame* mAvFrame = nullptr;
   };

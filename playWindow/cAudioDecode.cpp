@@ -5,46 +5,50 @@
 
 #include "cAudioDecode.h"
 
-#include "../../shared/decoders/aacdec.h"
 #include "../../shared/utils/cLog.h"
+#include "../../shared/decoders/aacdec.h"
 //}}}
 
 // public
 //{{{
 cAudioDecode::cAudioDecode (eFrameType frameType) {
 
-  if (frameType == eMp3) {
-    auto codec = avcodec_find_decoder (frameType == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
-    mContext = avcodec_alloc_context3 (codec);
-    avcodec_open2 (mContext, codec, NULL);
-    }
-  else if (frameType == eAac) 
+  if (frameType == eMp3)
+    mp3dec_init (&mMp3Dec);
+  else if (frameType == eAac)
     mAacDecoder = AACInitDecoder();
+  else if (frameType == eWav) {
+    }
+  //else {
+  //  auto codec = avcodec_find_decoder (frameType == eAac ? AV_CODEC_ID_AAC : AV_CODEC_ID_MP3);
+  //  mContext = avcodec_alloc_context3 (codec);
+  //  avcodec_open2 (mContext, codec, NULL);
+  //  }
 
-  av_init_packet (&mAvPacket);
-  mAvFrame = av_frame_alloc();
+  //av_init_packet (&mAvPacket);
+  //mAvFrame = av_frame_alloc();
   }
 //}}}
 //{{{
 cAudioDecode::cAudioDecode (uint8_t* framePtr, int frameLen) :
     mFramePtr(framePtr), mFrameLen(frameLen) {
 
-  av_init_packet (&mAvPacket);
-  mAvPacket.data = framePtr;
-  mAvPacket.size = frameLen;
+  //av_init_packet (&mAvPacket);
+  //mAvPacket.data = framePtr;
+  //mAvPacket.size = frameLen;
 
-  mAvFrame = av_frame_alloc();
+  //mAvFrame = av_frame_alloc();
   }
 //}}}
 //{{{
 cAudioDecode::~cAudioDecode() {
 
-  if (mContext)
-    avcodec_close (mContext);
+  //if (mContext)
+  //  avcodec_close (mContext);
 
-  av_frame_free (&mAvFrame);
+  //av_frame_free (&mAvFrame);
 
-  if (mAacDecoder) 
+  if (mAacDecoder)
     AACFreeDecoder (mAacDecoder);
   }
 //}}}
@@ -52,8 +56,8 @@ cAudioDecode::~cAudioDecode() {
 //{{{
 void cAudioDecode::setFrame (uint8_t* framePtr, int frameLen) {
 
-  mAvPacket.data = framePtr;
-  mAvPacket.size = frameLen;
+  //mAvPacket.data = framePtr;
+  //mAvPacket.size = frameLen;
   mFramePtr = framePtr;
   mFrameLen = frameLen;
   }
@@ -102,8 +106,8 @@ bool cAudioDecode::parseFrame (uint8_t* framePtr, uint8_t* frameLast) {
         mFramePtr = framePtr;
         mFrameLen = (((unsigned int)framePtr[3] & 0x3) << 11) | (((unsigned int)framePtr[4]) << 3) | (framePtr[5] >> 5);
 
-        mAvPacket.data = mFramePtr;
-        mAvPacket.size = mFrameLen;
+        //mAvPacket.data = mFramePtr;
+        //mAvPacket.size = mFrameLen;
 
         mFrameType = eAac;
 
@@ -232,8 +236,8 @@ bool cAudioDecode::parseFrame (uint8_t* framePtr, uint8_t* frameLast) {
         // return mp3Frame & size
         mFramePtr = framePtr;
         mFrameLen = size;
-        mAvPacket.data = mFramePtr;
-        mAvPacket.size = mFrameLen;
+        //mAvPacket.data = mFramePtr;
+        //mAvPacket.size = mFrameLen;
 
         mFrameType = eMp3;
 
@@ -314,55 +318,68 @@ int cAudioDecode::frameToSamples (float* samples) {
 // decode parser frame to samples using codec context, fixup song samplerate and samplesPerFrame
 
   if (mAacDecoder) {
-    auto numSamples = AACDecode (mAacDecoder, (uint8_t*)mAvPacket.data, mAvPacket.size, samples, &mSampleRate);
+    auto numSamples = AACDecode (mAacDecoder, (uint8_t*)mFramePtr, mFrameLen, samples, &mSampleRate);
     return numSamples;
     }
+
   else {
-     int numSamples = 0;
+    int16_t samples16 [2048*2];
+    mp3dec_frame_info_t frameInfo;
+    int numSamples = mp3dec_decode_frame (&mMp3Dec, (uint8_t*)mFramePtr, (int)mFrameLen, samples16, &frameInfo);
 
-    auto ret = avcodec_send_packet (mContext, &mAvPacket);
-    while (ret >= 0) {
-      ret = avcodec_receive_frame (mContext, mAvFrame);
-      if ((ret == AVERROR_EOF) || (ret < 0))
-        break;
-
-      if ((ret != AVERROR(EAGAIN)) && (mAvFrame->nb_samples > 0)) {
-        mSampleRate = mAvFrame->sample_rate;
-
-        //  covert planar avFrame->data to interleaved float samples
-        switch (mContext->sample_fmt) {
-          case AV_SAMPLE_FMT_S16P: // 16bit signed planar
-            for (auto channel = 0; channel < mAvFrame->channels; channel++) {
-              auto srcPtr = (int16_t*)mAvFrame->data[channel];
-              auto dstPtr = (float*)(samples) + channel;
-              for (auto sample = 0; sample < mAvFrame->nb_samples; sample++) {
-                *dstPtr = *srcPtr++ / float(0x8000);
-                dstPtr += mAvFrame->channels;
-                }
-              }
-            break;
-
-          case AV_SAMPLE_FMT_FLTP: // 32bit float planar
-            for (auto channel = 0; channel < mAvFrame->channels; channel++) {
-              auto srcPtr = (float*)mAvFrame->data[channel];
-              auto dstPtr = (float*)(samples) + channel;
-              for (auto sample = 0; sample < mAvFrame->nb_samples; sample++) {
-                *dstPtr = *srcPtr++;
-                dstPtr += mAvFrame->channels;
-                }
-              }
-            break;
-
-          default:
-            cLog::log (LOGERROR, "playThread - unrecognised sample_fmt %d ", mContext->sample_fmt);
-          }
-
-        numSamples = mAvFrame->nb_samples;
-        }
-      }
-
+    auto srcPtr = samples16;
+    auto dstPtr = samples;
+    for (auto sample = 0; sample < numSamples * 2; sample++)
+      *dstPtr++ = *srcPtr++ / float(0x8000);
     return numSamples;
     }
+  //{{{
+  //else {
+    //int numSamples = 0;
+    //auto ret = avcodec_send_packet (mContext, &mAvPacket);
+    //while (ret >= 0) {
+      //ret = avcodec_receive_frame (mContext, mAvFrame);
+      //if ((ret == AVERROR_EOF) || (ret < 0))
+        //break;
+
+      //if ((ret != AVERROR(EAGAIN)) && (mAvFrame->nb_samples > 0)) {
+        //mSampleRate = mAvFrame->sample_rate;
+
+        ////  covert planar avFrame->data to interleaved float samples
+        //switch (mContext->sample_fmt) {
+          //case AV_SAMPLE_FMT_S16P: // 16bit signed planar
+            //for (auto channel = 0; channel < mAvFrame->channels; channel++) {
+              //auto srcPtr = (int16_t*)mAvFrame->data[channel];
+              //auto dstPtr = (float*)(samples) + channel;
+              //for (auto sample = 0; sample < mAvFrame->nb_samples; sample++) {
+                //*dstPtr = *srcPtr++ / float(0x8000);
+                //dstPtr += mAvFrame->channels;
+                //}
+              //}
+            //break;
+
+          //case AV_SAMPLE_FMT_FLTP: // 32bit float planar
+            //for (auto channel = 0; channel < mAvFrame->channels; channel++) {
+              //auto srcPtr = (float*)mAvFrame->data[channel];
+              //auto dstPtr = (float*)(samples) + channel;
+              //for (auto sample = 0; sample < mAvFrame->nb_samples; sample++) {
+                //*dstPtr = *srcPtr++;
+                //dstPtr += mAvFrame->channels;
+                //}
+              //}
+            //break;
+
+          //default:
+            //cLog::log (LOGERROR, "playThread - unrecognised sample_fmt %d ", mContext->sample_fmt);
+          //}
+
+        //numSamples = mAvFrame->nb_samples;
+        //}
+      //}
+
+    //return numSamples;
+    //}
+  //}}}
   }
 //}}}
 
