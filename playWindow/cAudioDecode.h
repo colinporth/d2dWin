@@ -47,7 +47,7 @@ private:
   int mSampleRate = 0;
 
   cAacDecoder* mAacDecoder = nullptr;
-  mp3dec_t mMp3Dec;
+  cMp3Decoder* mMp3Decoder = nullptr;
   //AVCodecContext* mContext = nullptr;
   //AVPacket mAvPacket;
   //AVFrame* mAvFrame = nullptr;
