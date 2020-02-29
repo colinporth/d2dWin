@@ -4,6 +4,7 @@
 //  #include "libavcodec/avcodec.h"
 //  }
 #include "../../shared/decoders/minimp3.h"
+#include "../../shared/decoders/aacdec.h"
 
 class cAudioDecode {
 public:
@@ -45,7 +46,7 @@ private:
   eFrameType mFrameType = eUnknown;
   int mSampleRate = 0;
 
-  void* mAacDecoder = nullptr;
+  cAacDecoder* mAacDecoder = nullptr;
   mp3dec_t mMp3Dec;
   //AVCodecContext* mContext = nullptr;
   //AVPacket mAvPacket;
