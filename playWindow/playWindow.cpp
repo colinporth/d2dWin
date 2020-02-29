@@ -297,7 +297,7 @@ private:
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
                 // add aacFrame from aacFrames to song
-                auto numSamples = decode.frameToSamples (samples);
+                auto numSamples = decode.decodeSingleFrame (samples);
                 if (numSamples) {
                   // copy single aacFrame to aacFrame, add to song which owns it
                   int aacFrameLen = decode.getFrameLen();
@@ -426,7 +426,7 @@ private:
 
           while (decode.parseFrame (buffer, bufferEnd)) {
             if (decode.getFrameType() == mSong.getFrameType()) {
-              auto numSamples = decode.frameToSamples (samples);
+              auto numSamples = decode.decodeSingleFrame (samples);
               if (numSamples) {
                 int framelen = decode.getFrameLen();
                 auto frame = (uint8_t*)malloc (framelen);
@@ -511,7 +511,7 @@ private:
 
         while (!getExit() && !mSongChanged && decode.parseFrame (fileMapPtr, fileMapEnd)) {
           if (decode.getFrameType() == mSong.getFrameType()) {
-            auto numSamples = decode.frameToSamples (samples);
+            auto numSamples = decode.decodeSingleFrame (samples);
             if (numSamples) {
               // frame fixup aacHE sampleRate, samplesPerFrame
               mSong.setSampleRate (decode.getSampleRate());
@@ -575,7 +575,7 @@ private:
               srcSamples = (float*)framePtr->getPtr();
             else {
               decode.setFrame (framePtr->getPtr(), framePtr->getLen());
-              decode.frameToSamples (samples);
+              decode.decodeSingleFrame (samples);
               srcSamples = samples;
               }
             }

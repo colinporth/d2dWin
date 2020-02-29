@@ -4,6 +4,8 @@
 #include "stdafx.h"
 
 #include "cAudioDecode.h"
+#include "../../shared/decoders/cAacDecoder.h"
+#include "../../shared/decoders/cMp3Decoder.h"
 
 #include "../../shared/utils/cLog.h"
 //}}}
@@ -25,17 +27,6 @@ cAudioDecode::cAudioDecode (eFrameType frameType) {
   //  }
 
   //av_init_packet (&mAvPacket);
-  //mAvFrame = av_frame_alloc();
-  }
-//}}}
-//{{{
-cAudioDecode::cAudioDecode (uint8_t* framePtr, int frameLen) :
-    mFramePtr(framePtr), mFrameLen(frameLen) {
-
-  //av_init_packet (&mAvPacket);
-  //mAvPacket.data = framePtr;
-  //mAvPacket.size = frameLen;
-
   //mAvFrame = av_frame_alloc();
   }
 //}}}
@@ -313,10 +304,10 @@ bool cAudioDecode::parseFrame (uint8_t* framePtr, uint8_t* frameLast) {
   }
 //}}}
 //{{{
-int cAudioDecode::frameToSamples (float* samples) {
+int cAudioDecode::decodeSingleFrame (float* samples) {
 // decode parser frame to samples using codec context, fixup song samplerate and samplesPerFrame
 
-  auto numSamples = mAudioDecoder->decode ((uint8_t*)mFramePtr, mFrameLen, samples);
+  auto numSamples = mAudioDecoder->decodeSingleFrame ((uint8_t*)mFramePtr, mFrameLen, samples);
   mSampleRate = mAudioDecoder->getSampleRate();
   return numSamples;
 

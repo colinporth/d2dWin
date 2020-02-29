@@ -3,8 +3,7 @@
 //extern "C" {
 //  #include "libavcodec/avcodec.h"
 //  }
-#include "../../shared/decoders/cMp3Decoder.h"
-#include "../../shared/decoders/cAacDecoder.h"
+#include "../../shared/decoders/iAudioDecoder.h"
 
 class cAudioDecode {
 public:
@@ -12,7 +11,6 @@ public:
 
   cAudioDecode() {}
   cAudioDecode (eFrameType frameType);
-  cAudioDecode (uint8_t* framePtr, int frameLen);
   ~cAudioDecode();
 
   // gets
@@ -26,7 +24,7 @@ public:
   void setFrame (uint8_t* framePtr, int frameLen);
 
   bool parseFrame (uint8_t* framePtr, uint8_t* frameLast);
-  int frameToSamples (float* samples);
+  int decodeSingleFrame (float* samples);
 
   // statics not quite right but being here picks up eFrameType
   static eFrameType parseSomeFrames (uint8_t* framePtr, uint8_t* frameLast, int& sampleRate);
