@@ -5,8 +5,8 @@
     <ClCompile Include="playWindow.cpp" />
     <ClCompile Include="cAudioDecode.cpp" />
     <ClCompile Include="cSong.cpp" />
-    <ClCompile Include="..\..\shared\decoders\miniMp3.cpp" />
-    <ClCompile Include="..\..\shared\decoders\aacdec.cpp" />
+    <ClCompile Include="..\..\shared\decoders\cAacDecoder.cpp" />
+    <ClCompile Include="..\..\shared\decoders\cMp3Decoder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">
@@ -107,10 +107,13 @@
     <ClInclude Include="..\boxes\cFileListBox.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\aacdec.h">
+    <ClInclude Include="..\..\shared\decoders\cAacDecoder.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\miniMp3.h">
+    <ClInclude Include="..\..\shared\decoders\cMp3Decoder.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\iAudioDecoder.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

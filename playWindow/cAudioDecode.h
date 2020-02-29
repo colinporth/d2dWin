@@ -3,8 +3,8 @@
 //extern "C" {
 //  #include "libavcodec/avcodec.h"
 //  }
-#include "../../shared/decoders/minimp3.h"
-#include "../../shared/decoders/aacdec.h"
+#include "../../shared/decoders/cMp3Decoder.h"
+#include "../../shared/decoders/cAacDecoder.h"
 
 class cAudioDecode {
 public:

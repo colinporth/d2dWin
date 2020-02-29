@@ -6,7 +6,6 @@
 #include "cAudioDecode.h"
 
 #include "../../shared/utils/cLog.h"
-#include "../../shared/decoders/aacdec.h"
 //}}}
 
 // public
