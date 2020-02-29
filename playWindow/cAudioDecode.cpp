@@ -13,9 +13,9 @@
 cAudioDecode::cAudioDecode (eFrameType frameType) {
 
   if (frameType == eMp3)
-    mMp3Decoder = new cMp3Decoder();
+    mAudioDecoder = new cMp3Decoder();
   else if (frameType == eAac)
-    mAacDecoder = new cAacDecoder();
+    mAudioDecoder = new cAacDecoder();
   else if (frameType == eWav) {
     }
   //else {
@@ -47,8 +47,8 @@ cAudioDecode::~cAudioDecode() {
 
   //av_frame_free (&mAvFrame);
 
-  if (mAacDecoder)
-    delete (mAacDecoder);
+  if (mAudioDecoder)
+    delete (mAudioDecoder);
   }
 //}}}
 
@@ -316,14 +316,10 @@ bool cAudioDecode::parseFrame (uint8_t* framePtr, uint8_t* frameLast) {
 int cAudioDecode::frameToSamples (float* samples) {
 // decode parser frame to samples using codec context, fixup song samplerate and samplesPerFrame
 
-  if (mAacDecoder) {
-    auto numSamples = mAacDecoder->decode ((uint8_t*)mFramePtr, mFrameLen, samples);
-    mSampleRate = mAacDecoder->getSampleRate();
-    return numSamples;
-    }
-  else 
-    return mMp3Decoder->decode ((uint8_t*)mFramePtr, (int)mFrameLen, samples);
-    
+  auto numSamples = mAudioDecoder->decode ((uint8_t*)mFramePtr, mFrameLen, samples);
+  mSampleRate = mAudioDecoder->getSampleRate();
+  return numSamples;
+
   //{{{
   //else {
     //int numSamples = 0;

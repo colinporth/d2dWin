@@ -46,8 +46,7 @@ private:
   eFrameType mFrameType = eUnknown;
   int mSampleRate = 0;
 
-  cAacDecoder* mAacDecoder = nullptr;
-  cMp3Decoder* mMp3Decoder = nullptr;
+  iAudioDecoder* mAudioDecoder = nullptr;
   //AVCodecContext* mContext = nullptr;
   //AVPacket mAvPacket;
   //AVFrame* mAvFrame = nullptr;
