@@ -317,8 +317,11 @@ bool cAudioDecode::parseFrame (uint8_t* framePtr, uint8_t* frameLast) {
 int cAudioDecode::frameToSamples (float* samples) {
 // decode parser frame to samples using codec context, fixup song samplerate and samplesPerFrame
 
-  if (mAacDecoder)
-    return mAacDecoder->decode ((uint8_t*)mFramePtr, mFrameLen, samples, mSampleRate);
+  if (mAacDecoder) {
+    auto numSamples = mAacDecoder->decode ((uint8_t*)mFramePtr, mFrameLen, samples);
+    mSampleRate = mAacDecoder->getSampleRate();
+    return numSamples;
+    }
   else {
     mp3dec_frame_info_t frameInfo;
     return mp3dec_decode_frame (&mMp3Dec, (uint8_t*)mFramePtr, (int)mFrameLen, samples, &frameInfo);
