@@ -6,7 +6,7 @@
 #include "cSongBox.h"
 
 #include "audioWASAPI.h"
-#include "cAudioDecode.h"
+#include "../../shared/decoders/cAudioDecode.h"
 
 #include "../../shared/hls/r1x80.h"
 #include "../../shared/hls/r2x80.h"

@@ -1,7 +1,7 @@
 // cSong.h
 #pragma once
 //{{{  includes
-#include "cAudioDecode.h"
+#include "../../shared/decoders/cAudioDecode.h"
 
 #include "../../shared/kissFft/kiss_fft.h"
 #include "../../shared/kissFft/kiss_fftr.h"
