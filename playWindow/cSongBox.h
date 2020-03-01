@@ -279,7 +279,7 @@ private:
   //{{{
   bool drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame) {
 
-    int mono = mSong.getNumChannels() == 1;
+    bool mono = mSong.getNumChannels() == 1;
 
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     bool allFramesOk = true;
@@ -638,7 +638,7 @@ private:
   void drawOverviewWave (ID2D1DeviceContext* dc, int firstFrame, int playFrame, float playFrameX, float valueScale) {
   // draw Overview using bitmap cache
 
-    int mono = mSong.getNumChannels() == 1;
+    bool mono = mSong.getNumChannels() == 1;
     int lastFrame = mSong.getLastFrame();
     int totalFrames = mSong.getTotalFrames();
 
@@ -733,7 +733,7 @@ private:
   void drawOverviewLens (ID2D1DeviceContext* dc, int playFrame, float centreX, float width) {
   // draw frames centred at playFrame -/+ width in pixels, centred at centreX
 
-    int mono = mSong.getNumChannels() == 1;
+    bool mono = mSong.getNumChannels() == 1;
 
     // cut hole and frame it
     cRect dstRect = { mRect.left + centreX - mOverviewLens, mDstOverviewTop,
