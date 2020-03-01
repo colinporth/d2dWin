@@ -355,7 +355,7 @@ private:
       uint8_t* buffer = bufferFirst;
 
       int frameNum = -1;
-      float* samples = nullptr;
+      auto samples = (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
 
       cAudioDecode decode (cAudioDecode::eAac);
 
@@ -415,13 +415,12 @@ private:
             }
             //}}}
 
-          if (frameNum < 0) {
+          if (frameNum == -1) {
+            // enough data to determine frameType and sampleRate (wrong for aac sbr)
             frameNum = 0;
             int sampleRate;
             auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
-            mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
-            samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
-            player = thread ([=](){ playThread (true); });
+            mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, 44100);
             }
 
           while (decode.parseFrame (buffer, bufferEnd)) {
@@ -437,6 +436,9 @@ private:
                 mSong.setSamplesPerFrame (numSamples);
                 mSong.addFrame (frameNum++, true, frame, framelen, mSong.getNumFrames()+1, samples);
                 changed();
+
+                if (frameNum == 1) // launch player after first frame
+                  player = thread ([=](){ playThread (true); });
                 }
               }
             buffer += decode.getNextFrameOffset();
