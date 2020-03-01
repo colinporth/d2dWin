@@ -305,6 +305,7 @@ private:
                   memcpy (aacFrame, decode.getFramePtr(), aacFrameLen);
 
                   // frame fixup aacHE sampleRate, samplesPerFrame, !!! total estimate not right !!!
+                  mSong.setNumChannels (decode.getNumChannels());
                   mSong.setSampleRate (decode.getSampleRate());
                   mSong.setSamplesPerFrame (numSamples);
                   mSong.addFrame (seqFrameNum++, true, aacFrame, aacFrameLen, mSong.getNumFrames(), samples);
@@ -432,6 +433,7 @@ private:
                 memcpy (frame, decode.getFramePtr(), framelen);
 
                 // frame fixup aacHE sampleRate, samplesPerFrame
+                mSong.setNumChannels (decode.getNumChannels());
                 mSong.setSampleRate (decode.getSampleRate());
                 mSong.setSamplesPerFrame (numSamples);
                 mSong.addFrame (frameNum++, true, frame, framelen, mSong.getNumFrames()+1, samples);
@@ -516,6 +518,7 @@ private:
             auto numSamples = decode.decodeSingleFrame (samples);
             if (numSamples) {
               // frame fixup aacHE sampleRate, samplesPerFrame
+              mSong.setNumChannels (decode.getNumChannels());
               mSong.setSampleRate (decode.getSampleRate());
               mSong.setSamplesPerFrame (numSamples);
               int numFrames = mSong.getNumFrames();
@@ -561,6 +564,7 @@ private:
       device->setSampleRate (mSong.getSampleRate());
       float* samples = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
       float* silence = (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
+      float* samples1 = mSong.hasSamples() ? nullptr : (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
       memset (silence, 0, mSong.getMaxNumFrameSamplesBytes());
 
       cAudioDecode decode (mSong.getFrameType());
@@ -578,6 +582,13 @@ private:
             else {
               decode.setFrame (framePtr->getPtr(), framePtr->getLen());
               decode.decodeSingleFrame (samples);
+              if (decode.getNumChannels() == 1) {
+                // expand mono to stereo
+                for (int i = mSong.getSamplesPerFrame() - 1; i >= 0; i--) {
+                  samples[i*2] = samples [i];
+                  samples[i*2 + 1] = samples [i];
+                  }
+                }
               srcSamples = samples;
               }
             }
@@ -599,6 +610,7 @@ private:
       device->stop();
       free (silence);
       free (samples);
+      free (samples1);
       }
 
     cLog::log (LOGINFO, "exit");

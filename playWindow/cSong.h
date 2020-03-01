@@ -284,6 +284,7 @@ public:
   int getHlsFrameFromChunkNum (int chunkNum) { return mHlsBaseFrame + (chunkNum - mHlsBaseChunkNum) * mHlsFramesPerChunk; }
   //}}}
   //{{{  sets
+  void setNumChannels (int numChannels) { mNumChannels = numChannels; }
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
   void setSamplesPerFrame (int samplePerFrame) { mSamplesPerFrame = samplePerFrame; }
 

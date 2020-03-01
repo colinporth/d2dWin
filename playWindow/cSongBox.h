@@ -279,6 +279,8 @@ private:
   //{{{
   bool drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame) {
 
+    int mono = mSong.getNumChannels() == 1;
+
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     bool allFramesOk = true;
     auto firstFrame = mSong.getFirstFrame();
@@ -367,7 +369,7 @@ private:
         }
         //}}}
 
-      bitmapRect = { srcIndex, mSrcWaveCentre - powerValues[0], srcIndex + 1.f, mSrcWaveCentre + powerValues[1] };
+      bitmapRect = { srcIndex, mSrcWaveCentre - powerValues[0], srcIndex + 1.f, mSrcWaveCentre + (mono ? 0 : powerValues[1]) };
       mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
 
       if (silence) {
@@ -636,6 +638,7 @@ private:
   void drawOverviewWave (ID2D1DeviceContext* dc, int firstFrame, int playFrame, float playFrameX, float valueScale) {
   // draw Overview using bitmap cache
 
+    int mono = mSong.getNumChannels() == 1;
     int lastFrame = mSong.getLastFrame();
     int totalFrames = mSong.getTotalFrames();
 
@@ -669,7 +672,7 @@ private:
             if (framePtr->getPowerValues()) {
               float* powerValues = framePtr->getPowerValues();
               float leftValue = *powerValues++;
-              float rightValue = *powerValues;
+              float rightValue = mono ? 0 : *powerValues;
               if (frame < toFrame) {
                 int numSummedFrames = 1;
                 frame++;
@@ -679,7 +682,7 @@ private:
                     if (framePtr->getPowerValues()) {
                       auto powerValues = framePtr->getPowerValues();
                       leftValue += *powerValues++;
-                      rightValue += *powerValues;
+                      rightValue += mono ? 0 : *powerValues;
                       numSummedFrames++;
                       }
                     }
@@ -730,6 +733,8 @@ private:
   void drawOverviewLens (ID2D1DeviceContext* dc, int playFrame, float centreX, float width) {
   // draw frames centred at playFrame -/+ width in pixels, centred at centreX
 
+    int mono = mSong.getNumChannels() == 1;
+
     // cut hole and frame it
     cRect dstRect = { mRect.left + centreX - mOverviewLens, mDstOverviewTop,
                       mRect.left + centreX + mOverviewLens, mRect.bottom - 1.f };
@@ -754,7 +759,8 @@ private:
       if (framePtr && framePtr->getPowerValues()) {
         auto powerValues = framePtr->getPowerValues();
         maxPowerValue = std::max (maxPowerValue, *powerValues++);
-        maxPowerValue = std::max (maxPowerValue, *powerValues);
+        if (!mono)
+          maxPowerValue = std::max (maxPowerValue, *powerValues);
         }
       }
 
@@ -788,7 +794,7 @@ private:
 
         auto powerValues = framePtr->getPowerValues();
         dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
-        dstRect.bottom = mDstOverviewCentre + (*powerValues * valueScale);
+        dstRect.bottom = mDstOverviewCentre + ((mono ? 0 : *powerValues) * valueScale);
         if (frame == playFrame)
           colour = mWindow->getWhiteBrush();
         dc->FillRectangle (dstRect, colour);
