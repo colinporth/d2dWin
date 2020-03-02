@@ -53,18 +53,18 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
 
   for (int sample = 0; sample < mSamplesPerFrame; sample++) {
     timeBuf[sample] = 0;
-    for (auto chan = 0; chan < mNumChannels; chan++) {
+    for (auto channel = 0; channel < mNumChannels; channel++) {
       auto value = *samples++;
       timeBuf[sample] += value;
-      powerValues[chan] += value * value;
-      peakValues[chan] = max (abs(peakValues[chan]), value);
+      powerValues[channel] += value * value;
+      peakValues[channel] = max (abs(peakValues[channel]), value);
       }
     }
 
-  for (auto chan = 0; chan < mNumChannels; chan++) {
-    powerValues[chan] = sqrtf (powerValues[chan] / mSamplesPerFrame);
-    mMaxPowerValue = max (mMaxPowerValue, powerValues[chan]);
-    mMaxPeakValue = max (mMaxPeakValue, peakValues[chan]);
+  for (auto channel = 0; channel < mNumChannels; channel++) {
+    powerValues[channel] = sqrtf (powerValues[channel] / mSamplesPerFrame);
+    mMaxPowerValue = max (mMaxPowerValue, powerValues[channel]);
+    mMaxPeakValue = max (mMaxPeakValue, peakValues[channel]);
     }
 
   // ??? lock against init fftrConfig recalc???
