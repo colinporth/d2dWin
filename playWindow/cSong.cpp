@@ -1,4 +1,4 @@
-// cSong.cpp - singleton class
+// cSong.cpp
 #pragma once
 //{{{  includes
 #include "stdafx.h"

@@ -1,4 +1,4 @@
-// cYuvFrame.h
+// cAudFrame.h
 #pragma once
 #include "iFrame.h"
 
