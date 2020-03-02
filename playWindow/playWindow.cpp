@@ -639,17 +639,9 @@ private:
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO, true, "", "playWindow");
-  //av_log_set_level (AV_LOG_VERBOSE);
-  //av_log_set_callback (cLog::avLogCallback);
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-
-  std::string parentName = "";
-  std::string directoryName = "C:\\Users\\colin\\Desktop\\mixed";
-  std::string pathFileStr = parentName.empty() ? directoryName : parentName + "/" + directoryName;
-  std::string wildStr = "/*";
-  std::string searchStr = pathFileStr + wildStr;
 
   cAppWindow appWindow;
   appWindow.run ("playWindow", 800, 420, (numArgs > 1) ? wcharToString (args[1]) : "");
