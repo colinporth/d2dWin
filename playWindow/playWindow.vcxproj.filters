@@ -12,9 +12,6 @@
     <Filter Include="h">
       <UniqueIdentifier>{29a1756e-9c12-4c27-b4c9-5126e23f3281}</UniqueIdentifier>
     </Filter>
-    <Filter Include="h\bmp">
-      <UniqueIdentifier>{88dfebb0-2b27-4ed0-94ea-d88300fbc5f1}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\utils\cLog.h">
@@ -74,24 +71,6 @@
     <ClInclude Include="..\boxes\cBmpBox.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\hls\r1x80.h">
-      <Filter>h\bmp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\hls\r2x80.h">
-      <Filter>h\bmp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\hls\r3x80.h">
-      <Filter>h\bmp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\hls\r4x80.h">
-      <Filter>h\bmp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\hls\r5x80.h">
-      <Filter>h\bmp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\hls\r6x80.h">
-      <Filter>h\bmp</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\date\date.h">
       <Filter>h</Filter>
     </ClInclude>
@@ -114,6 +93,24 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\decoders\cAudioDecode.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\hls\r1x80.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\hls\r2x80.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\hls\r3x80.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\hls\r4x80.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\hls\r5x80.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\hls\r6x80.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

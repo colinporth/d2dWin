@@ -22,14 +22,14 @@ using namespace chrono;
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (const string& title, int width, int height, const string& name) {
+  void run (const string& title, int width, int height, const vector<string>& names) {
 
-    init (title + " " + name, width, height, false);
+    init (title, width, height, false);
     add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
 
-    if (name.empty()) {
+    if (names.empty()) {
       //{{{  hls radio 1..6
       add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index){
         mSong.clear(); mSong.setChan ("bbc_radio_one"); mSongChanged = true; } ));
@@ -54,10 +54,10 @@ public:
       //}}}
     else {
       cUrl url;
-      url.parse (name);
+      url.parse (names[0]);
       if (url.getScheme() == "http") {
         //{{{  shoutcast
-        mShoutCast.push_back (name);
+        mShoutCast.push_back (names[0]);
         mShoutCast.push_back ("http://stream.wqxr.org/wqxr.aac");
         mShoutCast.push_back ("http://stream.wqxr.org/js-stream.aac");
         mShoutCast.push_back ("http://tx.planetradio.co.uk/icecast.php?i=jazzhigh.aac");
@@ -66,8 +66,8 @@ public:
         mShoutCast.push_back ("http://live-absolute.sharp-stream.com/absoluteclassicrockhigh.aac");
         mShoutCast.push_back ("http://media-ice.musicradio.com:80/SmoothCountry");
 
-        add (new cListBox (this, 500.f, 300.f, mShoutCast, [&](cListBox* box, const std::string& string){
-          auto listBox = (cListBox*)box;
+        add (new cStringListBox (this, 500.f, 300.f, mShoutCast, [&](cStringListBox* box, const std::string& string){
+          auto listBox = (cStringListBox*)box;
           mSong.clear();
           mUrl = string;
           mSongChanged = true;
@@ -78,12 +78,12 @@ public:
         //mDebugStr = "shoutcast " + url.getHost() + " channel " + url.getPath();
         add (new cTitleBox (this, 500.f,20.f, mDebugStr));
 
-        thread ([=](){ icyThread (name); }).detach();
+        thread ([=](){ icyThread (names[0]); }).detach();
         }
         //}}}
       else {
         //{{{  filelist
-        mFileList = new cFileList (name, "*.aac;*.mp3;*.wav");
+        mFileList = new cFileList (names, "*.aac;*.mp3;*.wav");
 
         if (!mFileList->empty()) {
 
@@ -142,7 +142,7 @@ protected:
 
       case 0x2e: mSong.getSelect().clearAll(); changed(); break;; // delete select
 
-      case 0x0d: break; // enter
+      case 0x0d: mSongChanged = true; break; // enter
 
       // crude chan,bitrate change
       case '1' : mSong.clear(); mSong.setChan ("bbc_radio_one"); mSongChanged = true; break;
@@ -602,7 +602,7 @@ private:
             }
           });
 
-        if (!streaming && (mSong.getPlayFrame() > mSong.getLastFrame()))
+        if (!streaming && (mSong.getPlayFrame() >= mSong.getLastFrame()))
           mSongChanged = true;
         }
 
@@ -637,15 +637,17 @@ private:
 
 // main
 int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-  CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::init (LOGINFO, true, "", "playWindow");
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
 
-  cAppWindow appWindow;
-  appWindow.run ("playWindow", 800, 420, (numArgs > 1) ? wcharToString (args[1]) : "");
+  vector<string> names;
+  for (int i = 1; i < numArgs; i++)
+    names.push_back (wcharToString (args[i]));
 
-  CoUninitialize();
+  cAppWindow appWindow;
+  appWindow.run ("playWindow", 800, 420, names);
+
   return 0;
   }

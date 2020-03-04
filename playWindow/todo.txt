@@ -12,11 +12,8 @@ overview
 
 files
 - make keys 0 to 9 work
-- play next failing
-- end while analysing
 - command line
-  - list of files
-  - links to files,directories
+  - links to directories
 
 hls
 - make up down arrow work
@@ -24,7 +21,6 @@ hls
 
 shoutcast
 - make keys 0 to 9 up down arrow work
-- fix channel list display and selection
 
 editing
 - mute marking

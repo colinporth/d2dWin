@@ -61,6 +61,7 @@
 #include "../boxes/cFloatBox.h"
 #include "../boxes/cTitleBox.h"
 #include "../boxes/cListBox.h"
+#include "../boxes/cStringListBox.h"
 
 #include "../../shared/net/cUrl.h"
 #include "../../shared/net/cHttp.h"

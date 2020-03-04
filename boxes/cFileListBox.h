@@ -1,14 +1,15 @@
 // cFileListBox.h
 #pragma once
 #include "../common/cD2dWindow.h"
+#include "../boxes/cListBox.h"
 #include "../../shared/utils/cFileList.h"
 
-class cFileListBox : public cD2dWindow::cBox {
+class cFileListBox : public cListBox {
 public:
   //{{{
   cFileListBox (cD2dWindow* window, float width, float height, cFileList* fileList,
                 std::function<void (cFileListBox* box, int index)> hitCallback) :
-      cBox ("fileList", window, width, height), mFileList(fileList), mHitCallback(hitCallback) {}
+      cListBox (window, width, height), mFileList(fileList), mHitCallback(hitCallback) {}
   //}}}
   virtual ~cFileListBox() {}
 
@@ -100,6 +101,7 @@ public:
       mMoveInc = 0;
       }
 
+    mProxIndex = -1;
     return true;
     }
   //}}}
@@ -116,18 +118,26 @@ public:
 
     if (mWindow->getTimedMenuOn()) {
       mLineHeight = getLineHeight();
-      auto textHeight = mLineHeight*5.f/6.f;
+      auto textHeight = mLineHeight * 5.f / 6.f;
 
       if (!mPressed && mScrollInc)
         incScroll (mScrollInc * 0.9f);
 
+      // calc first row index, ensure curItemIndex is visible
       mFirstRowIndex = int(mScroll / mLineHeight);
-      //{{{  tricky sync of scroll to curIndex
-      //if (!mMoved && (mFileList->getIndex() < mFirstRowIndex)) {
-      //  mScroll -= mLineHeight;
-      //  mFirstRowIndex = int(mScroll / mLineHeight);
-      //  }
-      //}}}
+
+      if (mFileList->ensureItemVisible()) {
+        // strange interaction between itemIndex change and its visibility
+        if (mFileList->getIndex() < mFirstRowIndex) {
+          mFirstRowIndex = mFileList->getIndex();
+          mScroll = mFirstRowIndex * mLineHeight;
+          }
+        else if ((mLastRowIndex > 0) && (mFileList->getIndex() >= mLastRowIndex)) {
+          mFirstRowIndex += mFileList->getIndex() - mLastRowIndex;
+          mScroll = mFirstRowIndex * mLineHeight;
+          }
+        mProxed = false;
+        }
 
       float maxColumnWidth[cFileList::cFileItem::kFields] = { 0.f };
 
@@ -154,6 +164,7 @@ public:
           mWindow->getYellowBrush() :
             mFileList->isCurIndex (index) ? mWindow->getWhiteBrush() : mWindow->getBlueBrush();
         mRowVec.push_back (row);
+        mLastRowIndex = index;
 
         point.y += mLineHeight;
         index++;
@@ -233,6 +244,7 @@ private:
   float mScroll = 0.f;
   float mScrollInc = 0.f;
 
-  unsigned mFirstRowIndex = 0;
   unsigned mProxIndex = 0;
+  unsigned mFirstRowIndex = 0;
+  unsigned mLastRowIndex = 0;
   };
