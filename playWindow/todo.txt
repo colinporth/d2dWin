@@ -15,9 +15,13 @@ files
 - command line
   - links to directories
 
+aac
+- use flush on scrub
+mp3
+- scrub taking several frames to recover
+
 hls
 - make up down arrow work
-- show bitrate
 
 shoutcast
 - make keys 0 to 9 up down arrow work

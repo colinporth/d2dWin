@@ -47,7 +47,7 @@ public:
       mBitrateStr = "48k aacHE";
       addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
         //{{{  lambda
-        mSong.clear(); 
+        mSong.clear();
         switch (mSong.getBitrate()) {
           case 48000:
             mSong.setBitrate (96000);
@@ -62,7 +62,7 @@ public:
             mBitrateStr = "320k aac";
             break;
           case 320000:
-            mSong.setBitrate (48000); 
+            mSong.setBitrate (48000);
             mBitrateStr = "48k aacHE";
             break;
           }
@@ -603,22 +603,29 @@ private:
               srcSamples = (float*)framePtr->getPtr();
             else {
               decode.setFrame (framePtr->getPtr(), framePtr->getLen());
-              decode.decodeSingleFrame (samples);
-              if (decode.getNumChannels() == 1) {
-                //{{{  expand mono to stereo
-                for (int i = mSong.getSamplesPerFrame() - 1; i >= 0; i--) {
-                  samples[i*2] = samples [i];
-                  samples[i*2 + 1] = samples [i];
+              auto numSamples = decode.decodeSingleFrame (samples);
+              if (numSamples) {
+                if (decode.getNumChannels() == 1) {
+                  //{{{  expand mono to stereo
+                  for (int i = mSong.getSamplesPerFrame() - 1; i >= 0; i--) {
+                    samples[i*2] = samples [i];
+                    samples[i*2 + 1] = samples [i];
+                    }
                   }
+                  //}}}
+                srcSamples = samples;
+                numSrcSamples = mSong.getSamplesPerFrame();
                 }
-                //}}}
-              srcSamples = samples;
+              else {
+                srcSamples = silence;
+                numSrcSamples = 1;
+                }
               }
             }
-          else
+          else {
             srcSamples = silence;
-
-          numSrcSamples = mSong.getSamplesPerFrame();
+            numSrcSamples = mSong.getSamplesPerFrame();
+            }
 
           if (mPlaying && framePtr) {
             mSong.incPlayFrame (1, true);
@@ -626,8 +633,8 @@ private:
             }
           });
 
-        if (!streaming && (mSong.getPlayFrame() >= mSong.getLastFrame()))
-          mSongChanged = true;
+        if (!streaming && (mSong.getPlayFrame() > mSong.getLastFrame()))
+          break;
         }
 
       device->stop();
