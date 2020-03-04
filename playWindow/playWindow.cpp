@@ -45,7 +45,31 @@ public:
         mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; } ));
 
       mBitrateStr = "48k aacHE";
-      addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr), 4.f);
+      addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
+        //{{{  lambda
+        mSong.clear(); 
+        switch (mSong.getBitrate()) {
+          case 48000:
+            mSong.setBitrate (96000);
+            mBitrateStr = "96k aacHE";
+            break;
+          case 96000:
+            mSong.setBitrate (128000);
+            mBitrateStr = "128k aac";
+            break;
+          case 128000:
+            mSong.setBitrate (320000);
+            mBitrateStr = "320k aac";
+            break;
+          case 320000:
+            mSong.setBitrate (48000); 
+            mBitrateStr = "48k aacHE";
+            break;
+          }
+        mSongChanged = true;
+        }
+        //}}}
+        ), 4.f);
 
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 

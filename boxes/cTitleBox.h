@@ -6,9 +6,15 @@
 
 class cTitleBox : public cD2dWindow::cBox {
 public:
-  cTitleBox (cD2dWindow* window, float width, float height, std::string& title)
-    : cBox("title", window, width, height), mTitle(title) {}
+  cTitleBox (cD2dWindow* window, float width, float height, std::string& title,
+             std::function<void (cTitleBox* box)> hitCallback = [](cTitleBox*) {})
+    : cBox("title", window, width, height), mTitle(title), mHitCallback(hitCallback) {}
   virtual ~cTitleBox() {}
+
+  bool onDown (bool right, cPoint pos)  {
+    mHitCallback (this);
+    return true;
+    }
 
   void onDraw (ID2D1DeviceContext* dc) {
     IDWriteTextLayout* textLayout;
@@ -24,4 +30,5 @@ public:
 
 private:
   std::string& mTitle;
+  std::function<void (cTitleBox* box)> mHitCallback;
   };
