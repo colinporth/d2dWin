@@ -321,7 +321,7 @@ private:
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
                 // add aacFrame from aacFrames to song
-                auto numSamples = decode.decodeFrame (samples, false);
+                auto numSamples = decode.decodeFrame (samples, seqFrameNum);
                 if (numSamples) {
                   // copy single aacFrame to aacFrame, add to song which owns it
                   int aacFrameLen = decode.getFrameLen();
@@ -450,7 +450,7 @@ private:
 
           while (decode.parseFrame (buffer, bufferEnd)) {
             if (decode.getFrameType() == mSong.getFrameType()) {
-              auto numSamples = decode.decodeFrame (samples, false);
+              auto numSamples = decode.decodeFrame (samples, frameNum);
               if (numSamples) {
                 int framelen = decode.getFrameLen();
                 auto frame = (uint8_t*)malloc (framelen);
@@ -539,7 +539,7 @@ private:
 
         while (!getExit() && !mSongChanged && decode.parseFrame (fileMapPtr, fileMapEnd)) {
           if (decode.getFrameType() == mSong.getFrameType()) {
-            auto numSamples = decode.decodeFrame (samples, false);
+            auto numSamples = decode.decodeFrame (samples, frameNum);
             if (numSamples) {
               // frame fixup aacHE sampleRate, samplesPerFrame
               mSong.setNumChannels (decode.getNumChannels());
@@ -591,7 +591,6 @@ private:
 
       cAudioDecode decode (mSong.getFrameType());
 
-      int lastPlayFrame = mSong.getPlayFrame() - 1;
       device->start();
       while (!getExit() && !mSongChanged) {
         device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
@@ -606,8 +605,7 @@ private:
               srcSamples = (float*)framePtr->getPtr();
             else {
               decode.setFrame (framePtr->getPtr(), framePtr->getLen());
-              bool jumped = mSong.getPlayFrame() != (lastPlayFrame + 1);
-              if (decode.decodeFrame (samples, jumped) == mSong.getSamplesPerFrame()) {
+              if (decode.decodeFrame (samples, mSong.getPlayFrame()) == mSong.getSamplesPerFrame()) {
                 if (decode.getNumChannels() == 1) {
                   //{{{  expand mono to stereo
                   for (int i = mSong.getSamplesPerFrame() - 1; i >= 0; i--) {
@@ -622,7 +620,6 @@ private:
             }
 
           if (mPlaying && framePtr) {
-            lastPlayFrame = mSong.getPlayFrame();
             mSong.incPlayFrame (1, true);
             changed();
             }
