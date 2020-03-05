@@ -598,18 +598,16 @@ private:
           // lambda callback - load srcSamples
           shared_lock<shared_mutex> lock (mSong.getSharedMutex());
 
+          srcSamples = silence;
+          numSrcSamples = mSong.getSamplesPerFrame();
           auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
           if (mPlaying && framePtr && framePtr->getPtr()) {
-            if (mSong.hasSamples()) {
-              //{{{  already decoded
+            if (mSong.hasSamples()) // already decoded samples
               srcSamples = (float*)framePtr->getPtr();
-              numSrcSamples = mSong.getSamplesPerFrame();
-              }
-              //}}}
             else {
               decode.setFrame (framePtr->getPtr(), framePtr->getLen());
-              auto numSamples = decode.decodeFrame (samples, mSong.getPlayFrame() != (lastPlayFrame + 1));
-              if (numSamples) {
+              bool jumped = mSong.getPlayFrame() != (lastPlayFrame + 1);
+              if (decode.decodeFrame (samples, jumped) == mSong.getSamplesPerFrame()) {
                 if (decode.getNumChannels() == 1) {
                   //{{{  expand mono to stereo
                   for (int i = mSong.getSamplesPerFrame() - 1; i >= 0; i--) {
@@ -619,18 +617,8 @@ private:
                   }
                   //}}}
                 srcSamples = samples;
-                numSrcSamples = mSong.getSamplesPerFrame();
-                }
-              else {
-                // decode failed, probably due to jump, skip to next as fast as possible
-                srcSamples = silence;
-                numSrcSamples = 1;
                 }
               }
-            }
-          else {
-            srcSamples = silence;
-            numSrcSamples = mSong.getSamplesPerFrame();
             }
 
           if (mPlaying && framePtr) {
