@@ -16,21 +16,17 @@ constexpr static int kSilenceWindowFrames = 4;
 
 //{{{
 cSong::~cSong() {
-
   clearFrames();
   }
 //}}}
 
 //{{{
-void cSong::init (cAudioDecode::eFrameType frameType, eAddType addType,
-                  int numChannels, int samplesPerFrame, int sampleRate) {
+void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampleRate, int samplesPerFrame) {
 
   unique_lock<shared_mutex> lock (mSharedMutex);
 
   // reset frame type
   mFrameType = frameType;
-  mAddType = addType;
-
   mNumChannels = numChannels;
   mSampleRate = sampleRate;
   mSamplesPerFrame = samplesPerFrame;
@@ -43,8 +39,7 @@ void cSong::init (cAudioDecode::eFrameType frameType, eAddType addType,
   }
 //}}}
 //{{{
-void cSong::addFrame (int frame, uint8_t* stream, int frameLen, int totalFrames, float* samples) {
-// return true if enough frames added to start playing, streamLen only used to estimate totalFrames
+void cSong::addFrame (int frameNum, float* samples, bool owned, int totalFrames) {
 
   // sum of squares channel power
   auto powerValues = (float*)malloc (mNumChannels * 4);
@@ -54,10 +49,11 @@ void cSong::addFrame (int frame, uint8_t* stream, int frameLen, int totalFrames,
   auto peakValues = (float*)malloc (mNumChannels * 4);
   memset (peakValues, 0, mNumChannels * 4);
 
+  auto samplePtr = samples;
   for (int sample = 0; sample < mSamplesPerFrame; sample++) {
     timeBuf[sample] = 0;
     for (auto channel = 0; channel < mNumChannels; channel++) {
-      auto value = *samples++;
+      auto value = *samplePtr++;
       timeBuf[sample] += value;
       powerValues[channel] += value * value;
       peakValues[channel] = max (abs(peakValues[channel]), value);
@@ -98,16 +94,11 @@ void cSong::addFrame (int frame, uint8_t* stream, int frameLen, int totalFrames,
   unique_lock<shared_mutex> lock (mSharedMutex);
 
   // totalFrames can be a changing estimate for file, or increasing value for streaming
-  if ((mAddType == eMappedSamples) || (mAddType == eAllocSamples))
-    mFrameMap.insert (map<int,cFrame*>::value_type (
-      frame, new cFrame (samples, mAddType == eAllocSamples, powerValues, peakValues, freqValues, lumaValues)));
-  else
-    mFrameMap.insert (map<int,cFrame*>::value_type (
-      frame, new cFrame (stream, frameLen, mAddType == eAllocCoded,
-                         powerValues, peakValues, freqValues, lumaValues)));
+  mFrameMap.insert (map<int,cFrame*>::value_type (
+    frameNum, new cFrame (samples, owned, powerValues, peakValues, freqValues, lumaValues)));
   mTotalFrames = totalFrames;
 
-  checkSilenceWindow (frame);
+  checkSilenceWindow (frameNum);
   }
 //}}}
 //{{{
@@ -255,7 +246,8 @@ void cSong::clearFrames() {
   mSelect.clearAll();
 
   for (auto frame : mFrameMap)
-    delete (frame.second);
+    if (frame.second)
+      delete (frame.second);
   mFrameMap.clear();
 
   // reset maxValues
@@ -265,15 +257,15 @@ void cSong::clearFrames() {
   }
 //}}}
 //{{{
-void cSong::checkSilenceWindow (int frame) {
+void cSong::checkSilenceWindow (int frameNum) {
 
   // walk backwards looking for continuous loaded quiet frames
   auto windowSize = 0;
   while (true) {
-    auto framePtr = getFramePtr (frame);
+    auto framePtr = getFramePtr (frameNum);
     if (framePtr && framePtr->isQuiet()) {
       windowSize++;
-      frame--;
+      frameNum--;
       }
     else
       break;
@@ -282,7 +274,7 @@ void cSong::checkSilenceWindow (int frame) {
   if (windowSize > kSilenceWindowFrames) {
     // walk forward setting silence for continuous loaded quiet frames
     while (true) {
-      auto framePtr = getFramePtr (++frame);
+      auto framePtr = getFramePtr (++frameNum);
       if (framePtr && framePtr->isQuiet())
         framePtr->setSilence (true);
       else

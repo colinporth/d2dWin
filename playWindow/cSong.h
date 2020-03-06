@@ -9,31 +9,21 @@
 
 class cSong {
 public:
-  enum eAddType { eMappedSamples, eMappedCoded, eAllocSamples, eAllocCoded } ;
-
   //{{{
   class cFrame {
   public:
     static constexpr float kQuietThreshold = 0.01f;
     //{{{
-    cFrame (uint8_t* ptr, uint32_t len, bool owned, float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
-        mCoded(ptr), mSamples(nullptr), mLen(len), mOwned(owned),
-        mPowerValues(powerValues), mPeakValues(peakValues),
-        mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false), mSilence(false) {}
-    //}}}
-    //{{{
-    cFrame (float* ptr, bool owned, float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
-        mCoded(nullptr), mSamples(ptr), mLen(0), mOwned(owned),
+    cFrame (float* samples, bool owned, float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
+        mSamples(samples), mOwned(owned),
         mPowerValues(powerValues), mPeakValues(peakValues),
         mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false), mSilence(false) {}
     //}}}
     //{{{
     ~cFrame() {
 
-      if (mOwned) {
-        free (mCoded);
+      if (mOwned)
         free (mSamples);
-        }
 
       free (mPowerValues);
       free (mPeakValues);
@@ -43,9 +33,7 @@ public:
     //}}}
 
     // gets
-    uint8_t* getCoded() { return mCoded; }
     float* getSamples() { return mSamples; }
-    int getLen() { return mLen; }
 
     float* getPowerValues() { return mPowerValues;  }
     float* getPeakValues() { return mPeakValues;  }
@@ -63,9 +51,7 @@ public:
 
   private:
     // vars
-    uint8_t* mCoded;
     float* mSamples;
-    uint32_t mLen;
     bool mOwned;
 
     float* mPowerValues;
@@ -242,14 +228,8 @@ public:
   //}}}
   virtual ~cSong();
 
-  void init (cAudioDecode::eFrameType frameType, eAddType addType,
-             int numChannels, int samplesPerFrame, int sampleRate);
-  void addFrame (int frame, uint8_t* stream, int frameLen, int totalFrames, float* samples);
-  //{{{
-  void addFrame (int frame, float* samples, int totalFrames) {
-    addFrame (frame, nullptr, 0, totalFrames, samples);
-    }
-  //}}}
+  void init (cAudioDecode::eFrameType frameType, int numChannels, int sampleRate, int samplesPerFrame);
+  void addFrame (int frameNum, float* samples, bool owned, int totalFrames);
   void clear();
 
   enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed };
@@ -258,8 +238,6 @@ public:
   int getId() { return mId; }
 
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
-  bool hasSamples() { return (mAddType == eMappedSamples) || (mAddType == eAllocSamples); }
-
   int getNumChannels() { return mNumChannels; }
   int getNumSampleBytes() { return mNumChannels * sizeof(float); }
   int getSampleRate() { return mSampleRate; }
@@ -303,7 +281,15 @@ public:
   //{{{  sets
   void setNumChannels (int numChannels) { mNumChannels = numChannels; }
   void setSampleRate (int sampleRate) { mSampleRate = sampleRate; }
-  void setSamplesPerFrame (int samplePerFrame) { mSamplesPerFrame = samplePerFrame; }
+  void setSamplesPerFrame (int samplesPerFrame) { mSamplesPerFrame = samplesPerFrame; }
+  //{{{
+  void setFixups (int numChannels, int sampleRate, int samplesPerFrame) {
+    mNumChannels = numChannels;
+    mSampleRate = sampleRate;
+    mSamplesPerFrame = samplesPerFrame;
+    }
+  //}}}
+
 
   // playFrame
   void setPlayFrame (int frame);
@@ -331,7 +317,7 @@ public:
 private:
   void clearFrames();
 
-  void checkSilenceWindow (int frame);
+  void checkSilenceWindow (int frameNum);
   int skipPrev (int fromFrame, bool silence);
   int skipNext (int fromFrame, bool silence);
 
@@ -345,7 +331,7 @@ private:
   std::shared_mutex mSharedMutex;
 
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
-  eAddType mAddType = eAllocCoded;
+  bool owned = false;
 
   int mId = 0;
   int mNumChannels = kMaxNumChannels;
