@@ -22,12 +22,15 @@ cSong::~cSong() {
 //}}}
 
 //{{{
-void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate) {
+void cSong::init (cAudioDecode::eFrameType frameType, eAddType addType,
+                  int numChannels, int samplesPerFrame, int sampleRate) {
 
   unique_lock<shared_mutex> lock (mSharedMutex);
 
   // reset frame type
   mFrameType = frameType;
+  mAddType = addType;
+
   mNumChannels = numChannels;
   mSampleRate = sampleRate;
   mSamplesPerFrame = samplesPerFrame;
@@ -40,7 +43,7 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   }
 //}}}
 //{{{
-void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples) {
+void cSong::addFrame (int frame, uint8_t* stream, int frameLen, int totalFrames, float* samples) {
 // return true if enough frames added to start playing, streamLen only used to estimate totalFrames
 
   // sum of squares channel power
@@ -95,8 +98,13 @@ void cSong::addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int
   unique_lock<shared_mutex> lock (mSharedMutex);
 
   // totalFrames can be a changing estimate for file, or increasing value for streaming
-  mFrameMap.insert (map<int,cFrame*>::value_type (
-    frame, new cFrame (mapped, stream, frameLen, powerValues, peakValues, freqValues, lumaValues)));
+  if ((mAddType == eMappedSamples) || (mAddType == eAllocSamples))
+    mFrameMap.insert (map<int,cFrame*>::value_type (
+      frame, new cFrame (samples, mAddType == eAllocSamples, powerValues, peakValues, freqValues, lumaValues)));
+  else
+    mFrameMap.insert (map<int,cFrame*>::value_type (
+      frame, new cFrame (stream, frameLen, mAddType == eAllocCoded,
+                         powerValues, peakValues, freqValues, lumaValues)));
   mTotalFrames = totalFrames;
 
   checkSilenceWindow (frame);

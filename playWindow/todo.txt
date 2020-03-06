@@ -14,17 +14,18 @@ files
 - make keys 0 to 9 work
 - command line
   - links to directories
-
-aac
-- use flush on scrub
-mp3
-- scrub taking several frames to recover
+- mouse select unreliabl;e, keys work all the time why
+- escape exit slow and crashes
 
 hls
 - make up down arrow work
 
 shoutcast
+- filelist of wxqr wrong sample rate on 2nd sub plays
 - make keys 0 to 9 up down arrow work
+
+save samples for play scrubbing on ifdef
+- aac mp3 flushes not working well
 
 editing
 - mute marking

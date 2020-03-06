@@ -277,8 +277,6 @@ private:
 
     cLog::setThreadName ("hls ");
 
-    float* samples = (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
-
     mSong.setChan (chan);
     mSong.setBitrate (bitrate);
 
@@ -301,7 +299,7 @@ private:
 
         http.freeContent();
         //}}}
-        mSong.init (cAudioDecode::eAac, 2, mSong.getBitrate() >= 128000 ? 1024 : 2048, 48000);
+        mSong.init (cAudioDecode::eAac, cSong::eAllocSamples, 2, mSong.getBitrate() >= 128000 ? 1024 : 2048, 48000);
         mSong.setHlsBase (mediaSequence, programDateTimePoint);
         cAudioDecode decode (cAudioDecode::eAac);
 
@@ -320,19 +318,13 @@ private:
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
-                // add aacFrame from aacFrames to song
-                auto numSamples = decode.decodeFrame (samples, seqFrameNum);
-                if (numSamples) {
-                  // copy single aacFrame to aacFrame, add to song which owns it
-                  int aacFrameLen = decode.getFrameLen();
-                  auto aacFrame = (uint8_t*)malloc (aacFrameLen);
-                  memcpy (aacFrame, decode.getFramePtr(), aacFrameLen);
-
+                auto samples = decode.decodeFrame (seqFrameNum);
+                if (samples) {
                   // frame fixup aacHE sampleRate, samplesPerFrame, !!! total estimate not right !!!
                   mSong.setNumChannels (decode.getNumChannels());
                   mSong.setSampleRate (decode.getSampleRate());
-                  mSong.setSamplesPerFrame (numSamples);
-                  mSong.addFrame (seqFrameNum++, true, aacFrame, aacFrameLen, mSong.getNumFrames(), samples);
+                  mSong.setSamplesPerFrame (decode.getNumSamples());
+                  mSong.addFrame (seqFrameNum++, samples, mSong.getNumFrames());
                   changed();
                   }
                 aacFrames += decode.getNextFrameOffset();
@@ -358,7 +350,6 @@ private:
         }
       }
 
-    free (samples);
     cLog::log (LOGINFO, "exit");
     }
   //}}}
@@ -380,8 +371,6 @@ private:
       uint8_t* buffer = bufferFirst;
 
       int frameNum = -1;
-      auto samples = (float*)malloc (mSong.getMaxNumFrameSamplesBytes());
-
       cAudioDecode decode (cAudioDecode::eAac);
 
       thread player;
@@ -445,13 +434,13 @@ private:
             frameNum = 0;
             int sampleRate;
             auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
-            mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, 44100);
+            mSong.init (frameType, cSong::eAllocSamples, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, 44100);
             }
 
           while (decode.parseFrame (buffer, bufferEnd)) {
             if (decode.getFrameType() == mSong.getFrameType()) {
-              auto numSamples = decode.decodeFrame (samples, frameNum);
-              if (numSamples) {
+              auto samples = decode.decodeFrame (frameNum);
+              if (samples) {
                 int framelen = decode.getFrameLen();
                 auto frame = (uint8_t*)malloc (framelen);
                 memcpy (frame, decode.getFramePtr(), framelen);
@@ -459,8 +448,8 @@ private:
                 // frame fixup aacHE sampleRate, samplesPerFrame
                 mSong.setNumChannels (decode.getNumChannels());
                 mSong.setSampleRate (decode.getSampleRate());
-                mSong.setSamplesPerFrame (numSamples);
-                mSong.addFrame (frameNum++, true, frame, framelen, mSong.getNumFrames()+1, samples);
+                mSong.setSamplesPerFrame (decode.getNumSamples());
+                mSong.addFrame (frameNum++, frame, framelen, mSong.getNumFrames()+1, samples);
                 changed();
 
                 if (frameNum == 1) // launch player after first frame
@@ -483,7 +472,6 @@ private:
         //}}}
         );
 
-      free (samples);
       cLog::log (LOGINFO, "icyThread songChanged");
       player.join();
       }
@@ -517,46 +505,42 @@ private:
       if (frameType == cAudioDecode::eWav) {
         //{{{  float 32bit interleaved wav uses file map directly
         auto frameSamples = 1024;
-        mSong.init (frameType, 2, frameSamples, sampleRate);
+        mSong.init (frameType, cSong::eMappedSamples, 2, frameSamples, sampleRate);
 
         cAudioDecode decode (cAudioDecode::eWav);
         decode.parseFrame (fileMapPtr, fileMapEnd);
-        auto data = decode.getFramePtr();
+        auto samples = decode.getFramePtr();
 
         auto frameSampleBytes = frameSamples * 2 * 4;
-        while (!getExit() && !mSongChanged && ((data + frameSampleBytes) <= fileMapEnd)) {
-          mSong.addFrame (frameNum++, false, data, frameSampleBytes, fileMapSize / frameSampleBytes, (float*)data);
-          data += frameSampleBytes;
+        while (!getExit() && !mSongChanged && ((samples + frameSampleBytes) <= fileMapEnd)) {
+          mSong.addFrame (frameNum++, (float*)samples, fileMapSize / frameSampleBytes);
+          samples += frameSampleBytes;
           changed();
           }
         }
         //}}}
       else {
-        mSong.init (frameType, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
+        // hold onto decoded samples
+        mSong.init (frameType, cSong::eAllocSamples, 2, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, sampleRate);
 
         cAudioDecode decode (frameType);
-        auto samples = (float*)malloc (mSong.getSamplesPerFrame() * mSong.getNumSampleBytes());
-
         while (!getExit() && !mSongChanged && decode.parseFrame (fileMapPtr, fileMapEnd)) {
           if (decode.getFrameType() == mSong.getFrameType()) {
-            auto numSamples = decode.decodeFrame (samples, frameNum);
-            if (numSamples) {
+            auto samples = decode.decodeFrame (frameNum);
+            if (samples) {
               // frame fixup aacHE sampleRate, samplesPerFrame
               mSong.setNumChannels (decode.getNumChannels());
               mSong.setSampleRate (decode.getSampleRate());
-              mSong.setSamplesPerFrame (numSamples);
+              mSong.setSamplesPerFrame (decode.getNumSamples());
               int numFrames = mSong.getNumFrames();
               int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
-              mSong.addFrame (frameNum++, false, decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, samples);
+              mSong.addFrame (frameNum++, decode.getFramePtr(), decode.getFrameLen(), totalFrames+1, samples);
               changed();
               }
             }
           fileMapPtr += decode.getNextFrameOffset();
           }
         cLog::log (LOGINFO, "song analysed");
-
-        // done
-        free (samples);
         }
 
       // wait for play to end or abort
@@ -600,24 +584,8 @@ private:
           srcSamples = silence;
           numSrcSamples = mSong.getSamplesPerFrame();
           auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
-          if (mPlaying && framePtr && framePtr->getPtr()) {
-            if (mSong.hasSamples()) // already decoded samples
-              srcSamples = (float*)framePtr->getPtr();
-            else {
-              decode.setFrame (framePtr->getPtr(), framePtr->getLen());
-              if (decode.decodeFrame (samples, mSong.getPlayFrame()) == mSong.getSamplesPerFrame()) {
-                if (decode.getNumChannels() == 1) {
-                  //{{{  expand mono to stereo
-                  for (int i = mSong.getSamplesPerFrame() - 1; i >= 0; i--) {
-                    samples[i*2] = samples [i];
-                    samples[i*2 + 1] = samples [i];
-                    }
-                  }
-                  //}}}
-                srcSamples = samples;
-                }
-              }
-            }
+          if (mPlaying && framePtr) 
+            srcSamples = framePtr->getSamples();
 
           if (mPlaying && framePtr) {
             mSong.incPlayFrame (1, true);

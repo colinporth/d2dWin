@@ -9,22 +9,31 @@
 
 class cSong {
 public:
+  enum eAddType { eMappedSamples, eMappedCoded, eAllocSamples, eAllocCoded } ;
+
   //{{{
   class cFrame {
   public:
     static constexpr float kQuietThreshold = 0.01f;
     //{{{
-    cFrame (bool alloced, uint8_t* ptr, uint32_t len,
-            float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
-        mPtr(ptr), mLen(len), mAlloced(alloced),
+    cFrame (uint8_t* ptr, uint32_t len, bool owned, float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
+        mCoded(ptr), mSamples(nullptr), mLen(len), mOwned(owned),
+        mPowerValues(powerValues), mPeakValues(peakValues),
+        mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false), mSilence(false) {}
+    //}}}
+    //{{{
+    cFrame (float* ptr, bool owned, float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
+        mCoded(nullptr), mSamples(ptr), mLen(0), mOwned(owned),
         mPowerValues(powerValues), mPeakValues(peakValues),
         mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false), mSilence(false) {}
     //}}}
     //{{{
     ~cFrame() {
 
-      if (mAlloced)
-        free (mPtr);
+      if (mOwned) {
+        free (mCoded);
+        free (mSamples);
+        }
 
       free (mPowerValues);
       free (mPeakValues);
@@ -34,7 +43,8 @@ public:
     //}}}
 
     // gets
-    uint8_t* getPtr() { return mPtr; }
+    uint8_t* getCoded() { return mCoded; }
+    float* getSamples() { return mSamples; }
     int getLen() { return mLen; }
 
     float* getPowerValues() { return mPowerValues;  }
@@ -53,9 +63,10 @@ public:
 
   private:
     // vars
-    uint8_t* mPtr;
+    uint8_t* mCoded;
+    float* mSamples;
     uint32_t mLen;
-    bool mAlloced;
+    bool mOwned;
 
     float* mPowerValues;
     float* mPeakValues;
@@ -231,8 +242,14 @@ public:
   //}}}
   virtual ~cSong();
 
-  void init (cAudioDecode::eFrameType frameType, int numChannels, int samplesPerFrame, int sampleRate);
-  void addFrame (int frame, bool mapped, uint8_t* stream, int frameLen, int totalFrames, float* samples);
+  void init (cAudioDecode::eFrameType frameType, eAddType addType,
+             int numChannels, int samplesPerFrame, int sampleRate);
+  void addFrame (int frame, uint8_t* stream, int frameLen, int totalFrames, float* samples);
+  //{{{
+  void addFrame (int frame, float* samples, int totalFrames) {
+    addFrame (frame, nullptr, 0, totalFrames, samples);
+    }
+  //}}}
   void clear();
 
   enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed };
@@ -241,7 +258,7 @@ public:
   int getId() { return mId; }
 
   cAudioDecode::eFrameType getFrameType() { return mFrameType; }
-  bool hasSamples() { return mFrameType == cAudioDecode::eWav; }
+  bool hasSamples() { return (mAddType == eMappedSamples) || (mAddType == eAllocSamples); }
 
   int getNumChannels() { return mNumChannels; }
   int getNumSampleBytes() { return mNumChannels * sizeof(float); }
@@ -328,6 +345,7 @@ private:
   std::shared_mutex mSharedMutex;
 
   cAudioDecode::eFrameType mFrameType = cAudioDecode::eUnknown;
+  eAddType mAddType = eAllocCoded;
 
   int mId = 0;
   int mNumChannels = kMaxNumChannels;
