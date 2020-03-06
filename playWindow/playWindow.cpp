@@ -520,7 +520,7 @@ private:
               mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
               int numFrames = mSong.getNumFrames();
               int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
-              mSong.addFrame (frameNum++, samples, true, totalFrames+1);
+              mSong.addFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
               changed();
               }
             }
@@ -551,6 +551,7 @@ private:
 
     cLog::setThreadName ("play");
     float silence [2048*2] = { 0.f };
+    float samples [2048*2] = { 0.f };
 
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
@@ -567,8 +568,10 @@ private:
           shared_lock<shared_mutex> lock (mSong.getSharedMutex());
 
           auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
-          if (mPlaying && framePtr && framePtr->getSamples())
-            srcSamples = framePtr->getSamples();
+          if (mPlaying && framePtr && framePtr->getSamples()) {
+            memcpy (samples, framePtr->getSamples(), mSong.getSamplesPerFrame() * mSong.getNumChannels() * sizeof(float));
+            srcSamples = samples;
+            }
           else
             srcSamples = silence;
           numSrcSamples = mSong.getSamplesPerFrame();

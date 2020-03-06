@@ -39,7 +39,7 @@ void cSong::init (cAudioDecode::eFrameType frameType, int numChannels, int sampl
   }
 //}}}
 //{{{
-void cSong::addFrame (int frameNum, float* samples, bool owned, int totalFrames) {
+void cSong::addFrame (int frameNum, float* samples, bool owned, int totalFrames, uint8_t* framePtr) {
 
   // sum of squares channel power
   auto powerValues = (float*)malloc (mNumChannels * 4);
@@ -94,8 +94,8 @@ void cSong::addFrame (int frameNum, float* samples, bool owned, int totalFrames)
   unique_lock<shared_mutex> lock (mSharedMutex);
 
   // totalFrames can be a changing estimate for file, or increasing value for streaming
-  mFrameMap.insert (map<int,cFrame*>::value_type (
-    frameNum, new cFrame (samples, owned, powerValues, peakValues, freqValues, lumaValues)));
+  mFrameMap.insert (map<int,cFrame*>::value_type (frameNum, 
+    new cFrame (samples, owned, framePtr, powerValues, peakValues, freqValues, lumaValues)));
   mTotalFrames = totalFrames;
 
   checkSilenceWindow (frameNum);

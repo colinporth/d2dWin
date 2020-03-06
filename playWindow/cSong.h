@@ -14,8 +14,9 @@ public:
   public:
     static constexpr float kQuietThreshold = 0.01f;
     //{{{
-    cFrame (float* samples, bool owned, float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
-        mSamples(samples), mOwned(owned),
+    cFrame (float* samples, bool owned, uint8_t* framePtr,
+            float* powerValues, float* peakValues, uint8_t* freqValues, uint8_t* lumaValues) :
+        mSamples(samples), mOwned(owned), mPtr(framePtr),
         mPowerValues(powerValues), mPeakValues(peakValues),
         mFreqValues(freqValues), mFreqLuma(lumaValues), mMuted(false), mSilence(false) {}
     //}}}
@@ -34,6 +35,7 @@ public:
 
     // gets
     float* getSamples() { return mSamples; }
+    uint8_t* getPtr() { return mPtr; }
 
     float* getPowerValues() { return mPowerValues;  }
     float* getPeakValues() { return mPeakValues;  }
@@ -53,14 +55,17 @@ public:
     // vars
     float* mSamples;
     bool mOwned;
+    bool mMuted;
+    bool mSilence;
+
+    // hold onto mapped file framePtr
+    uint8_t* mPtr;
 
     float* mPowerValues;
     float* mPeakValues;
     uint8_t* mFreqValues;
     uint8_t* mFreqLuma;
 
-    bool mMuted;
-    bool mSilence;
     std::string mTitle;
     };
   //}}}
@@ -229,7 +234,7 @@ public:
   virtual ~cSong();
 
   void init (cAudioDecode::eFrameType frameType, int numChannels, int sampleRate, int samplesPerFrame);
-  void addFrame (int frameNum, float* samples, bool owned, int totalFrames);
+  void addFrame (int frameNum, float* samples, bool owned, int totalFrames, uint8_t* framePtr = nullptr);
   void clear();
 
   enum eHlsLoad { eHlsIdle, eHlsLoading, eHlsFailed };
