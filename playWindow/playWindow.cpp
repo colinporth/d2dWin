@@ -563,6 +563,15 @@ private:
           auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
           if (mPlaying && framePtr && framePtr->getSamples()) {
             memcpy (samples, framePtr->getSamples(), mSong.getSamplesPerFrame() * mSong.getNumChannels() * sizeof(float));
+            if (mSong.getNumChannels() == 1) {
+              //{{{  expand mono to stereo
+              for (int i = mSong.getSamplesPerFrame() - 1; i >= 0; i--) {
+                samples[i*2] = samples [i];
+                samples[i*2 + 1] = samples [i];
+                }
+              }
+
+              //}}}
             srcSamples = samples;
             }
           else
