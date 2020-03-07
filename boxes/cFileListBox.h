@@ -136,6 +136,8 @@ public:
           mFirstRowIndex += mFileList->getIndex() - mLastRowIndex;
           mScroll = mFirstRowIndex * mLineHeight;
           }
+
+        setTimedOn();
         mProxed = false;
         }
 

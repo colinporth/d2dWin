@@ -111,7 +111,7 @@ public:
 
         if (!mFileList->empty()) {
 
-          add (new cFileListBox (this, 0.f,-220.f, mFileList, [&](cFileListBox* box, int index){
+          add (new cFileListBox (this, 0.f,-200.f, mFileList, [&](cFileListBox* box, int index){
             mSong.clear(); mSongChanged = true; }))->setPin (true);
 
           mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
@@ -538,7 +538,6 @@ private:
   //}}}
   //{{{
   void playThread (bool streaming) {
-  // launched and lifetime per song
 
     cLog::setThreadName ("play");
     float silence [2048*2] = { 0.f };
@@ -560,16 +559,18 @@ private:
 
           auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
           if (mPlaying && framePtr && framePtr->getSamples()) {
-            memcpy (samples, framePtr->getSamples(), mSong.getSamplesPerFrame() * mSong.getNumChannels() * sizeof(float));
             if (mSong.getNumChannels() == 1) {
-              //{{{  expand mono to stereo
-              for (int i = mSong.getSamplesPerFrame() - 1; i >= 0; i--) {
-                samples[i*2] = samples [i];
-                samples[i*2 + 1] = samples [i];
+              //{{{  mono to stereo
+              auto src = framePtr->getSamples();
+              auto dst = samples;
+              for (int i = 0; i < mSong.getSamplesPerFrame(); i++) {
+                *dst++ = *src;
+                *dst++ = *src++;
                 }
               }
-
               //}}}
+            else
+              memcpy (samples, framePtr->getSamples(), mSong.getSamplesPerFrame() * mSong.getNumChannels() * sizeof(float));
             srcSamples = samples;
             }
           else
