@@ -24,9 +24,6 @@ shoutcast
 - filelist of wxqr wrong sample rate on 2nd sub plays
 - make keys 0 to 9 up down arrow work
 
-save samples for play scrubbing on ifdef
-- aac mp3 flushes not working well
-
 editing
 - mute marking
 - save using labelled selects and mutes
