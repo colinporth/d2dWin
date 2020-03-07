@@ -94,7 +94,7 @@ void cSong::addFrame (int frameNum, float* samples, bool owned, int totalFrames,
   unique_lock<shared_mutex> lock (mSharedMutex);
 
   // totalFrames can be a changing estimate for file, or increasing value for streaming
-  mFrameMap.insert (map<int,cFrame*>::value_type (frameNum, 
+  mFrameMap.insert (map<int,cFrame*>::value_type (frameNum,
     new cFrame (samples, owned, framePtr, powerValues, peakValues, freqValues, lumaValues)));
   mTotalFrames = totalFrames;
 
@@ -174,10 +174,12 @@ void cSong::incPlaySec (int secs, bool useSelectRange) {
 
 // hls
 //{{{
-void cSong::setHlsBase (int chunkNum, system_clock::time_point timePoint) {
+void cSong::setHlsBase (int chunkNum, system_clock::time_point timePoint, seconds offset) {
 // set baseChunkNum, baseTimePoint and baseFrame (sinceMidnight)
 
   unique_lock<shared_mutex> lock (mSharedMutex);
+
+  timePoint += offset;
 
   mHlsBaseChunkNum = chunkNum;
   mHlsBaseTimePoint = timePoint;

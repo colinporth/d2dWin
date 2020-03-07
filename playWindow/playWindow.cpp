@@ -295,12 +295,10 @@ private:
         system_clock::time_point programDateTimePoint;
         inputStream >> date::parse ("%FT%T", programDateTimePoint);
 
-        programDateTimePoint -= 37s;
-
         http.freeContent();
         //}}}
         mSong.init (cAudioDecode::eAac, 2, 48000, mSong.getBitrate() >= 128000 ? 1024 : 2048);
-        mSong.setHlsBase (mediaSequence, programDateTimePoint);
+        mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s);
         cAudioDecode decode (cAudioDecode::eAac);
 
         auto player = thread ([=](){ playThread (true); });
