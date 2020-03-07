@@ -491,43 +491,36 @@ private:
       int frameNum = 0;
       bool songDone = false;
       auto fileMapPtr = fileMapFirst;
+      cAudioDecode decode (frameType);
+
       if (frameType == cAudioDecode::eWav) {
-        //{{{  float 32bit interleaved wav uses file map directly
         auto frameSamples = 1024;
         mSong.init (frameType, 2, sampleRate, frameSamples);
-
-        cAudioDecode decode (cAudioDecode::eWav);
         decode.parseFrame (fileMapPtr, fileMapEnd);
-
         auto samples = decode.getFramePtr();
-        auto frameSampleBytes = frameSamples * 2 * 4;
-        while (!getExit() && !mSongChanged && ((samples + frameSampleBytes) <= fileMapEnd)) {
-          mSong.addFrame (frameNum++, (float*)samples, false, fileMapSize / frameSampleBytes);
-          samples += frameSampleBytes;
+        while (!getExit() && !mSongChanged && ((samples + (frameSamples * 2 * sizeof(float))) <= fileMapEnd)) {
+          mSong.addFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
+          samples += frameSamples * 2 * sizeof(float);
           changed();
           }
         }
-        //}}}
       else {
-        // hold onto decoded samples
         mSong.init (frameType, 2, sampleRate, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
-
-        cAudioDecode decode (frameType);
         while (!getExit() && !mSongChanged && decode.parseFrame (fileMapPtr, fileMapEnd)) {
           if (decode.getFrameType() == mSong.getFrameType()) {
             auto samples = decode.decodeFrame (frameNum);
             if (samples) {
-              mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
               int numFrames = mSong.getNumFrames();
               int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
+              mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
               mSong.addFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
               changed();
               }
             }
           fileMapPtr += decode.getNextFrameOffset();
           }
-        cLog::log (LOGINFO, "song analysed");
         }
+      cLog::log (LOGINFO, "song analysed");
 
       // wait for play to end or abort
       player.join();
