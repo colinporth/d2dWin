@@ -110,7 +110,6 @@ public:
         mFileList = new cFileList (names, "*.aac;*.mp3;*.wav");
 
         if (!mFileList->empty()) {
-
           add (new cFileListBox (this, 0.f,-200.f, mFileList, [&](cFileListBox* box, int index){
             mSong.clear(); mSongChanged = true; }))->setPin (true);
 
@@ -271,17 +270,13 @@ private:
   //{{{
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
-  // - host is redirected, assumes bbc radio aac, 48000 sampleaRate
 
     constexpr int kHlsPreload = 10; // about a minute
-
     cLog::setThreadName ("hls ");
 
     mSong.setChan (chan);
     mSong.setBitrate (bitrate);
-
     while (!getExit()) {
-      // loop till exit
       const string path = "pool_904/live/uk/" + mSong.getChan() +
                           "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
                           "-audio=" + dec(mSong.getBitrate());
@@ -301,8 +296,8 @@ private:
         mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s);
         cAudioDecode decode (cAudioDecode::eAac);
 
-        auto player = thread ([=](){ playThread (true); });
-
+        thread player;
+        bool firstTime = true;
         mSongChanged = false;
         while (!getExit() && !mSongChanged) {
           auto chunkNum = mSong.getHlsLoadChunkNum (getNow(), 12s, kHlsPreload);
@@ -321,6 +316,12 @@ private:
                   mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
                   mSong.addFrame (seqFrameNum++, samples, true, mSong.getNumFrames());
                   changed();
+                  if (firstTime) {
+                    //{{{  something to play, launch player
+                    firstTime = false;
+                    player = thread ([=](){ playThread (true); });
+                    }
+                    //}}}
                   }
                 aacFrames += decode.getNextFrameOffset();
                 }
@@ -340,11 +341,9 @@ private:
           else // no chunk available, back off for 100ms
             this_thread::sleep_for (100ms);
           }
-
         player.join();
         }
       }
-
     cLog::log (LOGINFO, "exit");
     }
   //}}}
@@ -493,7 +492,7 @@ private:
       if (cAudioDecode::mJpegPtr) // should delete old jpegImage, but we have memory to waste
         mJpegImageView->setImage (new cJpegImage (cAudioDecode::mJpegPtr, cAudioDecode::mJpegLen));
 
-      auto player = thread ([=](){ playThread (false); });
+      thread player;
 
       int frameNum = 0;
       bool songDone = false;
@@ -501,6 +500,7 @@ private:
       cAudioDecode decode (frameType);
 
       if (frameType == cAudioDecode::eWav) {
+        //{{{  parse wav
         auto frameSamples = 1024;
         mSong.init (frameType, 2, sampleRate, frameSamples);
         decode.parseFrame (fileMapPtr, fileMapEnd);
@@ -509,9 +509,13 @@ private:
           mSong.addFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
           samples += frameSamples * 2 * sizeof(float);
           changed();
+          if (frameNum == 1)
+            player = thread ([=](){ playThread (false); });
           }
         }
+        //}}}
       else {
+        //{{{  parse coded
         mSong.init (frameType, 2, sampleRate, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
         while (!getExit() && !mSongChanged && decode.parseFrame (fileMapPtr, fileMapEnd)) {
           if (decode.getFrameType() == mSong.getFrameType()) {
@@ -522,12 +526,15 @@ private:
               mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
               mSong.addFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
               changed();
+              if (frameNum == 1)
+                player = thread ([=](){ playThread (false); });
               }
             }
           fileMapPtr += decode.getNextFrameOffset();
           }
         }
-      cLog::log (LOGINFO, "song analysed");
+        //}}}
+      cLog::log (LOGINFO, "loaded");
 
       // wait for play to end or abort
       player.join();
