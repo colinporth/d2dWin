@@ -472,6 +472,15 @@ private:
     cLog::setThreadName ("file");
 
     while (!getExit()) {
+      if (cAudioDecode::mJpegPtr) {
+        //{{{  delete any jpegImage
+        mJpegImageView->setImage (nullptr);
+
+        delete (cAudioDecode::mJpegPtr);
+        cAudioDecode::mJpegPtr = nullptr;
+        }
+        //}}}
+
       HANDLE fileHandle = CreateFile (mFileList->getCurFileItem().getFullName().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
       HANDLE mapping = CreateFileMapping (fileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
       auto fileMapFirst = (uint8_t*)MapViewOfFile (mapping, FILE_MAP_READ, 0, 0, 0);
