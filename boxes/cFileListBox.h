@@ -117,6 +117,13 @@ public:
   void onDraw (ID2D1DeviceContext* dc) {
 
     if (mWindow->getTimedMenuOn()) {
+      auto countDown = mWindow->getCountDown();
+      float opacity = 1.f;
+      if (countDown < 5) {
+        opacity = countDown / 5.f;
+        mWindow->changed();
+        }
+
       mLineHeight = getLineHeight();
       auto textHeight = mLineHeight * 5.f / 6.f;
 
@@ -127,6 +134,7 @@ public:
       mFirstRowIndex = int(mScroll / mLineHeight);
 
       if (mFileList->ensureItemVisible()) {
+        //{{{  curItem probaly changed, show it
         // strange interaction between itemIndex change and its visibility
         if (mFileList->getIndex() < mFirstRowIndex) {
           mFirstRowIndex = mFileList->getIndex();
@@ -140,6 +148,7 @@ public:
         setTimedOn();
         mProxed = false;
         }
+        //}}}
 
       float maxColumnWidth[cFileList::cFileItem::kFields] = { 0.f };
 
@@ -172,24 +181,31 @@ public:
         index++;
         }
 
-      //{{{  layout and draw rows
-      // layout fieldStops
+      //{{{  layout fieldStops
       mColumnsWidth = 0.f;
       for (auto field = 0u; field < cFileList::cFileItem::kFields; field++) {
         mColumnsWidth += maxColumnWidth[field] + textHeight/2.f;
         mColumn[field] = mColumnsWidth - 2.f;
         }
-
-      // layout,draw bgnd
+      //}}}
+      //{{{  layout, draw bgnd
       mBgndRect = cRect (mColumnsWidth + mLineHeight/2.f, point.y);
+      auto brush = mWindow->getTransparentBgndBrush();
+      auto oldOpacity = brush->GetOpacity();
+      brush->SetOpacity (brush->GetOpacity() * opacity);
       dc->FillRectangle (mBgndRect + mRect.getTL(), mWindow->getTransparentBgndBrush());
-
-      // layout,draw fields
+      brush->SetOpacity (oldOpacity);
+      //}}}
+      //{{{  layout,draw fields
       for (auto& row : mRowVec) {
-        auto p = mRect.getTL() + row.mRect.getTL();
+        auto point = mRect.getTL() + row.mRect.getTL();
         for (auto field = 0u; field < cFileList::cFileItem::kFields; field++) {
-          p.x = mRect.left + row.mRect.left + (field ? mColumn[field]-row.mTextMetrics[field].width : 2.f);
-          dc->DrawTextLayout (p, row.mTextLayout[field], row.mBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+          point.x = mRect.left + row.mRect.left + (field ? mColumn[field]-row.mTextMetrics[field].width : 2.f);
+
+          row.mBrush->SetOpacity (opacity);
+          dc->DrawTextLayout (point, row.mTextLayout[field], row.mBrush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+          row.mBrush->SetOpacity (1.f);
+
           row.mTextLayout[field]->Release();
           }
         }

@@ -398,6 +398,8 @@ public:
   bool getMouseDown() { return mMouseDown; }
   bool getTimedMenuOn() { return mTimedMenuOn; }
 
+  int getCountDown() { return mCursorDown; }
+
   std::chrono::system_clock::time_point getNow();
   int getDayLightSeconds() { return mDayLightSeconds; }
 
