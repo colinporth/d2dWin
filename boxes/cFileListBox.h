@@ -190,13 +190,15 @@ public:
       //}}}
       //{{{  layout, draw bgnd
       mBgndRect = cRect (mColumnsWidth + mLineHeight/2.f, point.y);
+
       auto brush = mWindow->getTransparentBgndBrush();
       auto oldOpacity = brush->GetOpacity();
+
       brush->SetOpacity (brush->GetOpacity() * opacity);
       dc->FillRectangle (mBgndRect + mRect.getTL(), mWindow->getTransparentBgndBrush());
       brush->SetOpacity (oldOpacity);
       //}}}
-      //{{{  layout,draw fields
+      //{{{  layout, draw fields
       for (auto& row : mRowVec) {
         auto point = mRect.getTL() + row.mRect.getTL();
         for (auto field = 0u; field < cFileList::cFileItem::kFields; field++) {

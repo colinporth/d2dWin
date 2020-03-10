@@ -320,7 +320,7 @@ public:
       //}}}
 
     mEventHandle = CreateEvent (nullptr, FALSE, FALSE, nullptr);
-    if (mEventHandle == nullptr) {
+    if (mEventHandle == 0) {
       //{{{
       cLog::log (LOGERROR, "start - createEvent failed");
       return false;
@@ -428,8 +428,9 @@ public:
 
     if (mAudioClient != nullptr)
       mAudioClient->Stop();
-    if (mEventHandle != nullptr)
-      CloseHandle (mEventHandle);
+    //if (mEventHandle != 0)
+    //  CloseHandle (mEventHandle);
+    cLog::log (LOGERROR, "audioWASAPI CloseHandle removed");
 
     return true;
     }

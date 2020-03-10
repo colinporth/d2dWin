@@ -173,12 +173,13 @@ public:
     auto leftWaveFrame = playFrame - (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
     auto rightWaveFrame = playFrame + (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
     rightWaveFrame = std::min (rightWaveFrame, mSong.getLastFrame());
+    bool mono = mSong.getNumChannels() == 1;
 
     drawRange (dc, playFrame, leftWaveFrame, rightWaveFrame);
 
     if (mSong.getNumFrames()) {
-      drawWave (dc, playFrame, leftWaveFrame, rightWaveFrame);
-      drawOverview (dc, playFrame);
+      drawWave (dc, playFrame, leftWaveFrame, rightWaveFrame, mono);
+      drawOverview (dc, playFrame, mono);
       drawFreq (dc, playFrame);
       }
 
@@ -277,9 +278,7 @@ private:
     }
   //}}}
   //{{{
-  bool drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame) {
-
-    bool mono = mSong.getNumChannels() == 1;
+  bool drawBitmapFrames (int fromFrame, int toFrame, int playFrame, int rightFrame, bool mono) {
 
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     bool allFramesOk = true;
@@ -332,7 +331,11 @@ private:
               peakValues[i] = *peakValuesPtr++ * valueScale;
               }
 
-            bitmapRect = { srcIndex, mSrcPeakCentre - peakValues[0], srcIndex + 1.f, mSrcPeakCentre + peakValues[1] };
+
+            bitmapRect = { srcIndex,
+                           mono ?  (mSrcPeakTop + mWaveHeight) - (peakValues[0] * 2.f) : mSrcPeakCentre - peakValues[0],
+                           srcIndex + 1.f,
+                           mono ? mSrcPeakTop + mWaveHeight : mSrcPeakCentre + peakValues[1] };
             mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
             }
           }
@@ -369,7 +372,10 @@ private:
         }
         //}}}
 
-      bitmapRect = { srcIndex, mSrcWaveCentre - powerValues[0], srcIndex + 1.f, mSrcWaveCentre + (mono ? 0 : powerValues[1]) };
+      bitmapRect = { srcIndex,
+                     mono ?  (mSrcWaveTop + mWaveHeight) - (powerValues[0] * 2.f) : mSrcWaveCentre - powerValues[0],
+                     srcIndex + 1.f,
+                     mono ? mSrcWaveTop + mWaveHeight : mSrcWaveCentre + powerValues[1] };
       mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
 
       if (silence) {
@@ -428,7 +434,7 @@ private:
     }
   //}}}
   //{{{
-  void drawWave (ID2D1DeviceContext* dc, int playFrame, int leftFrame, int rightFrame) {
+  void drawWave (ID2D1DeviceContext* dc, int playFrame, int leftFrame, int rightFrame, bool mono) {
 
     bool allFramesOk = true;
     if (mFramesBitmapOk &&
@@ -437,7 +443,7 @@ private:
       // overlap
       if (leftFrame < mBitmapFirstFrame) {
         //{{{  draw new bitmap leftFrames
-        allFramesOk &= drawBitmapFrames (leftFrame, mBitmapFirstFrame, playFrame, rightFrame);
+        allFramesOk &= drawBitmapFrames (leftFrame, mBitmapFirstFrame, playFrame, rightFrame, mono);
 
         mBitmapFirstFrame = leftFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
@@ -446,7 +452,7 @@ private:
         //}}}
       if (rightFrame > mBitmapLastFrame) {
         //{{{  draw new bitmap rightFrames
-        allFramesOk &= drawBitmapFrames (mBitmapLastFrame, rightFrame, playFrame, rightFrame);
+        allFramesOk &= drawBitmapFrames (mBitmapLastFrame, rightFrame, playFrame, rightFrame, mono);
 
         mBitmapLastFrame = rightFrame;
         if (mBitmapLastFrame - mBitmapFirstFrame > (int)mBitmapWidth)
@@ -456,7 +462,7 @@ private:
       }
     else {
       //{{{  no overlap, draw all bitmap frames
-      allFramesOk &= drawBitmapFrames (leftFrame, rightFrame, playFrame, rightFrame);
+      allFramesOk &= drawBitmapFrames (leftFrame, rightFrame, playFrame, rightFrame, mono);
 
       mBitmapFirstFrame = leftFrame;
       mBitmapLastFrame = rightFrame;
@@ -492,8 +498,10 @@ private:
 
     // silence
     srcRect = { leftSrcIndex, mSrcSilenceTop, endSrcIndex, mSrcSilenceTop + mSrcSilenceHeight };
-    dstRect = { mRect.left, mDstWaveCentre - 2.f,
-                mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveCentre + 2.f, };
+    dstRect = { mRect.left,
+                mono ? mDstWaveTop + mWaveHeight - 4.f :  mDstWaveCentre - 2.f,
+                mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth,
+                mono ? mDstWaveTop + mWaveHeight :  mDstWaveCentre + 2.f };
     dc->FillOpacityMask (mBitmap, mWindow->getRedBrush(), dstRect, srcRect);
 
     // wave
@@ -534,8 +542,10 @@ private:
 
       // silence
       srcRect = { 0.f, mSrcSilenceTop, rightSrcIndex, mSrcSilenceTop + mSrcSilenceHeight };
-      dstRect = { mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth, mDstWaveCentre - 2.f,
-                  mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * mFrameWidth, mDstWaveCentre + 2.f };
+      dstRect = { mRect.left + (endSrcIndex - leftSrcIndex) * mFrameWidth,
+                  mono ? mDstWaveTop + mWaveHeight - 4.f :  mDstWaveCentre - 2.f,
+                  mRect.left + (endSrcIndex - leftSrcIndex + rightSrcIndex) * mFrameWidth,
+                  mono ? mDstWaveTop + mWaveHeight :  mDstWaveCentre + 2.f };
       dc->FillOpacityMask (mBitmap, mWindow->getRedBrush(), dstRect, srcRect);
 
       // wave
@@ -573,15 +583,17 @@ private:
       float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
       auto peakValues = framePtr->getPeakValues();
 
-      dstRect = { mRect.left + (dstPlay * mFrameWidth)-1.f, mDstWaveCentre - (*peakValues++ * valueScale),
-                  mRect.left + ((dstPlay+1.f) * mFrameWidth)+1.f, mDstWaveCentre + (*peakValues * valueScale) };
+      dstRect = { mRect.left + (dstPlay * mFrameWidth)-1.f,
+                  mono ? (mDstWaveTop + mWaveHeight) - (*peakValues++ * valueScale) * 2.f : mDstWaveCentre + (*peakValues++ * valueScale),
+                  mRect.left + ((dstPlay+1.f) * mFrameWidth)+1.f,
+                  mono ? mDstWaveTop + mWaveHeight : mDstWaveCentre + (*peakValues * valueScale) };
       dc->FillRectangle (dstRect, mWindow->getGreenBrush());
       }
     //}}}
     }
   //}}}
   //{{{
-  void drawOverview (ID2D1DeviceContext* dc, int playFrame) {
+  void drawOverview (ID2D1DeviceContext* dc, int playFrame, bool mono) {
 
     if (!mSong.getTotalFrames())
       return;
@@ -589,7 +601,7 @@ private:
     int firstFrame = mSong.getFirstFrame();
     float playFrameX = ((playFrame - firstFrame) * getWidth()) / mSong.getTotalFrames();
     float valueScale = mOverviewHeight / 2.f / mSong.getMaxPowerValue();
-    drawOverviewWave (dc, firstFrame, playFrame, playFrameX, valueScale);
+    drawOverviewWave (dc, firstFrame, playFrame, playFrameX, valueScale, mono);
 
     if (mOverviewPressed) {
       //{{{  animate on
@@ -620,25 +632,28 @@ private:
       else if (overviewLensCentreX + mOverviewLens > getWidth())
         overviewLensCentreX = getWidth() - mOverviewLens;
 
-      drawOverviewLens (dc, playFrame, overviewLensCentreX, mOverviewLens-1.f);
+      drawOverviewLens (dc, playFrame, overviewLensCentreX, mOverviewLens-1.f, mono);
       }
     else {
       //  draw playFrame
       auto framePtr = mSong.getFramePtr (playFrame);
       if (framePtr && framePtr->getPowerValues()) {
         auto powerValues = framePtr->getPowerValues();
-        cRect dstRect = { mRect.left + playFrameX, mDstOverviewCentre - (*powerValues++ * valueScale),
-                          mRect.left + playFrameX+1.f, mDstOverviewCentre + (*powerValues * valueScale) };
+        cRect dstRect = { mRect.left + playFrameX, 
+                          mono ? mDstOverviewTop + mOverviewHeight - (*powerValues++ * valueScale)*2.f :
+                                 mDstOverviewCentre - (*powerValues++ * valueScale),
+                          mRect.left + playFrameX+1.f, 
+                          mono ? mDstOverviewTop + mOverviewHeight :
+                                 mDstOverviewCentre + (*powerValues * valueScale) };
         dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
         }
       }
     }
   //}}}
   //{{{
-  void drawOverviewWave (ID2D1DeviceContext* dc, int firstFrame, int playFrame, float playFrameX, float valueScale) {
+  void drawOverviewWave (ID2D1DeviceContext* dc, int firstFrame, int playFrame, float playFrameX, float valueScale, bool mono) {
   // draw Overview using bitmap cache
 
-    bool mono = mSong.getNumChannels() == 1;
     int lastFrame = mSong.getLastFrame();
     int totalFrames = mSong.getTotalFrames();
 
@@ -694,8 +709,13 @@ private:
                 rightValue /= numSummedFrames;
                 }
 
-              cRect bitmapRect = { (float)x, mSrcOverviewCentre - (leftValue * valueScale) - 2.f,
-                                   x+1.f, mSrcOverviewCentre + (rightValue * valueScale) + 2.f };
+              cRect bitmapRect = {
+                (float)x,
+                mono ? mSrcOverviewTop + mOverviewHeight - ((leftValue * valueScale)*2.f) - 2.f :
+                       mSrcOverviewCentre - (leftValue * valueScale) - 2.f,
+                x+1.f,
+                mono ? mSrcOverviewTop + mOverviewHeight :
+                       mSrcOverviewCentre + (rightValue * valueScale) + 2.f };
               mBitmapTarget->FillRectangle (bitmapRect, mWindow->getWhiteBrush());
               }
             else
@@ -730,10 +750,8 @@ private:
     }
   //}}}
   //{{{
-  void drawOverviewLens (ID2D1DeviceContext* dc, int playFrame, float centreX, float width) {
+  void drawOverviewLens (ID2D1DeviceContext* dc, int playFrame, float centreX, float width, bool mono) {
   // draw frames centred at playFrame -/+ width in pixels, centred at centreX
-
-    bool mono = mSong.getNumChannels() == 1;
 
     // cut hole and frame it
     cRect dstRect = { mRect.left + centreX - mOverviewLens, mDstOverviewTop,
@@ -793,8 +811,10 @@ private:
           //}}}
 
         auto powerValues = framePtr->getPowerValues();
-        dstRect.top = mDstOverviewCentre - (*powerValues++ * valueScale);
-        dstRect.bottom = mDstOverviewCentre + ((mono ? 0 : *powerValues) * valueScale);
+        dstRect.top = mono ? mDstOverviewTop + mOverviewHeight - (*powerValues++ * valueScale)* 2.f :
+                             mDstOverviewCentre - (*powerValues++ * valueScale);
+        dstRect.bottom = mono ? mDstOverviewTop + mOverviewHeight :
+                                mDstOverviewCentre + ((mono ? 0 : *powerValues) * valueScale);
         if (frame == playFrame)
           colour = mWindow->getWhiteBrush();
         dc->FillRectangle (dstRect, colour);

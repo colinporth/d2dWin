@@ -459,7 +459,7 @@ private:
   void onResize (ID2D1DeviceContext* dc);
 
   // private vars
-  static cD2dWindow* mD2dWindow;
+  inline static cD2dWindow* mD2dWindow = nullptr;
 
   HWND mHWND = 0;
   bool mExit = false;

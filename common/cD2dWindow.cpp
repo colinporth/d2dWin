@@ -37,9 +37,6 @@ using namespace std;
 using namespace chrono;
 //}}}
 
-// static var init
-cD2dWindow* cD2dWindow::mD2dWindow = NULL;
-
 // local procedure
 //{{{
 LRESULT CALLBACK WndProc (HWND hWnd, unsigned int msg, WPARAM wparam, LPARAM lparam) {
