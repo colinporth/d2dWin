@@ -631,7 +631,7 @@ private:
   };
 
 // main
-int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
   cLog::init (LOGINFO, true, "", "playWindow");
 
   int numArgs;
