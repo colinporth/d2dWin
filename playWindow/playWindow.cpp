@@ -300,7 +300,7 @@ private:
         bool firstTime = true;
         mSongChanged = false;
         while (!getExit() && !mSongChanged) {
-          auto chunkNum = mSong.getHlsLoadChunkNum (getNow(), 12s, kHlsPreload);
+          auto chunkNum = mSong.getHlsLoadChunkNum (getNowRaw(), 12s, kHlsPreload);
           if (chunkNum) {
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);

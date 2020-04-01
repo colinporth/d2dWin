@@ -143,6 +143,11 @@ system_clock::time_point cD2dWindow::getNow() {
   return system_clock::now() + seconds (mDayLightSeconds);
   }
 //}}}
+//{{{
+system_clock::time_point cD2dWindow::getNowRaw() {
+  return system_clock::now();
+  }
+//}}}
 
 //{{{
 cD2dWindow::cBox* cD2dWindow::add (cBox* box) {

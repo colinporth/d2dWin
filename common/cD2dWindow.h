@@ -401,6 +401,7 @@ public:
   int getCountDown() { return mCursorDown; }
 
   std::chrono::system_clock::time_point getNow();
+  std::chrono::system_clock::time_point getNowRaw();
   int getDayLightSeconds() { return mDayLightSeconds; }
 
   bool getFullScreen() { return mFullScreen; }

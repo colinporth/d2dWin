@@ -215,6 +215,7 @@ private:
       auto subSeconds = value % 100;
 
       value /= 100;
+      value += mWindow->getDayLightSeconds();
       auto seconds = value % 60;
 
       value /= 60;
@@ -639,10 +640,10 @@ private:
       auto framePtr = mSong.getFramePtr (playFrame);
       if (framePtr && framePtr->getPowerValues()) {
         auto powerValues = framePtr->getPowerValues();
-        cRect dstRect = { mRect.left + playFrameX, 
+        cRect dstRect = { mRect.left + playFrameX,
                           mono ? mDstOverviewTop + mOverviewHeight - (*powerValues++ * valueScale)*2.f :
                                  mDstOverviewCentre - (*powerValues++ * valueScale),
-                          mRect.left + playFrameX+1.f, 
+                          mRect.left + playFrameX+1.f,
                           mono ? mDstOverviewTop + mOverviewHeight :
                                  mDstOverviewCentre + (*powerValues * valueScale) };
         dc->FillRectangle (dstRect, mWindow->getWhiteBrush());
