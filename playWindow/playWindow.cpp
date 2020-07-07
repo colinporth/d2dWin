@@ -556,10 +556,10 @@ private:
   void playThread (bool streaming) {
 
     cLog::setThreadName ("play");
+    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
     float silence [2048*2] = { 0.f };
     float samples [2048*2] = { 0.f };
-
-    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
     auto device = getDefaultAudioOutputDevice();
     if (device) {

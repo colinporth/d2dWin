@@ -13,6 +13,7 @@
   #pragma comment (lib,"libmfx.lib")
 #endif
 
+using namespace std;
 using namespace concurrency;
 //}}}
 //{{{  const
@@ -23,7 +24,7 @@ const int kChunkSize = 2048*188;
 //}}}
 
 //{{{
-cPlayView::cPlayView (cD2dWindow* window, float width, float height, const std::string& fileName) :
+cPlayView::cPlayView (cD2dWindow* window, float width, float height, const string& fileName) :
     cView("playerView", window, width, height),
     mFileName(fileName), mFirstVidPtsSem("firstVidPts") {
 
@@ -38,17 +39,10 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const std::
   mProgressBox = window->add (new cProgressBox (window, 0.f,6.f, this), 0.f,-6.f);
   mAudFrameBox = window->add (new cAudFrameBox (window, 82.f,240.0f, mPlayAudFrame, mAudio), -84.f,-240.f-6.0f);
 
-  // launch anal
-  auto threadHandle = std::thread ([=](){ analyserThread(); });
-  SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
-  threadHandle.detach();
-
-  std::thread ([=]() { audThread(); }).detach();
-  std::thread ([=]() { vidThread(); }).detach();
-
-  threadHandle = std::thread ([=](){ playThread(); });
-  SetThreadPriority (threadHandle.native_handle(), THREAD_PRIORITY_HIGHEST);
-  threadHandle.detach();
+  thread ([=](){ analyserThread(); }).detach();
+  thread ([=]() { audThread(); }).detach();
+  thread ([=]() { vidThread(); }).detach();
+  thread ([=](){ playThread(); }).detach();
   }
 //}}}
 //{{{
@@ -243,6 +237,7 @@ void cPlayView::analyserThread() {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::setThreadName ("anal");
+  SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 
   const auto fileChunkBuffer = (uint8_t*)malloc (kChunkSize);
   auto file = _open (mFileName.c_str(), _O_RDONLY | _O_BINARY);
@@ -522,6 +517,7 @@ void cPlayView::playThread() {
 
   CoInitializeEx (NULL, COINIT_MULTITHREADED);
   cLog::setThreadName ("play");
+  SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
 
   mFirstVidPtsSem.wait();
   mPlayPts = mAnalTs->getFirstPts (mVidTs->getPid()) - mAnalTs->getBasePts();

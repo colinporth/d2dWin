@@ -31,9 +31,6 @@
     <ClInclude Include="..\..\shared\utils\iAudio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\cWinAudio.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\utils\cWinAudio32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -52,15 +49,18 @@
     <ClInclude Include="..\..\shared\format\format.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cWinAudio16.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cD2dWindow.cpp" />
     <ClCompile Include="..\..\shared\utils\cLog.cpp" />
     <ClCompile Include="cJpegImage.cpp" />
-    <ClCompile Include="..\..\shared\utils\cWinAudio.cpp" />
     <ClCompile Include="..\..\shared\utils\cWinAudio32.cpp" />
     <ClCompile Include="..\..\shared\kissFft\kiss_fft.c" />
     <ClCompile Include="..\..\shared\kissFft\kiss_fftr.c" />
     <ClCompile Include="..\..\shared\format\format.cpp" />
+    <ClCompile Include="..\..\shared\utils\cWinAudio16.cpp" />
   </ItemGroup>
 </Project>
