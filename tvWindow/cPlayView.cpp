@@ -28,7 +28,7 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const strin
     cView("playerView", window, width, height),
     mFileName(fileName), mFirstVidPtsSem("firstVidPts") {
 
-  mAudio = new cWinAudio32 (2, 48000);
+  mAudio = new cAudio32 (2, 48000);
 
   // create transportStreams
   mAnalTs = new cAnalTransportStream();
