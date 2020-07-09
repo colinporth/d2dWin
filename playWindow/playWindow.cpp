@@ -280,7 +280,7 @@ private:
       const string path = "pool_904/live/uk/" + mSong.getChan() +
                           "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
                           "-audio=" + dec(mSong.getBitrate());
-      cWinSockHttp http;
+      cPlatformHttp http;
       auto redirectedHost = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
         //{{{  hls m3u8 ok, parse it for baseChunkNum, baseTimePoint
@@ -370,7 +370,7 @@ private:
       thread player;
       mSongChanged = false;
 
-      cWinSockHttp http;
+      cPlatformHttp http;
       cUrl parsedUrl;
       parsedUrl.parse (mUrl);
       http.get (parsedUrl.getHost(), parsedUrl.getPath(), "Icy-MetaData: 1",

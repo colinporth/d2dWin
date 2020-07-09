@@ -35,13 +35,6 @@ public:
         CoUninitialize();
         //}}}
         }).detach();
-        thread ([=]() {
-        //{{{  signalThread
-        CoInitializeEx (NULL, COINIT_MULTITHREADED);
-        mDvb->signalThread();
-        CoUninitialize();
-        //}}}
-        }).detach();
       }
 
     // fileList
