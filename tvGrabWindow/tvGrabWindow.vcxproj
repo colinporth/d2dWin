@@ -55,8 +55,9 @@
   <ItemGroup>
     <ClInclude Include="..\..\shared\date\date.h" />
     <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h" />
+    <ClInclude Include="..\..\shared\dvb\cDvb.h" />
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h" />
-    <ClInclude Include="..\..\shared\dvb\cWinDvb.h" />
+    <ClInclude Include="..\..\shared\dvb\huffmanTables.h" />
     <ClInclude Include="..\..\shared\utils\cBipBuffer.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\timer.h" />

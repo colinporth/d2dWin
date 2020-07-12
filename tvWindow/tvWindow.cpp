@@ -3,7 +3,6 @@
 #include "stdafx.h"
 #include "../../shared/utils/resolve.h"
 
-#include "../../shared/dvb/cWinDvb.h"
 #include "../../shared/utils/cFileList.h"
 
 #include "../boxes/cClockBox.h"
@@ -20,29 +19,16 @@ const string kTvRoot = "/tv";
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (string title, int width, int height, const string& rootOrFrequency) {
+  void run (string title, int width, int height, const string& root) {
 
     init (title, width, height, false);
     add (new cClockBox (this, 40.f), -84.f,2.f);
 
-    int frequency = atoi (rootOrFrequency.c_str());
-    if (frequency) {
-      mDvb = new cDvb (frequency * 1000, kTvRoot, false);
-      thread ([=]() {
-        //{{{  grabthread
-        CoInitializeEx (NULL, COINIT_MULTITHREADED);
-        mDvb->grabThread();
-        CoUninitialize();
-        //}}}
-        }).detach();
-      }
-
     // fileList
-    mFileList = new cFileList (frequency || rootOrFrequency.empty() ? kTvRoot : rootOrFrequency, "*.ts");
+    mFileList = new cFileList (root.empty() ? kTvRoot : root, "*.ts");
     thread([=]() { mFileList->watchThread(); }).detach();
 
-    auto boxWidth = frequency ? 480.f : 0.f;
-    add (new cFileListBox (this, -boxWidth,0.f, mFileList, [&](cFileListBox* box, int index) { selectFileItem(); }));
+    add (new cFileListBox (this, 0.f,0.f, mFileList, [&](cFileListBox* box, int index) { selectFileItem(); }));
 
     // launch file player
     if (!mFileList->empty())
@@ -55,7 +41,6 @@ public:
     messagePump();
 
     // cleanup
-    delete mDvb;
     delete mFileList;
     }
   //}}}
@@ -109,7 +94,6 @@ private:
   //}}}
   //{{{  vars
   cFileList* mFileList = nullptr;
-  cDvb* mDvb = nullptr;
 
   cBox* mPlayFocus;
   //}}}

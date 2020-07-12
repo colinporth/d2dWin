@@ -31,9 +31,6 @@
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\dvb\cWinDvb.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\boxes\cClockBox.h">
       <Filter>header</Filter>
     </ClInclude>
@@ -52,6 +49,10 @@
     <ClInclude Include="..\..\shared\date\date.h">
       <Filter>header</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\dvb\huffmanTables.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\dvb\cDvb.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="header">

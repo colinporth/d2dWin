@@ -3,7 +3,6 @@
   <ItemGroup>
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="cPlayView.cpp" />
-    <ClCompile Include="..\..\shared\dvb\cWinDvb.cpp" />
     <ClCompile Include="..\..\shared\dvb\cTransportStream.cpp" />
     <ClCompile Include="tvWindow.cpp" />
   </ItemGroup>
@@ -23,13 +22,7 @@
     <ClInclude Include="stdafx.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\shared\dvb\cWinDvb.h">
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="cPlayView.h">
@@ -47,9 +40,6 @@
     <ClInclude Include="..\boxes\cLogBox.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\boxes\cTsEpgBox.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\boxes\cWindowBox.h">
       <Filter>header</Filter>
     </ClInclude>
@@ -57,6 +47,9 @@
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\utils\cWinAudio16.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\dvb\huffmanTables.h">
       <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>

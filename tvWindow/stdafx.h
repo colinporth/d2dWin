@@ -1,11 +1,7 @@
 #pragma once
 #define _CRT_SECURE_NO_WARNINGS
-#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-// consider using MultiByteToWideChar() and WideCharToMultiByte()
-#define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
 
-#include <windows.h>
 #include <wrl.h>
 
 #include <shellapi.h>
