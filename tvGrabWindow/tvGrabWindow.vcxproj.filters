@@ -3,8 +3,8 @@
   <ItemGroup>
     <ClCompile Include="tvGrabWindow.cpp" />
     <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="..\..\shared\dvb\cWinDvb.cpp" />
     <ClCompile Include="..\..\shared\dvb\cTransportStream.cpp" />
+    <ClCompile Include="..\..\shared\dvb\cDvb.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\utils\utils.h">
