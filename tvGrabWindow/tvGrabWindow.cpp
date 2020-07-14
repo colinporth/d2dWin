@@ -24,7 +24,7 @@ public:
 
     auto frequency = param.empty() ? 626 : atoi (param.c_str());
     if (frequency) {
-      mDvb = new cDvb (frequency * 1000, rootName, false);
+      mDvb = new cDvb (frequency * 1000, rootName, false, "all", "");
       add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDvb), 0.f,0.f);
       add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
 
