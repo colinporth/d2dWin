@@ -40,10 +40,10 @@ public:
 
       for (auto &pidInfo : mTs->mPidInfoMap) {
         auto str = wdec (pidInfo.second.mPackets,mPacketDigits) +
-                   (mContDigits ? (L":" + wdec(pidInfo.second.mDisContinuity, mContDigits)) : L"") +
+                   (mContDigits ? (L":" + wdec(pidInfo.second.mContinuity, mContDigits)) : L"") +
                    L" " + wdec(pidInfo.first, 4) +
                    L" " + getFullPtsWstring (pidInfo.second.mPts) +
-                   L" " + pidInfo.second.getTypeWstring();
+                   L" " + strToWstr (pidInfo.second.getTypeString());
 
         r.left = mRect.left;
         r.bottom = r.top + mLineHeight;
@@ -63,7 +63,7 @@ public:
           mPacketDigits++;
         }
 
-      if (mTs->getDiscontinuity() > pow (10, mContDigits))
+      if (mTs->getErrors() > pow (10, mContDigits))
         mContDigits++;
       }
     }

@@ -147,7 +147,7 @@ private:
   public:
     cServiceName (cTsEpgBox* box, cService* service, float textHeight, cRect r) :
         cBoxItem(box, service, textHeight, r) {
-      mStr = service->getNameString();
+      mStr = service->getChannelString();
       mBrush = mService->getShowEpg() ? mBox->getWindow()->getWhiteBrush() : mBox->getWindow()->getBlueBrush();
       }
     virtual ~cServiceName() {}
@@ -172,7 +172,8 @@ private:
     virtual void onDown() {
 
       if (mService->getNowEpgItem()->toggleRecord())
-        mTs->start (mService, mService->getNowEpgItem()->getTitleString(), mTs->getTime(), true);
+        mTs->start (mService, mService->getNowEpgItem()->getTitleString(), 
+                    mTs->getTime(), mTs->getTime(), true);
       else
         mTs->stop (mService);
       }

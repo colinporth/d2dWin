@@ -22,9 +22,10 @@ public:
     init (title, width, height, false);
     setChangeCountDown (4);
 
+    vector <string> kChannelStrings = { "all" };
     auto frequency = param.empty() ? 626 : atoi (param.c_str());
     if (frequency) {
-      mDvb = new cDvb (frequency * 1000, rootName, false, "all", "");
+      mDvb = new cDvb (frequency * 1000, rootName, kChannelStrings, kChannelStrings);
       add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDvb), 0.f,0.f);
       add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
 
@@ -41,7 +42,7 @@ public:
       }
 
     else {
-      mDumpTs = new cDumpTransportStream (rootName, false);
+      mDumpTs = new cDumpTransportStream (rootName, kChannelStrings, kChannelStrings);
       add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDumpTs), 0.f,0.f);
       add (new cTsPidBox (this, -getHeight()/2.f, 0.f, mDumpTs), getHeight()/2.f,0.f);
       thread ([=]() { fileThread (param, mDumpTs); }).detach();
