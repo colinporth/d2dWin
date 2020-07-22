@@ -901,6 +901,15 @@ private:
       return true;
       }
     //}}}
+    //{{{
+    bool subDecodePes (cPidInfo* pidInfo, bool skip) {
+
+      auto length = pidInfo->mBufPtr - pidInfo->mBuffer;
+      cLog::log (LOGINFO, "sub vidPes " + dec(pidInfo->mPid) + " len:" + dec(length));
+
+      return true;
+      }
+    //}}}
 
   private:
     int64_t mBasePts = -1;
