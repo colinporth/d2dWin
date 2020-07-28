@@ -92,7 +92,7 @@ private:
       while (streamPos < streamSize) {
         if (streamSize - streamPos < chunkSize)
           chunkSize = streamSize - streamPos;
-        streamPos += ts->demux (streamPtr, chunkSize, streamPos, false, -1);
+        streamPos += ts->demux (streamPtr, chunkSize, streamPos, false, -1, 0);
         streamPtr += chunkSize;
         changed();
         //Sleep (10);

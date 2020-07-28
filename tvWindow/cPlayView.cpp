@@ -204,7 +204,7 @@ void cPlayView::setService (int index) {
   auto service = mAnalTs->getService (index);
   if (service) {
     mAudTs->setPid (service->getAudPid());
-    mVidTs->setPid (service->getVidPid());
+    mVidTs->setPid (service->getVidPid(), service->getSubPid());
     }
   }
 //}}}
@@ -254,7 +254,7 @@ void cPlayView::analyserThread() {
     auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
     auto chunkPtr = fileChunkBuffer;
     while (chunkBytesLeft >= 188) {
-      auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, false, -1);
+      auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, false, -1, 0);
       streamPos += bytesUsed;
       chunkPtr += bytesUsed;
       chunkBytesLeft -= (int)bytesUsed;
@@ -278,7 +278,7 @@ void cPlayView::analyserThread() {
     auto chunkBytesLeft = _read (file, fileChunkBuffer, kChunkSize);
     auto chunkPtr = fileChunkBuffer;
     while (chunkBytesLeft >= 188) {
-      auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, chunkPtr == fileChunkBuffer, -1);
+      auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, streamPos, chunkPtr == fileChunkBuffer, -1, 0);
       streamPos += bytesUsed;
       chunkPtr += bytesUsed;
       chunkBytesLeft -= (int)bytesUsed;
@@ -304,7 +304,7 @@ void cPlayView::analyserThread() {
       if (chunkBytesLeft >= 188) {
         auto chunkPtr = fileChunkBuffer;
         while (chunkBytesLeft >= 188) {
-          auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, mStreamPos, mStreamPos == 0, -1);
+          auto bytesUsed = mAnalTs->demux (chunkPtr, chunkBytesLeft, mStreamPos, mStreamPos == 0, -1, 0);
           mStreamPos += bytesUsed;
           chunkPtr += bytesUsed;
           chunkBytesLeft -= (int)bytesUsed;
@@ -392,7 +392,7 @@ void cPlayView::audThread() {
       while (chunkBytesLeft >= 188) {
         //{{{  demux up to a frame
         // decode a frame
-        auto bytesUsed = mAudTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mAudTs->getPid());
+        auto bytesUsed = mAudTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mAudTs->getPid(), 0);
         streamPos += bytesUsed;
         chunkPtr += bytesUsed;
         chunkBytesLeft -= (int)bytesUsed;
@@ -468,7 +468,8 @@ void cPlayView::vidThread() {
     else {
       while (chunkBytesLeft >= 188) {
         //{{{  demux up to a frame
-        auto bytesUsed = mVidTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip, mVidTs->getPid());
+        auto bytesUsed = mVidTs->demux (chunkPtr, chunkBytesLeft, streamPos, skip,
+                                        mVidTs->getPid(), mVidTs->getPid2());
         streamPos += bytesUsed;
         chunkPtr += bytesUsed;
         chunkBytesLeft -= (int)bytesUsed;

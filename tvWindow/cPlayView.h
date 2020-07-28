@@ -257,6 +257,7 @@ private:
     //}}}
 
     int getPid() { return mPid; }
+    int getPid2() { return mPid2; }
     int64_t getLastLoadedPts() { return mLastLoadedPts; }
 
     //{{{
@@ -319,6 +320,13 @@ private:
       invalidateFrames();
       }
     //}}}
+    //{{{
+    void setPid (int pid1, int pid2) {
+      mPid = pid1;
+      mPid2 = pid2;
+      invalidateFrames();
+      }
+    //}}}
 
     virtual void drawFrames (ID2D1DeviceContext* dc, const cRect& rect, IDWriteTextFormat* textFormat,
                              ID2D1SolidColorBrush* white, ID2D1SolidColorBrush* blue,
@@ -343,6 +351,7 @@ private:
 
     // vars
     int mPid = -1;
+    int mPid2 = -1;
     int64_t mLastLoadedPts = -1;
     int mLoadFrame = 0;
     concurrency::concurrent_vector<iFrame*> mFrames;
@@ -775,6 +784,17 @@ private:
       return decoded;
       }
     //}}}
+    //{{{
+    bool subDecodePes (cPidInfo* pidInfo, bool skip) {
+
+      if (pidInfo->mPid == mPid2) {
+        auto pesSize = int (pidInfo->mBufPtr - pidInfo->mBuffer);
+        cLog::log (LOGINFO, "cVidTransportStream::subDecodePes pid:" + dec(pidInfo->mPid) + " len:" + dec(pesSize));
+        }
+
+      return true;
+      }
+    //}}}
 
   private:
     //{{{
@@ -905,7 +925,7 @@ private:
     bool subDecodePes (cPidInfo* pidInfo, bool skip) {
 
       auto pesSize = int (pidInfo->mBufPtr - pidInfo->mBuffer);
-      cLog::log (LOGINFO, "subDecodePes " + dec(pesSize));
+      cLog::log (LOGINFO, "cAnalTransportStream::subDecodePes pid:" + dec(pidInfo->mPid) + " len:" + dec(pesSize));
       return true;
       }
     //}}}
