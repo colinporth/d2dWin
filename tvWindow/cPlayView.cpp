@@ -39,10 +39,10 @@ cPlayView::cPlayView (cD2dWindow* window, float width, float height, const strin
   mProgressBox = window->add (new cProgressBox (window, 0.f,6.f, this), 0.f,-6.f);
   mAudFrameBox = window->add (new cAudFrameBox (window, 82.f,240.0f, mPlayAudFrame, mAudio), -84.f,-240.f-6.0f);
 
-  thread ([=](){ analyserThread(); }).detach();
-  thread ([=]() { audThread(); }).detach();
-  thread ([=]() { vidThread(); }).detach();
-  thread ([=](){ playThread(); }).detach();
+  thread ([=]() { analyserThread(); } ).detach();
+  thread ([=]() { audThread(); } ).detach();
+  thread ([=]() { vidThread(); } ).detach();
+  thread ([=]() { playThread(); } ).detach();
   }
 //}}}
 //{{{

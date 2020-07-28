@@ -904,9 +904,8 @@ private:
     //{{{
     bool subDecodePes (cPidInfo* pidInfo, bool skip) {
 
-      auto length = pidInfo->mBufPtr - pidInfo->mBuffer;
-      cLog::log (LOGINFO, "sub vidPes " + dec(pidInfo->mPid) + " len:" + dec(length));
-
+      auto pesSize = int (pidInfo->mBufPtr - pidInfo->mBuffer);
+      cLog::log (LOGINFO, "subDecodePes " + dec(pesSize));
       return true;
       }
     //}}}
@@ -972,6 +971,7 @@ private:
   cAnalTransportStream* mAnalTs;
   cAudTransportStream* mAudTs;
   cVidTransportStream* mVidTs;
+  cVidTransportStream* mSubTs;
 
   cSemaphore mPlayPtsSem;
   cSemaphore mFirstVidPtsSem;
