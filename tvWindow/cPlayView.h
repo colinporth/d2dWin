@@ -792,7 +792,7 @@ private:
         cLog::log (LOGINFO, "cVidTransportStream::subDecodePes pid:" + dec(pidInfo->mPid) + " len:" + dec(pesSize));
         }
 
-      return true;
+      return false;
       }
     //}}}
 
@@ -926,7 +926,7 @@ private:
 
       auto pesSize = int (pidInfo->mBufPtr - pidInfo->mBuffer);
       cLog::log (LOGINFO, "cAnalTransportStream::subDecodePes pid:" + dec(pidInfo->mPid) + " len:" + dec(pesSize));
-      return true;
+      return false;
       }
     //}}}
 
