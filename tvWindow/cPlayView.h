@@ -785,7 +785,7 @@ private:
       }
     //}}}
     //{{{
-    bool subDecodePes (cPidInfo* pidInfo, bool skip) {
+    bool subDecodePes (cPidInfo* pidInfo) {
 
       if (pidInfo->mPid == mPid2) {
         auto pesSize = int (pidInfo->mBufPtr - pidInfo->mBuffer);
@@ -922,7 +922,7 @@ private:
       }
     //}}}
     //{{{
-    bool subDecodePes (cPidInfo* pidInfo, bool skip) {
+    bool subDecodePes (cPidInfo* pidInfo) {
 
       auto pesSize = int (pidInfo->mBufPtr - pidInfo->mBuffer);
       cLog::log (LOGINFO, "cAnalTransportStream::subDecodePes pid:" + dec(pidInfo->mPid) + " len:" + dec(pesSize));
