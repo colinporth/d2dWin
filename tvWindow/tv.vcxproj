@@ -68,6 +68,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\date\date.h" />
+    <ClInclude Include="..\..\shared\dvb\cSubtitleDecoder.h" />
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h" />
     <ClInclude Include="..\..\shared\dvb\huffmanTables.h" />
     <ClInclude Include="..\..\shared\utils\cFileList.h" />

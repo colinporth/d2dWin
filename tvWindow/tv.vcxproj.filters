@@ -52,6 +52,9 @@
     <ClInclude Include="..\..\shared\dvb\huffmanTables.h">
       <Filter>header</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\dvb\cSubtitleDecoder.h">
+      <Filter>header</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="header">

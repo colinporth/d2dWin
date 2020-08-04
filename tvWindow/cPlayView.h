@@ -5,6 +5,8 @@
 #include "../../shared/utils/cWinAudio16.h"
 
 #include "../../shared/dvb/cTransportStream.h"
+#include "../../shared/dvb/cSubtitleDecoder.h"
+
 #include "../common/cVidFrame.h"
 #include "../common/cAudFrame.h"
 
@@ -789,7 +791,15 @@ private:
 
       if (pidInfo->mPid == mPid2) {
         auto pesSize = int (pidInfo->mBufPtr - pidInfo->mBuffer);
-        cLog::log (LOGINFO, "cVidTransportStream::subDecodePes pid:" + dec(pidInfo->mPid) + " len:" + dec(pesSize));
+        cLog::log (LOGINFO, "vid subDecodePes - pid:" + dec(pidInfo->mPid) +
+                            " pts:" + getPtsString (pidInfo->mPts) +
+                            " size:" + dec(pidInfo->getBufUsed(),4) +
+                            " sid:" + dec(pidInfo->mPid));
+
+        cSubtitleDecoder decoder;
+        cSubtitle subtitle;
+        decoder.decode (pidInfo->mBuffer, pidInfo->getBufUsed(), &subtitle);
+        subtitle.debug("- ");
         }
 
       return false;
@@ -925,7 +935,16 @@ private:
     bool subDecodePes (cPidInfo* pidInfo) {
 
       auto pesSize = int (pidInfo->mBufPtr - pidInfo->mBuffer);
-      cLog::log (LOGINFO, "cAnalTransportStream::subDecodePes pid:" + dec(pidInfo->mPid) + " len:" + dec(pesSize));
+      cLog::log (LOGINFO, "anal subDecodePes - pid:" + dec(pidInfo->mPid) +
+                          " pts:" + getPtsString (pidInfo->mPts) +
+                          " size:" + dec(pidInfo->getBufUsed(),4) +
+                          " sid:" + dec(pidInfo->mPid));
+
+      cSubtitleDecoder decoder;
+      cSubtitle subtitle;
+      decoder.decode (pidInfo->mBuffer, pidInfo->getBufUsed(), &subtitle);
+      subtitle.debug("- ");
+
       return false;
       }
     //}}}
