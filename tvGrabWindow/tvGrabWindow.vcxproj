@@ -54,7 +54,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\date\date.h" />
-    <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h" />
     <ClInclude Include="..\..\shared\dvb\cDvb.h" />
     <ClInclude Include="..\..\shared\dvb\cSubtitleDecoder.h" />
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h" />
@@ -165,6 +164,15 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='release avx|x64'">
     <LinkIncremental>false</LinkIncremental>
     <LibraryPath>..\lib64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <VcpkgEnabled>false</VcpkgEnabled>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <VcpkgEnabled>false</VcpkgEnabled>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='release avx|x64'">
+    <VcpkgEnabled>false</VcpkgEnabled>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

@@ -26,8 +26,8 @@ public:
     auto frequency = param.empty() ? 626 : atoi (param.c_str());
     if (frequency) {
       mDvb = new cDvb (frequency * 1000, rootName, kChannelStrings, kChannelStrings);
-      add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDvb), 0.f,0.f);
-      add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb), getHeight()/2.f,0.f);
+      add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDvb->getTransportStream()), 0.f,0.f);
+      add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb->getTransportStream()), getHeight()/2.f,0.f);
 
       add (new cTitleBox (this, 60.f,24.f, mDvb->mErrorStr), -200.f,0.f);
       add (new cTitleBox (this, 60.f,24.f, mDvb->mSignalStr), -130.f,0.f);
@@ -42,10 +42,10 @@ public:
       }
 
     else {
-      mDumpTs = new cDumpTransportStream (rootName, kChannelStrings, kChannelStrings);
-      add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDumpTs), 0.f,0.f);
-      add (new cTsPidBox (this, -getHeight()/2.f, 0.f, mDumpTs), getHeight()/2.f,0.f);
-      thread ([=]() { fileThread (param, mDumpTs); }).detach();
+      mDvb = new cDvb (0, "/tv", { "all" }, { "" });
+      add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDvb->getTransportStream()), 0.f,0.f);
+      add (new cTsPidBox (this, -getHeight()/2.f, 0.f, mDvb->getTransportStream()), getHeight()/2.f,0.f);
+      thread ([=]() { mDvb->readThread (param); }).detach();
       }
 
     add (new cLogBox (this, 20.f));
@@ -54,7 +54,6 @@ public:
     messagePump();
 
     delete mDvb;
-    delete mDumpTs;
     }
   //}}}
 
@@ -74,7 +73,8 @@ protected:
 
 private:
   //{{{
-  void fileThread (const string& fileName, cDumpTransportStream* ts) {
+  void fileThread (const string& fileName, cTransportStream* ts) {
+  // older windows only filethread, use shared dvb now
 
     CoInitializeEx (NULL, COINIT_MULTITHREADED);
     cLog::setThreadName ("file");
@@ -115,7 +115,6 @@ private:
 
   // vars
   cDvb* mDvb = nullptr;
-  cDumpTransportStream* mDumpTs = nullptr;
   };
 
 

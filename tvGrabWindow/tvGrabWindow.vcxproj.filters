@@ -25,9 +25,6 @@
     <ClInclude Include="..\..\shared\utils\cBipBuffer.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\dvb\cDumpTransportStream.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cTransportStream.h">
       <Filter>header</Filter>
     </ClInclude>
