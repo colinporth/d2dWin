@@ -35,7 +35,7 @@ public:
       thread ([=]() {
         //{{{  grabthread
         CoInitializeEx (NULL, COINIT_MULTITHREADED);
-        mDvb->grabThread();
+        mDvb->grabThread ("", "");
         CoUninitialize();
         //}}}
         }).detach();

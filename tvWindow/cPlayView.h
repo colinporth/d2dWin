@@ -796,9 +796,8 @@ private:
                             " size:" + dec(pidInfo->getBufUsed(),4) +
                             " sid:" + dec(pidInfo->mPid));
 
-        cSubtitleDecoder decoder;
         cSubtitle subtitle;
-        decoder.decode (pidInfo->mBuffer, pidInfo->getBufUsed(), &subtitle);
+        subtitle.decode (pidInfo->mBuffer, pidInfo->getBufUsed());
         subtitle.debug("- ");
         }
 
@@ -940,9 +939,8 @@ private:
                           " size:" + dec(pidInfo->getBufUsed(),4) +
                           " sid:" + dec(pidInfo->mPid));
 
-      cSubtitleDecoder decoder;
       cSubtitle subtitle;
-      decoder.decode (pidInfo->mBuffer, pidInfo->getBufUsed(), &subtitle);
+      subtitle.decode (pidInfo->mBuffer, pidInfo->getBufUsed());
       subtitle.debug("- ");
 
       return false;
