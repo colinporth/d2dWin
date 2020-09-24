@@ -18,6 +18,10 @@
 using namespace std;
 using namespace chrono;
 //}}}
+const string kHost = "as-hls-uk-live.bbcfmt.s.llnwi.net";
+const vector <string> kChannels = { "bbc_radio_one",    "bbc_radio_two",       "bbc_radio_three",
+                                    "bbc_radio_fourfm", "bbc_radio_five_live", "bbc_6music" };
+const int kBitRate = 128000;
 
 class cAppWindow : public cD2dWindow {
 public:
@@ -30,19 +34,19 @@ public:
     add (new cSongBox (this, 0.f,0.f, mSong));
 
     if (names.empty()) {
-      //{{{  hls radio 1..6
-      add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index){
-        mSong.clear(); mSong.setChan ("bbc_radio_one"); mSongChanged = true; } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index){
-        mSong.clear(); mSong.setChan ("bbc_radio_two"); mSongChanged = true; } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index){
-        mSong.clear(); mSong.setChan ("bbc_radio_three"); mSongChanged = true; } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index){
-        mSong.clear(); mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true; } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index){
-        mSong.clear(); mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index){
-        mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; } ));
+      //{{{  add radio 1..6 with action lambda
+      add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index) {
+        mSong.clear(); mSong.setChan (kChannels[0]); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index) {
+        mSong.clear(); mSong.setChan (kChannels[1]); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index) {
+        mSong.clear(); mSong.setChan (kChannels[2]); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index) {
+        mSong.clear(); mSong.setChan (kChannels[3]); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index) {
+        mSong.clear(); mSong.setChan (kChannels[4]); mSongChanged = true; } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index) {
+        mSong.clear(); mSong.setChan (kChannels[5]); mSongChanged = true; } ));
 
       mBitrateStr = "48k aacHE";
       addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
@@ -73,7 +77,8 @@ public:
 
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 
-      thread ([=](){ hlsThread ("as-hls-uk-live.bbcfmt.s.llnwd.net", "bbc_radio_fourfm", 128000); }).detach();
+      // startup radio4
+      thread ([=](){ hlsThread (kHost, kChannels[3], kBitRate); }).detach();
       }
       //}}}
     else {
