@@ -328,15 +328,15 @@ private:
 int main (int argc, char** argv) {
 
   cLog::init (LOGINFO, false, "", "hlsWindow");
+  vector<string> names;
 
   //int numArgs;
   //auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-  vector<string> names;
   //for (int i = 1; i < numArgs; i++)
   //  names.push_back (wcharToString (args[i]));
 
   cAppWindow appWindow;
-  appWindow.run ("playWindow", 800, 420, names);
+  appWindow.run ("hlsWindow", 800, 420, names);
 
   return 0;
   }
