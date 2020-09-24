@@ -4,10 +4,10 @@
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="cSong.cpp" />
     <ClCompile Include="..\..\shared\decoders\cAacDecoder.cpp" />
-    <ClCompile Include="..\..\shared\decoders\cMp3Decoder.cpp" />
     <ClCompile Include="..\..\shared\decoders\cAudioDecode.cpp" />
     <ClCompile Include="..\..\shared\net\cHttp.cpp" />
-    <ClCompile Include="playWindow.cpp" />
+    <ClCompile Include="hlsWindow.cpp" />
+    <ClCompile Include="..\..\shared\decoders\cMp3Decoder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">
@@ -87,9 +87,6 @@
     <ClInclude Include="..\..\shared\decoders\cAacDecoder.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\cMp3Decoder.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\decoders\iAudioDecoder.h">
       <Filter>h</Filter>
     </ClInclude>
@@ -112,6 +109,9 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\hls\r6x80.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\cMp3Decoder.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>
