@@ -647,11 +647,11 @@ private:
 
 // main
 int WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+
   cLog::init (LOGINFO, true, "", "playWindow");
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-
   vector<string> names;
   for (int i = 1; i < numArgs; i++)
     names.push_back (wcharToString (args[i]));
