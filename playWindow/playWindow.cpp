@@ -73,7 +73,7 @@ public:
 
       add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
 
-      thread ([=](){ hlsThread ("as-hls-uk-live.bbcfmt.hs.llnwd.net", "bbc_radio_fourfm", 48000); }).detach();
+      thread ([=](){ hlsThread ("as-hls-uk-live.bbcfmt.s.llnwd.net", "bbc_radio_fourfm", 128000); }).detach();
       }
       //}}}
     else {
