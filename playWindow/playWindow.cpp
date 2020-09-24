@@ -23,6 +23,16 @@ const vector <string> kChannels = { "bbc_radio_one",    "bbc_radio_two",       "
                                     "bbc_radio_fourfm", "bbc_radio_five_live", "bbc_6music" };
 const int kBitRate = 128000;
 
+//{{{  proper link to m3u8, fix it to use it one day
+const string kLink = "a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_med/llnw/";
+// + channel.m3u8"
+// - returns
+//    #EXTM3U
+//    #EXT-X-VERSION:3
+//    #EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=135680,CODECS="mp4a.40.2"
+//    http://as-hls-uk-live.bbcfmt.s.llnwi.net/pool_904/live/uk/bbc_radio_three/bbc_radio_three.isml/bbc_radio_three-audio%3d128000.norewind.m3u8
+//}}}
+
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
