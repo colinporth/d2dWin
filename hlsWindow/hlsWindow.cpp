@@ -19,10 +19,16 @@ using namespace std;
 using namespace chrono;
 //}}}
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d827008.m3u8
+//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_four_hd/bbc_four_hd.isml/bbc_four_hd-pa4%3d128000-video%3d5070016.m3u8
+//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_south_west/bbc_one_south_west.isml/bbc_one_south_west-pa3%3d96000-video%3d1604032.m3u8
 
 const string kHost = "vs-hls-uk-live.akamaized.net";
-const vector <string> kChannels = { "bbc_one_hd" };
-const int kBitRate = 128000;
+
+const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
+constexpr int kBitRate = 128000;
+//constexpr int kVidBitrate = 827008;
+//constexpr int kVidBitrate = 2812032;
+constexpr int kVidBitrate = 5070016;
 
 class cAppWindow : public cD2dWindow {
 public:
@@ -34,36 +40,7 @@ public:
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
 
-    mBitrateStr = "128k 827008";
-    addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
-      //{{{  lambda
-      mSong.clear();
-      switch (mSong.getBitrate()) {
-        case 48000:
-          mSong.setBitrate (96000);
-          mBitrateStr = "96k aacHE";
-          break;
-        case 96000:
-          mSong.setBitrate (128000);
-          mBitrateStr = "128k aac";
-          break;
-        case 128000:
-          mSong.setBitrate (320000);
-          mBitrateStr = "320k aac";
-          break;
-        case 320000:
-          mSong.setBitrate (48000);
-          mBitrateStr = "48k aacHE";
-          break;
-        }
-      mSongChanged = true;
-      }
-      //}}}
-      ), 4.f);
-
-    add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
-
-    // startup radio4
+    // startup
     thread ([=](){ hlsThread (kHost, kChannels[0], kBitRate); }).detach();
 
     mLogBox = add (new cLogBox (this, 20.f));
@@ -102,20 +79,6 @@ protected:
 
       case 0x2e: mSong.getSelect().clearAll(); changed(); break;; // delete select
 
-      case 0x0d: mSongChanged = true; break; // enter
-
-      // crude chan,bitrate change
-      case '1' : mSong.clear(); mSong.setChan ("bbc_radio_one"); mSongChanged = true; break;
-      case '2' : mSong.clear(); mSong.setChan ("bbc_radio_two"); mSongChanged = true; break;
-      case '3' : mSong.clear(); mSong.setChan ("bbc_radio_three"); mSongChanged = true; break;
-      case '4' : mSong.clear(); mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true;  break;
-      case '5' : mSong.clear(); mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; break;
-      case '6' : mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; break;
-      case '7' : mSong.clear(); mSong.setBitrate (48000); mBitrateStr = "48k aacHE"; mSongChanged = true; break;
-      case '8' : mSong.clear(); mSong.setBitrate (96000); mBitrateStr = "96k aacHE"; mSongChanged = true; break;
-      case '9' : mSong.clear(); mSong.setBitrate (128000); mBitrateStr = "128k aac"; mSongChanged = true; break;
-      case '0' : mSong.clear(); mSong.setBitrate (320000); mBitrateStr = "320k aac"; mSongChanged = true; break;
-
       default  : cLog::log (LOGINFO, "key %x", key); changed(); break;
       }
 
@@ -138,23 +101,42 @@ private:
     }
   //}}}
   //{{{
-  static uint8_t* extractAacFramesFromTs (uint8_t* ts, int tsLen) {
-  // extract aacFrames from ts packets, pack back into ts, gets smaller ts gets stripped
+  static uint8_t* extractFramesFromTs (uint8_t* ts, int tsLen, uint8_t* vidFramesPtr) {
+  // extract aacFrames, vidframes from ts packets
+  // - audio put back into ts, gets smaller ts gets stripped
+  // - video into supplied buffer
 
     auto aacFramesPtr = ts;
 
     auto tsEnd = ts + tsLen;
     while ((ts < tsEnd) && (*ts++ == 0x47)) {
-      // ts packet start
+      // ts packet start, dumb ts parser
       auto payStart = ts[0] & 0x40;
       auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
       auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
       ts += headerBytes;
       auto tsBodyBytes = 187 - headerBytes;
 
-      if (pid == 34) {
-        if (payStart &&
-            !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
+      if (pid == 33) {
+        if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
+          //cLog::log (LOGINFO, "video pid:%d header %x %x %x %x headerBytes:%d",
+          //                    pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
+
+          int pesHeaderBytes = 9 + ts[8];
+          ts += pesHeaderBytes;
+          tsBodyBytes -= pesHeaderBytes;
+          }
+
+        // copy ts payload into vidFrames buffer
+        memcpy (vidFramesPtr, ts, tsBodyBytes);
+        vidFramesPtr += tsBodyBytes;
+        }
+
+      else if (pid == 34) {
+        if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
+          //cLog::log(LOGINFO, "audio pid:%d header %x %x %x %x headerBytes:%d",
+          //                   pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
+
           int pesHeaderBytes = 9 + ts[8];
           ts += pesHeaderBytes;
           tsBodyBytes -= pesHeaderBytes;
@@ -163,6 +145,14 @@ private:
         // copy ts payload aacFrames back into buffer
         memcpy (aacFramesPtr, ts, tsBodyBytes);
         aacFramesPtr += tsBodyBytes;
+        }
+
+      else {
+        // other pid
+        if (payStart) {
+          cLog::log (LOGINFO, "other pid:%d header %x %x %x %x headerBytes:%d",
+                              pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
+          }
         }
 
       ts += tsBodyBytes;
@@ -176,16 +166,18 @@ private:
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
+    uint8_t* vidFrames = (uint8_t*)malloc (10000000);
+
     constexpr int kHlsPreload = 10; // about a minute
     cLog::setThreadName ("hls ");
 
     mSong.setChan (chan);
-    mSong.setBitrate (bitrate);
+    mSong.setBitrate (bitrate, 360);
     while (!getExit()) {
       const string path = "pool_902/live/uk/" + mSong.getChan() +
                           "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
                           "-pa4=" + dec(mSong.getBitrate()) +
-                          "-video=827008";
+                          "-video=" + dec(kVidBitrate);
       cPlatformHttp http;
       auto redirectedHost = http.getRedirect (host, path + ".m3u8");
       if (http.getContent()) {
@@ -215,7 +207,7 @@ private:
                                    " at " + date::format ("%T", floor<seconds>(getNow())));
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
               auto aacFrames = http.getContent();
-              auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
+              auto aacFramesEnd = extractFramesFromTs (aacFrames, http.getContentSize(), vidFrames);
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
                 auto samples = decode.decodeFrame (seqFrameNum);
                 if (samples) {
@@ -224,7 +216,7 @@ private:
                   changed();
                   if (firstTime) {
                     firstTime = false;
-                    //player = thread ([=](){ playThread (true); });
+                    player = thread ([=](){ playThread (true); });
                     }
                   }
                 aacFrames += decode.getNextFrameOffset();
@@ -245,7 +237,7 @@ private:
           else // no chunk available, back off for 100ms
             this_thread::sleep_for (100ms);
           }
-        //player.join();
+        player.join();
         }
       }
     cLog::log (LOGINFO, "exit");
@@ -312,31 +304,17 @@ private:
   //{{{  vars
   cSong mSong;
   bool mSongChanged = false;
-
   bool mPlaying = true;
-
-  string mBitrateStr;
-  string mUrl;
-
-  string mDebugStr;
   cBox* mLogBox = nullptr;
   //}}}
   };
 
-// main
-//int WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 int main (int argc, char** argv) {
 
   cLog::init (LOGINFO, false, "", "hlsWindow");
-  vector<string> names;
-
-  //int numArgs;
-  //auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-  //for (int i = 1; i < numArgs; i++)
-  //  names.push_back (wcharToString (args[i]));
 
   cAppWindow appWindow;
-  appWindow.run ("hlsWindow", 800, 420, names);
+  appWindow.run ("hlsWindow", 800, 420, {});
 
   return 0;
   }

@@ -304,9 +304,9 @@ public:
   // stream
   void setChan (const std::string& chan) { mChan = chan; }
   //{{{
-  void setBitrate (int bitrate) {
+  void setBitrate (int bitrate, int framesPerChunk) {
     mBitrate = bitrate;
-    mHlsFramesPerChunk = (bitrate >= 128000) ? 300 : 150;
+    mHlsFramesPerChunk = framesPerChunk;
     }
   //}}}
 
