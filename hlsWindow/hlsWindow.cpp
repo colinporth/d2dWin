@@ -23,7 +23,6 @@ using namespace chrono;
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_south_west/bbc_one_south_west.isml/bbc_one_south_west-pa3%3d96000-video%3d1604032.m3u8
 
 const string kHost = "vs-hls-uk-live.akamaized.net";
-
 const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
 constexpr int kBitRate = 128000;
 //constexpr int kVidBitrate = 827008;
