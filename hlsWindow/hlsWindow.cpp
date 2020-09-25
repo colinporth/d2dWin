@@ -21,7 +21,6 @@ using namespace chrono;
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d827008.m3u8
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_four_hd/bbc_four_hd.isml/bbc_four_hd-pa4%3d128000-video%3d5070016.m3u8
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_south_west/bbc_one_south_west.isml/bbc_one_south_west-pa3%3d96000-video%3d1604032.m3u8
-
 const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
 constexpr int kBitRate = 128000;
@@ -105,6 +104,8 @@ private:
   // - audio put back into ts, gets smaller ts gets stripped
   // - video into supplied buffer
 
+    int audioPesNum = 0;
+    int videoPesNum = 0;
     auto aacFramesPtr = ts;
 
     auto tsEnd = ts + tsLen;
@@ -118,9 +119,7 @@ private:
 
       if (pid == 33) {
         if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-          //cLog::log (LOGINFO, "video pid:%d header %x %x %x %x headerBytes:%d",
-          //                    pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
-
+          cLog::log (LOGINFO, "video pid:" + dec(pid) + " " + dec(videoPesNum++));
           int pesHeaderBytes = 9 + ts[8];
           ts += pesHeaderBytes;
           tsBodyBytes -= pesHeaderBytes;
@@ -133,8 +132,7 @@ private:
 
       else if (pid == 34) {
         if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-          //cLog::log(LOGINFO, "audio pid:%d header %x %x %x %x headerBytes:%d",
-          //                   pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
+          cLog::log (LOGINFO, "audio pid:" + dec(pid) + " " + dec(audioPesNum++));
 
           int pesHeaderBytes = 9 + ts[8];
           ts += pesHeaderBytes;
@@ -165,6 +163,7 @@ private:
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
+    mFile = fopen ("C:/Users/colin/Desktop/hls.ts", "wb");
     uint8_t* vidFrames = (uint8_t*)malloc (10000000);
 
     constexpr int kHlsPreload = 10; // about a minute
@@ -202,8 +201,12 @@ private:
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
-              cLog::log (LOGINFO1, "got " + dec(chunkNum) +
-                                   " at " + date::format ("%T", floor<seconds>(getNow())));
+              cLog::log (LOGINFO, "got " + dec(chunkNum) +
+                                   " at " + date::format ("%T", floor<seconds>(getNow())) +
+                                   " size:" + dec(http.getContentSize()));
+
+              fwrite (http.getContent(), 1, http.getContentSize(), mFile);
+
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractFramesFromTs (aacFrames, http.getContentSize(), vidFrames);
@@ -239,6 +242,8 @@ private:
         player.join();
         }
       }
+
+    fclose (mFile);
     cLog::log (LOGINFO, "exit");
     }
   //}}}
@@ -305,6 +310,8 @@ private:
   bool mSongChanged = false;
   bool mPlaying = true;
   cBox* mLogBox = nullptr;
+
+  FILE* mFile = nullptr;
   //}}}
   };
 
