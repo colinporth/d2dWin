@@ -1,4 +1,4 @@
-// playWindow.cpp
+// hlsWindow.cpp
 //{{{  includes
 #include "stdafx.h"
 
@@ -14,6 +14,14 @@
 #include "../boxes/cCalendarBox.h"
 #include "../boxes/cSongBox.h"
 
+#include "../mfx/include/mfxvideo++.h"
+
+#ifdef _DEBUG
+  #pragma comment (lib,"libmfx_d.lib")
+#else
+  #pragma comment (lib,"libmfx.lib")
+#endif
+
 using namespace std;
 using namespace chrono;
 //}}}
@@ -21,6 +29,322 @@ using namespace chrono;
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d827008.m3u8
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_four_hd/bbc_four_hd.isml/bbc_four_hd-pa4%3d128000-video%3d5070016.m3u8
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_south_west/bbc_one_south_west.isml/bbc_one_south_west-pa3%3d96000-video%3d1604032.m3u8
+//}}}
+
+//{{{
+class cNv12VideoFrame {
+public:
+  //{{{
+  virtual ~cNv12VideoFrame() {
+    _aligned_free (mYbuf);
+    _aligned_free (mUbuf);
+    _aligned_free (mVbuf);
+    _aligned_free (mBgra);
+    }
+  //}}}
+
+  //{{{
+  void set (uint8_t* nv12, int stride, int width, int height) {
+
+    mWidth = width;
+    mHeight = height;
+
+    mYStride = stride;
+    mUVStride = stride/2;
+
+    // copy all of nv12 to yBuf
+    mYbuf = (uint8_t*)_aligned_realloc (mYbuf, height * mYStride * 3 / 2, 128);
+    memcpy (mYbuf, nv12, height * mYStride * 3 / 2);
+
+    // unpack NV12 to planar uv
+    mUbuf = (uint8_t*)_aligned_realloc (mUbuf, (mHeight/2) * mUVStride, 128);
+    mVbuf = (uint8_t*)_aligned_realloc (mVbuf, (mHeight/2) * mUVStride, 128);
+
+    uint8_t* uv = mYbuf + (mHeight * mYStride);
+    uint8_t* u = mUbuf;
+    uint8_t* v = mVbuf;
+    for (int i = 0; i < mHeight/2 * mUVStride; i++) {
+      *u++ = *uv++;
+      *v++ = *uv++;
+      }
+
+    mBgra = (uint32_t*)_aligned_realloc (mBgra, mWidth * 4 * mHeight, 128);
+    int argbStride = mWidth;
+
+    __m128i y0r0, y0r1, u0, v0;
+    __m128i y00r0, y01r0, y00r1, y01r1;
+    __m128i u00, u01, v00, v01;
+    __m128i rv00, rv01, gu00, gu01, gv00, gv01, bu00, bu01;
+    __m128i r00, r01, g00, g01, b00, b01;
+    __m128i rgb0123, rgb4567, rgb89ab, rgbcdef;
+    __m128i gbgb;
+    __m128i ysub, uvsub;
+    __m128i zero, facy, facrv, facgu, facgv, facbu;
+    __m128i *srcy128r0, *srcy128r1;
+    __m128i *dstrgb128r0, *dstrgb128r1;
+    __m64   *srcu64, *srcv64;
+
+    ysub  = _mm_set1_epi32 (0x00100010);
+    uvsub = _mm_set1_epi32 (0x00800080);
+
+    facy  = _mm_set1_epi32 (0x004a004a);
+    facrv = _mm_set1_epi32 (0x00660066);
+    facgu = _mm_set1_epi32 (0x00190019);
+    facgv = _mm_set1_epi32 (0x00340034);
+    facbu = _mm_set1_epi32 (0x00810081);
+
+    zero  = _mm_set1_epi32( 0x00000000 );
+
+    for (int y = 0; y < mHeight; y += 2) {
+      srcy128r0 = (__m128i *)(mYbuf + mYStride*y);
+      srcy128r1 = (__m128i *)(mYbuf + mYStride*y + mYStride);
+      srcu64 = (__m64 *)(mUbuf + mUVStride*(y/2));
+      srcv64 = (__m64 *)(mVbuf + mUVStride*(y/2));
+
+      dstrgb128r0 = (__m128i *)(mBgra + argbStride*y);
+      dstrgb128r1 = (__m128i *)(mBgra + argbStride*y + argbStride);
+
+      for (int x = 0; x < mWidth; x += 16) {
+        u0 = _mm_loadl_epi64 ((__m128i *)srcu64 ); srcu64++;
+        v0 = _mm_loadl_epi64 ((__m128i *)srcv64 ); srcv64++;
+
+        y0r0 = _mm_load_si128( srcy128r0++ );
+        y0r1 = _mm_load_si128( srcy128r1++ );
+        //{{{  constant y factors
+        y00r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r0, zero), ysub), facy);
+        y01r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r0, zero), ysub), facy);
+        y00r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r1, zero), ysub), facy);
+        y01r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r1, zero), ysub), facy);
+        //}}}
+        //{{{  expand u and v so they're aligned with y values
+        u0  = _mm_unpacklo_epi8 (u0, zero);
+        u00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (u0, u0), uvsub);
+        u01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (u0, u0), uvsub);
+
+        v0  = _mm_unpacklo_epi8( v0,  zero );
+        v00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (v0, v0), uvsub);
+        v01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (v0, v0), uvsub);
+        //}}}
+        //{{{  common factors on both rows.
+        rv00 = _mm_mullo_epi16 (facrv, v00);
+        rv01 = _mm_mullo_epi16 (facrv, v01);
+        gu00 = _mm_mullo_epi16 (facgu, u00);
+        gu01 = _mm_mullo_epi16 (facgu, u01);
+        gv00 = _mm_mullo_epi16 (facgv, v00);
+        gv01 = _mm_mullo_epi16 (facgv, v01);
+        bu00 = _mm_mullo_epi16 (facbu, u00);
+        bu01 = _mm_mullo_epi16 (facbu, u01);
+        //}}}
+        //{{{  row 0
+        r00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, rv00), 6);
+        r01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, rv01), 6);
+        g00 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y00r0, gu00), gv00), 6);
+        g01 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y01r0, gu01), gv01), 6);
+        b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, bu00), 6);
+        b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, bu01), 6);
+
+        r00 = _mm_packus_epi16 (r00, r01);         // rrrr.. saturated
+        g00 = _mm_packus_epi16 (g00, g01);         // gggg.. saturated
+        b00 = _mm_packus_epi16 (b00, b01);         // bbbb.. saturated
+
+        r01     = _mm_unpacklo_epi8 (r00, zero); // 0r0r..
+        gbgb    = _mm_unpacklo_epi8 (b00, g00);  // gbgb..
+        rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
+        rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
+
+        r01     = _mm_unpackhi_epi8 (r00, zero);
+        gbgb    = _mm_unpackhi_epi8 (b00, g00 );
+        rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
+        rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
+
+        _mm_stream_si128 (dstrgb128r0++, rgb0123);
+        _mm_stream_si128 (dstrgb128r0++, rgb4567);
+        _mm_stream_si128 (dstrgb128r0++, rgb89ab);
+        _mm_stream_si128 (dstrgb128r0++, rgbcdef);
+        //}}}
+        //{{{  row 1
+        r00 = _mm_srai_epi16 (_mm_add_epi16 (y00r1, rv00), 6);
+        r01 = _mm_srai_epi16 (_mm_add_epi16 (y01r1, rv01), 6);
+        g00 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y00r1, gu00), gv00), 6);
+        g01 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y01r1, gu01), gv01), 6);
+        b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r1, bu00), 6);
+        b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r1, bu01), 6);
+
+        r00 = _mm_packus_epi16 (r00, r01);         // rrrr.. saturated
+        g00 = _mm_packus_epi16 (g00, g01);         // gggg.. saturated
+        b00 = _mm_packus_epi16 (b00, b01);         // bbbb.. saturated
+
+        r01     = _mm_unpacklo_epi8 (r00,  zero); // 0r0r..
+        gbgb    = _mm_unpacklo_epi8 (b00,  g00);  // gbgb..
+        rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
+        rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
+
+        r01     = _mm_unpackhi_epi8 (r00, zero);
+        gbgb    = _mm_unpackhi_epi8 (b00, g00);
+        rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
+        rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
+
+        _mm_stream_si128 (dstrgb128r1++, rgb0123);
+        _mm_stream_si128 (dstrgb128r1++, rgb4567);
+        _mm_stream_si128 (dstrgb128r1++, rgb89ab);
+        _mm_stream_si128 (dstrgb128r1++, rgbcdef);
+        //}}}
+        }
+      }
+    }
+  //}}}
+  //{{{
+  ID2D1Bitmap* makeBitmap (ID2D1DeviceContext* dc, ID2D1Bitmap* bitmap) {
+
+    if (bitmap)  {
+      auto pixelSize = bitmap->GetPixelSize();
+      if ((pixelSize.width != mWidth) || (pixelSize.height != mHeight)) {
+        // bitmap size changed
+        bitmap->Release();
+        bitmap = nullptr;
+        }
+      }
+
+    if (!bitmap) // create/recreate bitmap
+      dc->CreateBitmap (D2D1::SizeU(mWidth, mHeight),
+                        { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
+                        &bitmap);
+
+    bitmap->CopyFromMemory (&D2D1::RectU(0,0, mWidth,mHeight), mBgra, mWidth * 4);
+
+    return bitmap;
+    }
+  //}}}
+
+private:
+  // vars
+  int mWidth = 0;
+  int mHeight = 0;
+
+  int mYStride = 0;
+  int mUVStride = 0;
+
+  uint8_t* mYbuf = nullptr;
+  uint8_t* mUbuf = nullptr;
+  uint8_t* mVbuf = nullptr;
+
+  uint32_t* mBgra = nullptr;
+  };
+//}}}
+//{{{
+class cVideoDecode {
+public:
+  //{{{
+  cVideoDecode() {
+    mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
+    }
+  //}}}
+  //{{{
+  ~cVideoDecode() {
+
+    // Clean up resources
+    // -  recommended to close Media SDK components first, before releasing allocated surfaces
+    //    since //    some surfaces may still be locked by internal Media SDK resources.
+    MFXVideoDECODE_Close (mSession);
+
+    // mSession closed automatically on destruction
+    for (int i = 0; i < mNumSurfaces; i++)
+      delete mSurfaces[i];
+    }
+  //}}}
+
+  //{{{
+  void decode (int frameNum, uint8_t* pes, int pesSize) {
+
+    mBitstream.Data = pes;
+    mBitstream.DataOffset = 0;
+    mBitstream.DataLength = pesSize;
+    mBitstream.MaxLength = pesSize;
+    mBitstream.TimeStamp = frameNum; //pidInfo->mPts;
+
+    if (!mNumSurfaces) {
+      // allocate decoder surfaces, init decoder, decode header
+      memset (&mVideoParams, 0, sizeof(mVideoParams));
+      mVideoParams.mfx.CodecId = MFX_CODEC_AVC;
+      mVideoParams.IOPattern = MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
+      mfxStatus status = MFXVideoDECODE_DecodeHeader (mSession, &mBitstream, &mVideoParams);
+      if (status == MFX_ERR_NONE) {
+        //  query surfaces
+        mfxFrameAllocRequest frameAllocRequest;
+        memset (&frameAllocRequest, 0, sizeof(frameAllocRequest));
+        status =  MFXVideoDECODE_QueryIOSurf (mSession, &mVideoParams, &frameAllocRequest);
+        mNumSurfaces = frameAllocRequest.NumFrameSuggested;
+        mWidth = ((mfxU32)((frameAllocRequest.Info.Width)+31)) & (~(mfxU32)31);
+        mHeight = ((mfxU32)((frameAllocRequest.Info.Height)+31)) & (~(mfxU32)31);
+        }
+
+      // alloc surfaces in system memory
+      mSurfaces = new mfxFrameSurface1*[mNumSurfaces];
+      for (int i = 0; i < mNumSurfaces; i++) {
+        mSurfaces[i] = new mfxFrameSurface1;
+        memset (mSurfaces[i], 0, sizeof (mfxFrameSurface1));
+        memcpy (&mSurfaces[i]->Info, &mVideoParams.mfx.FrameInfo, sizeof(mfxFrameInfo));
+
+        // allocate nv12 followed by planar u, planar v
+        mSurfaces[i]->Data.Y = new mfxU8[mWidth * mHeight * 12 / 8];
+        mSurfaces[i]->Data.U = mSurfaces[i]->Data.Y + mWidth * mHeight;
+        mSurfaces[i]->Data.V = nullptr; // NV12 ignores V pointer
+        mSurfaces[i]->Data.Pitch = mWidth;
+        }
+
+      status = MFXVideoDECODE_Init (mSession, &mVideoParams);
+      }
+
+    if (mNumSurfaces) {
+      //mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
+      mfxStatus status = MFX_ERR_NONE;
+      while (status >= MFX_ERR_NONE || status == MFX_ERR_MORE_SURFACE) {
+        int index = getFreeSurfaceIndex (mSurfaces, mNumSurfaces);
+        mfxFrameSurface1* surface = nullptr;
+        mfxSyncPoint syncDecode = nullptr;
+        cLog::log (LOGINFO, "decode surface" + dec (index));
+        status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, mSurfaces[index], &surface, &syncDecode);
+        if (status == MFX_ERR_NONE) {
+          status = mSession.SyncOperation (syncDecode, 60000);
+          if (status == MFX_ERR_NONE) {
+            cLog::log (LOGINFO, "decode %d, %d %d %d",
+                                 surface->Data.TimeStamp,
+                                 surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
+
+            mNv12VideoFrame.set (surface->Data.Y, surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
+            }
+          }
+        }
+      }
+    }
+  //}}}
+
+private:
+  //{{{
+  int getFreeSurfaceIndex (mfxFrameSurface1** surfaces, mfxU16 poolSize) {
+
+    if (surfaces)
+      for (mfxU16 i = 0; i < poolSize; i++)
+        if (0 == surfaces[i]->Data.Locked)
+          return i;
+
+    return MFX_ERR_NOT_FOUND;
+    }
+  //}}}
+
+  mfxVersion kMfxVersion = { 0,1 };
+  MFXVideoSession mSession;
+
+  mfxVideoParam mVideoParams;
+  mfxU16 mNumSurfaces = 0;
+  int mWidth = 0;
+  int mHeight = 0;
+
+  mfxBitstream mBitstream;
+  mfxFrameSurface1** mSurfaces;
+
+  cNv12VideoFrame mNv12VideoFrame;
+  };
 //}}}
 
 const string kHost = "vs-hls-uk-live.akamaized.net";
@@ -93,11 +417,7 @@ private:
     const char* tagPtr = strstr ((char*)buffer, tag);
     const char* valuePtr = tagPtr + strlen (tag);
     const char* endPtr = strchr (valuePtr, '\n');
-
-    const string valueString = string (valuePtr, endPtr - valuePtr);
-    cLog::log (LOGINFO, string(tagPtr, endPtr - tagPtr) + " value: " + valueString);
-
-    return valueString;
+    return string (valuePtr, endPtr - valuePtr);
     }
   //}}}
 
@@ -108,6 +428,7 @@ private:
     mFile = fopen ("C:/Users/colin/Desktop/hls.ts", "wb");
 
     int vidFrameNum = 0;
+    cVideoDecode videoDecode;
 
     constexpr int kHlsPreload = 10; // about a minute
     cLog::setThreadName ("hls ");
@@ -142,15 +463,13 @@ private:
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
-              //{{{  chunk loaded ok, process it
+              //{{{  chunk loaded, process it
               cLog::log (LOGINFO, "chunk " + dec(chunkNum) +
                                   " at " + date::format ("%T", floor<seconds>(getNow())) +
                                   " " + dec(http.getContentSize()));
               fwrite (http.getContent(), 1, http.getContentSize(), mFile);
 
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
-
-              uint8_t* ts = http.getContent();
 
               int patNum = 0;
               int pgmNum = 0;
@@ -162,7 +481,8 @@ private:
               auto aacFrames = http.getContent();
               auto aacFramesPtr = aacFrames;
 
-              auto tsEnd = ts + http.getContentSize();
+              uint8_t* ts = http.getContent();
+              uint8_t* tsEnd = ts + http.getContentSize();
               while ((ts < tsEnd) && (*ts++ == 0x47)) {
                 // ts packet start, dumb ts parser
                 auto payStart = ts[0] & 0x40;
@@ -181,6 +501,8 @@ private:
                     if (vidPes) {
                       // last vidPes at vidFrameNum
                       mSong.addVideoFrame (vidFrameNum, vidPes, vidPesLen);
+                      videoDecode.decode (vidFrameNum, vidPes, vidPesLen);
+
                       vidPes = nullptr;
                       vidPesLen = 0;
                       vidFrameNum++;
@@ -189,7 +511,7 @@ private:
                     vidPesNum++;
                     }
 
-                  // copy ts payload into vidPes buffer
+                  // copy ts payload into vidPes buffer, !!!! expensive way !!!!!!
                   vidPes = (uint8_t*)realloc (vidPes, vidPesLen + tsBodyBytes);
                   memcpy (vidPes + vidPesLen, ts, tsBodyBytes);
                   vidPesLen += tsBodyBytes;
@@ -236,7 +558,8 @@ private:
                   //}}}
                 ts += tsBodyBytes;
                 }
-              cLog::log (LOGINFO, "- pat:" + dec(patNum) + " pgm:" + dec(pgmNum) + " videoPes:" + dec(vidPesNum) + " audioPes:" + dec(audPesNum));
+              cLog::log (LOGINFO, "- pat:" + dec(patNum) + " pgm:" + dec(pgmNum) +
+                                  " videoPes:" + dec(vidPesNum) + " audioPes:" + dec(audPesNum));
 
               while (decode.parseFrame (aacFrames, aacFramesPtr)) {
                 float* samples = decode.decodeFrame (seqFrameNum);
