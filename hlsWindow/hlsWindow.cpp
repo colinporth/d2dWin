@@ -324,10 +324,9 @@ public:
 
     //mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
     mfxStatus status = MFX_ERR_NONE;
-    while (status >= MFX_ERR_NONE || status == MFX_ERR_MORE_SURFACE) {
+    while ((status >= MFX_ERR_NONE) || (status == MFX_ERR_MORE_SURFACE)) {
       mfxFrameSurface1* surface = nullptr;
       mfxSyncPoint syncDecode = nullptr;
-      //cLog::log (LOGINFO, "decode surface" + dec (index));
       status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, getFreeSurface(), &surface, &syncDecode);
       if (status == MFX_ERR_NONE) {
         status = mSession.SyncOperation (syncDecode, 60000);
@@ -347,7 +346,7 @@ public:
 private:
   //{{{
   cFrame* getOldestFrame() {
-  // return free, or oldest frame
+  // return new or oldest frame
 
     if (mFrames.size() < kMaxVideoFrames) {
       mFrames.push_back (new cFrame);
