@@ -60,7 +60,6 @@ public:
       }
     //}}}
 
-    bool ok() { return mOk; }
     int getWidth() { return mWidth; }
     int getHeight() { return mHeight; }
     uint32_t* getBgra() { return mBgra; }
@@ -68,8 +67,6 @@ public:
 
     //{{{
     void setNv12 (uint8_t* buffer, int stride, int width, int height, uint64_t timestamp) {
-
-      mOk = false;
 
       mYStride = stride;
       mUVStride = stride/2;
@@ -94,33 +91,29 @@ public:
         *v++ = *uv++;
         }
 
-      mBgra = (uint32_t*)_aligned_realloc (mBgra, mWidth * 4 * mHeight, 128);
       int argbStride = mWidth;
+      mBgra = (uint32_t*)_aligned_realloc (mBgra, mWidth * 4 * mHeight, 128);
 
       __m128i ysub  = _mm_set1_epi32 (0x00100010);
       __m128i uvsub = _mm_set1_epi32 (0x00800080);
-
       __m128i facy  = _mm_set1_epi32 (0x004a004a);
       __m128i facrv = _mm_set1_epi32 (0x00660066);
       __m128i facgu = _mm_set1_epi32 (0x00190019);
       __m128i facgv = _mm_set1_epi32 (0x00340034);
       __m128i facbu = _mm_set1_epi32 (0x00810081);
-
-      __m128i zero  = _mm_set1_epi32( 0x00000000 );
+      __m128i zero  = _mm_set1_epi32 (0x00000000);
 
       for (int y = 0; y < mHeight; y += 2) {
-        __m128i* srcy128r0 = (__m128i *)(mYbuf + mYStride*y);
-        __m128i* srcy128r1 = (__m128i *)(mYbuf + mYStride*y + mYStride);
-        __m64* srcu64 = (__m64 *)(mUbuf + mUVStride*(y/2));
-        __m64* srcv64 = (__m64 *)(mVbuf + mUVStride*(y/2));
-
-        __m128i* dstrgb128r0 = (__m128i *)(mBgra + argbStride*y);
-        __m128i* dstrgb128r1 = (__m128i *)(mBgra + argbStride*y + argbStride);
+        __m128i* srcy128r0 = (__m128i*)(mYbuf + mYStride*y);
+        __m128i* srcy128r1 = (__m128i*)(mYbuf + mYStride*y + mYStride);
+        __m64* srcu64 = (__m64*)(mUbuf + mUVStride*(y/2));
+        __m64* srcv64 = (__m64*)(mVbuf + mUVStride*(y/2));
+        __m128i* dstrgb128r0 = (__m128i*)(mBgra + argbStride*y);
+        __m128i* dstrgb128r1 = (__m128i*)(mBgra + argbStride*y + argbStride);
 
         for (int x = 0; x < mWidth; x += 16) {
           __m128i u0 = _mm_loadl_epi64 ((__m128i *)srcu64 ); srcu64++;
           __m128i v0 = _mm_loadl_epi64 ((__m128i *)srcv64 ); srcv64++;
-
           __m128i y0r0 = _mm_load_si128( srcy128r0++ );
           __m128i y0r1 = _mm_load_si128( srcy128r1++ );
           //{{{  constant y factors
@@ -130,11 +123,11 @@ public:
           __m128i y01r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r1, zero), ysub), facy);
           //}}}
           //{{{  expand u and v so they're aligned with y values
-          u0  = _mm_unpacklo_epi8 (u0, zero);
+          u0 = _mm_unpacklo_epi8 (u0, zero);
           __m128i u00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (u0, u0), uvsub);
           __m128i u01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (u0, u0), uvsub);
 
-          v0  = _mm_unpacklo_epi8( v0,  zero );
+          v0 = _mm_unpacklo_epi8( v0,  zero );
           __m128i v00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (v0, v0), uvsub);
           __m128i v01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (v0, v0), uvsub);
           //}}}
@@ -156,17 +149,17 @@ public:
           __m128i b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, bu00), 6);
           __m128i b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, bu01), 6);
 
-          r00 = _mm_packus_epi16 (r00, r01);         // rrrr.. saturated
-          g00 = _mm_packus_epi16 (g00, g01);         // gggg.. saturated
-          b00 = _mm_packus_epi16 (b00, b01);         // bbbb.. saturated
+          r00 = _mm_packus_epi16 (r00, r01);                // rrrr.. saturated
+          g00 = _mm_packus_epi16 (g00, g01);                // gggg.. saturated
+          b00 = _mm_packus_epi16 (b00, b01);                // bbbb.. saturated
 
-          r01     = _mm_unpacklo_epi8 (r00, zero); // 0r0r..
-          __m128i gbgb    = _mm_unpacklo_epi8 (b00, g00);  // gbgb..
-          __m128i rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
-          __m128i rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
+          r01 = _mm_unpacklo_epi8 (r00, zero);              // 0r0r..
+          __m128i gbgb    = _mm_unpacklo_epi8 (b00, g00);   // gbgb..
+          __m128i rgb0123 = _mm_unpacklo_epi16 (gbgb, r01); // 0rgb0rgb..
+          __m128i rgb4567 = _mm_unpackhi_epi16 (gbgb, r01); // 0rgb0rgb..
 
-          r01     = _mm_unpackhi_epi8 (r00, zero);
-          gbgb    = _mm_unpackhi_epi8 (b00, g00 );
+          r01 = _mm_unpackhi_epi8 (r00, zero);
+          gbgb = _mm_unpackhi_epi8 (b00, g00 );
           __m128i rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
           __m128i rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
 
@@ -183,14 +176,14 @@ public:
           b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r1, bu00), 6);
           b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r1, bu01), 6);
 
-          r00 = _mm_packus_epi16 (r00, r01);         // rrrr.. saturated
-          g00 = _mm_packus_epi16 (g00, g01);         // gggg.. saturated
-          b00 = _mm_packus_epi16 (b00, b01);         // bbbb.. saturated
+          r00 = _mm_packus_epi16 (r00, r01);        // rrrr.. saturated
+          g00 = _mm_packus_epi16 (g00, g01);        // gggg.. saturated
+          b00 = _mm_packus_epi16 (b00, b01);        // bbbb.. saturated
 
           r01     = _mm_unpacklo_epi8 (r00,  zero); // 0r0r..
           gbgb    = _mm_unpacklo_epi8 (b00,  g00);  // gbgb..
-          rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
-          rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
+          rgb0123 = _mm_unpacklo_epi16 (gbgb, r01); // 0rgb0rgb..
+          rgb4567 = _mm_unpackhi_epi16 (gbgb, r01); // 0rgb0rgb..
 
           r01     = _mm_unpackhi_epi8 (r00, zero);
           gbgb    = _mm_unpackhi_epi8 (b00, g00);
@@ -204,13 +197,10 @@ public:
           //}}}
           }
         }
-
-      mOk = true;
       }
     //}}}
 
   private:
-    bool mOk = false;
     int mYStride = 0;
     int mUVStride = 0;
 
@@ -257,11 +247,10 @@ public:
 
     double nearest = 0.0;
     for (auto frame : mFrames)
-      if (frame->ok())
-        if (!nearestFrame || (fabs(frame->getTimestamp() - mPlayFrame)) < nearest) {
-          nearestFrame = frame;
-          nearest = fabs(frame->getTimestamp() - mPlayFrame);
-          }
+      if (!nearestFrame || (fabs(frame->getTimestamp() - mPlayFrame)) < nearest) {
+        nearestFrame = frame;
+        nearest = fabs(frame->getTimestamp() - mPlayFrame);
+        }
 
     return nearestFrame;
     }
