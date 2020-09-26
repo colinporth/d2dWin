@@ -4,7 +4,7 @@
 
 #include "cPlayView.h"
 
-#include "../../shared/utils/cWinAudio32.h"
+#include "../../shared/audio/cWinAudio32.h"
 #include "../boxes/cAudFrameBox.h"
 
 #ifdef _DEBUG

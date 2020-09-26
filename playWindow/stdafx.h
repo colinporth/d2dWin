@@ -46,11 +46,6 @@
 #include <dwrite.h>
 //}}}
 
-#include "../../shared/date/date.h"
-#include "../../shared/utils/utils.h"
-#include "../../shared/utils/cLog.h"
-#include "../../shared/utils/cSemaphore.h"
-
 #include "../common/cD2dWindow.h"
 #include "../boxes/cLogBox.h"
 #include "../boxes/cBmpBox.h"
@@ -62,10 +57,6 @@
 #include "../boxes/cTitleBox.h"
 #include "../boxes/cListBox.h"
 #include "../boxes/cStringListBox.h"
-
-#include "../../shared/net/cUrl.h"
-#include "../../shared/net/cHttp.h"
-#include "../../shared/net/cWinSockHttp.h"
 
 #include "../../shared/utils/cFileList.h"
 #include "../boxes/cFileListBox.h"

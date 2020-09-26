@@ -78,9 +78,6 @@
     <ClInclude Include="..\..\shared\decoders\cAacDecoder.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\iAudioDecoder.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\decoders\cAudioDecode.h">
       <Filter>h</Filter>
     </ClInclude>
@@ -108,7 +105,7 @@
     <ClInclude Include="..\..\shared\decoders\cSong.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\audioWASAPI.h">
+    <ClInclude Include="..\..\shared\audio\iAudio.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

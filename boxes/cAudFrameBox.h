@@ -4,7 +4,7 @@
 
 #include "../common/cD2dWindow.h"
 #include "../common/cAudFrame.h"
-#include "../../shared/utils/iAudio.h"
+#include "../../shared/audio/iAudio.h"
 //}}}
 
 class cAudFrameBox : public cD2dWindow::cBox {

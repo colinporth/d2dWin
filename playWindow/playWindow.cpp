@@ -2,9 +2,10 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "../../shared/utils/audioWASAPI.h"
+#include "../../shared/audio/audioWASAPI.h"
 #include "../../shared/decoders/cSong.h"
 #include "../../shared/decoders/cAudioDecode.h"
+#include "../../shared/net/cWinSockHttp.h"
 
 #include "../../shared/hls/r1x80.h"
 #include "../../shared/hls/r2x80.h"

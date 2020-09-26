@@ -2,7 +2,7 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "../../shared/utils/audioWASAPI.h"
+#include "../../shared/audio/audioWASAPI.h"
 #include "../../shared/decoders/cSong.h"
 #include "../../shared/decoders/cAudioDecode.h"
 

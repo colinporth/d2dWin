@@ -2,7 +2,7 @@
 //{{{  includes
 #pragma once
 
-#include "../../shared/utils/cWinAudio16.h"
+#include "../../shared/audio/cWinAudio16.h"
 
 #include "../../shared/dvb/cTransportStream.h"
 #include "../../shared/dvb/cSubtitle.h"

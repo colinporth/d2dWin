@@ -57,10 +57,10 @@
     <ClCompile Include="cD2dWindow.cpp" />
     <ClCompile Include="..\..\shared\utils\cLog.cpp" />
     <ClCompile Include="cJpegImage.cpp" />
-    <ClCompile Include="..\..\shared\utils\cWinAudio32.cpp" />
     <ClCompile Include="..\..\shared\kissFft\kiss_fft.c" />
     <ClCompile Include="..\..\shared\kissFft\kiss_fftr.c" />
     <ClCompile Include="..\..\shared\format\format.cpp" />
-    <ClCompile Include="..\..\shared\utils\cWinAudio16.cpp" />
+    <ClCompile Include="..\..\shared\audio\cWinAudio16.cpp" />
+    <ClCompile Include="..\..\shared\audio\cWinAudio32.cpp" />
   </ItemGroup>
 </Project>

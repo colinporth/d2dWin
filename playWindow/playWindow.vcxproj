@@ -91,12 +91,13 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\shared\audio\audioWASAPI.h" />
+    <ClInclude Include="..\..\shared\audio\iAudio.h" />
     <ClInclude Include="..\..\shared\date\date.h" />
     <ClInclude Include="..\..\shared\decoders\cAacDecoder.h" />
     <ClInclude Include="..\..\shared\decoders\cAudioDecode.h" />
     <ClInclude Include="..\..\shared\decoders\cMp3Decoder.h" />
     <ClInclude Include="..\..\shared\decoders\cSong.h" />
-    <ClInclude Include="..\..\shared\decoders\iAudioDecoder.h" />
     <ClInclude Include="..\..\shared\hls\r1x80.h" />
     <ClInclude Include="..\..\shared\hls\r2x80.h" />
     <ClInclude Include="..\..\shared\hls\r3x80.h" />
@@ -105,7 +106,6 @@
     <ClInclude Include="..\..\shared\hls\r6x80.h" />
     <ClInclude Include="..\..\shared\net\cHttp.h" />
     <ClInclude Include="..\..\shared\net\cWinSockHttp.h" />
-    <ClInclude Include="..\..\shared\utils\audioWASAPI.h" />
     <ClInclude Include="..\..\shared\utils\cFileList.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
