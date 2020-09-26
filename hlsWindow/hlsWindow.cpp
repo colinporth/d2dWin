@@ -143,20 +143,22 @@ private:
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               //{{{  chunk loaded ok, process it
-              cLog::log (LOGINFO, "got chunkNum:" + dec(chunkNum) +
+              cLog::log (LOGINFO, "chunk " + dec(chunkNum) +
                                   " at " + date::format ("%T", floor<seconds>(getNow())) +
-                                  " size:" + dec(http.getContentSize()));
+                                  " " + dec(http.getContentSize()));
               fwrite (http.getContent(), 1, http.getContentSize(), mFile);
 
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
 
               uint8_t* ts = http.getContent();
 
+              int patNum = 0;
+              int pgmNum = 0;
               int vidPesNum = 0;
+              int audPesNum = 0;
+
               uint8_t* vidPes = nullptr;
               int vidPesLen = 0;
-
-              int audPesNum = 0;
               auto aacFrames = http.getContent();
               auto aacFramesPtr = aacFrames;
 
@@ -177,6 +179,7 @@ private:
                     tsBodyBytes -= pesHeaderBytes;
 
                     if (vidPes) {
+                      // last vidPes at vidFrameNum
                       mSong.addVideoFrame (vidFrameNum, vidPes, vidPesLen);
                       vidPes = nullptr;
                       vidPesLen = 0;
@@ -186,7 +189,7 @@ private:
                     vidPesNum++;
                     }
 
-                  // copy ts payload into vidFrames buffer
+                  // copy ts payload into vidPes buffer
                   vidPes = (uint8_t*)realloc (vidPes, vidPesLen + tsBodyBytes);
                   memcpy (vidPes + vidPesLen, ts, tsBodyBytes);
                   vidPesLen += tsBodyBytes;
@@ -209,14 +212,18 @@ private:
                   //}}}
                 else if (pid == 0) {
                   //{{{  pat
-                  if (payStart)
-                    cLog::log (LOGINFO, "pat");
+                  if (payStart) {
+                    //cLog::log (LOGINFO, "pat");
+                    patNum++;
+                    }
                   }
                   //}}}
-                else if (pid == 32)
+                else if (pid == 32) {
                   //{{{  pgm
                   if (payStart) {
-                    cLog::log (LOGINFO, "pgm");
+                    //cLog::log (LOGINFO, "pgm");
+                    pgmNum++;
+                    }
                   }
                   //}}}
                 else {
@@ -229,7 +236,7 @@ private:
                   //}}}
                 ts += tsBodyBytes;
                 }
-              cLog::log (LOGINFO, "ts - videoPes:" + dec(vidPesNum) + " audioPes:" + dec(audPesNum));
+              cLog::log (LOGINFO, "- pat:" + dec(patNum) + " pgm:" + dec(pgmNum) + " videoPes:" + dec(vidPesNum) + " audioPes:" + dec(audPesNum));
 
               while (decode.parseFrame (aacFrames, aacFramesPtr)) {
                 float* samples = decode.decodeFrame (seqFrameNum);
