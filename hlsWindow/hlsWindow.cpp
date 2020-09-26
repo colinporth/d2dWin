@@ -435,7 +435,7 @@ private:
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (const string& title, int width, int height, const vector<string>& names) {
+  void run (const string& title, int width, int height) {
 
     init (title, width, height, false);
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
@@ -496,6 +496,7 @@ private:
     const char* tagPtr = strstr ((char*)buffer, tag);
     const char* valuePtr = tagPtr + strlen (tag);
     const char* endPtr = strchr (valuePtr, '\n');
+
     return string (valuePtr, endPtr - valuePtr);
     }
   //}}}
@@ -503,11 +504,11 @@ private:
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
+    cLog::setThreadName ("hls ");
+
     //mFile = fopen ("C:/Users/colin/Desktop/hls.ts", "wb");
     int vidFrameNum = 0;
-
     constexpr int kHlsPreload = 2;
-    cLog::setThreadName ("hls ");
 
     mSong.setChan (chan);
     mSong.setBitrate (bitrate, 360);
@@ -526,6 +527,7 @@ private:
 
         http.freeContent();
         //}}}
+
         mSong.init (cAudioDecode::eAac, 2, 48000, 1024);
         mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s);
         cAudioDecode decode (cAudioDecode::eAac);
@@ -754,6 +756,6 @@ private:
 int main (int argc, char** argv) {
   cLog::init (LOGINFO, false, "", "hlsWindow");
   cAppWindow appWindow;
-  appWindow.run ("hlsWindow", 800, 420, {});
+  appWindow.run ("hlsWindow", 800, 420);
   return 0;
   }
