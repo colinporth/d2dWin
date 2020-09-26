@@ -235,10 +235,10 @@ public:
   //}}}
   //{{{
   ~cMfxVideoDecode() {
+  // Clean up resources
+  // recommended to close Media SDK components first, before releasing allocated surfaces
+  // since some surfaces may still be locked by internal Media SDK resources.
 
-    // Clean up resources
-    // -  recommended to close Media SDK components first, before releasing allocated surfaces
-    //    since //    some surfaces may still be locked by internal Media SDK resources.
     MFXVideoDECODE_Close (mSession);
 
     // mSession closed automatically on destruction
@@ -389,11 +389,11 @@ private:
   };
 //}}}
 //{{{
-class cMfxVideoDecodeBox : public cD2dWindow::cView {
+class cVideoDecodeBox : public cD2dWindow::cView {
 public:
-  cMfxVideoDecodeBox (cD2dWindow* window, float width, float height, cMfxVideoDecode& videoDecode)
+  cVideoDecodeBox (cD2dWindow* window, float width, float height, cMfxVideoDecode& videoDecode)
       : cView("videoDecode", window, width, height), mVideoDecode(videoDecode) {}
-  virtual ~cMfxVideoDecodeBox() {}
+  virtual ~cVideoDecodeBox() {}
 
   void onDraw (ID2D1DeviceContext* dc) {
 
@@ -444,7 +444,7 @@ public:
   void run (const string& title, int width, int height, const vector<string>& names) {
 
     init (title, width, height, false);
-    add (new cMfxVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
+    add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
     //add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
@@ -573,73 +573,77 @@ private:
                 ts += headerBytes;
                 auto tsBodyBytes = 187 - headerBytes;
 
-                if (pid == 33) {
-                  //{{{  vid pes
-                  if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-                    int pesHeaderBytes = 9 + ts[8];
-                    ts += pesHeaderBytes;
-                    tsBodyBytes -= pesHeaderBytes;
+                switch (pid) {
+                  //{{{
+                  case  0: // pat
+                    if (payStart) {
+                      //cLog::log (LOGINFO, "pat");
+                      patNum++;
+                      }
+                    break;
+                  //}}}
+                  //{{{
+                  case 32: // pgm
+                    if (payStart) {
+                      //cLog::log (LOGINFO, "pgm");
+                      pgmNum++;
+                      }
+                    break;
+                  //}}}
+                  //{{{
+                  case 33: // video pes
+                    if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
+                      int pesHeaderBytes = 9 + ts[8];
+                      ts += pesHeaderBytes;
+                      tsBodyBytes -= pesHeaderBytes;
 
-                    if (vidPes) {
-                      // last vidPes at vidFrameNum
-                      //mSong.addVideoFrame (vidFrameNum, vidPes, vidPesLen);
-                      mVideoDecode.decode (vidPes, vidPesLen, vidFrameNum);
+                      if (vidPes) {
+                        // last vidPes at vidFrameNum
+                        //mSong.addVideoFrame (vidFrameNum, vidPes, vidPesLen);
+                        mVideoDecode.decode (vidPes, vidPesLen, vidFrameNum);
 
-                      vidPes = nullptr;
-                      vidPesLen = 0;
-                      vidFrameNum++;
+                        vidPes = nullptr;
+                        vidPesLen = 0;
+                        vidFrameNum++;
+                        }
+
+                      vidPesNum++;
                       }
 
-                    vidPesNum++;
-                    }
+                    // copy ts payload into vidPes buffer, !!!! expensive way !!!!!!
+                    vidPes = (uint8_t*)realloc (vidPes, vidPesLen + tsBodyBytes);
+                    memcpy (vidPes + vidPesLen, ts, tsBodyBytes);
+                    vidPesLen += tsBodyBytes;
 
-                  // copy ts payload into vidPes buffer, !!!! expensive way !!!!!!
-                  vidPes = (uint8_t*)realloc (vidPes, vidPesLen + tsBodyBytes);
-                  memcpy (vidPes + vidPesLen, ts, tsBodyBytes);
-                  vidPesLen += tsBodyBytes;
-                  }
+                    break;
                   //}}}
-                else if (pid == 34) {
-                  //{{{  aud pes
-                  if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-                    int pesHeaderBytes = 9 + ts[8];
-                    ts += pesHeaderBytes;
-                    tsBodyBytes -= pesHeaderBytes;
+                  //{{{
+                  case 34: // audio pes
+                    if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
+                      int pesHeaderBytes = 9 + ts[8];
+                      ts += pesHeaderBytes;
+                      tsBodyBytes -= pesHeaderBytes;
 
-                    audPesNum++;
-                    }
+                      audPesNum++;
+                      }
 
-                  // copy ts payload aacFrames back into buffer, for later decode
-                  memcpy (aacFramesPtr, ts, tsBodyBytes);
-                  aacFramesPtr += tsBodyBytes;
-                  }
+                    // copy ts payload aacFrames back into buffer, for later decode
+                    memcpy (aacFramesPtr, ts, tsBodyBytes);
+                    aacFramesPtr += tsBodyBytes;
+
+                    break;
                   //}}}
-                else if (pid == 0) {
-                  //{{{  pat
-                  if (payStart) {
-                    //cLog::log (LOGINFO, "pat");
-                    patNum++;
-                    }
-                  }
+                  //{{{
+                  default: // other pid
+                    if (payStart)
+                      cLog::log (LOGINFO, "other pid:%d header %x %x %x %x headerBytes:%d",
+                                          pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
+                    break;
                   //}}}
-                else if (pid == 32) {
-                  //{{{  pgm
-                  if (payStart) {
-                    //cLog::log (LOGINFO, "pgm");
-                    pgmNum++;
-                    }
                   }
-                  //}}}
-                else {
-                  //{{{  other
-                  // other pid
-                  if (payStart)
-                    cLog::log (LOGINFO, "other pid:%d header %x %x %x %x headerBytes:%d",
-                                        pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
-                  }
-                  //}}}
                 ts += tsBodyBytes;
                 }
+
               cLog::log (LOGINFO, "- pat:" + dec(patNum) + " pgm:" + dec(pgmNum) +
                                   " videoPes:" + dec(vidPesNum) + " audioPes:" + dec(audPesNum));
 
