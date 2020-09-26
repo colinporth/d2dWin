@@ -32,10 +32,10 @@ using namespace chrono;
 //}}}
 
 //{{{
-class cNv12VideoFrame {
+class cVideoFrame {
 public:
   //{{{
-  virtual ~cNv12VideoFrame() {
+  virtual ~cVideoFrame() {
     _aligned_free (mYbuf);
     _aligned_free (mUbuf);
     _aligned_free (mVbuf);
@@ -242,7 +242,7 @@ public:
     mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
 
     for (int i = 0; i < 400; i++)
-      mDecodedFrames.push_back (new cNv12VideoFrame);
+      mDecodedFrames.push_back (new cVideoFrame);
     }
   //}}}
   //{{{
@@ -257,11 +257,36 @@ public:
     for (int i = 0; i < mNumSurfaces; i++)
       delete mSurfaces[i];
 
-    for (int i = 0; i < 400; i++)
-      delete mDecodedFrames[i];
+    for (auto decodedFrame : mDecodedFrames)
+      delete decodedFrame;
     }
   //}}}
 
+  int getPlayFrame() { return mPlayFrame; }
+  //{{{
+  cVideoFrame* findCurFrame() {
+
+    int nearestFrame = -1;
+    double nearDist = 9999999;
+
+    for (int i = 0; i < 400; i++) {
+      if (mDecodedFrames[i]) {
+        if (fabs(mDecodedFrames[i]->getTimestamp() - mPlayFrame) < nearDist) {
+          nearestFrame = i;
+          nearDist = fabs(mDecodedFrames[i]->getTimestamp() - mPlayFrame);
+          }
+        }
+      }
+
+    return nearestFrame >= 0 ? mDecodedFrames[nearestFrame] : nullptr;
+    }
+  //}}}
+  //{{{
+  void setPlayFrame (int playFrame) {
+
+    mPlayFrame = playFrame;
+    }
+  //}}}
   //{{{
   void decode (int frameNum, uint8_t* pes, int pesSize) {
 
@@ -349,7 +374,7 @@ private:
     uint64_t oldestFrameTimestamp = 0;
 
     for (int i = 0; i < 400; i++) {
-      if (mDecodedFrames[i] == 0)
+      if (!mDecodedFrames[i])
         return i;
       else if (mDecodedFrames[i]->getTimestamp() < oldestFrameTimestamp) {
         oldestFrame = i;
@@ -372,7 +397,41 @@ private:
   mfxBitstream mBitstream;
   mfxFrameSurface1** mSurfaces;
 
-  vector <cNv12VideoFrame*> mDecodedFrames;
+  vector <cVideoFrame*> mDecodedFrames;
+  int mPlayFrame = 0;
+  };
+//}}}
+//{{{
+class cVideoDecodeBox : public cD2dWindow::cBox {
+public:
+  //{{{
+  cVideoDecodeBox (cD2dWindow* window, float width, float height, cVideoDecode& videoDecode)
+      : cBox("videodecode", window, width, height), mVideoDecode(videoDecode) {
+    }
+  //}}}
+  virtual ~cVideoDecodeBox() {}
+
+  void onDraw (ID2D1DeviceContext* dc) {
+
+    cVideoFrame* vidFrame = mVideoDecode.findCurFrame();
+    if (vidFrame) {
+      cLog::log (LOGINFO, "show %d was:%d", vidFrame->getTimestamp(), mBitmapTimestamp);
+      if (vidFrame->getTimestamp() != mBitmapTimestamp) {
+        // make new bitmap from vidFrame
+        mBitmap = vidFrame->makeBitmap (dc, mBitmap);
+        mBitmapTimestamp = vidFrame->getTimestamp();
+        }
+      }
+
+    if (mBitmap)
+      dc->DrawBitmap (mBitmap, cRect(getSize()));
+    }
+
+private:
+  cVideoDecode& mVideoDecode;
+
+  ID2D1Bitmap* mBitmap = nullptr;
+  uint64_t mBitmapTimestamp = 0;
   };
 //}}}
 
@@ -389,7 +448,8 @@ public:
   void run (const string& title, int width, int height, const vector<string>& names) {
 
     init (title, width, height, false);
-    add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
+    add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
+    //add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
 
@@ -457,7 +517,6 @@ private:
     mFile = fopen ("C:/Users/colin/Desktop/hls.ts", "wb");
 
     int vidFrameNum = 0;
-    cVideoDecode videoDecode;
 
     constexpr int kHlsPreload = 2;
     cLog::setThreadName ("hls ");
@@ -530,7 +589,7 @@ private:
                     if (vidPes) {
                       // last vidPes at vidFrameNum
                       mSong.addVideoFrame (vidFrameNum, vidPes, vidPesLen);
-                      videoDecode.decode (vidFrameNum, vidPes, vidPesLen);
+                      mVideoDecode.decode (vidFrameNum, vidPes, vidPesLen);
 
                       vidPes = nullptr;
                       vidPesLen = 0;
@@ -672,6 +731,7 @@ private:
 
           if (mPlaying && framePtr) {
             mSong.incPlayFrame (1, true);
+            mVideoDecode.setPlayFrame (mSong.getBasePlayFrame());
             changed();
             }
           });
@@ -694,6 +754,8 @@ private:
   cBox* mLogBox = nullptr;
 
   FILE* mFile = nullptr;
+
+  cVideoDecode mVideoDecode;
   //}}}
   };
 
