@@ -23,9 +23,9 @@ using namespace chrono;
 const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
 constexpr int kBitRate = 128000;
-//constexpr int kVidBitrate = 827008;
+constexpr int kVidBitrate = 827008;
 //constexpr int kVidBitrate = 2812032;
-constexpr int kVidBitrate = 5070016;
+//constexpr int kVidBitrate = 5070016;
 
 class cAppWindow : public cD2dWindow {
 public:
@@ -118,7 +118,7 @@ private:
 
       if (pid == 33) {
         if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-          cLog::log (LOGINFO, "video pid:" + dec(pid) + " " + dec(videoPesNum++));
+          videoPesNum++;
           int pesHeaderBytes = 9 + ts[8];
           ts += pesHeaderBytes;
           tsBodyBytes -= pesHeaderBytes;
@@ -131,8 +131,7 @@ private:
 
       else if (pid == 34) {
         if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-          cLog::log (LOGINFO, "audio pid:" + dec(pid) + " " + dec(audioPesNum++));
-
+          audioPesNum++;
           int pesHeaderBytes = 9 + ts[8];
           ts += pesHeaderBytes;
           tsBodyBytes -= pesHeaderBytes;
@@ -143,17 +142,16 @@ private:
         aacFramesPtr += tsBodyBytes;
         }
 
-      else {
+      else
         // other pid
-        if (payStart) {
+        if (payStart)
           cLog::log (LOGINFO, "other pid:%d header %x %x %x %x headerBytes:%d",
                               pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
-          }
-        }
 
       ts += tsBodyBytes;
       }
 
+    cLog::log (LOGINFO, "ts - videoPes:" + dec(videoPesNum) + " audioPes:" + dec(audioPesNum));
     return aacFramesPtr;
     }
   //}}}
@@ -171,12 +169,10 @@ private:
     mSong.setChan (chan);
     mSong.setBitrate (bitrate, 360);
     while (!getExit()) {
-      const string path = "pool_902/live/uk/" + mSong.getChan() +
-                          "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
-                          "-pa4=" + dec(mSong.getBitrate()) +
-                          "-video=" + dec(kVidBitrate);
+      const string path = "pool_902/live/uk/" + mSong.getChan() + "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
+                          "-pa4=" + dec(mSong.getBitrate()) + "-video=" + dec(kVidBitrate);
       cPlatformHttp http;
-      auto redirectedHost = http.getRedirect (host, path + ".m3u8");
+      string redirectedHost = http.getRedirect (host, path + ".m3u8");
       if (http.getContent()) {
         //{{{  hls m3u8 ok, parse it for baseChunkNum, baseTimePoint
         int mediaSequence = stoi (getTaggedValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
@@ -187,7 +183,7 @@ private:
 
         http.freeContent();
         //}}}
-        mSong.init (cAudioDecode::eAac, 2, 48000, mSong.getBitrate() >= 128000 ? 1024 : 2048);
+        mSong.init (cAudioDecode::eAac, 2, 48000, 1024);
         mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s);
         cAudioDecode decode (cAudioDecode::eAac);
 
@@ -195,7 +191,7 @@ private:
         bool firstTime = true;
         mSongChanged = false;
         while (!getExit() && !mSongChanged) {
-          auto chunkNum = mSong.getHlsLoadChunkNum (getNowRaw(), 12s, kHlsPreload);
+          int chunkNum = mSong.getHlsLoadChunkNum (getNowRaw(), 12s, kHlsPreload);
           if (chunkNum) {
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
@@ -207,10 +203,10 @@ private:
               fwrite (http.getContent(), 1, http.getContentSize(), mFile);
 
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
-              auto aacFrames = http.getContent();
-              auto aacFramesEnd = extractFramesFromTs (aacFrames, http.getContentSize(), vidFrames);
+              uint8_t* aacFrames = http.getContent();
+              uint8_t* aacFramesEnd = extractFramesFromTs (aacFrames, http.getContentSize(), vidFrames);
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
-                auto samples = decode.decodeFrame (seqFrameNum);
+                float* samples = decode.decodeFrame (seqFrameNum);
                 if (samples) {
                   mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
                   mSong.addFrame (seqFrameNum++, samples, true, mSong.getNumFrames());
