@@ -32,217 +32,206 @@ using namespace chrono;
 //}}}
 
 //{{{
-class cVideoFrame {
-public:
-  //{{{
-  virtual ~cVideoFrame() {
-    _aligned_free (mYbuf);
-    _aligned_free (mUbuf);
-    _aligned_free (mVbuf);
-    _aligned_free (mBgra);
-    }
-  //}}}
-
-  uint64_t getTimestamp() { return mTimestamp; }
-  //{{{
-  void set (uint8_t* nv12, int stride, int width, int height, uint64_t timestamp) {
-
-    mWidth = width;
-    mHeight = height;
-    mTimestamp = timestamp;
-
-    mYStride = stride;
-    mUVStride = stride/2;
-
-    // copy all of nv12 to yBuf
-    mYbuf = (uint8_t*)_aligned_realloc (mYbuf, height * mYStride * 3 / 2, 128);
-    memcpy (mYbuf, nv12, height * mYStride * 3 / 2);
-
-    // unpack nv12 to planar uv
-    mUbuf = (uint8_t*)_aligned_realloc (mUbuf, (mHeight/2) * mUVStride, 128);
-    mVbuf = (uint8_t*)_aligned_realloc (mVbuf, (mHeight/2) * mUVStride, 128);
-
-    uint8_t* uv = mYbuf + (mHeight * mYStride);
-    uint8_t* u = mUbuf;
-    uint8_t* v = mVbuf;
-    for (int i = 0; i < mHeight/2 * mUVStride; i++) {
-      *u++ = *uv++;
-      *v++ = *uv++;
-      }
-
-    mBgra = (uint32_t*)_aligned_realloc (mBgra, mWidth * 4 * mHeight, 128);
-    int argbStride = mWidth;
-
-    __m128i y0r0, y0r1, u0, v0;
-    __m128i y00r0, y01r0, y00r1, y01r1;
-    __m128i u00, u01, v00, v01;
-    __m128i rv00, rv01, gu00, gu01, gv00, gv01, bu00, bu01;
-    __m128i r00, r01, g00, g01, b00, b01;
-    __m128i rgb0123, rgb4567, rgb89ab, rgbcdef;
-    __m128i gbgb;
-    __m128i ysub, uvsub;
-    __m128i zero, facy, facrv, facgu, facgv, facbu;
-    __m128i *srcy128r0, *srcy128r1;
-    __m128i *dstrgb128r0, *dstrgb128r1;
-    __m64   *srcu64, *srcv64;
-
-    ysub  = _mm_set1_epi32 (0x00100010);
-    uvsub = _mm_set1_epi32 (0x00800080);
-
-    facy  = _mm_set1_epi32 (0x004a004a);
-    facrv = _mm_set1_epi32 (0x00660066);
-    facgu = _mm_set1_epi32 (0x00190019);
-    facgv = _mm_set1_epi32 (0x00340034);
-    facbu = _mm_set1_epi32 (0x00810081);
-
-    zero  = _mm_set1_epi32( 0x00000000 );
-
-    for (int y = 0; y < mHeight; y += 2) {
-      srcy128r0 = (__m128i *)(mYbuf + mYStride*y);
-      srcy128r1 = (__m128i *)(mYbuf + mYStride*y + mYStride);
-      srcu64 = (__m64 *)(mUbuf + mUVStride*(y/2));
-      srcv64 = (__m64 *)(mVbuf + mUVStride*(y/2));
-
-      dstrgb128r0 = (__m128i *)(mBgra + argbStride*y);
-      dstrgb128r1 = (__m128i *)(mBgra + argbStride*y + argbStride);
-
-      for (int x = 0; x < mWidth; x += 16) {
-        u0 = _mm_loadl_epi64 ((__m128i *)srcu64 ); srcu64++;
-        v0 = _mm_loadl_epi64 ((__m128i *)srcv64 ); srcv64++;
-
-        y0r0 = _mm_load_si128( srcy128r0++ );
-        y0r1 = _mm_load_si128( srcy128r1++ );
-        //{{{  constant y factors
-        y00r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r0, zero), ysub), facy);
-        y01r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r0, zero), ysub), facy);
-        y00r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r1, zero), ysub), facy);
-        y01r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r1, zero), ysub), facy);
-        //}}}
-        //{{{  expand u and v so they're aligned with y values
-        u0  = _mm_unpacklo_epi8 (u0, zero);
-        u00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (u0, u0), uvsub);
-        u01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (u0, u0), uvsub);
-
-        v0  = _mm_unpacklo_epi8( v0,  zero );
-        v00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (v0, v0), uvsub);
-        v01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (v0, v0), uvsub);
-        //}}}
-        //{{{  common factors on both rows.
-        rv00 = _mm_mullo_epi16 (facrv, v00);
-        rv01 = _mm_mullo_epi16 (facrv, v01);
-        gu00 = _mm_mullo_epi16 (facgu, u00);
-        gu01 = _mm_mullo_epi16 (facgu, u01);
-        gv00 = _mm_mullo_epi16 (facgv, v00);
-        gv01 = _mm_mullo_epi16 (facgv, v01);
-        bu00 = _mm_mullo_epi16 (facbu, u00);
-        bu01 = _mm_mullo_epi16 (facbu, u01);
-        //}}}
-        //{{{  row 0
-        r00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, rv00), 6);
-        r01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, rv01), 6);
-        g00 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y00r0, gu00), gv00), 6);
-        g01 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y01r0, gu01), gv01), 6);
-        b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, bu00), 6);
-        b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, bu01), 6);
-
-        r00 = _mm_packus_epi16 (r00, r01);         // rrrr.. saturated
-        g00 = _mm_packus_epi16 (g00, g01);         // gggg.. saturated
-        b00 = _mm_packus_epi16 (b00, b01);         // bbbb.. saturated
-
-        r01     = _mm_unpacklo_epi8 (r00, zero); // 0r0r..
-        gbgb    = _mm_unpacklo_epi8 (b00, g00);  // gbgb..
-        rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
-        rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
-
-        r01     = _mm_unpackhi_epi8 (r00, zero);
-        gbgb    = _mm_unpackhi_epi8 (b00, g00 );
-        rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
-        rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
-
-        _mm_stream_si128 (dstrgb128r0++, rgb0123);
-        _mm_stream_si128 (dstrgb128r0++, rgb4567);
-        _mm_stream_si128 (dstrgb128r0++, rgb89ab);
-        _mm_stream_si128 (dstrgb128r0++, rgbcdef);
-        //}}}
-        //{{{  row 1
-        r00 = _mm_srai_epi16 (_mm_add_epi16 (y00r1, rv00), 6);
-        r01 = _mm_srai_epi16 (_mm_add_epi16 (y01r1, rv01), 6);
-        g00 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y00r1, gu00), gv00), 6);
-        g01 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y01r1, gu01), gv01), 6);
-        b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r1, bu00), 6);
-        b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r1, bu01), 6);
-
-        r00 = _mm_packus_epi16 (r00, r01);         // rrrr.. saturated
-        g00 = _mm_packus_epi16 (g00, g01);         // gggg.. saturated
-        b00 = _mm_packus_epi16 (b00, b01);         // bbbb.. saturated
-
-        r01     = _mm_unpacklo_epi8 (r00,  zero); // 0r0r..
-        gbgb    = _mm_unpacklo_epi8 (b00,  g00);  // gbgb..
-        rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
-        rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
-
-        r01     = _mm_unpackhi_epi8 (r00, zero);
-        gbgb    = _mm_unpackhi_epi8 (b00, g00);
-        rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
-        rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
-
-        _mm_stream_si128 (dstrgb128r1++, rgb0123);
-        _mm_stream_si128 (dstrgb128r1++, rgb4567);
-        _mm_stream_si128 (dstrgb128r1++, rgb89ab);
-        _mm_stream_si128 (dstrgb128r1++, rgbcdef);
-        //}}}
-        }
-      }
-    }
-  //}}}
-  //{{{
-  ID2D1Bitmap* makeBitmap (ID2D1DeviceContext* dc, ID2D1Bitmap* bitmap) {
-
-    if (bitmap)  {
-      auto pixelSize = bitmap->GetPixelSize();
-      if ((pixelSize.width != mWidth) || (pixelSize.height != mHeight)) {
-        // bitmap size changed
-        bitmap->Release();
-        bitmap = nullptr;
-        }
-      }
-
-    if (!bitmap) // create/recreate bitmap
-      dc->CreateBitmap (D2D1::SizeU(mWidth, mHeight),
-                        { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
-                        &bitmap);
-
-    bitmap->CopyFromMemory (&D2D1::RectU(0,0, mWidth,mHeight), mBgra, mWidth * 4);
-
-    return bitmap;
-    }
-  //}}}
-
-private:
-  // vars
-  int mWidth = 0;
-  int mHeight = 0;
-  uint64_t mTimestamp = 0;
-
-  int mYStride = 0;
-  int mUVStride = 0;
-
-  uint8_t* mYbuf = nullptr;
-  uint8_t* mUbuf = nullptr;
-  uint8_t* mVbuf = nullptr;
-
-  uint32_t* mBgra = nullptr;
-  };
-//}}}
-//{{{
 class cVideoDecode {
 public:
   //{{{
+  class cFrame {
+  public:
+    //{{{
+    virtual ~cFrame() {
+      _aligned_free (mYbuf);
+      _aligned_free (mUbuf);
+      _aligned_free (mVbuf);
+      _aligned_free (mBgra);
+      }
+    //}}}
+
+    bool ok() { return mOk; }
+    int getWidth() { return mWidth; }
+    int getHeight() { return mHeight; }
+    uint32_t* getBgra() { return mBgra; }
+    uint64_t getTimestamp() { return mTimestamp; }
+
+    //{{{
+    void set (uint8_t* nv12, int stride, int width, int height, uint64_t timestamp) {
+
+      mOk = false;
+
+      mYStride = stride;
+      mUVStride = stride/2;
+
+      mWidth = width;
+      mHeight = height;
+      mTimestamp = timestamp;
+
+      // copy all of nv12 to yBuf
+      mYbuf = (uint8_t*)_aligned_realloc (mYbuf, height * mYStride * 3 / 2, 128);
+      memcpy (mYbuf, nv12, height * mYStride * 3 / 2);
+
+      // unpack nv12 to planar uv
+      mUbuf = (uint8_t*)_aligned_realloc (mUbuf, (mHeight/2) * mUVStride, 128);
+      mVbuf = (uint8_t*)_aligned_realloc (mVbuf, (mHeight/2) * mUVStride, 128);
+
+      uint8_t* uv = mYbuf + (mHeight * mYStride);
+      uint8_t* u = mUbuf;
+      uint8_t* v = mVbuf;
+      for (int i = 0; i < mHeight/2 * mUVStride; i++) {
+        *u++ = *uv++;
+        *v++ = *uv++;
+        }
+
+      mBgra = (uint32_t*)_aligned_realloc (mBgra, mWidth * 4 * mHeight, 128);
+      int argbStride = mWidth;
+
+      __m128i y0r0, y0r1, u0, v0;
+      __m128i y00r0, y01r0, y00r1, y01r1;
+      __m128i u00, u01, v00, v01;
+      __m128i rv00, rv01, gu00, gu01, gv00, gv01, bu00, bu01;
+      __m128i r00, r01, g00, g01, b00, b01;
+      __m128i rgb0123, rgb4567, rgb89ab, rgbcdef;
+      __m128i gbgb;
+      __m128i ysub, uvsub;
+      __m128i zero, facy, facrv, facgu, facgv, facbu;
+      __m128i *srcy128r0, *srcy128r1;
+      __m128i *dstrgb128r0, *dstrgb128r1;
+      __m64   *srcu64, *srcv64;
+
+      ysub  = _mm_set1_epi32 (0x00100010);
+      uvsub = _mm_set1_epi32 (0x00800080);
+
+      facy  = _mm_set1_epi32 (0x004a004a);
+      facrv = _mm_set1_epi32 (0x00660066);
+      facgu = _mm_set1_epi32 (0x00190019);
+      facgv = _mm_set1_epi32 (0x00340034);
+      facbu = _mm_set1_epi32 (0x00810081);
+
+      zero  = _mm_set1_epi32( 0x00000000 );
+
+      for (int y = 0; y < mHeight; y += 2) {
+        srcy128r0 = (__m128i *)(mYbuf + mYStride*y);
+        srcy128r1 = (__m128i *)(mYbuf + mYStride*y + mYStride);
+        srcu64 = (__m64 *)(mUbuf + mUVStride*(y/2));
+        srcv64 = (__m64 *)(mVbuf + mUVStride*(y/2));
+
+        dstrgb128r0 = (__m128i *)(mBgra + argbStride*y);
+        dstrgb128r1 = (__m128i *)(mBgra + argbStride*y + argbStride);
+
+        for (int x = 0; x < mWidth; x += 16) {
+          u0 = _mm_loadl_epi64 ((__m128i *)srcu64 ); srcu64++;
+          v0 = _mm_loadl_epi64 ((__m128i *)srcv64 ); srcv64++;
+
+          y0r0 = _mm_load_si128( srcy128r0++ );
+          y0r1 = _mm_load_si128( srcy128r1++ );
+          //{{{  constant y factors
+          y00r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r0, zero), ysub), facy);
+          y01r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r0, zero), ysub), facy);
+          y00r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r1, zero), ysub), facy);
+          y01r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r1, zero), ysub), facy);
+          //}}}
+          //{{{  expand u and v so they're aligned with y values
+          u0  = _mm_unpacklo_epi8 (u0, zero);
+          u00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (u0, u0), uvsub);
+          u01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (u0, u0), uvsub);
+
+          v0  = _mm_unpacklo_epi8( v0,  zero );
+          v00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (v0, v0), uvsub);
+          v01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (v0, v0), uvsub);
+          //}}}
+          //{{{  common factors on both rows.
+          rv00 = _mm_mullo_epi16 (facrv, v00);
+          rv01 = _mm_mullo_epi16 (facrv, v01);
+          gu00 = _mm_mullo_epi16 (facgu, u00);
+          gu01 = _mm_mullo_epi16 (facgu, u01);
+          gv00 = _mm_mullo_epi16 (facgv, v00);
+          gv01 = _mm_mullo_epi16 (facgv, v01);
+          bu00 = _mm_mullo_epi16 (facbu, u00);
+          bu01 = _mm_mullo_epi16 (facbu, u01);
+          //}}}
+          //{{{  row 0
+          r00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, rv00), 6);
+          r01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, rv01), 6);
+          g00 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y00r0, gu00), gv00), 6);
+          g01 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y01r0, gu01), gv01), 6);
+          b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, bu00), 6);
+          b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, bu01), 6);
+
+          r00 = _mm_packus_epi16 (r00, r01);         // rrrr.. saturated
+          g00 = _mm_packus_epi16 (g00, g01);         // gggg.. saturated
+          b00 = _mm_packus_epi16 (b00, b01);         // bbbb.. saturated
+
+          r01     = _mm_unpacklo_epi8 (r00, zero); // 0r0r..
+          gbgb    = _mm_unpacklo_epi8 (b00, g00);  // gbgb..
+          rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
+          rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
+
+          r01     = _mm_unpackhi_epi8 (r00, zero);
+          gbgb    = _mm_unpackhi_epi8 (b00, g00 );
+          rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
+          rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
+
+          _mm_stream_si128 (dstrgb128r0++, rgb0123);
+          _mm_stream_si128 (dstrgb128r0++, rgb4567);
+          _mm_stream_si128 (dstrgb128r0++, rgb89ab);
+          _mm_stream_si128 (dstrgb128r0++, rgbcdef);
+          //}}}
+          //{{{  row 1
+          r00 = _mm_srai_epi16 (_mm_add_epi16 (y00r1, rv00), 6);
+          r01 = _mm_srai_epi16 (_mm_add_epi16 (y01r1, rv01), 6);
+          g00 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y00r1, gu00), gv00), 6);
+          g01 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y01r1, gu01), gv01), 6);
+          b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r1, bu00), 6);
+          b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r1, bu01), 6);
+
+          r00 = _mm_packus_epi16 (r00, r01);         // rrrr.. saturated
+          g00 = _mm_packus_epi16 (g00, g01);         // gggg.. saturated
+          b00 = _mm_packus_epi16 (b00, b01);         // bbbb.. saturated
+
+          r01     = _mm_unpacklo_epi8 (r00,  zero); // 0r0r..
+          gbgb    = _mm_unpacklo_epi8 (b00,  g00);  // gbgb..
+          rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
+          rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
+
+          r01     = _mm_unpackhi_epi8 (r00, zero);
+          gbgb    = _mm_unpackhi_epi8 (b00, g00);
+          rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
+          rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
+
+          _mm_stream_si128 (dstrgb128r1++, rgb0123);
+          _mm_stream_si128 (dstrgb128r1++, rgb4567);
+          _mm_stream_si128 (dstrgb128r1++, rgb89ab);
+          _mm_stream_si128 (dstrgb128r1++, rgbcdef);
+          //}}}
+          }
+        }
+
+      mOk = true;
+      }
+    //}}}
+
+  private:
+    bool mOk = false;
+    int mYStride = 0;
+    int mUVStride = 0;
+
+    int mWidth = 0;
+    int mHeight = 0;
+    uint64_t mTimestamp = 0xFFFFFFFFFFFFFFFF;
+
+    uint8_t* mYbuf = nullptr;
+    uint8_t* mUbuf = nullptr;
+    uint8_t* mVbuf = nullptr;
+
+    uint32_t* mBgra = nullptr;
+    };
+  //}}}
+
+  //{{{
   cVideoDecode() {
+
     mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
 
     for (int i = 0; i < 400; i++)
-      mDecodedFrames.push_back (new cVideoFrame);
+      mFrames.push_back (new cFrame);
     }
   //}}}
   //{{{
@@ -257,28 +246,25 @@ public:
     for (int i = 0; i < mNumSurfaces; i++)
       delete mSurfaces[i];
 
-    for (auto decodedFrame : mDecodedFrames)
-      delete decodedFrame;
+    for (auto frame : mFrames)
+      delete frame;
     }
   //}}}
 
-  int getPlayFrame() { return mPlayFrame; }
   //{{{
-  cVideoFrame* findCurFrame() {
+  cFrame* getCurFrame() {
 
-    int nearestFrame = -1;
-    double nearDist = 9999999;
+    cFrame* nearestFrame = nullptr;
 
-    for (int i = 0; i < 400; i++) {
-      if (mDecodedFrames[i]) {
-        if (fabs(mDecodedFrames[i]->getTimestamp() - mPlayFrame) < nearDist) {
-          nearestFrame = i;
-          nearDist = fabs(mDecodedFrames[i]->getTimestamp() - mPlayFrame);
+    double nearest = 0.0;
+    for (auto frame : mFrames)
+      if (frame->ok())
+        if (!nearestFrame || (fabs(frame->getTimestamp() - mPlayFrame)) < nearest) {
+          nearestFrame = frame;
+          nearest = fabs(frame->getTimestamp() - mPlayFrame);
           }
-        }
-      }
 
-    return nearestFrame >= 0 ? mDecodedFrames[nearestFrame] : nullptr;
+    return nearestFrame;
     }
   //}}}
   //{{{
@@ -288,13 +274,13 @@ public:
     }
   //}}}
   //{{{
-  void decode (int frameNum, uint8_t* pes, int pesSize) {
+  void decode (uint8_t* pes, int pesSize, uint64_t timestamp) {
 
     mBitstream.Data = pes;
     mBitstream.DataOffset = 0;
     mBitstream.DataLength = pesSize;
     mBitstream.MaxLength = pesSize;
-    mBitstream.TimeStamp = frameNum;
+    mBitstream.TimeStamp = timestamp;
 
     if (!mNumSurfaces) {
       // allocate decoder surfaces, init decoder, decode header
@@ -333,21 +319,19 @@ public:
       //mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
       mfxStatus status = MFX_ERR_NONE;
       while (status >= MFX_ERR_NONE || status == MFX_ERR_MORE_SURFACE) {
-        int index = getFreeSurfaceIndex (mSurfaces, mNumSurfaces);
         mfxFrameSurface1* surface = nullptr;
         mfxSyncPoint syncDecode = nullptr;
         //cLog::log (LOGINFO, "decode surface" + dec (index));
-        status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, mSurfaces[index], &surface, &syncDecode);
+        status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, getFreeSurface(), &surface, &syncDecode);
         if (status == MFX_ERR_NONE) {
           status = mSession.SyncOperation (syncDecode, 60000);
           if (status == MFX_ERR_NONE) {
             //cLog::log (LOGINFO, "decode %d, %d %d %d",
             //                     surface->Data.TimeStamp,
             //                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
-            int oldestFrame = findOldestDecodedFrame();
-            mDecodedFrames[oldestFrame]->set (surface->Data.Y,
-                                              surface->Data.Pitch, surface->Info.Width, surface->Info.Height,
-                                              surface->Data.TimeStamp);
+            getOldestFrame()->set (surface->Data.Y,
+                                   surface->Data.Pitch, surface->Info.Width, surface->Info.Height,
+                                   surface->Data.TimeStamp);
             }
           }
         }
@@ -357,32 +341,30 @@ public:
 
 private:
   //{{{
-  int getFreeSurfaceIndex (mfxFrameSurface1** surfaces, mfxU16 poolSize) {
+  cFrame* getOldestFrame() {
+  // return free, or oldest frame
 
-    if (surfaces)
-      for (mfxU16 i = 0; i < poolSize; i++)
-        if (0 == surfaces[i]->Data.Locked)
-          return i;
-
-    return MFX_ERR_NOT_FOUND;
-    }
-  //}}}
-  //{{{
-  int findOldestDecodedFrame() {
-
-    int oldestFrame = 0;
-    uint64_t oldestFrameTimestamp = 0;
-
-    for (int i = 0; i < 400; i++) {
-      if (!mDecodedFrames[i])
-        return i;
-      else if (mDecodedFrames[i]->getTimestamp() < oldestFrameTimestamp) {
-        oldestFrame = i;
-        oldestFrameTimestamp = mDecodedFrames[i]->getTimestamp();
-        }
+    cFrame* oldestFrame = nullptr;
+    for (auto frame : mFrames) {
+      if (!frame->ok())
+        return frame;
+      else if (!oldestFrame)
+        oldestFrame = frame;
+      else if (frame->getTimestamp() < oldestFrame->getTimestamp())
+        oldestFrame = frame;
       }
 
     return oldestFrame;
+    }
+  //}}}
+  //{{{
+  mfxFrameSurface1* getFreeSurface() {
+
+    for (mfxU16 i = 0; i < mNumSurfaces; i++)
+      if (!mSurfaces[i]->Data.Locked)
+        return mSurfaces[i];
+
+    return nullptr;
     }
   //}}}
 
@@ -397,29 +379,42 @@ private:
   mfxBitstream mBitstream;
   mfxFrameSurface1** mSurfaces;
 
-  vector <cVideoFrame*> mDecodedFrames;
+  vector <cFrame*> mFrames;
   int mPlayFrame = 0;
   };
 //}}}
 //{{{
 class cVideoDecodeBox : public cD2dWindow::cBox {
 public:
-  //{{{
   cVideoDecodeBox (cD2dWindow* window, float width, float height, cVideoDecode& videoDecode)
-      : cBox("videodecode", window, width, height), mVideoDecode(videoDecode) {
-    }
-  //}}}
+      : cBox("videodecode", window, width, height), mVideoDecode(videoDecode) {}
   virtual ~cVideoDecodeBox() {}
 
   void onDraw (ID2D1DeviceContext* dc) {
 
-    cVideoFrame* vidFrame = mVideoDecode.findCurFrame();
-    if (vidFrame) {
-      cLog::log (LOGINFO, "show %d was:%d", vidFrame->getTimestamp(), mBitmapTimestamp);
-      if (vidFrame->getTimestamp() != mBitmapTimestamp) {
-        // make new bitmap from vidFrame
-        mBitmap = vidFrame->makeBitmap (dc, mBitmap);
-        mBitmapTimestamp = vidFrame->getTimestamp();
+    cVideoDecode::cFrame* frame = mVideoDecode.getCurFrame();
+    if (frame) {
+      cLog::log (LOGINFO, "onDraw:%d was:%d", frame->getTimestamp(), mTimestamp);
+      if (frame->getTimestamp() != mTimestamp) {
+        // make new bitmap from frame
+        if (mBitmap)  {
+          auto pixelSize = mBitmap->GetPixelSize();
+          if ((pixelSize.width != frame->getWidth()) || (pixelSize.height != frame->getHeight())) {
+            // bitmap size changed
+            mBitmap->Release();
+            mBitmap = nullptr;
+            }
+          }
+
+        if (!mBitmap) // create/recreate bitmap
+          dc->CreateBitmap (D2D1::SizeU(frame->getWidth(), frame->getHeight()),
+                            { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
+                            &mBitmap);
+
+        mBitmap->CopyFromMemory (&D2D1::RectU(0,0, frame->getWidth(),frame->getHeight()),
+                                 frame->getBgra(), frame->getWidth() * 4);
+
+        mTimestamp = frame->getTimestamp();
         }
       }
 
@@ -431,15 +426,15 @@ private:
   cVideoDecode& mVideoDecode;
 
   ID2D1Bitmap* mBitmap = nullptr;
-  uint64_t mBitmapTimestamp = 0;
+  uint64_t mTimestamp = 0;
   };
 //}}}
 
 const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
 constexpr int kBitRate = 128000;
-constexpr int kVidBitrate = 827008;
-//constexpr int kVidBitrate = 2812032;
+//constexpr int kVidBitrate = 827008;
+constexpr int kVidBitrate = 2812032;
 //constexpr int kVidBitrate = 5070016;
 
 class cAppWindow : public cD2dWindow {
@@ -588,8 +583,8 @@ private:
 
                     if (vidPes) {
                       // last vidPes at vidFrameNum
-                      mSong.addVideoFrame (vidFrameNum, vidPes, vidPesLen);
-                      mVideoDecode.decode (vidFrameNum, vidPes, vidPesLen);
+                      //mSong.addVideoFrame (vidFrameNum, vidPes, vidPesLen);
+                      mVideoDecode.decode (vidPes, vidPesLen, vidFrameNum);
 
                       vidPes = nullptr;
                       vidPesLen = 0;
