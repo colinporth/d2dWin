@@ -43,11 +43,13 @@ public:
     }
   //}}}
 
+  uint64_t getTimestamp() { return mTimestamp; }
   //{{{
-  void set (uint8_t* nv12, int stride, int width, int height) {
+  void set (uint8_t* nv12, int stride, int width, int height, uint64_t timestamp) {
 
     mWidth = width;
     mHeight = height;
+    mTimestamp = timestamp;
 
     mYStride = stride;
     mUVStride = stride/2;
@@ -56,7 +58,7 @@ public:
     mYbuf = (uint8_t*)_aligned_realloc (mYbuf, height * mYStride * 3 / 2, 128);
     memcpy (mYbuf, nv12, height * mYStride * 3 / 2);
 
-    // unpack NV12 to planar uv
+    // unpack nv12 to planar uv
     mUbuf = (uint8_t*)_aligned_realloc (mUbuf, (mHeight/2) * mUVStride, 128);
     mVbuf = (uint8_t*)_aligned_realloc (mVbuf, (mHeight/2) * mUVStride, 128);
 
@@ -220,6 +222,7 @@ private:
   // vars
   int mWidth = 0;
   int mHeight = 0;
+  uint64_t mTimestamp = 0;
 
   int mYStride = 0;
   int mUVStride = 0;
@@ -237,6 +240,9 @@ public:
   //{{{
   cVideoDecode() {
     mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
+
+    for (int i = 0; i < 400; i++)
+      mDecodedFrames.push_back (new cNv12VideoFrame);
     }
   //}}}
   //{{{
@@ -250,6 +256,9 @@ public:
     // mSession closed automatically on destruction
     for (int i = 0; i < mNumSurfaces; i++)
       delete mSurfaces[i];
+
+    for (int i = 0; i < 400; i++)
+      delete mDecodedFrames[i];
     }
   //}}}
 
@@ -302,16 +311,18 @@ public:
         int index = getFreeSurfaceIndex (mSurfaces, mNumSurfaces);
         mfxFrameSurface1* surface = nullptr;
         mfxSyncPoint syncDecode = nullptr;
-        cLog::log (LOGINFO, "decode surface" + dec (index));
+        //cLog::log (LOGINFO, "decode surface" + dec (index));
         status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, mSurfaces[index], &surface, &syncDecode);
         if (status == MFX_ERR_NONE) {
           status = mSession.SyncOperation (syncDecode, 60000);
           if (status == MFX_ERR_NONE) {
-            cLog::log (LOGINFO, "decode %d, %d %d %d",
-                                 surface->Data.TimeStamp,
-                                 surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
-
-            mNv12VideoFrame.set (surface->Data.Y, surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
+            //cLog::log (LOGINFO, "decode %d, %d %d %d",
+            //                     surface->Data.TimeStamp,
+            //                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
+            int oldestFrame = findOldestDecodedFrame();
+            mDecodedFrames[oldestFrame]->set (surface->Data.Y,
+                                              surface->Data.Pitch, surface->Info.Width, surface->Info.Height,
+                                              surface->Data.TimeStamp);
             }
           }
         }
@@ -331,6 +342,24 @@ private:
     return MFX_ERR_NOT_FOUND;
     }
   //}}}
+  //{{{
+  int findOldestDecodedFrame() {
+
+    int oldestFrame = 0;
+    uint64_t oldestFrameTimestamp = 0;
+
+    for (int i = 0; i < 400; i++) {
+      if (mDecodedFrames[i] == 0)
+        return i;
+      else if (mDecodedFrames[i]->getTimestamp() < oldestFrameTimestamp) {
+        oldestFrame = i;
+        oldestFrameTimestamp = mDecodedFrames[i]->getTimestamp();
+        }
+      }
+
+    return oldestFrame;
+    }
+  //}}}
 
   mfxVersion kMfxVersion = { 0,1 };
   MFXVideoSession mSession;
@@ -343,7 +372,7 @@ private:
   mfxBitstream mBitstream;
   mfxFrameSurface1** mSurfaces;
 
-  cNv12VideoFrame mNv12VideoFrame;
+  vector <cNv12VideoFrame*> mDecodedFrames;
   };
 //}}}
 
@@ -430,7 +459,7 @@ private:
     int vidFrameNum = 0;
     cVideoDecode videoDecode;
 
-    constexpr int kHlsPreload = 10; // about a minute
+    constexpr int kHlsPreload = 2;
     cLog::setThreadName ("hls ");
 
     mSong.setChan (chan);
