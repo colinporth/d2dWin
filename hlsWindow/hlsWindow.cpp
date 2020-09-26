@@ -17,9 +17,12 @@
 using namespace std;
 using namespace chrono;
 //}}}
+//{{{  urls
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d827008.m3u8
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_four_hd/bbc_four_hd.isml/bbc_four_hd-pa4%3d128000-video%3d5070016.m3u8
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_south_west/bbc_one_south_west.isml/bbc_one_south_west-pa3%3d96000-video%3d1604032.m3u8
+//}}}
+
 const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
 constexpr int kBitRate = 128000;
@@ -196,10 +199,9 @@ private:
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
-              cLog::log (LOGINFO, "got " + dec(chunkNum) +
-                                   " at " + date::format ("%T", floor<seconds>(getNow())) +
-                                   " size:" + dec(http.getContentSize()));
-
+              cLog::log (LOGINFO, "got chunkNum:" + dec(chunkNum) +
+                                  " at " + date::format ("%T", floor<seconds>(getNow())) +
+                                  " size:" + dec(http.getContentSize()));
               fwrite (http.getContent(), 1, http.getContentSize(), mFile);
 
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
