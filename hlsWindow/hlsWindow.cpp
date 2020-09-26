@@ -291,7 +291,7 @@ private:
           // lambda callback - load srcSamples
           shared_lock<shared_mutex> lock (mSong.getSharedMutex());
 
-          auto framePtr = mSong.getFramePtr (mSong.getPlayFrame());
+          auto framePtr = mSong.getAudioFramePtr (mSong.getPlayFrame());
           if (mPlaying && framePtr && framePtr->getSamples()) {
             if (mSong.getNumChannels() == 1) {
               //{{{  mono to stereo
