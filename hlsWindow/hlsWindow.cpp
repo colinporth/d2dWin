@@ -384,10 +384,10 @@ private:
   };
 //}}}
 //{{{
-class cVideoDecodeBox : public cD2dWindow::cBox {
+class cVideoDecodeBox : public cD2dWindow::cView {
 public:
   cVideoDecodeBox (cD2dWindow* window, float width, float height, cVideoDecode& videoDecode)
-      : cBox("videodecode", window, width, height), mVideoDecode(videoDecode) {}
+      : cView("videoDecode", window, width, height), mVideoDecode(videoDecode) {}
   virtual ~cVideoDecodeBox() {}
 
   void onDraw (ID2D1DeviceContext* dc) {
@@ -418,8 +418,11 @@ public:
         }
       }
 
-    if (mBitmap)
+    if (mBitmap) {
+      dc->SetTransform (mView2d.mTransform);
       dc->DrawBitmap (mBitmap, cRect(getSize()));
+      dc->SetTransform (D2D1::Matrix3x2F::Identity());
+      }
     }
 
 private:
