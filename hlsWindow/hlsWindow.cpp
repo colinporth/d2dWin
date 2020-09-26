@@ -238,12 +238,12 @@ public:
   // Clean up resources
   // recommended to close Media SDK components first, before releasing allocated surfaces
   // since some surfaces may still be locked by internal Media SDK resources.
+  // mSession closed automatically on destruction
 
     MFXVideoDECODE_Close (mSession);
 
-    // mSession closed automatically on destruction
-    for (int i = 0; i < mNumSurfaces; i++)
-      delete mSurfaces[i];
+    for (auto surface : mSurfaces)
+      delete surface;
 
     for (auto frame : mFrames)
       delete frame;
@@ -281,7 +281,7 @@ public:
     mBitstream.MaxLength = pesSize;
     mBitstream.TimeStamp = timestamp;
 
-    if (!mNumSurfaces) {
+    if (mSurfaces.empty()) {
       // allocate decoder surfaces, init decoder, decode header
       mfxVideoParam mVideoParams;
       memset (&mVideoParams, 0, sizeof(mVideoParams));
@@ -299,22 +299,19 @@ public:
         cLog::log (LOGERROR, "MFXVideoDECODE_QueryIOSurf failed");
         return;
         }
-      mNumSurfaces = frameAllocRequest.NumFrameSuggested;
       mWidth = ((mfxU32)((frameAllocRequest.Info.Width)+31)) & (~(mfxU32)31);
       mHeight = ((mfxU32)((frameAllocRequest.Info.Height)+31)) & (~(mfxU32)31);
 
       // alloc surfaces in system memory
-      mSurfaces = new mfxFrameSurface1*[mNumSurfaces];
-      for (int i = 0; i < mNumSurfaces; i++) {
-        mSurfaces[i] = new mfxFrameSurface1;
-        memset (mSurfaces[i], 0, sizeof (mfxFrameSurface1));
-        memcpy (&mSurfaces[i]->Info, &mVideoParams.mfx.FrameInfo, sizeof(mfxFrameInfo));
-
-        // allocate nv12 followed by planar u, planar v
-        mSurfaces[i]->Data.Y = new mfxU8[mWidth * mHeight * 12 / 8];
-        mSurfaces[i]->Data.U = mSurfaces[i]->Data.Y + mWidth * mHeight;
-        mSurfaces[i]->Data.V = nullptr; // NV12 ignores V pointer
-        mSurfaces[i]->Data.Pitch = mWidth;
+      for (int i = 0; i < frameAllocRequest.NumFrameSuggested; i++) {
+        auto surface = new mfxFrameSurface1;
+        memset (surface, 0, sizeof (mfxFrameSurface1));
+        memcpy (&surface->Info, &mVideoParams.mfx.FrameInfo, sizeof(mfxFrameInfo));
+        surface->Data.Y = new mfxU8[mWidth * mHeight * 12 / 8];
+        surface->Data.U = surface->Data.Y + mWidth * mHeight;
+        surface->Data.V = nullptr; // NV12 ignores V pointer
+        surface->Data.Pitch = mWidth;
+        mSurfaces.push_back (surface);
         }
 
       if (MFXVideoDECODE_Init (mSession, &mVideoParams) != MFX_ERR_NONE) {
@@ -367,22 +364,19 @@ private:
   //{{{
   mfxFrameSurface1* getFreeSurface() {
 
-    for (mfxU16 i = 0; i < mNumSurfaces; i++)
-      if (!mSurfaces[i]->Data.Locked)
-        return mSurfaces[i];
+    for (auto surface : mSurfaces)
+      if (!surface->Data.Locked)
+        return surface;
 
     return nullptr;
     }
   //}}}
 
   MFXVideoSession mSession;
-
-  mfxU16 mNumSurfaces = 0;
+  mfxBitstream mBitstream;
+  vector <mfxFrameSurface1*> mSurfaces;
   int mWidth = 0;
   int mHeight = 0;
-
-  mfxBitstream mBitstream;
-  mfxFrameSurface1** mSurfaces;
 
   vector <cFrame*> mFrames;
   int mPlayFrame = 0;
