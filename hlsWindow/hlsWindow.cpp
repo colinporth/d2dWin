@@ -5,7 +5,13 @@
 #include "../../shared/audio/audioWASAPI.h"
 #include "../../shared/decoders/cSong.h"
 #include "../../shared/decoders/cAudioDecode.h"
+#include "../../shared/net/cWinSockHttp.h"
 
+#include "../common/cD2dWindow.h"
+#include "../boxes/cLogBox.h"
+#include "../boxes/cWindowBox.h"
+#include "../boxes/cClockBox.h"
+#include "../boxes/cCalendarBox.h"
 #include "../boxes/cSongBox.h"
 
 using namespace std;

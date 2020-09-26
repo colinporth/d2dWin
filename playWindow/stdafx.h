@@ -46,6 +46,7 @@
 #include <dwrite.h>
 //}}}
 
+// d2dWindow and boxes
 #include "../common/cD2dWindow.h"
 #include "../boxes/cLogBox.h"
 #include "../boxes/cBmpBox.h"
