@@ -14,6 +14,22 @@
 #include "../../shared/hls/r5x80.h"
 #include "../../shared/hls/r6x80.h"
 
+#include "../common/cD2dWindow.h"
+#include "../boxes/cLogBox.h"
+#include "../boxes/cWindowBox.h"
+#include "../boxes/cClockBox.h"
+#include "../boxes/cCalendarBox.h"
+#include "../boxes/cBmpBox.h"
+#include "../boxes/cTitleBox.h"
+
+#include "../boxes/cListBox.h"
+#include "../boxes/cStringListBox.h"
+#include "../../shared/utils/cFileList.h"
+#include "../boxes/cFileListBox.h"
+
+#include "../common/cJpegImage.h"
+#include "../boxes/cJpegImageView.h"
+
 #include "../boxes/cSongBox.h"
 
 using namespace std;
