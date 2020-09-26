@@ -2,12 +2,12 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="cSong.cpp" />
     <ClCompile Include="..\..\shared\decoders\cAacDecoder.cpp" />
     <ClCompile Include="..\..\shared\decoders\cAudioDecode.cpp" />
     <ClCompile Include="..\..\shared\net\cHttp.cpp" />
     <ClCompile Include="hlsWindow.cpp" />
     <ClCompile Include="..\..\shared\decoders\cMp3Decoder.cpp" />
+    <ClCompile Include="..\..\shared\decoders\cSong.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">
@@ -48,9 +48,6 @@
     <ClInclude Include="..\common\cJpegImage.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="audioWASAPI.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>h</Filter>
     </ClInclude>
@@ -58,12 +55,6 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\net\cWinSockHttp.h">
-      <Filter>h</Filter>
-    </ClInclude>
-    <ClInclude Include="cSong.h">
-      <Filter>h</Filter>
-    </ClInclude>
-    <ClInclude Include="cSongBox.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\boxes\cJpegImageView.h">
@@ -112,6 +103,12 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\decoders\cMp3Decoder.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\decoders\cSong.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\audioWASAPI.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

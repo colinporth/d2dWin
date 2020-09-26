@@ -2,18 +2,11 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "cSong.h"
-#include "cSongBox.h"
-
-#include "audioWASAPI.h"
+#include "../../shared/utils/audioWASAPI.h"
+#include "../../shared/decoders/cSong.h"
 #include "../../shared/decoders/cAudioDecode.h"
 
-#include "../../shared/hls/r1x80.h"
-#include "../../shared/hls/r2x80.h"
-#include "../../shared/hls/r3x80.h"
-#include "../../shared/hls/r4x80.h"
-#include "../../shared/hls/r5x80.h"
-#include "../../shared/hls/r6x80.h"
+#include "../boxes/cSongBox.h"
 
 using namespace std;
 using namespace chrono;

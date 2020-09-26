@@ -6,7 +6,7 @@
 #include <dwrite.h>
 
 #include "../../shared/utils/cLog.h"
-#include "cSong.h"
+#include "../../shared/decoders/cSong.h"
 //}}}
 
 class cSongBox : public cD2dWindow::cBox {

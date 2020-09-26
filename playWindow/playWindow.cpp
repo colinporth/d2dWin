@@ -2,10 +2,8 @@
 //{{{  includes
 #include "stdafx.h"
 
-#include "cSong.h"
-#include "cSongBox.h"
-
-#include "audioWASAPI.h"
+#include "../../shared/utils/audioWASAPI.h"
+#include "../../shared/decoders/cSong.h"
 #include "../../shared/decoders/cAudioDecode.h"
 
 #include "../../shared/hls/r1x80.h"
@@ -14,6 +12,8 @@
 #include "../../shared/hls/r4x80.h"
 #include "../../shared/hls/r5x80.h"
 #include "../../shared/hls/r6x80.h"
+
+#include "../boxes/cSongBox.h"
 
 using namespace std;
 using namespace chrono;
@@ -64,19 +64,19 @@ public:
         mSong.clear();
         switch (mSong.getBitrate()) {
           case 48000:
-            mSong.setBitrate (96000);
+            mSong.setBitrate (96000, 150);
             mBitrateStr = "96k aacHE";
             break;
           case 96000:
-            mSong.setBitrate (128000);
+            mSong.setBitrate (128000, 300);
             mBitrateStr = "128k aac";
             break;
           case 128000:
-            mSong.setBitrate (320000);
+            mSong.setBitrate (320000, 300);
             mBitrateStr = "320k aac";
             break;
           case 320000:
-            mSong.setBitrate (48000);
+            mSong.setBitrate (48000, 150);
             mBitrateStr = "48k aacHE";
             break;
           }
@@ -189,10 +189,10 @@ protected:
       case '4' : mSong.clear(); mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true;  break;
       case '5' : mSong.clear(); mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; break;
       case '6' : mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; break;
-      case '7' : mSong.clear(); mSong.setBitrate (48000); mBitrateStr = "48k aacHE"; mSongChanged = true; break;
-      case '8' : mSong.clear(); mSong.setBitrate (96000); mBitrateStr = "96k aacHE"; mSongChanged = true; break;
-      case '9' : mSong.clear(); mSong.setBitrate (128000); mBitrateStr = "128k aac"; mSongChanged = true; break;
-      case '0' : mSong.clear(); mSong.setBitrate (320000); mBitrateStr = "320k aac"; mSongChanged = true; break;
+      case '7' : mSong.clear(); mSong.setBitrate (48000, 150); mBitrateStr = "48k aacHE"; mSongChanged = true; break;
+      case '8' : mSong.clear(); mSong.setBitrate (96000, 150); mBitrateStr = "96k aacHE"; mSongChanged = true; break;
+      case '9' : mSong.clear(); mSong.setBitrate (128000, 300); mBitrateStr = "128k aac"; mSongChanged = true; break;
+      case '0' : mSong.clear(); mSong.setBitrate (320000, 300); mBitrateStr = "320k aac"; mSongChanged = true; break;
 
       default  : cLog::log (LOGINFO, "key %x", key); changed(); break;
       }
@@ -290,7 +290,7 @@ private:
     cLog::setThreadName ("hls ");
 
     mSong.setChan (chan);
-    mSong.setBitrate (bitrate);
+    mSong.setBitrate (bitrate, bitrate >= 128000 ? 300 : 150);
     while (!getExit()) {
       const string path = "pool_904/live/uk/" + mSong.getChan() +
                           "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
