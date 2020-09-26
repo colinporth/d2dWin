@@ -35,8 +35,18 @@ using namespace chrono;
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_south_west/bbc_one_south_west.isml/bbc_one_south_west-pa3%3d96000-video%3d1604032.m3u8
 //}}}
 
+const string kHost = "vs-hls-uk-live.akamaized.net";
+const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
+constexpr int kBitRate = 128000;
+
+//constexpr int kVidBitrate = 827008;
+constexpr int kVidBitrate = 1604032;
+//constexpr int kVidBitrate = 2812032;
+//constexpr int kVidBitrate = 5070016;
+constexpr int kMaxVideoFrames = 400;
+
 //{{{
-class cVideoDecode {
+class cMfxVideoDecode {
 public:
   //{{{
   class cFrame {
@@ -217,16 +227,14 @@ public:
   //}}}
 
   //{{{
-  cVideoDecode() {
+  cMfxVideoDecode() {
 
+    mfxVersion kMfxVersion = { 0,1 };
     mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
-
-    for (int i = 0; i < 400; i++)
-      mFrames.push_back (new cFrame);
     }
   //}}}
   //{{{
-  ~cVideoDecode() {
+  ~cMfxVideoDecode() {
 
     // Clean up resources
     // -  recommended to close Media SDK components first, before releasing allocated surfaces
@@ -278,16 +286,21 @@ public:
       memset (&mVideoParams, 0, sizeof(mVideoParams));
       mVideoParams.mfx.CodecId = MFX_CODEC_AVC;
       mVideoParams.IOPattern = MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
-      mfxStatus status = MFXVideoDECODE_DecodeHeader (mSession, &mBitstream, &mVideoParams);
-      if (status == MFX_ERR_NONE) {
-        //  query surfaces
-        mfxFrameAllocRequest frameAllocRequest;
-        memset (&frameAllocRequest, 0, sizeof(frameAllocRequest));
-        status =  MFXVideoDECODE_QueryIOSurf (mSession, &mVideoParams, &frameAllocRequest);
-        mNumSurfaces = frameAllocRequest.NumFrameSuggested;
-        mWidth = ((mfxU32)((frameAllocRequest.Info.Width)+31)) & (~(mfxU32)31);
-        mHeight = ((mfxU32)((frameAllocRequest.Info.Height)+31)) & (~(mfxU32)31);
+      if (MFXVideoDECODE_DecodeHeader (mSession, &mBitstream, &mVideoParams) != MFX_ERR_NONE) {
+        cLog::log (LOGERROR, "MFXVideoDECODE_DecodeHeader failed");
+        return;
         }
+
+      //  query surfaces
+      mfxFrameAllocRequest frameAllocRequest;
+      memset (&frameAllocRequest, 0, sizeof(frameAllocRequest));
+      if (MFXVideoDECODE_QueryIOSurf (mSession, &mVideoParams, &frameAllocRequest) != MFX_ERR_NONE) {
+        cLog::log (LOGERROR, "MFXVideoDECODE_QueryIOSurf failed");
+        return;
+        }
+      mNumSurfaces = frameAllocRequest.NumFrameSuggested;
+      mWidth = ((mfxU32)((frameAllocRequest.Info.Width)+31)) & (~(mfxU32)31);
+      mHeight = ((mfxU32)((frameAllocRequest.Info.Height)+31)) & (~(mfxU32)31);
 
       // alloc surfaces in system memory
       mSurfaces = new mfxFrameSurface1*[mNumSurfaces];
@@ -303,27 +316,28 @@ public:
         mSurfaces[i]->Data.Pitch = mWidth;
         }
 
-      status = MFXVideoDECODE_Init (mSession, &mVideoParams);
+      if (MFXVideoDECODE_Init (mSession, &mVideoParams) != MFX_ERR_NONE) {
+        cLog::log (LOGERROR, "MFXVideoDECODE_Init failed");
+        return;
+        }
       }
 
-    if (mNumSurfaces) {
-      //mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
-      mfxStatus status = MFX_ERR_NONE;
-      while (status >= MFX_ERR_NONE || status == MFX_ERR_MORE_SURFACE) {
-        mfxFrameSurface1* surface = nullptr;
-        mfxSyncPoint syncDecode = nullptr;
-        //cLog::log (LOGINFO, "decode surface" + dec (index));
-        status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, getFreeSurface(), &surface, &syncDecode);
+    //mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
+    mfxStatus status = MFX_ERR_NONE;
+    while (status >= MFX_ERR_NONE || status == MFX_ERR_MORE_SURFACE) {
+      mfxFrameSurface1* surface = nullptr;
+      mfxSyncPoint syncDecode = nullptr;
+      //cLog::log (LOGINFO, "decode surface" + dec (index));
+      status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, getFreeSurface(), &surface, &syncDecode);
+      if (status == MFX_ERR_NONE) {
+        status = mSession.SyncOperation (syncDecode, 60000);
         if (status == MFX_ERR_NONE) {
-          status = mSession.SyncOperation (syncDecode, 60000);
-          if (status == MFX_ERR_NONE) {
-            //cLog::log (LOGINFO, "decode %d, %d %d %d",
-            //                     surface->Data.TimeStamp,
-            //                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
-            getOldestFrame()->setNv12 (surface->Data.Y,
-                                       surface->Data.Pitch, surface->Info.Width, surface->Info.Height,
-                                       surface->Data.TimeStamp);
-            }
+          //cLog::log (LOGINFO, "decode %d, %d %d %d",
+          //                     surface->Data.TimeStamp,
+          //                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
+          getOldestFrame()->setNv12 (surface->Data.Y,
+                                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height,
+                                     surface->Data.TimeStamp);
           }
         }
       }
@@ -335,15 +349,17 @@ private:
   cFrame* getOldestFrame() {
   // return free, or oldest frame
 
+    if (mFrames.size() < kMaxVideoFrames) {
+      mFrames.push_back (new cFrame);
+      return mFrames.back();
+      }
+
     cFrame* oldestFrame = nullptr;
-    for (auto frame : mFrames) {
-      if (!frame->ok())
-        return frame;
-      else if (!oldestFrame)
+    for (auto frame : mFrames)
+      if (!oldestFrame)
         oldestFrame = frame;
       else if (frame->getTimestamp() < oldestFrame->getTimestamp())
         oldestFrame = frame;
-      }
 
     return oldestFrame;
     }
@@ -359,7 +375,6 @@ private:
     }
   //}}}
 
-  mfxVersion kMfxVersion = { 0,1 };
   MFXVideoSession mSession;
 
   mfxVideoParam mVideoParams;
@@ -375,15 +390,15 @@ private:
   };
 //}}}
 //{{{
-class cVideoDecodeBox : public cD2dWindow::cView {
+class cMfxVideoDecodeBox : public cD2dWindow::cView {
 public:
-  cVideoDecodeBox (cD2dWindow* window, float width, float height, cVideoDecode& videoDecode)
+  cMfxVideoDecodeBox (cD2dWindow* window, float width, float height, cMfxVideoDecode& videoDecode)
       : cView("videoDecode", window, width, height), mVideoDecode(videoDecode) {}
-  virtual ~cVideoDecodeBox() {}
+  virtual ~cMfxVideoDecodeBox() {}
 
   void onDraw (ID2D1DeviceContext* dc) {
 
-    cVideoDecode::cFrame* frame = mVideoDecode.getCurFrame();
+    auto frame = mVideoDecode.getCurFrame();
     if (frame) {
       cLog::log (LOGINFO, "onDraw:%d was:%d", frame->getTimestamp(), mTimestamp);
       if (frame->getTimestamp() != mTimestamp) {
@@ -417,20 +432,12 @@ public:
     }
 
 private:
-  cVideoDecode& mVideoDecode;
+  cMfxVideoDecode& mVideoDecode;
 
   ID2D1Bitmap* mBitmap = nullptr;
   uint64_t mTimestamp = 0;
   };
 //}}}
-
-const string kHost = "vs-hls-uk-live.akamaized.net";
-const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
-constexpr int kBitRate = 128000;
-//constexpr int kVidBitrate = 827008;
-constexpr int kVidBitrate = 1604032;
-//constexpr int kVidBitrate = 2812032;
-//constexpr int kVidBitrate = 5070016;
 
 class cAppWindow : public cD2dWindow {
 public:
@@ -438,7 +445,7 @@ public:
   void run (const string& title, int width, int height, const vector<string>& names) {
 
     init (title, width, height, false);
-    add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
+    add (new cMfxVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
     //add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
@@ -742,7 +749,7 @@ private:
   cBox* mLogBox = nullptr;
 
   //FILE* mFile = nullptr;
-  cVideoDecode mVideoDecode;
+  cMfxVideoDecode mVideoDecode;
   //}}}
   };
 
