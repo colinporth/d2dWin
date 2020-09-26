@@ -283,6 +283,7 @@ public:
 
     if (!mNumSurfaces) {
       // allocate decoder surfaces, init decoder, decode header
+      mfxVideoParam mVideoParams;
       memset (&mVideoParams, 0, sizeof(mVideoParams));
       mVideoParams.mfx.CodecId = MFX_CODEC_AVC;
       mVideoParams.IOPattern = MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
@@ -331,9 +332,9 @@ public:
       if (status == MFX_ERR_NONE) {
         status = mSession.SyncOperation (syncDecode, 60000);
         if (status == MFX_ERR_NONE) {
-          //cLog::log (LOGINFO, "decode %d, %d %d %d",
-          //                     surface->Data.TimeStamp,
-          //                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
+          cLog::log (LOGINFO, "decode %d, %d %d %d",
+                               surface->Data.TimeStamp,
+                               surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
           getOldestFrame()->setNv12 (surface->Data.Y,
                                      surface->Data.Pitch, surface->Info.Width, surface->Info.Height,
                                      surface->Data.TimeStamp);
@@ -376,7 +377,6 @@ private:
 
   MFXVideoSession mSession;
 
-  mfxVideoParam mVideoParams;
   mfxU16 mNumSurfaces = 0;
   int mWidth = 0;
   int mHeight = 0;
@@ -756,12 +756,10 @@ private:
   //}}}
   };
 
+// main
 int main (int argc, char** argv) {
-
   cLog::init (LOGINFO, false, "", "hlsWindow");
-
   cAppWindow appWindow;
   appWindow.run ("hlsWindow", 800, 420, {});
-
   return 0;
   }
