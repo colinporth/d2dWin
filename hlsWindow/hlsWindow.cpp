@@ -27,6 +27,10 @@ using namespace chrono;
 //}}}
 //{{{  urls
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d827008.m3u8
+//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d1604032.m3u8
+//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d2812032.m3u8
+//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d5070016.m3u8
+
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_four_hd/bbc_four_hd.isml/bbc_four_hd-pa4%3d128000-video%3d5070016.m3u8
 //vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_south_west/bbc_one_south_west.isml/bbc_one_south_west-pa3%3d96000-video%3d1604032.m3u8
 //}}}
@@ -53,7 +57,7 @@ public:
     uint64_t getTimestamp() { return mTimestamp; }
 
     //{{{
-    void set (uint8_t* nv12, int stride, int width, int height, uint64_t timestamp) {
+    void setNv12 (uint8_t* buffer, int stride, int width, int height, uint64_t timestamp) {
 
       mOk = false;
 
@@ -66,7 +70,7 @@ public:
 
       // copy all of nv12 to yBuf
       mYbuf = (uint8_t*)_aligned_realloc (mYbuf, height * mYStride * 3 / 2, 128);
-      memcpy (mYbuf, nv12, height * mYStride * 3 / 2);
+      memcpy (mYbuf, buffer, height * mYStride * 3 / 2);
 
       // unpack nv12 to planar uv
       mUbuf = (uint8_t*)_aligned_realloc (mUbuf, (mHeight/2) * mUVStride, 128);
@@ -83,91 +87,78 @@ public:
       mBgra = (uint32_t*)_aligned_realloc (mBgra, mWidth * 4 * mHeight, 128);
       int argbStride = mWidth;
 
-      __m128i y0r0, y0r1, u0, v0;
-      __m128i y00r0, y01r0, y00r1, y01r1;
-      __m128i u00, u01, v00, v01;
-      __m128i rv00, rv01, gu00, gu01, gv00, gv01, bu00, bu01;
-      __m128i r00, r01, g00, g01, b00, b01;
-      __m128i rgb0123, rgb4567, rgb89ab, rgbcdef;
-      __m128i gbgb;
-      __m128i ysub, uvsub;
-      __m128i zero, facy, facrv, facgu, facgv, facbu;
-      __m128i *srcy128r0, *srcy128r1;
-      __m128i *dstrgb128r0, *dstrgb128r1;
-      __m64   *srcu64, *srcv64;
+      __m128i ysub  = _mm_set1_epi32 (0x00100010);
+      __m128i uvsub = _mm_set1_epi32 (0x00800080);
 
-      ysub  = _mm_set1_epi32 (0x00100010);
-      uvsub = _mm_set1_epi32 (0x00800080);
+      __m128i facy  = _mm_set1_epi32 (0x004a004a);
+      __m128i facrv = _mm_set1_epi32 (0x00660066);
+      __m128i facgu = _mm_set1_epi32 (0x00190019);
+      __m128i facgv = _mm_set1_epi32 (0x00340034);
+      __m128i facbu = _mm_set1_epi32 (0x00810081);
 
-      facy  = _mm_set1_epi32 (0x004a004a);
-      facrv = _mm_set1_epi32 (0x00660066);
-      facgu = _mm_set1_epi32 (0x00190019);
-      facgv = _mm_set1_epi32 (0x00340034);
-      facbu = _mm_set1_epi32 (0x00810081);
-
-      zero  = _mm_set1_epi32( 0x00000000 );
+      __m128i zero  = _mm_set1_epi32( 0x00000000 );
 
       for (int y = 0; y < mHeight; y += 2) {
-        srcy128r0 = (__m128i *)(mYbuf + mYStride*y);
-        srcy128r1 = (__m128i *)(mYbuf + mYStride*y + mYStride);
-        srcu64 = (__m64 *)(mUbuf + mUVStride*(y/2));
-        srcv64 = (__m64 *)(mVbuf + mUVStride*(y/2));
+        __m128i* srcy128r0 = (__m128i *)(mYbuf + mYStride*y);
+        __m128i* srcy128r1 = (__m128i *)(mYbuf + mYStride*y + mYStride);
+        __m64* srcu64 = (__m64 *)(mUbuf + mUVStride*(y/2));
+        __m64* srcv64 = (__m64 *)(mVbuf + mUVStride*(y/2));
 
-        dstrgb128r0 = (__m128i *)(mBgra + argbStride*y);
-        dstrgb128r1 = (__m128i *)(mBgra + argbStride*y + argbStride);
+        __m128i* dstrgb128r0 = (__m128i *)(mBgra + argbStride*y);
+        __m128i* dstrgb128r1 = (__m128i *)(mBgra + argbStride*y + argbStride);
 
         for (int x = 0; x < mWidth; x += 16) {
-          u0 = _mm_loadl_epi64 ((__m128i *)srcu64 ); srcu64++;
-          v0 = _mm_loadl_epi64 ((__m128i *)srcv64 ); srcv64++;
+          __m128i u0 = _mm_loadl_epi64 ((__m128i *)srcu64 ); srcu64++;
+          __m128i v0 = _mm_loadl_epi64 ((__m128i *)srcv64 ); srcv64++;
 
-          y0r0 = _mm_load_si128( srcy128r0++ );
-          y0r1 = _mm_load_si128( srcy128r1++ );
+          __m128i y0r0 = _mm_load_si128( srcy128r0++ );
+          __m128i y0r1 = _mm_load_si128( srcy128r1++ );
           //{{{  constant y factors
-          y00r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r0, zero), ysub), facy);
-          y01r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r0, zero), ysub), facy);
-          y00r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r1, zero), ysub), facy);
-          y01r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r1, zero), ysub), facy);
+          __m128i y00r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r0, zero), ysub), facy);
+          __m128i y01r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r0, zero), ysub), facy);
+          __m128i y00r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r1, zero), ysub), facy);
+          __m128i y01r1 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r1, zero), ysub), facy);
           //}}}
           //{{{  expand u and v so they're aligned with y values
           u0  = _mm_unpacklo_epi8 (u0, zero);
-          u00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (u0, u0), uvsub);
-          u01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (u0, u0), uvsub);
+          __m128i u00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (u0, u0), uvsub);
+          __m128i u01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (u0, u0), uvsub);
 
           v0  = _mm_unpacklo_epi8( v0,  zero );
-          v00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (v0, v0), uvsub);
-          v01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (v0, v0), uvsub);
+          __m128i v00 = _mm_sub_epi16 (_mm_unpacklo_epi16 (v0, v0), uvsub);
+          __m128i v01 = _mm_sub_epi16 (_mm_unpackhi_epi16 (v0, v0), uvsub);
           //}}}
           //{{{  common factors on both rows.
-          rv00 = _mm_mullo_epi16 (facrv, v00);
-          rv01 = _mm_mullo_epi16 (facrv, v01);
-          gu00 = _mm_mullo_epi16 (facgu, u00);
-          gu01 = _mm_mullo_epi16 (facgu, u01);
-          gv00 = _mm_mullo_epi16 (facgv, v00);
-          gv01 = _mm_mullo_epi16 (facgv, v01);
-          bu00 = _mm_mullo_epi16 (facbu, u00);
-          bu01 = _mm_mullo_epi16 (facbu, u01);
+          __m128i rv00 = _mm_mullo_epi16 (facrv, v00);
+          __m128i rv01 = _mm_mullo_epi16 (facrv, v01);
+          __m128i gu00 = _mm_mullo_epi16 (facgu, u00);
+          __m128i gu01 = _mm_mullo_epi16 (facgu, u01);
+          __m128i gv00 = _mm_mullo_epi16 (facgv, v00);
+          __m128i gv01 = _mm_mullo_epi16 (facgv, v01);
+          __m128i bu00 = _mm_mullo_epi16 (facbu, u00);
+          __m128i bu01 = _mm_mullo_epi16 (facbu, u01);
           //}}}
           //{{{  row 0
-          r00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, rv00), 6);
-          r01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, rv01), 6);
-          g00 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y00r0, gu00), gv00), 6);
-          g01 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y01r0, gu01), gv01), 6);
-          b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, bu00), 6);
-          b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, bu01), 6);
+          __m128i r00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, rv00), 6);
+          __m128i r01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, rv01), 6);
+          __m128i g00 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y00r0, gu00), gv00), 6);
+          __m128i g01 = _mm_srai_epi16 (_mm_sub_epi16 (_mm_sub_epi16 (y01r0, gu01), gv01), 6);
+          __m128i b00 = _mm_srai_epi16 (_mm_add_epi16 (y00r0, bu00), 6);
+          __m128i b01 = _mm_srai_epi16 (_mm_add_epi16 (y01r0, bu01), 6);
 
           r00 = _mm_packus_epi16 (r00, r01);         // rrrr.. saturated
           g00 = _mm_packus_epi16 (g00, g01);         // gggg.. saturated
           b00 = _mm_packus_epi16 (b00, b01);         // bbbb.. saturated
 
           r01     = _mm_unpacklo_epi8 (r00, zero); // 0r0r..
-          gbgb    = _mm_unpacklo_epi8 (b00, g00);  // gbgb..
-          rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
-          rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
+          __m128i gbgb    = _mm_unpacklo_epi8 (b00, g00);  // gbgb..
+          __m128i rgb0123 = _mm_unpacklo_epi16 (gbgb, r01);  // 0rgb0rgb..
+          __m128i rgb4567 = _mm_unpackhi_epi16 (gbgb, r01);  // 0rgb0rgb..
 
           r01     = _mm_unpackhi_epi8 (r00, zero);
           gbgb    = _mm_unpackhi_epi8 (b00, g00 );
-          rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
-          rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
+          __m128i rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
+          __m128i rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
 
           _mm_stream_si128 (dstrgb128r0++, rgb0123);
           _mm_stream_si128 (dstrgb128r0++, rgb4567);
@@ -329,9 +320,9 @@ public:
             //cLog::log (LOGINFO, "decode %d, %d %d %d",
             //                     surface->Data.TimeStamp,
             //                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
-            getOldestFrame()->set (surface->Data.Y,
-                                   surface->Data.Pitch, surface->Info.Width, surface->Info.Height,
-                                   surface->Data.TimeStamp);
+            getOldestFrame()->setNv12 (surface->Data.Y,
+                                       surface->Data.Pitch, surface->Info.Width, surface->Info.Height,
+                                       surface->Data.TimeStamp);
             }
           }
         }
@@ -437,7 +428,8 @@ const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
 constexpr int kBitRate = 128000;
 //constexpr int kVidBitrate = 827008;
-constexpr int kVidBitrate = 2812032;
+constexpr int kVidBitrate = 1604032;
+//constexpr int kVidBitrate = 2812032;
 //constexpr int kVidBitrate = 5070016;
 
 class cAppWindow : public cD2dWindow {
@@ -507,13 +499,11 @@ private:
     return string (valuePtr, endPtr - valuePtr);
     }
   //}}}
-
   //{{{
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
-    mFile = fopen ("C:/Users/colin/Desktop/hls.ts", "wb");
-
+    //mFile = fopen ("C:/Users/colin/Desktop/hls.ts", "wb");
     int vidFrameNum = 0;
 
     constexpr int kHlsPreload = 2;
@@ -553,7 +543,7 @@ private:
               cLog::log (LOGINFO, "chunk " + dec(chunkNum) +
                                   " at " + date::format ("%T", floor<seconds>(getNow())) +
                                   " " + dec(http.getContentSize()));
-              fwrite (http.getContent(), 1, http.getContentSize(), mFile);
+              //fwrite (http.getContent(), 1, http.getContentSize(), mFile);
 
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
 
@@ -682,7 +672,7 @@ private:
         }
       }
 
-    fclose (mFile);
+    //fclose (mFile);
     cLog::log (LOGINFO, "exit");
     }
   //}}}
@@ -751,8 +741,7 @@ private:
   bool mPlaying = true;
   cBox* mLogBox = nullptr;
 
-  FILE* mFile = nullptr;
-
+  //FILE* mFile = nullptr;
   cVideoDecode mVideoDecode;
   //}}}
   };

@@ -1,0 +1,10 @@
+#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=1012300,CODECS="mp4a.40.2,avc1.77.30",RESOLUTION=704x396
+http://vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d827008.m3u8
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=1835920,CODECS="mp4a.40.2,avc1.100.31",RESOLUTION=960x540
+http://vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d1604032.m3u8
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=3116400,CODECS="mp4a.40.2,avc1.100.31",RESOLUTION=960x540
+http://vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d2812032.m3u8
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=5509880,CODECS="mp4a.40.2,avc1.100.32",RESOLUTION=1280x720
+http://vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d5070016.m3u8
