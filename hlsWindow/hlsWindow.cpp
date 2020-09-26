@@ -260,7 +260,7 @@ public:
     mBitstream.DataOffset = 0;
     mBitstream.DataLength = pesSize;
     mBitstream.MaxLength = pesSize;
-    mBitstream.TimeStamp = frameNum; //pidInfo->mPts;
+    mBitstream.TimeStamp = frameNum;
 
     if (!mNumSurfaces) {
       // allocate decoder surfaces, init decoder, decode header
