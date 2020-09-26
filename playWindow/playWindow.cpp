@@ -3,7 +3,7 @@
 #include "stdafx.h"
 
 #include "../../shared/audio/audioWASAPI.h"
-#include "../../shared/decoders/cSong.h"
+#include "../../shared/utils/cSong.h"
 #include "../../shared/decoders/cAudioDecode.h"
 #include "../../shared/net/cWinSockHttp.h"
 
@@ -346,7 +346,7 @@ private:
                 auto samples = decode.decodeFrame (seqFrameNum);
                 if (samples) {
                   mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                  mSong.addFrame (seqFrameNum++, samples, true, mSong.getNumFrames());
+                  mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames());
                   changed();
                   if (firstTime) {
                     //{{{  something to play, launch player
@@ -468,7 +468,7 @@ private:
               auto samples = decode.decodeFrame (frameNum);
               if (samples) {
                 mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                mSong.addFrame (frameNum++, samples, true, mSong.getNumFrames()+1);
+                mSong.addAudioFrame (frameNum++, samples, true, mSong.getNumFrames()+1);
                 changed();
                 if (frameNum == 1) // launch player after first frame
                   player = thread ([=](){ playThread (true); });
@@ -538,7 +538,7 @@ private:
         decode.parseFrame (fileMapPtr, fileMapEnd);
         auto samples = decode.getFramePtr();
         while (!getExit() && !mSongChanged && ((samples + (frameSamples * 2 * sizeof(float))) <= fileMapEnd)) {
-          mSong.addFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
+          mSong.addAudioFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
           samples += frameSamples * 2 * sizeof(float);
           changed();
           if (frameNum == 1)
@@ -556,7 +556,7 @@ private:
               int numFrames = mSong.getNumFrames();
               int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
               mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-              mSong.addFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
+              mSong.addAudioFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
               changed();
               if (frameNum == 1)
                 player = thread ([=](){ playThread (false); });

@@ -7,7 +7,7 @@
     <ClCompile Include="..\..\shared\decoders\cAudioDecode.cpp" />
     <ClCompile Include="..\..\shared\net\cHttp.cpp" />
     <ClCompile Include="playWindow.cpp" />
-    <ClCompile Include="..\..\shared\decoders\cSong.cpp" />
+    <ClCompile Include="..\..\shared\utils\cSong.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">
@@ -102,13 +102,13 @@
     <ClInclude Include="..\..\shared\hls\r6x80.h">
       <Filter>h</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\decoders\cSong.h">
-      <Filter>h</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\audio\audioWASAPI.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\audio\iAudio.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\utils\cSong.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

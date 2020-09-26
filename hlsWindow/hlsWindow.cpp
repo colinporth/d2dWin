@@ -3,7 +3,7 @@
 #include "stdafx.h"
 
 #include "../../shared/audio/audioWASAPI.h"
-#include "../../shared/decoders/cSong.h"
+#include "../../shared/utils/cSong.h"
 #include "../../shared/decoders/cAudioDecode.h"
 #include "../../shared/net/cWinSockHttp.h"
 
@@ -100,71 +100,14 @@ private:
     return valueString;
     }
   //}}}
-  //{{{
-  static uint8_t* extractFramesFromTs (uint8_t* ts, int tsLen, uint8_t* vidFramesPtr) {
-  // extract aacFrames, vidframes from ts packets
-  // - audio put back into ts, gets smaller ts gets stripped
-  // - video into supplied buffer
-
-    int audioPesNum = 0;
-    int videoPesNum = 0;
-    auto aacFramesPtr = ts;
-
-    auto tsEnd = ts + tsLen;
-    while ((ts < tsEnd) && (*ts++ == 0x47)) {
-      // ts packet start, dumb ts parser
-      auto payStart = ts[0] & 0x40;
-      auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
-      auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
-      ts += headerBytes;
-      auto tsBodyBytes = 187 - headerBytes;
-
-      if (pid == 33) {
-        if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-          videoPesNum++;
-          int pesHeaderBytes = 9 + ts[8];
-          ts += pesHeaderBytes;
-          tsBodyBytes -= pesHeaderBytes;
-          }
-
-        // copy ts payload into vidFrames buffer
-        memcpy (vidFramesPtr, ts, tsBodyBytes);
-        vidFramesPtr += tsBodyBytes;
-        }
-
-      else if (pid == 34) {
-        if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-          audioPesNum++;
-          int pesHeaderBytes = 9 + ts[8];
-          ts += pesHeaderBytes;
-          tsBodyBytes -= pesHeaderBytes;
-          }
-
-        // copy ts payload aacFrames back into buffer
-        memcpy (aacFramesPtr, ts, tsBodyBytes);
-        aacFramesPtr += tsBodyBytes;
-        }
-
-      else
-        // other pid
-        if (payStart)
-          cLog::log (LOGINFO, "other pid:%d header %x %x %x %x headerBytes:%d",
-                              pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
-
-      ts += tsBodyBytes;
-      }
-
-    cLog::log (LOGINFO, "ts - videoPes:" + dec(videoPesNum) + " audioPes:" + dec(audioPesNum));
-    return aacFramesPtr;
-    }
-  //}}}
 
   //{{{
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
     mFile = fopen ("C:/Users/colin/Desktop/hls.ts", "wb");
-    uint8_t* vidFrames = (uint8_t*)malloc (10000000);
+
+    int vidFrameNum = 0;
 
     constexpr int kHlsPreload = 10; // about a minute
     cLog::setThreadName ("hls ");
@@ -199,19 +142,100 @@ private:
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
+              //{{{  chunk loaded ok, process it
               cLog::log (LOGINFO, "got chunkNum:" + dec(chunkNum) +
                                   " at " + date::format ("%T", floor<seconds>(getNow())) +
                                   " size:" + dec(http.getContentSize()));
               fwrite (http.getContent(), 1, http.getContentSize(), mFile);
 
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
-              uint8_t* aacFrames = http.getContent();
-              uint8_t* aacFramesEnd = extractFramesFromTs (aacFrames, http.getContentSize(), vidFrames);
-              while (decode.parseFrame (aacFrames, aacFramesEnd)) {
+
+              uint8_t* ts = http.getContent();
+
+              int vidPesNum = 0;
+              uint8_t* vidPes = nullptr;
+              int vidPesLen = 0;
+
+              int audPesNum = 0;
+              auto aacFrames = http.getContent();
+              auto aacFramesPtr = aacFrames;
+
+              auto tsEnd = ts + http.getContentSize();
+              while ((ts < tsEnd) && (*ts++ == 0x47)) {
+                // ts packet start, dumb ts parser
+                auto payStart = ts[0] & 0x40;
+                auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
+                auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
+                ts += headerBytes;
+                auto tsBodyBytes = 187 - headerBytes;
+
+                if (pid == 33) {
+                  //{{{  vid pes
+                  if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
+                    int pesHeaderBytes = 9 + ts[8];
+                    ts += pesHeaderBytes;
+                    tsBodyBytes -= pesHeaderBytes;
+
+                    if (vidPes) {
+                      mSong.addVideoFrame (vidFrameNum, vidPes, vidPesLen);
+                      vidPes = nullptr;
+                      vidPesLen = 0;
+                      vidFrameNum++;
+                      }
+
+                    vidPesNum++;
+                    }
+
+                  // copy ts payload into vidFrames buffer
+                  vidPes = (uint8_t*)realloc (vidPes, vidPesLen + tsBodyBytes);
+                  memcpy (vidPes + vidPesLen, ts, tsBodyBytes);
+                  vidPesLen += tsBodyBytes;
+                  }
+                  //}}}
+                else if (pid == 34) {
+                  //{{{  aud pes
+                  if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
+                    int pesHeaderBytes = 9 + ts[8];
+                    ts += pesHeaderBytes;
+                    tsBodyBytes -= pesHeaderBytes;
+
+                    audPesNum++;
+                    }
+
+                  // copy ts payload aacFrames back into buffer, for later decode
+                  memcpy (aacFramesPtr, ts, tsBodyBytes);
+                  aacFramesPtr += tsBodyBytes;
+                  }
+                  //}}}
+                else if (pid == 0) {
+                  //{{{  pat
+                  if (payStart)
+                    cLog::log (LOGINFO, "pat");
+                  }
+                  //}}}
+                else if (pid == 32)
+                  //{{{  pgm
+                  if (payStart) {
+                    cLog::log (LOGINFO, "pgm");
+                  }
+                  //}}}
+                else {
+                  //{{{  other
+                  // other pid
+                  if (payStart)
+                    cLog::log (LOGINFO, "other pid:%d header %x %x %x %x headerBytes:%d",
+                                        pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
+                  }
+                  //}}}
+                ts += tsBodyBytes;
+                }
+              cLog::log (LOGINFO, "ts - videoPes:" + dec(vidPesNum) + " audioPes:" + dec(audPesNum));
+
+              while (decode.parseFrame (aacFrames, aacFramesPtr)) {
                 float* samples = decode.decodeFrame (seqFrameNum);
                 if (samples) {
                   mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                  mSong.addFrame (seqFrameNum++, samples, true, mSong.getNumFrames());
+                  mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames());
                   changed();
                   if (firstTime) {
                     firstTime = false;
@@ -220,9 +244,11 @@ private:
                   }
                 aacFrames += decode.getNextFrameOffset();
                 }
+
               http.freeContent();
               mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
               }
+              //}}}
             else {
               //{{{  failed to load expected available chunk, back off for 250ms
               mSong.setHlsLoad (cSong::eHlsFailed, chunkNum);

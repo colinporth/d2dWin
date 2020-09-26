@@ -51,7 +51,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release avx|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\shared\decoders\cSong.cpp">
+    <ClCompile Include="..\..\shared\net\cHttp.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release avx|Win32'">NotUsing</PrecompiledHeader>
@@ -59,7 +59,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release avx|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\shared\net\cHttp.cpp">
+    <ClCompile Include="..\..\shared\utils\cSong.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='release avx|Win32'">NotUsing</PrecompiledHeader>
@@ -96,7 +96,6 @@
     <ClInclude Include="..\..\shared\decoders\cAacDecoder.h" />
     <ClInclude Include="..\..\shared\decoders\cAudioDecode.h" />
     <ClInclude Include="..\..\shared\decoders\cMp3Decoder.h" />
-    <ClInclude Include="..\..\shared\decoders\cSong.h" />
     <ClInclude Include="..\..\shared\hls\r1x80.h" />
     <ClInclude Include="..\..\shared\hls\r2x80.h" />
     <ClInclude Include="..\..\shared\hls\r3x80.h" />
@@ -108,6 +107,7 @@
     <ClInclude Include="..\..\shared\utils\cFileList.h" />
     <ClInclude Include="..\..\shared\utils\cLog.h" />
     <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
+    <ClInclude Include="..\..\shared\utils\cSong.h" />
     <ClInclude Include="..\boxes\cBmpBox.h" />
     <ClInclude Include="..\boxes\cCalendarBox.h" />
     <ClInclude Include="..\boxes\cClockBox.h" />
