@@ -228,16 +228,10 @@ public:
   //}}}
   //{{{
   ~cMfxVideoDecode() {
-  // Clean up resources
-  // recommended to close Media SDK components first, before releasing allocated surfaces
-  // since some surfaces may still be locked by internal Media SDK resources.
-  // mSession closed automatically on destruction
 
     MFXVideoDECODE_Close (mSession);
-
     for (auto surface : mSurfaces)
       delete surface;
-
     for (auto frame : mFrames)
       delete frame;
     }
@@ -260,22 +254,18 @@ public:
       }
 
     if (nearestFrame)
-      cLog::log (LOGINFO, "found %5u %c %u %u %u",
+      cLog::log (LOGINFO, "getPlayFrame %5u %c %u %u %u",
                           nearestFrame->getSeqNum(), nearestFrame->getFrameType(),
                           nearestFrame->getPts(), mPlayPts, nearestDist);
     else
-      cLog::log (LOGINFO, "no playFrame");
+      cLog::log (LOGINFO, "getPlayFrame null");
+
     return nearestFrame;
     }
   //}}}
+  void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
   //{{{
-  void setPlayPts (uint64_t playPts) {
-
-    mPlayPts = playPts;
-    }
-  //}}}
-  //{{{
-  void decode (uint64_t seqNum, uint8_t* pes, int pesSize, uint64_t pts) {
+  void decode (uint64_t seqNum, uint64_t pts, uint8_t* pes, int pesSize) {
 
     char frameType = getFrameType (pes, pesSize);
 
@@ -348,33 +338,7 @@ public:
 
 private:
   //{{{
-  cFrame* allocateFrame (uint64_t pts) {
-  // return frame older than playPts or add new frame
-
-    // reuse any frame older than 4 frames before playPts
-    uint64_t oldPts = mPlayPts - (4 * (90000/25));
-    for (auto frame : mFrames)
-      if (frame->getPts() < oldPts)
-        return frame;
-
-    mFrames.push_back (new cFrame);
-
-    cLog::log (LOGINFO, "allocating new frame %d for %u at play:%u", mFrames.size(), pts, mPlayPts);
-    return mFrames.back();
-    }
-  //}}}
-  //{{{
-  mfxFrameSurface1* getFreeSurface() {
-
-    for (auto surface : mSurfaces)
-      if (!surface->Data.Locked)
-        return surface;
-
-    return nullptr;
-    }
-  //}}}
-  //{{{
-  char getFrameType (uint8_t* pes, int64_t pesSize) {
+  static char getFrameType (uint8_t* pes, int64_t pesSize) {
   // return frameType of video pes
 
     //{{{
@@ -670,6 +634,34 @@ private:
     return '?';
     }
   //}}}
+  //{{{
+  cFrame* allocateFrame (uint64_t pts) {
+  // return frame older than mPlayPts or add new frame
+
+    // reuse any frame older than 4 frames before playPts
+    uint64_t oldPts = mPlayPts - (4 * (90000/25));
+    for (auto frame : mFrames)
+      if (frame->getPts() < oldPts)
+        return frame;
+
+    // allocate new frame
+    mFrames.push_back (new cFrame);
+
+    cLog::log (LOGINFO, "allocating new frame %d for %u at play:%u", mFrames.size(), pts, mPlayPts);
+    return mFrames.back();
+    }
+  //}}}
+  //{{{
+  mfxFrameSurface1* getFreeSurface() {
+  // return first unlocked surface;
+
+    for (auto surface : mSurfaces)
+      if (!surface->Data.Locked)
+        return surface;
+
+    return nullptr;
+    }
+  //}}}
 
   MFXVideoSession mSession;
   mfxBitstream mBitstream;
@@ -907,16 +899,14 @@ private:
                     ts += pesHeaderBytes;
                     tsBodyBytes -= pesHeaderBytes;
 
-                    if (vidPes) {
+                    if (vidPes)
                       // new vidPes starting, decode last vidPes
                       //cLog::log (LOGINFO, "videoPes %u", vidPts);
                       //mSong.addVideoFrame (vidPes, vidPesLen, vidPts);
-                      mVideoDecode.decode (vidFrameNum++, vidPes, vidPesLen, vidPts);
+                      mVideoDecode.decode (vidFrameNum++, vidPts, vidPes, vidPesLen);
 
-                      vidPes = nullptr;
-                      vidPesLen = 0;
-                      }
-
+                    vidPes = nullptr;
+                    vidPesLen = 0;
                     vidPesNum++;
                     }
 
@@ -956,7 +946,7 @@ private:
 
               // decode last vidPes
               if (vidPes)
-                mVideoDecode.decode (vidFrameNum++, vidPes, vidPesLen, vidPts);
+                mVideoDecode.decode (vidFrameNum++, vidPts, vidPes, vidPesLen);
 
               // now process whole chunk aud frames, maybe should do pes by pes like vid
               audPts = firstAudPts;
