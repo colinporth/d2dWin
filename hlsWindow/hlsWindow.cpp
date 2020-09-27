@@ -45,6 +45,7 @@ public:
   //{{{
   class cFrame {
   public:
+    cFrame (uint64_t pts, char type) : mPts(pts), mType(type), mOk(false) {}
     //{{{
     virtual ~cFrame() {
       _aligned_free (mYbuf);
@@ -54,21 +55,24 @@ public:
       }
     //}}}
 
-    uint64_t getSeqNum() { return mSeqNum; }
+    bool ok() { return mOk; }
     uint64_t getPts() { return mPts; }
-    char getFrameType() { return mType; }
 
     int getWidth() { return mWidth; }
     int getHeight() { return mHeight; }
     uint32_t* getBgra() { return mBgra; }
 
     //{{{
-    void setNv12 (uint64_t seqNum, uint64_t pts, char type, uint8_t* buffer, int stride, int width, int height) {
-
-      mSeqNum = seqNum;
+    void set (uint64_t pts, char type) {
+      mOk = false;
       mPts = pts;
       mType = type;
+      }
+    //}}}
+    //{{{
+    void setNv12 (uint8_t* buffer, int width, int height, int stride) {
 
+      mOk = false;
       mYStride = stride;
       mUVStride = stride/2;
 
@@ -197,13 +201,14 @@ public:
           //}}}
           }
         }
+      mOk = true;
       }
     //}}}
 
   private:
-    uint64_t mSeqNum = 0;
+    bool mOk = false;
     uint64_t mPts = 0;
-    char mType = '?';
+    char mType = ' ';
 
     int mYStride = 0;
     int mUVStride = 0;
@@ -238,36 +243,20 @@ public:
   //}}}
 
   //{{{
-  cFrame* getPlayFrame() {
-  // return nearest frame to mPlayPts
-  // - can be nullptr if none available
+  cFrame* findPlayFrame() {
 
-    cFrame* nearestFrame = nullptr;
+    for (auto frame : mFrames)
+      if (frame->getPts()/3600 == mPlayPts/3600)
+        return frame;
 
-    uint64_t nearestDist = 0xFFFFFFFFFFFFFFFF;
-    for (auto frame : mFrames) {
-      uint64_t dist = (frame->getPts() >= mPlayPts) ? (frame->getPts() - mPlayPts) : (mPlayPts - frame->getPts());
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearestFrame = frame;
-        }
-      }
-
-    if (nearestFrame)
-      cLog::log (LOGINFO, "getPlayFrame %5u %c %u %u %u",
-                          nearestFrame->getSeqNum(), nearestFrame->getFrameType(),
-                          nearestFrame->getPts(), mPlayPts, nearestDist);
-    else
-      cLog::log (LOGINFO, "getPlayFrame null");
-
-    return nearestFrame;
+    return nullptr;
     }
   //}}}
   void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
   //{{{
   void decode (uint64_t seqNum, uint64_t pts, uint8_t* pes, int pesSize) {
 
-    char frameType = getFrameType (pes, pesSize);
+    allocateFrame (pts, getType (pes, pesSize));
 
     mBitstream.Data = pes;
     mBitstream.DataOffset = 0;
@@ -324,12 +313,11 @@ public:
       if (status == MFX_ERR_NONE) {
         status = mSession.SyncOperation (syncDecode, 60000);
         if (status == MFX_ERR_NONE) {
-          //cLog::log (LOGINFO, "decode %d, %d %d %d",
-          //                     surface->Data.TimeStamp,
-          //                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
-          auto frame = allocateFrame (surface->Data.TimeStamp);
-          frame->setNv12 (seqNum, surface->Data.TimeStamp, frameType,
-                          surface->Data.Y, surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
+          //cLog::log (LOGINFO, "-> frame pts:%u %dx%d:%d",
+          //                    surface->Data.TimeStamp/3600,
+          //                    surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
+          auto frame = findAllocatedFrame (surface->Data.TimeStamp);
+          frame->setNv12 (surface->Data.Y, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
           }
         }
       }
@@ -338,7 +326,7 @@ public:
 
 private:
   //{{{
-  static char getFrameType (uint8_t* pes, int64_t pesSize) {
+  static char getType (uint8_t* pes, int64_t pesSize) {
   // return frameType of video pes
 
     //{{{
@@ -634,23 +622,7 @@ private:
     return '?';
     }
   //}}}
-  //{{{
-  cFrame* allocateFrame (uint64_t pts) {
-  // return frame older than mPlayPts or add new frame
 
-    // reuse any frame older than 4 frames before playPts
-    uint64_t oldPts = mPlayPts - (4 * (90000/25));
-    for (auto frame : mFrames)
-      if (frame->getPts() < oldPts)
-        return frame;
-
-    // allocate new frame
-    mFrames.push_back (new cFrame);
-
-    cLog::log (LOGINFO, "allocating new frame %d for %u at play:%u", mFrames.size(), pts, mPlayPts);
-    return mFrames.back();
-    }
-  //}}}
   //{{{
   mfxFrameSurface1* getFreeSurface() {
   // return first unlocked surface;
@@ -658,6 +630,33 @@ private:
     for (auto surface : mSurfaces)
       if (!surface->Data.Locked)
         return surface;
+
+    return nullptr;
+    }
+  //}}}
+  //{{{
+  cFrame* allocateFrame (uint64_t pts, char type) {
+  // return first frame older than mPlayPts, otherwise add new frame
+
+    for (auto frame : mFrames)
+      if (frame->ok() && (frame->getPts() < mPlayPts)) {
+        frame->set (pts, type);
+        return frame;
+        }
+
+    // allocate new frame
+    mFrames.push_back (new cFrame (pts, type));
+
+    //cLog::log (LOGINFO, "allocating new frame %d for %u at play:%u", mFrames.size(), pts, mPlayPts);
+    return mFrames.back();
+    }
+  //}}}
+  //{{{
+  cFrame* findAllocatedFrame (uint64_t pts) {
+
+    for (auto frame : mFrames)
+      if (frame->getPts() == pts)
+        return frame;
 
     return nullptr;
     }
@@ -677,26 +676,26 @@ private:
 class cVideoDecodeBox : public cD2dWindow::cView {
 public:
   cVideoDecodeBox (cD2dWindow* window, float width, float height, cMfxVideoDecode& videoDecode)
-      : cView("videoDecode", window, width, height), mVideoDecode(videoDecode) {}
+    : cView("videoDecode", window, width, height), mVideoDecode(videoDecode) {}
   virtual ~cVideoDecodeBox() {}
 
   void onDraw (ID2D1DeviceContext* dc) {
 
-    auto frame = mVideoDecode.getPlayFrame();
+    auto frame = mVideoDecode.findPlayFrame();
     if (frame) {
       if (frame->getPts() != mPts) {
         //cLog::log (LOGINFO, "onDraw show:%u was:%u", frame->getPts(), mPts);
-        // make new bitmap from frame
+        // new Frame, update bitmap
         if (mBitmap)  {
           auto pixelSize = mBitmap->GetPixelSize();
           if ((pixelSize.width != frame->getWidth()) || (pixelSize.height != frame->getHeight())) {
-            // bitmap size changed
+            // bitmap size changed, remove, then recreate
             mBitmap->Release();
             mBitmap = nullptr;
             }
           }
 
-        if (!mBitmap) // create/recreate bitmap
+        if (!mBitmap)
           dc->CreateBitmap (D2D1::SizeU(frame->getWidth(), frame->getHeight()),
                             { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
                             &mBitmap);
@@ -840,7 +839,7 @@ private:
 
         mSong.init (cAudioDecode::eAac, 2, 48000, 1024);
         mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s);
-        cAudioDecode decode (cAudioDecode::eAac);
+        cAudioDecode audioDecode (cAudioDecode::eAac);
 
         thread player;
         bool firstTime = true;
@@ -852,9 +851,9 @@ private:
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               //{{{  chunk loaded, process it
-              cLog::log (LOGINFO, "chunk " + dec(chunkNum) +
-                                  " at " + date::format ("%T", floor<seconds>(getNow())) +
-                                  " " + dec(http.getContentSize()));
+              //cLog::log (LOGINFO, "chunk " + dec(chunkNum) +
+              //                    " at " + date::format ("%T", floor<seconds>(getNow())) +
+              //                    " " + dec(http.getContentSize()));
               //fwrite (http.getContent(), 1, http.getContentSize(), mFile);
 
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
@@ -865,12 +864,10 @@ private:
               uint8_t* vidPes = nullptr;
               int vidPesLen = 0;
               uint64_t vidPts = 0;
-              uint64_t firstVidPts = 0;
 
               auto aacFrames = http.getContent();
               auto aacFramesPtr = aacFrames;
               uint64_t audPts = 0;
-              uint64_t firstAudPts = 0;
 
               uint8_t* ts = http.getContent();
               uint8_t* tsEnd = ts + http.getContentSize();
@@ -885,25 +882,17 @@ private:
                 if (pid == 33) {
                   //{{{  vid pes
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-                    // vid pes start
-                    if (ts[7] & 0x80) {
-                      // has vid pts
+                    // new vidPes start
+                    if (vidPes) // process last vidPes
+                      mVideoDecode.decode (vidFrameNum++, vidPts, vidPes, vidPesLen);
+                      //mSong.addVideoFrame (vidPes, vidPesLen, vidPts);
+
+                    if (ts[7] & 0x80) // has vid pts
                       vidPts = getPts (ts+9);
-                      if (!firstVidPts)
-                        firstVidPts = vidPts;
-                      if (!mFirstPts)
-                        mFirstPts = audPts;
-                      }
 
                     int pesHeaderBytes = 9 + ts[8];
                     ts += pesHeaderBytes;
                     tsBodyBytes -= pesHeaderBytes;
-
-                    if (vidPes)
-                      // new vidPes starting, decode last vidPes
-                      //cLog::log (LOGINFO, "videoPes %u", vidPts);
-                      //mSong.addVideoFrame (vidPes, vidPesLen, vidPts);
-                      mVideoDecode.decode (vidFrameNum++, vidPts, vidPes, vidPesLen);
 
                     vidPes = nullptr;
                     vidPesLen = 0;
@@ -920,12 +909,9 @@ private:
                   //{{{  audio pes
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
                     // aud pes start
-                    if (ts[7] & 0x80) {
-                      // has aud pts
-                      audPts = getPts (ts+9);
-                      if (!firstAudPts)
-                        firstAudPts = audPts;
-                      }
+                    if (ts[7] & 0x80) // has aud pts
+                      if (!audPts) // ony need first of chunk
+                        audPts = getPts (ts+9);
 
                     //cLog::log (LOGINFO, "audioPes %u", audPts);
 
@@ -944,31 +930,28 @@ private:
                 ts += tsBodyBytes;
                 }
 
-              // decode last vidPes
+              // process any outstanding vidPes
               if (vidPes)
                 mVideoDecode.decode (vidFrameNum++, vidPts, vidPes, vidPesLen);
 
-              // now process whole chunk aud frames, maybe should do pes by pes like vid
-              audPts = firstAudPts;
-              while (decode.parseFrame (aacFrames, aacFramesPtr)) {
-                float* samples = decode.decodeFrame (seqFrameNum);
+              // process whole chunk of audFrames, !!!! could do this above for each pes like vid !!!!
+              while (audioDecode.parseFrame (aacFrames, aacFramesPtr)) {
+                float* samples = audioDecode.decodeFrame (seqFrameNum);
                 if (samples) {
-                  mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
+                  mSong.setFixups (audioDecode.getNumChannels(), audioDecode.getSampleRate(), audioDecode.getNumSamples());
                   mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, audPts);
-                  audPts += (decode.getNumSamples() * 90) / 48;
+                  audPts += (audioDecode.getNumSamples() * 90) / 48;
                   changed();
                   if (firstTime) {
                     firstTime = false;
                     player = thread ([=](){ playThread (true); });
                     }
                   }
-                aacFrames += decode.getNextFrameOffset();
+                aacFrames += audioDecode.getNextFrameOffset();
                 }
 
-              cLog::log (LOGINFO, "chunk:%d vidPes:%d audPes:%d vidPts:%u,%u firstAudPts:%u,%u",
-                                  chunkNum, vidPesNum, audPesNum,
-                                  firstVidPts-mFirstPts, vidPts-mFirstPts, firstAudPts-mFirstPts, audPts-mFirstPts);
-
+              cLog::log (LOGINFO, "chunk:%d vidPes:%d audPes:%d vidPts:%u audPts:%u",
+                                  chunkNum, vidPesNum, audPesNum, vidPts, audPts);
               http.freeContent();
               mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
               }
@@ -1061,8 +1044,6 @@ private:
 
   //FILE* mFile = nullptr;
   cMfxVideoDecode mVideoDecode;
-
-  uint64_t mFirstPts = 0;
   //}}}
   };
 
