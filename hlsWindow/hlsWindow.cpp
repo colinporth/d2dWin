@@ -37,12 +37,7 @@ using namespace chrono;
 const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
 constexpr int kBitRate = 128000;
-
-//constexpr int kVidBitrate = 827008;
-constexpr int kVidBitrate = 1604032;
-//constexpr int kVidBitrate = 2812032;
-//constexpr int kVidBitrate = 5070016;
-constexpr int kMaxVideoFrames = 400;
+constexpr int kVidBitrate = 1604032; // 827008 1604032 2812032 5070016
 
 //{{{
 class cMfxVideoDecode {
@@ -61,18 +56,18 @@ public:
 
     uint64_t getSeqNum() { return mSeqNum; }
     uint64_t getPts() { return mPts; }
-    char getFrameType() { return mFrameType; }
+    char getFrameType() { return mType; }
 
     int getWidth() { return mWidth; }
     int getHeight() { return mHeight; }
     uint32_t* getBgra() { return mBgra; }
 
     //{{{
-    void setNv12 (uint64_t seqNum, uint64_t pts, char frameType, uint8_t* buffer, int stride, int width, int height) {
+    void setNv12 (uint64_t seqNum, uint64_t pts, char type, uint8_t* buffer, int stride, int width, int height) {
 
       mSeqNum = seqNum;
       mPts = pts;
-      mFrameType = frameType;
+      mType = type;
 
       mYStride = stride;
       mUVStride = stride/2;
@@ -208,7 +203,7 @@ public:
   private:
     uint64_t mSeqNum = 0;
     uint64_t mPts = 0;
-    char mFrameType = '?';
+    char mType = '?';
 
     int mYStride = 0;
     int mUVStride = 0;
@@ -266,7 +261,7 @@ public:
 
     if (nearestFrame)
       cLog::log (LOGINFO, "found %5u %c %u %u %u",
-                          nearestFrame->getSeqNum(), nearestFrame->getFrameType(), 
+                          nearestFrame->getSeqNum(), nearestFrame->getFrameType(),
                           nearestFrame->getPts(), mPlayPts, nearestDist);
     else
       cLog::log (LOGINFO, "no playFrame");
