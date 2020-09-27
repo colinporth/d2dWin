@@ -8,11 +8,10 @@
 #include "../../shared/net/cWinSockHttp.h"
 
 #include "../common/cD2dWindow.h"
-#include "../boxes/cLogBox.h"
 #include "../boxes/cWindowBox.h"
 #include "../boxes/cClockBox.h"
-#include "../boxes/cCalendarBox.h"
 #include "../boxes/cSongBox.h"
+#include "../boxes/cLogBox.h"
 
 #include "../mfx/include/mfxvideo++.h"
 
@@ -60,20 +59,26 @@ public:
       }
     //}}}
 
+    uint64_t getSeqNum() { return mSeqNum; }
+    uint64_t getPts() { return mPts; }
+    char getFrameType() { return mFrameType; }
+
     int getWidth() { return mWidth; }
     int getHeight() { return mHeight; }
     uint32_t* getBgra() { return mBgra; }
-    uint64_t getTimestamp() { return mTimestamp; }
 
     //{{{
-    void setNv12 (uint8_t* buffer, int stride, int width, int height, uint64_t timestamp) {
+    void setNv12 (uint64_t seqNum, uint64_t pts, char frameType, uint8_t* buffer, int stride, int width, int height) {
+
+      mSeqNum = seqNum;
+      mPts = pts;
+      mFrameType = frameType;
 
       mYStride = stride;
       mUVStride = stride/2;
 
       mWidth = width;
       mHeight = height;
-      mTimestamp = timestamp;
 
       // copy all of nv12 to yBuf
       mYbuf = (uint8_t*)_aligned_realloc (mYbuf, height * mYStride * 3 / 2, 128);
@@ -201,12 +206,15 @@ public:
     //}}}
 
   private:
+    uint64_t mSeqNum = 0;
+    uint64_t mPts = 0;
+    char mFrameType = '?';
+
     int mYStride = 0;
     int mUVStride = 0;
 
     int mWidth = 0;
     int mHeight = 0;
-    uint64_t mTimestamp = 0xFFFFFFFFFFFFFFFF;
 
     uint8_t* mYbuf = nullptr;
     uint8_t* mUbuf = nullptr;
@@ -241,37 +249,49 @@ public:
   //}}}
 
   //{{{
-  cFrame* getCurFrame() {
+  cFrame* getPlayFrame() {
+  // return nearest frame to mPlayPts
+  // - can be nullptr if none available
 
     cFrame* nearestFrame = nullptr;
 
-    double nearest = 0.0;
-    for (auto frame : mFrames)
-      if (!nearestFrame || (fabs(frame->getTimestamp() - mPlayFrame)) < nearest) {
+    uint64_t nearestDist = 0xFFFFFFFFFFFFFFFF;
+    for (auto frame : mFrames) {
+      uint64_t dist = (frame->getPts() >= mPlayPts) ? (frame->getPts() - mPlayPts) : (mPlayPts - frame->getPts());
+      if (dist < nearestDist) {
+        nearestDist = dist;
         nearestFrame = frame;
-        nearest = fabs(frame->getTimestamp() - mPlayFrame);
         }
+      }
 
+    if (nearestFrame)
+      cLog::log (LOGINFO, "found %5u %c %u %u %u",
+                          nearestFrame->getSeqNum(), nearestFrame->getFrameType(), 
+                          nearestFrame->getPts(), mPlayPts, nearestDist);
+    else
+      cLog::log (LOGINFO, "no playFrame");
     return nearestFrame;
     }
   //}}}
   //{{{
-  void setPlayFrame (int playFrame) {
+  void setPlayPts (uint64_t playPts) {
 
-    mPlayFrame = playFrame;
+    mPlayPts = playPts;
     }
   //}}}
   //{{{
-  void decode (uint8_t* pes, int pesSize, uint64_t timestamp) {
+  void decode (uint64_t seqNum, uint8_t* pes, int pesSize, uint64_t pts) {
+
+    char frameType = getFrameType (pes, pesSize);
 
     mBitstream.Data = pes;
     mBitstream.DataOffset = 0;
     mBitstream.DataLength = pesSize;
     mBitstream.MaxLength = pesSize;
-    mBitstream.TimeStamp = timestamp;
+    mBitstream.TimeStamp = pts;
 
     if (mSurfaces.empty()) {
-      // allocate decoder surfaces, init decoder, decode header
+      //{{{  allocate decoder surfaces, init decoder, decode header
       mfxVideoParam mVideoParams;
       memset (&mVideoParams, 0, sizeof(mVideoParams));
       mVideoParams.mfx.CodecId = MFX_CODEC_AVC;
@@ -308,6 +328,7 @@ public:
         return;
         }
       }
+      //}}}
 
     //mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
     mfxStatus status = MFX_ERR_NONE;
@@ -318,12 +339,12 @@ public:
       if (status == MFX_ERR_NONE) {
         status = mSession.SyncOperation (syncDecode, 60000);
         if (status == MFX_ERR_NONE) {
-          cLog::log (LOGINFO, "decode %d, %d %d %d",
-                               surface->Data.TimeStamp,
-                               surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
-          getOldestFrame()->setNv12 (surface->Data.Y,
-                                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height,
-                                     surface->Data.TimeStamp);
+          //cLog::log (LOGINFO, "decode %d, %d %d %d",
+          //                     surface->Data.TimeStamp,
+          //                     surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
+          auto frame = allocateFrame (surface->Data.TimeStamp);
+          frame->setNv12 (seqNum, surface->Data.TimeStamp, frameType,
+                          surface->Data.Y, surface->Data.Pitch, surface->Info.Width, surface->Info.Height);
           }
         }
       }
@@ -332,22 +353,19 @@ public:
 
 private:
   //{{{
-  cFrame* getOldestFrame() {
-  // return new or oldest frame
+  cFrame* allocateFrame (uint64_t pts) {
+  // return frame older than playPts or add new frame
 
-    if (mFrames.size() < kMaxVideoFrames) {
-      mFrames.push_back (new cFrame);
-      return mFrames.back();
-      }
-
-    cFrame* oldestFrame = nullptr;
+    // reuse any frame older than 4 frames before playPts
+    uint64_t oldPts = mPlayPts - (4 * (90000/25));
     for (auto frame : mFrames)
-      if (!oldestFrame)
-        oldestFrame = frame;
-      else if (frame->getTimestamp() < oldestFrame->getTimestamp())
-        oldestFrame = frame;
+      if (frame->getPts() < oldPts)
+        return frame;
 
-    return oldestFrame;
+    mFrames.push_back (new cFrame);
+
+    cLog::log (LOGINFO, "allocating new frame %d for %u at play:%u", mFrames.size(), pts, mPlayPts);
+    return mFrames.back();
     }
   //}}}
   //{{{
@@ -360,6 +378,303 @@ private:
     return nullptr;
     }
   //}}}
+  //{{{
+  char getFrameType (uint8_t* pes, int64_t pesSize) {
+  // return frameType of video pes
+
+    //{{{
+    class cBitstream {
+    // used to parse H264 stream to find I frames
+    public:
+      cBitstream (const uint8_t* buffer, uint32_t bit_len) :
+        mDecBuffer(buffer), mDecBufferSize(bit_len), mNumOfBitsInBuffer(0), mBookmarkOn(false) {}
+
+      //{{{
+      uint32_t peekBits (uint32_t bits) {
+
+        bookmark (true);
+        uint32_t ret = getBits (bits);
+        bookmark (false);
+        return ret;
+        }
+      //}}}
+      //{{{
+      uint32_t getBits (uint32_t numBits) {
+
+        //{{{
+        static const uint32_t msk[33] = {
+          0x00000000, 0x00000001, 0x00000003, 0x00000007,
+          0x0000000f, 0x0000001f, 0x0000003f, 0x0000007f,
+          0x000000ff, 0x000001ff, 0x000003ff, 0x000007ff,
+          0x00000fff, 0x00001fff, 0x00003fff, 0x00007fff,
+          0x0000ffff, 0x0001ffff, 0x0003ffff, 0x0007ffff,
+          0x000fffff, 0x001fffff, 0x003fffff, 0x007fffff,
+          0x00ffffff, 0x01ffffff, 0x03ffffff, 0x07ffffff,
+          0x0fffffff, 0x1fffffff, 0x3fffffff, 0x7fffffff,
+          0xffffffff
+          };
+        //}}}
+
+        if (numBits == 0)
+          return 0;
+
+        uint32_t retData;
+        if (mNumOfBitsInBuffer >= numBits) {  // don't need to read from FILE
+          mNumOfBitsInBuffer -= numBits;
+          retData = mDecData >> mNumOfBitsInBuffer;
+          // wmay - this gets done below...retData &= msk[numBits];
+          }
+        else {
+          uint32_t nbits;
+          nbits = numBits - mNumOfBitsInBuffer;
+          if (nbits == 32)
+            retData = 0;
+          else
+            retData = mDecData << nbits;
+
+          switch ((nbits - 1) / 8) {
+            case 3:
+              nbits -= 8;
+              if (mDecBufferSize < 8)
+                return 0;
+              retData |= *mDecBuffer++ << nbits;
+              mDecBufferSize -= 8;
+              // fall through
+            case 2:
+              nbits -= 8;
+              if (mDecBufferSize < 8)
+                return 0;
+              retData |= *mDecBuffer++ << nbits;
+              mDecBufferSize -= 8;
+            case 1:
+              nbits -= 8;
+              if (mDecBufferSize < 8)
+                return 0;
+              retData |= *mDecBuffer++ << nbits;
+              mDecBufferSize -= 8;
+            case 0:
+              break;
+            }
+          if (mDecBufferSize < nbits)
+            return 0;
+
+          mDecData = *mDecBuffer++;
+          mNumOfBitsInBuffer = min(8u, mDecBufferSize) - nbits;
+          mDecBufferSize -= min(8u, mDecBufferSize);
+          retData |= (mDecData >> mNumOfBitsInBuffer) & msk[nbits];
+          }
+
+        return (retData & msk[numBits]);
+        };
+      //}}}
+
+      //{{{
+      uint32_t getUe() {
+
+        uint32_t bits;
+        uint32_t read;
+        int bits_left;
+        bool done = false;
+        bits = 0;
+
+        // we want to read 8 bits at a time - if we don't have 8 bits,
+        // read what's left, and shift.  The exp_golomb_bits calc remains the same.
+        while (!done) {
+          bits_left = bits_remain();
+          if (bits_left < 8) {
+            read = peekBits (bits_left) << (8 - bits_left);
+            done = true;
+            }
+          else {
+            read = peekBits (8);
+            if (read == 0) {
+              getBits (8);
+              bits += 8;
+              }
+            else
+             done = true;
+            }
+          }
+
+        uint8_t coded = exp_golomb_bits[read];
+        getBits (coded);
+        bits += coded;
+
+        return getBits (bits + 1) - 1;
+        }
+      //}}}
+      //{{{
+      int32_t getSe() {
+
+        uint32_t ret;
+        ret = getUe();
+        if ((ret & 0x1) == 0) {
+          ret >>= 1;
+          int32_t temp = 0 - ret;
+          return temp;
+          }
+
+        return (ret + 1) >> 1;
+        }
+      //}}}
+
+      //{{{
+      void check_0s (int count) {
+
+        uint32_t val = getBits (count);
+        if (val != 0)
+          cLog::log (LOGERROR, "field error - %d bits should be 0 is %x", count, val);
+        }
+      //}}}
+      //{{{
+      int bits_remain() {
+        return mDecBufferSize + mNumOfBitsInBuffer;
+        };
+      //}}}
+      //{{{
+      int byte_align() {
+
+        int temp = 0;
+        if (mNumOfBitsInBuffer != 0)
+          temp = getBits (mNumOfBitsInBuffer);
+        else {
+          // if we are byte aligned, check for 0x7f value - this will indicate
+          // we need to skip those bits
+          uint8_t readval = peekBits (8);
+          if (readval == 0x7f)
+            readval = getBits (8);
+          }
+
+        return temp;
+        };
+      //}}}
+
+    private:
+      //{{{
+      const uint8_t exp_golomb_bits[256] = {
+        8, 7, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 3,
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0,
+        };
+      //}}}
+
+      //{{{
+      void bookmark (bool on) {
+
+        if (on) {
+          mNumOfBitsInBuffer_bookmark = mNumOfBitsInBuffer;
+          mDecBuffer_bookmark = mDecBuffer;
+          mDecBufferSize_bookmark = mDecBufferSize;
+          mBookmarkOn = 1;
+          mDecData_bookmark = mDecData;
+          }
+
+        else {
+          mNumOfBitsInBuffer = mNumOfBitsInBuffer_bookmark;
+          mDecBuffer = mDecBuffer_bookmark;
+          mDecBufferSize = mDecBufferSize_bookmark;
+          mDecData = mDecData_bookmark;
+          mBookmarkOn = 0;
+          }
+
+        };
+      //}}}
+
+      const uint8_t* mDecBuffer;
+      uint32_t mDecBufferSize;
+      uint32_t mNumOfBitsInBuffer;
+      bool mBookmarkOn;
+
+      uint8_t mDecData_bookmark = 0;
+      uint8_t mDecData = 0;
+
+      uint32_t mNumOfBitsInBuffer_bookmark = 0;
+      const uint8_t* mDecBuffer_bookmark = 0;
+      uint32_t mDecBufferSize_bookmark = 0;
+      };
+    //}}}
+
+    // h264 minimal parser
+    auto pesEnd = pes + pesSize;
+    while (pes < pesEnd) {
+      //{{{  skip past startcode, find next startcode
+      auto buf = pes;
+      auto bufSize = pesSize;
+
+      uint32_t startOffset = 0;
+      if (!buf[0] && !buf[1]) {
+        if (!buf[2] && buf[3] == 1) {
+          buf += 4;
+          startOffset = 4;
+          }
+        else if (buf[2] == 1) {
+          buf += 3;
+          startOffset = 3;
+          }
+        }
+
+      // find next start code
+      auto offset = startOffset;
+      uint32_t nalSize = offset;
+      uint32_t val = 0xffffffff;
+      while (offset++ < bufSize - 3) {
+        val = (val << 8) | *buf++;
+        if (val == 0x0000001) {
+          nalSize = offset - 4;
+          break;
+          }
+        if ((val & 0x00ffffff) == 0x0000001) {
+          nalSize = offset - 3;
+          break;
+          }
+
+        nalSize = (uint32_t)bufSize;
+        }
+      //}}}
+
+      if (nalSize > 3) {
+        // parse NAL bitStream
+        cBitstream bitstream (buf, (nalSize - startOffset) * 8);
+        bitstream.check_0s (1);
+        bitstream.getBits (2);
+        switch (bitstream.getBits (5)) {
+          case 1:
+          case 5:
+            bitstream.getUe();
+            switch (bitstream.getUe()) {
+              case 5: return 'P';
+              case 6: return 'B';
+              case 7: return 'I';
+              default:return '?';
+              }
+            break;
+          //case 6: cLog::log(LOGINFO, ("SEI"); break;
+          //case 7: cLog::log(LOGINFO, ("SPS"); break;
+          //case 8: cLog::log(LOGINFO, ("PPS"); break;
+          //case 9: cLog::log(LOGINFO,  ("AUD"); break;
+          //case 0x0d: cLog::log(LOGINFO, ("SEQEXT"); break;
+          }
+        }
+
+      pes += nalSize;
+      }
+
+    return '?';
+    }
+  //}}}
 
   MFXVideoSession mSession;
   mfxBitstream mBitstream;
@@ -368,7 +683,7 @@ private:
   int mHeight = 0;
 
   vector <cFrame*> mFrames;
-  int mPlayFrame = 0;
+  uint64_t mPlayPts = 0;
   };
 //}}}
 //{{{
@@ -380,10 +695,10 @@ public:
 
   void onDraw (ID2D1DeviceContext* dc) {
 
-    auto frame = mVideoDecode.getCurFrame();
+    auto frame = mVideoDecode.getPlayFrame();
     if (frame) {
-      cLog::log (LOGINFO, "onDraw:%d was:%d", frame->getTimestamp(), mTimestamp);
-      if (frame->getTimestamp() != mTimestamp) {
+      if (frame->getPts() != mPts) {
+        //cLog::log (LOGINFO, "onDraw show:%u was:%u", frame->getPts(), mPts);
         // make new bitmap from frame
         if (mBitmap)  {
           auto pixelSize = mBitmap->GetPixelSize();
@@ -402,7 +717,7 @@ public:
         mBitmap->CopyFromMemory (&D2D1::RectU(0,0, frame->getWidth(),frame->getHeight()),
                                  frame->getBgra(), frame->getWidth() * 4);
 
-        mTimestamp = frame->getTimestamp();
+        mPts = frame->getPts();
         }
       }
 
@@ -417,7 +732,7 @@ private:
   cMfxVideoDecode& mVideoDecode;
 
   ID2D1Bitmap* mBitmap = nullptr;
-  uint64_t mTimestamp = 0;
+  uint64_t mPts = 0;
   };
 //}}}
 
@@ -428,7 +743,6 @@ public:
 
     init (title, width, height, false);
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
-    //add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
 
@@ -490,13 +804,33 @@ private:
     }
   //}}}
   //{{{
+  static uint64_t getPts (uint8_t* ts) {
+  // return 33 bits of pts,dts
+
+    if ((ts[0] & 0x01) && (ts[2] & 0x01) && (ts[4] & 0x01)) {
+      // valid marker bits
+      uint64_t pts = ts[0] & 0x0E;
+      pts = (pts << 7) | ts[1];
+      pts = (pts << 8) | (ts[2] & 0xFE);
+      pts = (pts << 7) | ts[3];
+      pts = (pts << 7) | (ts[4] >> 1);
+      return pts;
+      }
+    else {
+      cLog::log (LOGERROR, "getPts marker bits - %02x %02x %02x %02x 0x02", ts[0], ts[1], ts[2], ts[3], ts[4]);
+      return 0;
+      }
+    }
+  //}}}
+
+  //{{{
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
     cLog::setThreadName ("hls ");
+    int vidFrameNum = 0;
 
     //mFile = fopen ("C:/Users/colin/Desktop/hls.ts", "wb");
-    int vidFrameNum = 0;
     constexpr int kHlsPreload = 2;
 
     mSong.setChan (chan);
@@ -538,15 +872,18 @@ private:
 
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
 
-              int patNum = 0;
-              int pgmNum = 0;
               int vidPesNum = 0;
               int audPesNum = 0;
 
               uint8_t* vidPes = nullptr;
               int vidPesLen = 0;
+              uint64_t vidPts = 0;
+              uint64_t firstVidPts = 0;
+
               auto aacFrames = http.getContent();
               auto aacFramesPtr = aacFrames;
+              uint64_t audPts = 0;
+              uint64_t firstAudPts = 0;
 
               uint8_t* ts = http.getContent();
               uint8_t* tsEnd = ts + http.getContentSize();
@@ -558,85 +895,82 @@ private:
                 ts += headerBytes;
                 auto tsBodyBytes = 187 - headerBytes;
 
-                switch (pid) {
-                  //{{{
-                  case  0: // pat
-                    if (payStart) {
-                      //cLog::log (LOGINFO, "pat");
-                      patNum++;
-                      }
-                    break;
-                  //}}}
-                  //{{{
-                  case 32: // pgm
-                    if (payStart) {
-                      //cLog::log (LOGINFO, "pgm");
-                      pgmNum++;
-                      }
-                    break;
-                  //}}}
-                  //{{{
-                  case 33: // video pes
-                    if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-                      int pesHeaderBytes = 9 + ts[8];
-                      ts += pesHeaderBytes;
-                      tsBodyBytes -= pesHeaderBytes;
-
-                      if (vidPes) {
-                        // last vidPes at vidFrameNum
-                        //mSong.addVideoFrame (vidFrameNum, vidPes, vidPesLen);
-                        mVideoDecode.decode (vidPes, vidPesLen, vidFrameNum);
-
-                        vidPes = nullptr;
-                        vidPesLen = 0;
-                        vidFrameNum++;
-                        }
-
-                      vidPesNum++;
+                if (pid == 33) {
+                  //{{{  vid pes
+                  if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
+                    // vid pes start
+                    if (ts[7] & 0x80) {
+                      // has vid pts
+                      vidPts = getPts (ts+9);
+                      if (!firstVidPts)
+                        firstVidPts = vidPts;
+                      if (!mFirstPts)
+                        mFirstPts = audPts;
                       }
 
-                    // copy ts payload into vidPes buffer, !!!! expensive way !!!!!!
-                    vidPes = (uint8_t*)realloc (vidPes, vidPesLen + tsBodyBytes);
-                    memcpy (vidPes + vidPesLen, ts, tsBodyBytes);
-                    vidPesLen += tsBodyBytes;
+                    int pesHeaderBytes = 9 + ts[8];
+                    ts += pesHeaderBytes;
+                    tsBodyBytes -= pesHeaderBytes;
 
-                    break;
-                  //}}}
-                  //{{{
-                  case 34: // audio pes
-                    if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-                      int pesHeaderBytes = 9 + ts[8];
-                      ts += pesHeaderBytes;
-                      tsBodyBytes -= pesHeaderBytes;
+                    if (vidPes) {
+                      // new vidPes starting, decode last vidPes
+                      //cLog::log (LOGINFO, "videoPes %u", vidPts);
+                      //mSong.addVideoFrame (vidPes, vidPesLen, vidPts);
+                      mVideoDecode.decode (vidFrameNum++, vidPes, vidPesLen, vidPts);
 
-                      audPesNum++;
+                      vidPes = nullptr;
+                      vidPesLen = 0;
                       }
 
-                    // copy ts payload aacFrames back into buffer, for later decode
-                    memcpy (aacFramesPtr, ts, tsBodyBytes);
-                    aacFramesPtr += tsBodyBytes;
+                    vidPesNum++;
+                    }
 
-                    break;
-                  //}}}
-                  //{{{
-                  default: // other pid
-                    if (payStart)
-                      cLog::log (LOGINFO, "other pid:%d header %x %x %x %x headerBytes:%d",
-                                          pid, int(ts[0]), int(ts[1]), int(ts[2]), int(ts[3]), headerBytes);
-                    break;
-                  //}}}
+                  // copy ts payload into vidPes buffer, !!!! expensive way !!!!!!
+                  vidPes = (uint8_t*)realloc (vidPes, vidPesLen + tsBodyBytes);
+                  memcpy (vidPes + vidPesLen, ts, tsBodyBytes);
+                  vidPesLen += tsBodyBytes;
                   }
+                  //}}}
+                else if (pid == 34) {
+                  //{{{  audio pes
+                  if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
+                    // aud pes start
+                    if (ts[7] & 0x80) {
+                      // has aud pts
+                      audPts = getPts (ts+9);
+                      if (!firstAudPts)
+                        firstAudPts = audPts;
+                      }
+
+                    //cLog::log (LOGINFO, "audioPes %u", audPts);
+
+                    int pesHeaderBytes = 9 + ts[8];
+                    ts += pesHeaderBytes;
+                    tsBodyBytes -= pesHeaderBytes;
+
+                    audPesNum++;
+                    }
+
+                  // copy ts payload aacFrames back into buffer, for later decode
+                  memcpy (aacFramesPtr, ts, tsBodyBytes);
+                  aacFramesPtr += tsBodyBytes;
+                  }
+                  //}}}
                 ts += tsBodyBytes;
                 }
 
-              cLog::log (LOGINFO, "- pat:" + dec(patNum) + " pgm:" + dec(pgmNum) +
-                                  " videoPes:" + dec(vidPesNum) + " audioPes:" + dec(audPesNum));
+              // decode last vidPes
+              if (vidPes)
+                mVideoDecode.decode (vidFrameNum++, vidPes, vidPesLen, vidPts);
 
+              // now process whole chunk aud frames, maybe should do pes by pes like vid
+              audPts = firstAudPts;
               while (decode.parseFrame (aacFrames, aacFramesPtr)) {
                 float* samples = decode.decodeFrame (seqFrameNum);
                 if (samples) {
                   mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                  mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames());
+                  mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, audPts);
+                  audPts += (decode.getNumSamples() * 90) / 48;
                   changed();
                   if (firstTime) {
                     firstTime = false;
@@ -645,6 +979,10 @@ private:
                   }
                 aacFrames += decode.getNextFrameOffset();
                 }
+
+              cLog::log (LOGINFO, "chunk:%d vidPes:%d audPes:%d vidPts:%u,%u firstAudPts:%u,%u",
+                                  chunkNum, vidPesNum, audPesNum,
+                                  firstVidPts-mFirstPts, vidPts-mFirstPts, firstAudPts-mFirstPts, audPts-mFirstPts);
 
               http.freeContent();
               mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
@@ -713,8 +1051,8 @@ private:
           numSrcSamples = mSong.getSamplesPerFrame();
 
           if (mPlaying && framePtr) {
+            mVideoDecode.setPlayPts (framePtr->getPts());
             mSong.incPlayFrame (1, true);
-            mVideoDecode.setPlayFrame (mSong.getBasePlayFrame());
             changed();
             }
           });
@@ -738,6 +1076,8 @@ private:
 
   //FILE* mFile = nullptr;
   cMfxVideoDecode mVideoDecode;
+
+  uint64_t mFirstPts = 0;
   //}}}
   };
 
