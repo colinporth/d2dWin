@@ -35,7 +35,9 @@ using namespace chrono;
 //}}}
 
 const string kHost = "vs-hls-uk-live.akamaized.net";
-const vector <string> kChannels = { "bbc_one_hd", "bbc_four_hd", "bbc_one_south_west" };
+const int kChannelNum = 3;
+const vector <string> kChannels = { "bbc_one_hd", "bbc_two_hd", "bbc_four_hd", "bbc_news_channel_hd", // 128000
+                                    "bbc_one_south_west", "bbc_parliament" };  // 96000
 constexpr int kBitRate = 128000;
 constexpr int kVidBitrate = 1604032; // 827008 1604032 2812032 5070016
 
@@ -240,18 +242,17 @@ public:
     }
   //}}}
 
+  int getNumSurfaces() { return (int)mSurfaces.size(); }
   int getNumAllocatedFrames() { return (int)mDecodedFrames.size(); }
-  void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
 
+  void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
   //{{{
   cFrame* findPlayFrame() {
-  // returns
-  // - nearest frame within a 25fps frame of mPlayPts
-  // - nullptr if none
+  // returns nearest frame within a 25fps frame of mPlayPts, nullptr if none
 
-    uint64_t nearDist = 3600;
+    uint64_t nearDist = 90000 / 25;
+
     cFrame* nearFrame = nullptr;
-
     for (auto frame : mDecodedFrames) {
       uint64_t dist = frame->getPts() > mPlayPts ? frame->getPts() - mPlayPts : mPlayPts - frame->getPts();
       if (dist < nearDist) {
@@ -263,6 +264,7 @@ public:
     return nearFrame;
     }
   //}}}
+
   //{{{
   void decode (uint64_t seqNum, uint64_t pts, uint8_t* pes, int pesSize) {
 
@@ -273,7 +275,7 @@ public:
     mBitstream.TimeStamp = pts;
 
     if (!mWidth) {
-      // first time, decode header, init decoder
+      // firstTime, decode header, init decoder
       memset (&mVideoParams, 0, sizeof(mVideoParams));
       mVideoParams.mfx.CodecId = MFX_CODEC_AVC;
       mVideoParams.IOPattern = MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
@@ -325,7 +327,7 @@ public:
 private:
   //{{{
   mfxFrameSurface1* getFreeSurface() {
-  // return first unlocked surface;
+  // return first unlocked surface, allocate new if none
 
     for (auto surface : mSurfaces)
       if (!surface->Data.Locked)
@@ -339,6 +341,8 @@ private:
     surface->Data.V = nullptr; // NV12 ignores V pointer
     surface->Data.Pitch = mWidth;
     mSurfaces.push_back (surface);
+
+    cLog::log (LOGINFO1, "allocating new surface");
 
     return nullptr;
     }
@@ -413,7 +417,7 @@ public:
       dc->SetTransform (D2D1::Matrix3x2F::Identity());
       }
 
-    string str = dec(mVideoDecode.getNumAllocatedFrames());
+    string str = dec(mVideoDecode.getNumAllocatedFrames()) + " " + dec(mVideoDecode.getNumSurfaces());
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
       std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
@@ -442,7 +446,7 @@ public:
     add (new cSongBox (this, 0.f,0.f, mSong));
 
     // startup
-    thread ([=](){ hlsThread (kHost, kChannels[0], kBitRate); }).detach();
+    thread ([=](){ hlsThread (kHost, kChannels[kChannelNum], kBitRate); }).detach();
 
     mLogBox = add (new cLogBox (this, 20.f));
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
@@ -462,24 +466,67 @@ protected:
 
       case 'F' : toggleFullScreen(); break;
       case 'L' : mLogBox->togglePin(); break;
-
-      case 'M' : mSong.getSelect().addMark (mSong.getPlayFrame()); changed(); break;
-
       case ' ' : mPlaying = !mPlaying; break;
 
-      case 0x21: mSong.incPlaySec (-60*60, false);  changed(); break; // page up - back one hour
-      case 0x22: mSong.incPlaySec (60*60, false);  changed(); break; // page down - forward one hour
-      case 0x25: mSong.incPlaySec (getShift() ? -300 : getControl() ? -10 : -1, false);  changed(); break; // left arrow  - 1 sec
-      case 0x27: mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);  changed(); break; // right arrow  + 1 sec
-
-      case 0x24: mSong.setPlayFrame (
-        mSong.getSelect().empty() ? mSong.getFirstFrame() : mSong.getSelect().getFirstFrame()); changed(); break; // home
-      case 0x23: mSong.setPlayFrame (
-        mSong.getSelect().empty() ? mSong.getLastFrame() : mSong.getSelect().getLastFrame()); changed(); break; // end
-
-      case 0x2e: mSong.getSelect().clearAll(); changed(); break;; // delete select
-
-      default  : cLog::log (LOGINFO, "key %x", key); changed(); break;
+      //{{{
+      case 'M' :  // mark
+        mSong.getSelect().addMark (mSong.getPlayFrame());
+        changed();
+        break;
+      //}}}
+      //{{{
+      case 0x21: // page up - back one hour
+        mSong.incPlaySec (-60*60, false);
+        //mVideoDecode.setPlayPts (framePtr->getPts());
+        changed();
+        break;
+      //}}}
+      //{{{
+      case 0x22:  // page down - forward one hour
+        mSong.incPlaySec (60*60, false);
+        //mVideoDecode.setPlayPts (framePtr->getPts());
+        changed();
+        break;
+      //}}}
+      //{{{
+      case 0x25: // left arrow  - 1 sec
+        mSong.incPlaySec (getShift() ? -300 : getControl() ? -10 : -1, false);
+        //mVideoDecode.setPlayPts (framePtr->getPts());
+        changed();
+        break;
+      //}}}
+      //{{{
+      case 0x27: // right arrow  + 1 sec
+        mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);
+        //mVideoDecode.setPlayPts (framePtr->getPts());
+        changed();
+        break;
+      //}}}
+      //{{{
+      case 0x24: // home
+        mSong.setPlayFrame (
+        mSong.getSelect().empty() ? mSong.getFirstFrame() : mSong.getSelect().getFirstFrame());
+        changed();
+        break;
+      //}}}
+      //{{{
+      case 0x23: // end
+        mSong.setPlayFrame (
+        mSong.getSelect().empty() ? mSong.getLastFrame() : mSong.getSelect().getLastFrame());
+        changed();
+        break;
+      //}}}
+      //{{{
+      case 0x2e: // delete select
+        mSong.getSelect().clearAll(); changed();
+        break;
+      //}}}
+      //{{{
+      default:
+        cLog::log (LOGINFO, "key %x", key);
+        changed();
+        break;
+      //}}}
       }
 
     return false;
