@@ -1,4 +1,4 @@
-// hlsWindow.cpp
+ // hlsWindow.cpp
 //{{{  includes
 #include "stdafx.h"
 
@@ -27,9 +27,9 @@ using namespace std;
 using namespace chrono;
 //}}}
 constexpr int kChannelNum = 3;
-constexpr int kMaxVideoFrames = 50;
+constexpr int kMaxVideoFrames = 200;
 constexpr int kBitRate = 128000;
-constexpr int kVidBitrate = 1604032; // 827008 1604032 2812032 5070016
+constexpr int kVidBitrate = 827008; // 827008 1604032 2812032 5070016
 const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd", "bbc_two_hd", "bbc_four_hd", "bbc_news_channel_hd", // pa4=128000
                                     "bbc_one_south_west", "bbc_parliament" };  // pa3=96000
@@ -264,12 +264,12 @@ public:
   //}}}
 
   //{{{
-  void decode (uint64_t pts, uint8_t* pes, unsigned int pesSize) {
+  void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {
 
-    mBitstream.Data = pes;
+    mBitstream.Data = pesBuffer;
     mBitstream.DataOffset = 0;
-    mBitstream.DataLength = pesSize;
-    mBitstream.MaxLength = pesSize;
+    mBitstream.DataLength = pesBufferLen;
+    mBitstream.MaxLength = pesBufferLen;
     mBitstream.TimeStamp = pts;
 
     if (!mWidth) {
@@ -290,7 +290,9 @@ public:
         return;
         }
       mWidth = ((mfxU32)((frameAllocRequest.Info.Width)+31)) & (~(mfxU32)31);
-      mHeight = ((mfxU32)((frameAllocRequest.Info.Height)+31)) & (~(mfxU32)31);
+      mHeight = frameAllocRequest.Info.Height;
+      // unsure why this was done ??? trace it back for height as well as width ???
+      //mHeight = ((mfxU32)((frameAllocRequest.Info.Height)+31)) & (~(mfxU32)31);
 
       if (MFXVideoDECODE_Init (mSession, &mVideoParams) != MFX_ERR_NONE) {
         cLog::log (LOGERROR, "MFXVideoDECODE_Init failed");
@@ -301,7 +303,7 @@ public:
     // reset decoder on skip
     //mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
 
-    // decode pes
+    // decode video pes
     // - could be none or multiple frames
     // - returned by decode order, not presentation order
     mfxStatus status = MFX_ERR_NONE;
@@ -312,7 +314,7 @@ public:
       if (status == MFX_ERR_NONE) {
         status = mSession.SyncOperation (syncDecode, 60000);
         if (status == MFX_ERR_NONE) {
-          cLog::log (LOGINFO1, "decode pts:%u %dx%d:%d",
+          cLog::log (LOGINFO1, "decoded pts:%u %dx%d:%d",
                                surface->Data.TimeStamp, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
           auto frame = getFreeFrame (surface->Data.TimeStamp);
           frame->setNv12 (surface->Data.Y, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
@@ -443,7 +445,7 @@ private:
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (const string& title, int width, int height) {
+  void run (const string& title, int width, int height, int channelNum) {
 
     init (title, width, height, false);
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
@@ -451,7 +453,7 @@ public:
     add (new cSongBox (this, 0.f,0.f, mSong));
 
     // startup
-    thread ([=](){ hlsThread (kHost, kChannels[kChannelNum], kBitRate); }).detach();
+    thread ([=](){ hlsThread (kHost, kChannels[channelNum], kBitRate); }).detach();
 
     mLogBox = add (new cLogBox (this, 20.f));
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
@@ -571,22 +573,28 @@ private:
 
   //{{{
   void hlsThread (const string& host, const string& chan, int bitrate) {
-  // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
+  // hls http chunk load and decode thread
 
     cLog::setThreadName ("hls ");
 
     constexpr int kHlsPreload = 2;
+
     uint8_t* pesBuffer = nullptr;
+    int pesBufferLen = 0;
 
     mSong.setChan (chan);
-    mSong.setBitrate (bitrate, 360);
+    mSong.setBitrate (bitrate, 360); // 360 audio frames per chunk
+
     while (!getExit()) {
-      const string path = "pool_902/live/uk/" + mSong.getChan() + "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
-                          "-pa4=" + dec(mSong.getBitrate()) + "-video=" + dec(kVidBitrate);
+      const string path = "pool_902/live/uk/" + mSong.getChan() +
+                          "/" + mSong.getChan() +
+                          ".isml/" + mSong.getChan() +
+                          "-pa4=" + dec(mSong.getBitrate()) +
+                          "-video=" + dec(kVidBitrate);
       cPlatformHttp http;
       string redirectedHost = http.getRedirect (host, path + ".m3u8");
       if (http.getContent()) {
-        //{{{  got m3u8, parse for baseChunkNum, baseTimePoint
+        //{{{  got .m3u8, parse for mediaSequence, programDateTimePoint
         int mediaSequence = stoi (getTagValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
 
         istringstream inputStream (getTagValue (http.getContent(), "#EXT-X-PROGRAM-DATE-TIME:"));
@@ -609,14 +617,14 @@ private:
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
-              int pesLen = 0;
-              uint64_t pts = 0;
-              uint8_t* ts = http.getContent();
-              uint8_t* tsEnd = ts + http.getContentSize();
-              //{{{  process audio
+              //{{{  process audio first
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
 
+              uint64_t pts = 0;
+
               // parse ts packets
+              uint8_t* ts = http.getContent();
+              uint8_t* tsEnd = ts + http.getContentSize();
               while ((ts < tsEnd) && (*ts++ == 0x47)) {
                 auto payStart = ts[0] & 0x40;
                 auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
@@ -627,11 +635,12 @@ private:
                 if (pid == 34) {
                   // audio pid
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-                    if (pesLen) {
+                    if (pesBufferLen) {
                       //{{{  process prev audio pes
                       uint8_t* pesBufferPtr = pesBuffer;
+                      uint8_t* pesBufferEnd = pesBuffer + pesBufferLen;
 
-                      while (audioDecode.parseFrame (pesBufferPtr, pesBuffer + pesLen)) {
+                      while (audioDecode.parseFrame (pesBufferPtr, pesBufferEnd)) {
                         // several aacFrames per audio pes
                         float* samples = audioDecode.decodeFrame (seqFrameNum);
                         if (samples) {
@@ -642,6 +651,7 @@ private:
                           changed();
 
                           if (firstTime) {
+                            // launch player
                             firstTime = false;
                             player = thread ([=](){ playThread (true); });
                             }
@@ -650,11 +660,11 @@ private:
                         pesBufferPtr += audioDecode.getNextFrameOffset();
                         }
 
-                      pesLen = 0;
+                      pesBufferLen = 0;
                       }
                       //}}}
 
-                    if (ts[7] & 0x80) 
+                    if (ts[7] & 0x80)
                       pts = getPts (ts+9);
 
                     // skip header
@@ -664,18 +674,20 @@ private:
                     }
 
                   // copy ts payload into pesBuffer
-                  pesBuffer = (uint8_t*)realloc (pesBuffer, pesLen + tsBodyBytes);
-                  memcpy (pesBuffer + pesLen, ts, tsBodyBytes);
-                  pesLen += tsBodyBytes;
+                  pesBuffer = (uint8_t*)realloc (pesBuffer, pesBufferLen + tsBodyBytes);
+                  memcpy (pesBuffer + pesBufferLen, ts, tsBodyBytes);
+                  pesBufferLen += tsBodyBytes;
                   }
+
                 ts += tsBodyBytes;
                 }
 
-              if (pesLen) {
+              if (pesBufferLen) {
                 //{{{  process last audio pes
                 uint8_t* pesBufferPtr = pesBuffer;
+                uint8_t* pesBufferEnd = pesBuffer + pesBufferLen;
 
-                while (audioDecode.parseFrame (pesBufferPtr, pesBuffer + pesLen)) {
+                while (audioDecode.parseFrame (pesBufferPtr, pesBufferEnd)) {
                   // several aacFrames per audio pes
                   float* samples = audioDecode.decodeFrame (seqFrameNum);
                   if (samples) {
@@ -687,15 +699,14 @@ private:
                   pesBufferPtr += audioDecode.getNextFrameOffset();
                   }
 
-                pesLen = 0;
+                pesBufferLen = 0;
                 }
                 //}}}
               //}}}
               mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
-
-              ts = http.getContent();
-              //{{{  process video
+              //{{{  process video second, may block waiting for free video frames
               // parse ts packets
+              ts = http.getContent();
               while ((ts < tsEnd) && (*ts++ == 0x47)) {
                 auto payStart = ts[0] & 0x40;
                 auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
@@ -706,13 +717,13 @@ private:
                 if (pid == 33) {
                   //  video pid
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-                    if (pesLen) {
+                    if (pesBufferLen) {
                       // process prev video pes
-                      mVideoDecode.decode (pts, pesBuffer, pesLen);
-                      pesLen = 0;
+                      mVideoDecode.decode (pts, pesBuffer, pesBufferLen);
+                      pesBufferLen = 0;
                       }
 
-                    if (ts[7] & 0x80) 
+                    if (ts[7] & 0x80)
                       pts = getPts (ts+9);
 
                     // skip header
@@ -722,20 +733,20 @@ private:
                     }
 
                   // copy ts payload into pesBuffer
-                  pesBuffer = (uint8_t*)realloc (pesBuffer, pesLen + tsBodyBytes);
-                  memcpy (pesBuffer + pesLen, ts, tsBodyBytes);
-                  pesLen += tsBodyBytes;
+                  pesBuffer = (uint8_t*)realloc (pesBuffer, pesBufferLen + tsBodyBytes);
+                  memcpy (pesBuffer + pesBufferLen, ts, tsBodyBytes);
+                  pesBufferLen += tsBodyBytes;
                   }
+
                 ts += tsBodyBytes;
                 }
 
-              if (pesLen) {
+              if (pesBufferLen) {
                 // process last video pesBuffer
-                mVideoDecode.decode (pts, pesBuffer, pesLen);
-                pesLen = 0;
+                mVideoDecode.decode (pts, pesBuffer, pesBufferLen);
+                pesBufferLen = 0;
                 }
               //}}}
-
               http.freeContent();
               }
             else {
@@ -761,6 +772,7 @@ private:
   //}}}
   //{{{
   void playThread (bool streaming) {
+  // audio player thread, video just follows play pts
 
     cLog::setThreadName ("play");
     SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -832,6 +844,6 @@ private:
 int WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
   cLog::init (LOGINFO, true, "", "hlsWindow");
   cAppWindow appWindow;
-  appWindow.run ("hlsWindow", 800, 420);
+  appWindow.run ("hlsWindow", 800, 420, kChannelNum);
   return 0;
   }
