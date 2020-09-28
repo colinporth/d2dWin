@@ -35,8 +35,6 @@ const vector <string> kChannels = { "bbc_one_hd",          "bbc_two_hd",        
                                     "bbc_news_channel_hd", "bbc_one_scotland_hd", "s4cpbs",      // pa4
                                     "bbc_one_south_west",  "bbc_parliament" };                   // pa3
 
-constexpr int kMaxVideoFramePoolSize = 200;
-
 //{{{
 class cVideoDecode {
 public:
@@ -275,6 +273,7 @@ public:
   virtual void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) = 0;
 
 protected:
+  static constexpr int kMaxVideoFramePoolSize = 200;
   //{{{
   cFrame* getFreeFrame (uint64_t pts) {
   // return first frame older than mPlayPts, otherwise add new frame
@@ -306,8 +305,65 @@ protected:
   int mWidth = 0;
   int mHeight = 0;
 
-  vector <cFrame*> mFramePool;
   uint64_t mPlayPts = 0;
+  vector <cFrame*> mFramePool;
+  };
+//}}}
+//{{{
+class cVideoDecodeBox : public cD2dWindow::cView {
+public:
+  cVideoDecodeBox (cD2dWindow* window, float width, float height, cVideoDecode* videoDecode)
+    : cView("videoDecode", window, width, height), mVideoDecode(videoDecode) {}
+  virtual ~cVideoDecodeBox() {}
+
+  void onDraw (ID2D1DeviceContext* dc) {
+
+    auto frame = mVideoDecode->findPlayFrame();
+    if (frame) {
+      if (frame->getPts() != mPts) { // new Frame, update bitmap
+        mPts = frame->getPts();
+        if (mBitmap)  {
+          auto pixelSize = mBitmap->GetPixelSize();
+          if ((pixelSize.width != frame->getWidth()) || (pixelSize.height != frame->getHeight())) {
+            // bitmap size changed, remove and recreate
+            mBitmap->Release();
+            mBitmap = nullptr;
+            }
+          }
+
+        if (!mBitmap)
+          dc->CreateBitmap (D2D1::SizeU(frame->getWidth(), frame->getHeight()),
+                            { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
+                            &mBitmap);
+        mBitmap->CopyFromMemory (&D2D1::RectU(0,0, frame->getWidth(),frame->getHeight()),
+                                 frame->getBgra(), frame->getWidth() * 4);
+        }
+      }
+
+    if (mBitmap) {
+      dc->SetTransform (mView2d.mTransform);
+      dc->DrawBitmap (mBitmap, cRect(getSize()));
+      dc->SetTransform (D2D1::Matrix3x2F::Identity());
+      }
+
+    // info string
+    string str = dec(mVideoDecode->getFramePoolSize()) +
+                 " " + dec(mVideoDecode->getSurfacePoolSize()) +
+                 " " + dec(mVideoDecode->getWidth()) +
+                 "x" + dec(mVideoDecode->getHeight());
+    IDWriteTextLayout* textLayout;
+    mWindow->getDwriteFactory()->CreateTextLayout (
+      std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+      mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+    dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+    textLayout->Release();
+    }
+
+private:
+  cVideoDecode* mVideoDecode;
+
+  ID2D1Bitmap* mBitmap = nullptr;
+  uint64_t mPts = 0;
   };
 //}}}
 //{{{
@@ -434,63 +490,6 @@ public:
   void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {}
 
 private:
-  };
-//}}}
-//{{{
-class cVideoDecodeBox : public cD2dWindow::cView {
-public:
-  cVideoDecodeBox (cD2dWindow* window, float width, float height, cVideoDecode* videoDecode)
-    : cView("videoDecode", window, width, height), mVideoDecode(videoDecode) {}
-  virtual ~cVideoDecodeBox() {}
-
-  void onDraw (ID2D1DeviceContext* dc) {
-
-    auto frame = mVideoDecode->findPlayFrame();
-    if (frame) {
-      if (frame->getPts() != mPts) { // new Frame, update bitmap
-        mPts = frame->getPts();
-        if (mBitmap)  {
-          auto pixelSize = mBitmap->GetPixelSize();
-          if ((pixelSize.width != frame->getWidth()) || (pixelSize.height != frame->getHeight())) {
-            // bitmap size changed, remove and recreate
-            mBitmap->Release();
-            mBitmap = nullptr;
-            }
-          }
-
-        if (!mBitmap)
-          dc->CreateBitmap (D2D1::SizeU(frame->getWidth(), frame->getHeight()),
-                            { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
-                            &mBitmap);
-        mBitmap->CopyFromMemory (&D2D1::RectU(0,0, frame->getWidth(),frame->getHeight()),
-                                 frame->getBgra(), frame->getWidth() * 4);
-        }
-      }
-
-    if (mBitmap) {
-      dc->SetTransform (mView2d.mTransform);
-      dc->DrawBitmap (mBitmap, cRect(getSize()));
-      dc->SetTransform (D2D1::Matrix3x2F::Identity());
-      }
-
-    // info string
-    string str = dec(mVideoDecode->getFramePoolSize()) +
-                 " " + dec(mVideoDecode->getSurfacePoolSize()) +
-                 " " + dec(mVideoDecode->getWidth()) +
-                 "x" + dec(mVideoDecode->getHeight());
-    IDWriteTextLayout* textLayout;
-    mWindow->getDwriteFactory()->CreateTextLayout (
-      std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
-      mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-    dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
-    textLayout->Release();
-    }
-
-private:
-  cVideoDecode* mVideoDecode;
-
-  ID2D1Bitmap* mBitmap = nullptr;
-  uint64_t mPts = 0;
   };
 //}}}
 
