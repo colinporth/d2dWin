@@ -40,12 +40,12 @@ constexpr int kBitRate = 128000;
 constexpr int kVidBitrate = 1604032; // 827008 1604032 2812032 5070016
 
 //{{{
-class cMfxVideoDecode {
+class cVideoDecode {
 public:
   //{{{
   class cFrame {
   public:
-    cFrame (uint64_t pts, char type) : mPts(pts), mType(type), mOk(false) {}
+    cFrame (uint64_t pts) : mPts(pts),  mOk(false) {}
     //{{{
     virtual ~cFrame() {
       _aligned_free (mYbuf);
@@ -63,10 +63,9 @@ public:
     uint32_t* getBgra() { return mBgra; }
 
     //{{{
-    void set (uint64_t pts, char type) {
+    void set (uint64_t pts) {
       mOk = false;
       mPts = pts;
-      mType = type;
       }
     //}}}
     //{{{
@@ -208,7 +207,6 @@ public:
   private:
     bool mOk = false;
     uint64_t mPts = 0;
-    char mType = ' ';
 
     int mYStride = 0;
     int mUVStride = 0;
@@ -225,14 +223,14 @@ public:
   //}}}
 
   //{{{
-  cMfxVideoDecode() {
+  cVideoDecode() {
 
     mfxVersion kMfxVersion = { 0,1 };
     mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
     }
   //}}}
   //{{{
-  ~cMfxVideoDecode() {
+  ~cVideoDecode() {
 
     MFXVideoDECODE_Close (mSession);
     for (auto surface : mSurfaces)
@@ -242,6 +240,7 @@ public:
     }
   //}}}
 
+  int getNumAllocatedFrames() { return (int)mFrames.size(); }
   void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
 
   //{{{
@@ -256,8 +255,6 @@ public:
   //}}}
   //{{{
   void decode (uint64_t seqNum, uint64_t pts, uint8_t* pes, int pesSize) {
-
-    allocateFrame (pts, getType (pes, pesSize));
 
     mBitstream.Data = pes;
     mBitstream.DataOffset = 0;
@@ -317,7 +314,7 @@ public:
           //cLog::log (LOGINFO, "-> frame pts:%u %dx%d:%d",
           //                    surface->Data.TimeStamp/3600,
           //                    surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
-          auto frame = findAllocatedFrame (surface->Data.TimeStamp);
+          auto frame = allocateFrame (surface->Data.TimeStamp);
           frame->setNv12 (surface->Data.Y, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
           }
         }
@@ -636,30 +633,20 @@ private:
     }
   //}}}
   //{{{
-  cFrame* allocateFrame (uint64_t pts, char type) {
+  cFrame* allocateFrame (uint64_t pts) {
   // return first frame older than mPlayPts, otherwise add new frame
 
     for (auto frame : mFrames)
       if (frame->ok() && (frame->getPts() < mPlayPts)) {
-        frame->set (pts, type);
+        frame->set (pts);
         return frame;
         }
 
     // allocate new frame
-    mFrames.push_back (new cFrame (pts, type));
+    mFrames.push_back (new cFrame (pts));
 
     //cLog::log (LOGINFO, "allocating new frame %d for %u at play:%u", mFrames.size(), pts, mPlayPts);
     return mFrames.back();
-    }
-  //}}}
-  //{{{
-  cFrame* findAllocatedFrame (uint64_t pts) {
-
-    for (auto frame : mFrames)
-      if (frame->getPts() == pts)
-        return frame;
-
-    return nullptr;
     }
   //}}}
 
@@ -676,7 +663,7 @@ private:
 //{{{
 class cVideoDecodeBox : public cD2dWindow::cView {
 public:
-  cVideoDecodeBox (cD2dWindow* window, float width, float height, cMfxVideoDecode& videoDecode)
+  cVideoDecodeBox (cD2dWindow* window, float width, float height, cVideoDecode& videoDecode)
     : cView("videoDecode", window, width, height), mVideoDecode(videoDecode) {}
   virtual ~cVideoDecodeBox() {}
 
@@ -713,10 +700,19 @@ public:
       dc->DrawBitmap (mBitmap, cRect(getSize()));
       dc->SetTransform (D2D1::Matrix3x2F::Identity());
       }
+
+    string str = dec(mVideoDecode.getNumAllocatedFrames());
+    IDWriteTextLayout* textLayout;
+    mWindow->getDwriteFactory()->CreateTextLayout (
+      std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
+      mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
+    dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
+    dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
+    textLayout->Release();
     }
 
 private:
-  cMfxVideoDecode& mVideoDecode;
+  cVideoDecode& mVideoDecode;
 
   ID2D1Bitmap* mBitmap = nullptr;
   uint64_t mPts = 0;
@@ -1043,7 +1039,7 @@ private:
   cBox* mLogBox = nullptr;
 
   //FILE* mFile = nullptr;
-  cMfxVideoDecode mVideoDecode;
+  cVideoDecode mVideoDecode;
   //}}}
   };
 
