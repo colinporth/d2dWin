@@ -107,16 +107,18 @@ public:
       for (int y = 0; y < mHeight; y += 2) {
         __m128i* srcy128r0 = (__m128i*)(mYbuf + mYStride*y);
         __m128i* srcy128r1 = (__m128i*)(mYbuf + mYStride*y + mYStride);
-        __m64* srcu64 = (__m64*)(mUbuf + mUVStride*(y/2));
-        __m64* srcv64 = (__m64*)(mVbuf + mUVStride*(y/2));
-        __m128i* dstrgb128r0 = (__m128i*)(mBgra + argbStride*y);
-        __m128i* dstrgb128r1 = (__m128i*)(mBgra + argbStride*y + argbStride);
+        __m64* srcu64 = (__m64*)(mUbuf + mUVStride * (y/2));
+        __m64* srcv64 = (__m64*)(mVbuf + mUVStride * (y/2));
+        __m128i* dstrgb128r0 = (__m128i*)(mBgra + argbStride * y);
+        __m128i* dstrgb128r1 = (__m128i*)(mBgra + argbStride * y + argbStride);
 
         for (int x = 0; x < mWidth; x += 16) {
-          __m128i u0 = _mm_loadl_epi64 ((__m128i *)srcu64 ); srcu64++;
-          __m128i v0 = _mm_loadl_epi64 ((__m128i *)srcv64 ); srcv64++;
-          __m128i y0r0 = _mm_load_si128( srcy128r0++ );
-          __m128i y0r1 = _mm_load_si128( srcy128r1++ );
+          __m128i u0 = _mm_loadl_epi64 ((__m128i *)srcu64 ); 
+          srcu64++;
+          __m128i v0 = _mm_loadl_epi64 ((__m128i *)srcv64 ); 
+          srcv64++;
+          __m128i y0r0 = _mm_load_si128 (srcy128r0++);
+          __m128i y0r1 = _mm_load_si128 (srcy128r1++);
           //{{{  constant y factors
           __m128i y00r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpacklo_epi8 (y0r0, zero), ysub), facy);
           __m128i y01r0 = _mm_mullo_epi16 (_mm_sub_epi16 (_mm_unpackhi_epi8 (y0r0, zero), ysub), facy);
@@ -160,7 +162,7 @@ public:
           __m128i rgb4567 = _mm_unpackhi_epi16 (gbgb, r01); // 0rgb0rgb..
 
           r01 = _mm_unpackhi_epi8 (r00, zero);
-          gbgb = _mm_unpackhi_epi8 (b00, g00 );
+          gbgb = _mm_unpackhi_epi8 (b00, g00);
           __m128i rgb89ab = _mm_unpacklo_epi16 (gbgb, r01);
           __m128i rgbcdef = _mm_unpackhi_epi16 (gbgb, r01);
 
@@ -181,8 +183,8 @@ public:
           g00 = _mm_packus_epi16 (g00, g01);        // gggg.. saturated
           b00 = _mm_packus_epi16 (b00, b01);        // bbbb.. saturated
 
-          r01     = _mm_unpacklo_epi8 (r00,  zero); // 0r0r..
-          gbgb    = _mm_unpacklo_epi8 (b00,  g00);  // gbgb..
+          r01     = _mm_unpacklo_epi8 (r00, zero);  // 0r0r..
+          gbgb    = _mm_unpacklo_epi8 (b00, g00);   // gbgb..
           rgb0123 = _mm_unpacklo_epi16 (gbgb, r01); // 0rgb0rgb..
           rgb4567 = _mm_unpackhi_epi16 (gbgb, r01); // 0rgb0rgb..
 
@@ -473,12 +475,11 @@ public:
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
+    mLogBox = add (new cLogBox (this, 20.f));
+    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     // startup
     thread ([=](){ hlsThread (kHost, kChannels[channelNum], audBitrate, vidBitrate); }).detach();
-
-    mLogBox = add (new cLogBox (this, 20.f));
-    add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     // loop till quit
     messagePump();
