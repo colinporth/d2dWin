@@ -113,9 +113,9 @@ public:
         __m128i* dstrgb128r1 = (__m128i*)(mBgra + argbStride * y + argbStride);
 
         for (int x = 0; x < mWidth; x += 16) {
-          __m128i u0 = _mm_loadl_epi64 ((__m128i *)srcu64 ); 
+          __m128i u0 = _mm_loadl_epi64 ((__m128i *)srcu64 );
           srcu64++;
-          __m128i v0 = _mm_loadl_epi64 ((__m128i *)srcv64 ); 
+          __m128i v0 = _mm_loadl_epi64 ((__m128i *)srcv64 );
           srcv64++;
           __m128i y0r0 = _mm_load_si128 (srcy128r0++);
           __m128i y0r1 = _mm_load_si128 (srcy128r1++);
@@ -228,20 +228,10 @@ public:
     };
   //}}}
 
+  cVideoDecode() {}
   //{{{
-  cVideoDecode() {
+  virtual ~cVideoDecode() {
 
-    mfxVersion kMfxVersion = { 0,1 };
-    mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
-    }
-  //}}}
-  //{{{
-  ~cVideoDecode() {
-
-    MFXVideoDECODE_Close (mSession);
-
-    for (auto surface : mSurfacePool)
-      delete surface;
     for (auto frame : mFramePool)
       delete frame;
     }
@@ -250,7 +240,7 @@ public:
   int getWidth() { return mWidth; }
   int getHeight() { return mHeight; }
   int getFramePoolSize() { return (int)mFramePool.size(); }
-  int getSurfacePoolSize() { return (int)mSurfacePool.size(); }
+  int getSurfacePoolSize() { return 0; }
 
   void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
   //{{{
@@ -279,6 +269,64 @@ public:
 
     for (auto frame : mFramePool)
       frame->clear();
+    }
+  //}}}
+
+  virtual void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) = 0;
+
+protected:
+  //{{{
+  cFrame* getFreeFrame (uint64_t pts) {
+  // return first frame older than mPlayPts, otherwise add new frame
+
+    while (true) {
+      for (auto frame : mFramePool) {
+        if (frame->ok() && (frame->getPts() < mPlayPts)) {
+          // reuse frame
+          frame->set (pts);
+          return frame;
+          }
+        }
+
+      if (mFramePool.size() < kMaxVideoFramePoolSize) {
+        // allocate new frame
+        mFramePool.push_back (new cFrame (pts));
+        cLog::log (LOGINFO1, "allocated newFrame %d for %u at play:%u", mFramePool.size(), pts, mPlayPts);
+        return mFramePool.back();
+        }
+      else
+        this_thread::sleep_for (40ms);
+      }
+
+    // cannot reach here
+    return nullptr;
+    }
+  //}}}
+
+  int mWidth = 0;
+  int mHeight = 0;
+
+  vector <cFrame*> mFramePool;
+  uint64_t mPlayPts = 0;
+  };
+//}}}
+//{{{
+class cMfxVideoDecode : public cVideoDecode {
+public:
+  //{{{
+  cMfxVideoDecode() : cVideoDecode() {
+
+    mfxVersion kMfxVersion = { 0,1 };
+    mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
+    }
+  //}}}
+  //{{{
+  virtual ~cMfxVideoDecode() {
+
+    MFXVideoDECODE_Close (mSession);
+
+    for (auto surface : mSurfacePool)
+      delete surface;
     }
   //}}}
 
@@ -368,56 +416,23 @@ private:
     return nullptr;
     }
   //}}}
-  //{{{
-  cFrame* getFreeFrame (uint64_t pts) {
-  // return first frame older than mPlayPts, otherwise add new frame
-
-    while (true) {
-      for (auto frame : mFramePool) {
-        if (frame->ok() && (frame->getPts() < mPlayPts)) {
-          // reuse frame
-          frame->set (pts);
-          return frame;
-          }
-        }
-
-      if (mFramePool.size() < kMaxVideoFramePoolSize) {
-        // allocate new frame
-        mFramePool.push_back (new cFrame (pts));
-        cLog::log (LOGINFO1, "allocated newFrame %d for %u at play:%u", mFramePool.size(), pts, mPlayPts);
-        return mFramePool.back();
-        }
-      else
-        this_thread::sleep_for (40ms);
-      }
-
-    // cannot reach here
-    return nullptr;
-    }
-  //}}}
 
   MFXVideoSession mSession;
   mfxVideoParam mVideoParams;
   mfxBitstream mBitstream;
   vector <mfxFrameSurface1*> mSurfacePool;
-
-  int mWidth = 0;
-  int mHeight = 0;
-
-  vector <cFrame*> mFramePool;
-  uint64_t mPlayPts = 0;
   };
 //}}}
 //{{{
 class cVideoDecodeBox : public cD2dWindow::cView {
 public:
-  cVideoDecodeBox (cD2dWindow* window, float width, float height, cVideoDecode& videoDecode)
+  cVideoDecodeBox (cD2dWindow* window, float width, float height, cVideoDecode* videoDecode)
     : cView("videoDecode", window, width, height), mVideoDecode(videoDecode) {}
   virtual ~cVideoDecodeBox() {}
 
   void onDraw (ID2D1DeviceContext* dc) {
 
-    auto frame = mVideoDecode.findPlayFrame();
+    auto frame = mVideoDecode->findPlayFrame();
     if (frame) {
       if (frame->getPts() != mPts) { // new Frame, update bitmap
         mPts = frame->getPts();
@@ -446,10 +461,10 @@ public:
       }
 
     // info string
-    string str = dec(mVideoDecode.getFramePoolSize()) +
-                 " " + dec(mVideoDecode.getSurfacePoolSize()) +
-                 " " + dec(mVideoDecode.getWidth()) +
-                 "x" + dec(mVideoDecode.getHeight());
+    string str = dec(mVideoDecode->getFramePoolSize()) +
+                 " " + dec(mVideoDecode->getSurfacePoolSize()) +
+                 " " + dec(mVideoDecode->getWidth()) +
+                 "x" + dec(mVideoDecode->getHeight());
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
       std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
@@ -459,7 +474,7 @@ public:
     }
 
 private:
-  cVideoDecode& mVideoDecode;
+  cVideoDecode* mVideoDecode;
 
   ID2D1Bitmap* mBitmap = nullptr;
   uint64_t mPts = 0;
@@ -472,7 +487,10 @@ public:
   void run (const string& title, int width, int height, int channelNum, int audBitrate, int vidBitrate) {
 
     init (title, width, height, false);
+
+    mVideoDecode = new cMfxVideoDecode();
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
+
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
     mLogBox = add (new cLogBox (this, 20.f));
@@ -508,7 +526,7 @@ protected:
       case 0x21: // page up - back one hour
         mSong.incPlaySec (-60*60, false);
         //mVideoDecode.setPlayPts (framePtr->getPts());
-        mVideoDecode.clear();
+        mVideoDecode->clear();
         changed();
         break;
       //}}}
@@ -516,7 +534,7 @@ protected:
       case 0x22: // page down - forward one hour
         mSong.incPlaySec (60*60, false);
         //mVideoDecode.setPlayPts (framePtr->getPts());
-        mVideoDecode.clear();
+        mVideoDecode->clear();
         changed();
         break;
       //}}}
@@ -524,7 +542,7 @@ protected:
       case 0x25: // left  arrow -1s, ctrl -10s, shift -5m
         mSong.incPlaySec (-(getShift() ? 300 : getControl() ? 10 : 1), false);
         //mVideoDecode.setPlayPts (framePtr->getPts());
-        mVideoDecode.clear();
+        mVideoDecode->clear();
         changed();
         break;
       //}}}
@@ -532,7 +550,7 @@ protected:
       case 0x27: // right arrow +1s, ctrl +10s, shift +5m
         mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);
         if (getShift() || getControl())
-          mVideoDecode.clear();
+          mVideoDecode->clear();
         //mVideoDecode.setPlayPts (framePtr->getPts());
         changed();
         break;
@@ -747,7 +765,7 @@ private:
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
                     if (pesBufferLen) {
                       // process prev videoPes
-                      mVideoDecode.decode (pts, pesBuffer, pesBufferLen);
+                      mVideoDecode->decode (pts, pesBuffer, pesBufferLen);
                       pesBufferLen = 0;
                       }
 
@@ -771,7 +789,7 @@ private:
 
               if (pesBufferLen) {
                 // process last videoPes
-                mVideoDecode.decode (pts, pesBuffer, pesBufferLen);
+                mVideoDecode->decode (pts, pesBuffer, pesBufferLen);
                 pesBufferLen = 0;
                 }
               //}}}
@@ -841,7 +859,7 @@ private:
           numSrcSamples = mSong.getSamplesPerFrame();
 
           if (mPlaying && framePtr) {
-            mVideoDecode.setPlayPts (framePtr->getPts());
+            mVideoDecode->setPlayPts (framePtr->getPts());
             mSong.incPlayFrame (1, true);
             changed();
             }
@@ -864,7 +882,7 @@ private:
   bool mPlaying = true;
   cBox* mLogBox = nullptr;
 
-  cVideoDecode mVideoDecode;
+  cVideoDecode* mVideoDecode = nullptr;
   //}}}
   };
 
