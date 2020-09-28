@@ -1,6 +1,7 @@
  // hlsWindow.cpp
 //{{{  includes
 #include "stdafx.h"
+#include <shellapi.h>
 
 #include "../../shared/utils/cSong.h"
 
@@ -25,14 +26,16 @@
 using namespace std;
 using namespace chrono;
 //}}}
-constexpr int kChannelNum = 3;
-constexpr int kMaxVideoFrames = 200;
+constexpr int kDefaultChannelNum = 3;
 constexpr int kAudBitrate = 128000; //  96000  128000
 constexpr int kVidBitrate = 827008; // 827008 1604032 2812032 5070016
+
 const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd",          "bbc_two_hd",          "bbc_four_hd", // pa4
                                     "bbc_news_channel_hd", "bbc_one_scotland_hd", "s4cpbs",      // pa4
                                     "bbc_one_south_west",  "bbc_parliament" };                   // pa3
+
+constexpr int kMaxVideoFrames = 200;
 
 //{{{
 class cVideoDecode {
@@ -199,15 +202,21 @@ public:
       }
     //}}}
 
+    //{{{
+    void clear() {
+      mOk = false;
+      mPts = 0;
+      }
+    //}}}
+
   private:
     bool mOk = false;
     uint64_t mPts = 0;
 
-    int mYStride = 0;
-    int mUVStride = 0;
-
     int mWidth = 0;
     int mHeight = 0;
+    int mYStride = 0;
+    int mUVStride = 0;
 
     uint8_t* mYbuf = nullptr;
     uint8_t* mUbuf = nullptr;
@@ -260,6 +269,14 @@ public:
       }
 
     return nearFrame;
+    }
+  //}}}
+  //{{{
+  void clear() {
+  // returns nearest frame within a 25fps frame of mPlayPts, nullptr if none
+
+    for (auto frame : mDecodedFrames)
+      frame->clear();
     }
   //}}}
 
@@ -329,10 +346,12 @@ private:
   mfxFrameSurface1* getFreeSurface() {
   // return first unlocked surface, allocate new if none
 
+    // reuse any unlocked surface
     for (auto surface : mSurfaces)
       if (!surface->Data.Locked)
         return surface;
 
+    // allocate new surface
     auto surface = new mfxFrameSurface1;
     memset (surface, 0, sizeof (mfxFrameSurface1));
     memcpy (&surface->Info, &mVideoParams.mfx.FrameInfo, sizeof(mfxFrameInfo));
@@ -342,7 +361,7 @@ private:
     surface->Data.Pitch = mWidth;
     mSurfaces.push_back (surface);
 
-    cLog::log (LOGINFO1, "allocating new surface");
+    cLog::log (LOGINFO1, "allocating new mfxFrameSurface1");
 
     return nullptr;
     }
@@ -354,12 +373,14 @@ private:
     while (true) {
       for (auto frame : mDecodedFrames) {
         if (frame->ok() && (frame->getPts() < mPlayPts)) {
+          // reuse frame
           frame->set (pts);
           return frame;
           }
         }
 
       if (mDecodedFrames.size() < kMaxVideoFrames) {
+        // allocate new frame
         mDecodedFrames.push_back (new cFrame (pts));
         cLog::log (LOGINFO1, "allocated newFrame %d for %u at play:%u", mDecodedFrames.size(), pts, mPlayPts);
         return mDecodedFrames.back();
@@ -368,6 +389,7 @@ private:
         this_thread::sleep_for (40ms);
       }
 
+    // cannot reach here
     return nullptr;
     }
   //}}}
@@ -445,7 +467,7 @@ private:
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
-  void run (const string& title, int width, int height, int channelNum) {
+  void run (const string& title, int width, int height, int channelNum, int audBitrate, int vidBitrate) {
 
     init (title, width, height, false);
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
@@ -453,7 +475,7 @@ public:
     add (new cSongBox (this, 0.f,0.f, mSong));
 
     // startup
-    thread ([=](){ hlsThread (kHost, kChannels[channelNum], kAudBitrate, kVidBitrate); }).detach();
+    thread ([=](){ hlsThread (kHost, kChannels[channelNum], audBitrate, vidBitrate); }).detach();
 
     mLogBox = add (new cLogBox (this, 20.f));
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
@@ -485,6 +507,7 @@ protected:
       case 0x21: // page up - back one hour
         mSong.incPlaySec (-60*60, false);
         //mVideoDecode.setPlayPts (framePtr->getPts());
+        mVideoDecode.clear();
         changed();
         break;
       //}}}
@@ -492,6 +515,7 @@ protected:
       case 0x22: // page down - forward one hour
         mSong.incPlaySec (60*60, false);
         //mVideoDecode.setPlayPts (framePtr->getPts());
+        mVideoDecode.clear();
         changed();
         break;
       //}}}
@@ -499,12 +523,15 @@ protected:
       case 0x25: // left  arrow -1s, ctrl -10s, shift -5m
         mSong.incPlaySec (-(getShift() ? 300 : getControl() ? 10 : 1), false);
         //mVideoDecode.setPlayPts (framePtr->getPts());
+        mVideoDecode.clear();
         changed();
         break;
       //}}}
       //{{{
       case 0x27: // right arrow +1s, ctrl +10s, shift +5m
         mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);
+        if (getShift() || getControl())
+          mVideoDecode.clear();
         //mVideoDecode.setPlayPts (framePtr->getPts());
         changed();
         break;
@@ -583,13 +610,13 @@ private:
     int pesBufferLen = 0;
 
     mSong.setChannel (channel);
-    mSong.setBitrate (audBitrate, audBitrate >= 128000 ? 360 : 180); // 360 audio frames per chunk
+    mSong.setBitrate (audBitrate, audBitrate < 128000 ? 180 : 360); // audBitrate, audioFrames per chunk
 
     while (!getExit()) {
       const string path = "pool_902/live/uk/" + mSong.getChannel() +
                           "/" + mSong.getChannel() +
                           ".isml/" + mSong.getChannel() +
-                          (mSong.getBitrate() >= 128000 ? "-pa4=" : "-pa3=") + dec(mSong.getBitrate()) +
+                          (mSong.getBitrate() < 128000 ? "-pa3=" : "-pa4=") + dec(mSong.getBitrate()) +
                           "-video=" + dec(vidBitrate);
       cPlatformHttp http;
       string redirectedHost = http.getRedirect (host, path + ".m3u8");
@@ -604,7 +631,7 @@ private:
         http.freeContent();
         //}}}
 
-        mSong.init (cAudioDecode::eAac, 2, 48000, mSong.getBitrate() >= 128000 ? 1024 : 2048);
+        mSong.init (cAudioDecode::eAac, 2, 48000, mSong.getBitrate() < 128000 ? 2048 : 1024); // samplesPerFrame
         mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s, (2*60*60) - 30);
         cAudioDecode audioDecode (cAudioDecode::eAac);
 
@@ -636,7 +663,7 @@ private:
                   // audio pid
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
                     if (pesBufferLen) {
-                      //{{{  process prev audio pes
+                      //{{{  process prev audioPes
                       uint8_t* pesBufferPtr = pesBuffer;
                       uint8_t* pesBufferEnd = pesBuffer + pesBufferLen;
 
@@ -683,7 +710,7 @@ private:
                 }
 
               if (pesBufferLen) {
-                //{{{  process last audio pes
+                //{{{  process last audioPes
                 uint8_t* pesBufferPtr = pesBuffer;
                 uint8_t* pesBufferEnd = pesBuffer + pesBufferLen;
 
@@ -704,7 +731,7 @@ private:
                 //}}}
               //}}}
               mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
-              //{{{  process video second, may block waiting for free video frames
+              //{{{  process video second, may block waiting for free videoFrames
               // parse ts packets
               ts = http.getContent();
               while ((ts < tsEnd) && (*ts++ == 0x47)) {
@@ -718,7 +745,7 @@ private:
                   //  video pid
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
                     if (pesBufferLen) {
-                      // process prev video pes
+                      // process prev videoPes
                       mVideoDecode.decode (pts, pesBuffer, pesBufferLen);
                       pesBufferLen = 0;
                       }
@@ -742,7 +769,7 @@ private:
                 }
 
               if (pesBufferLen) {
-                // process last video pesBuffer
+                // process last videoPes
                 mVideoDecode.decode (pts, pesBuffer, pesBufferLen);
                 pesBufferLen = 0;
                 }
@@ -842,8 +869,18 @@ private:
 
 // main
 int WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+
   cLog::init (LOGINFO, true, "", "hlsWindow");
+
+  int numArgs;
+  auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
+  vector<string> names;
+  for (int i = 1; i < numArgs; i++)
+    names.push_back (wcharToString (args[i]));
+
+  int channelNum = names.empty() ? kDefaultChannelNum : stoi (names[0]);
+
   cAppWindow appWindow;
-  appWindow.run ("hlsWindow", 800, 420, kChannelNum);
+  appWindow.run ("hlsWindow", 800, 420, channelNum, kAudBitrate, kVidBitrate);
   return 0;
   }
