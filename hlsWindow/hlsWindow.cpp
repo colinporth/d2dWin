@@ -35,7 +35,7 @@ const vector <string> kChannels = { "bbc_one_hd",          "bbc_two_hd",        
                                     "bbc_news_channel_hd", "bbc_one_scotland_hd", "s4cpbs",      // pa4
                                     "bbc_one_south_west",  "bbc_parliament" };                   // pa3
 
-constexpr int kMaxVideoFrames = 200;
+constexpr int kMaxVideoFramePoolSize = 200;
 
 //{{{
 class cVideoDecode {
@@ -238,17 +238,17 @@ public:
 
     MFXVideoDECODE_Close (mSession);
 
-    for (auto surface : mSurfaces)
+    for (auto surface : mSurfacePool)
       delete surface;
-    for (auto frame : mDecodedFrames)
+    for (auto frame : mFramePool)
       delete frame;
     }
   //}}}
 
   int getWidth() { return mWidth; }
   int getHeight() { return mHeight; }
-  int getNumSurfaces() { return (int)mSurfaces.size(); }
-  int getNumDecodedFrames() { return (int)mDecodedFrames.size(); }
+  int getFramePoolSize() { return (int)mFramePool.size(); }
+  int getSurfacePoolSize() { return (int)mSurfacePool.size(); }
 
   void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
   //{{{
@@ -258,7 +258,7 @@ public:
     uint64_t nearDist = 90000 / 25;
 
     cFrame* nearFrame = nullptr;
-    for (auto frame : mDecodedFrames) {
+    for (auto frame : mFramePool) {
       if (frame->ok()) {
         uint64_t dist = frame->getPts() > mPlayPts ? frame->getPts() - mPlayPts : mPlayPts - frame->getPts();
         if (dist < nearDist) {
@@ -275,7 +275,7 @@ public:
   void clear() {
   // returns nearest frame within a 25fps frame of mPlayPts, nullptr if none
 
-    for (auto frame : mDecodedFrames)
+    for (auto frame : mFramePool)
       frame->clear();
     }
   //}}}
@@ -347,7 +347,7 @@ private:
   // return first unlocked surface, allocate new if none
 
     // reuse any unlocked surface
-    for (auto surface : mSurfaces)
+    for (auto surface : mSurfacePool)
       if (!surface->Data.Locked)
         return surface;
 
@@ -359,7 +359,7 @@ private:
     surface->Data.U = surface->Data.Y + mWidth * mHeight;
     surface->Data.V = nullptr; // NV12 ignores V pointer
     surface->Data.Pitch = mWidth;
-    mSurfaces.push_back (surface);
+    mSurfacePool.push_back (surface);
 
     cLog::log (LOGINFO1, "allocating new mfxFrameSurface1");
 
@@ -371,7 +371,7 @@ private:
   // return first frame older than mPlayPts, otherwise add new frame
 
     while (true) {
-      for (auto frame : mDecodedFrames) {
+      for (auto frame : mFramePool) {
         if (frame->ok() && (frame->getPts() < mPlayPts)) {
           // reuse frame
           frame->set (pts);
@@ -379,11 +379,11 @@ private:
           }
         }
 
-      if (mDecodedFrames.size() < kMaxVideoFrames) {
+      if (mFramePool.size() < kMaxVideoFramePoolSize) {
         // allocate new frame
-        mDecodedFrames.push_back (new cFrame (pts));
-        cLog::log (LOGINFO1, "allocated newFrame %d for %u at play:%u", mDecodedFrames.size(), pts, mPlayPts);
-        return mDecodedFrames.back();
+        mFramePool.push_back (new cFrame (pts));
+        cLog::log (LOGINFO1, "allocated newFrame %d for %u at play:%u", mFramePool.size(), pts, mPlayPts);
+        return mFramePool.back();
         }
       else
         this_thread::sleep_for (40ms);
@@ -397,12 +397,12 @@ private:
   MFXVideoSession mSession;
   mfxVideoParam mVideoParams;
   mfxBitstream mBitstream;
-  vector <mfxFrameSurface1*> mSurfaces;
+  vector <mfxFrameSurface1*> mSurfacePool;
 
   int mWidth = 0;
   int mHeight = 0;
 
-  vector <cFrame*> mDecodedFrames;
+  vector <cFrame*> mFramePool;
   uint64_t mPlayPts = 0;
   };
 //}}}
@@ -444,8 +444,8 @@ public:
       }
 
     // info string
-    string str = dec(mVideoDecode.getNumDecodedFrames()) +
-                 " " + dec(mVideoDecode.getNumSurfaces()) +
+    string str = dec(mVideoDecode.getFramePoolSize()) +
+                 " " + dec(mVideoDecode.getSurfacePoolSize()) +
                  " " + dec(mVideoDecode.getWidth()) +
                  "x" + dec(mVideoDecode.getHeight());
     IDWriteTextLayout* textLayout;
