@@ -242,6 +242,8 @@ public:
     }
   //}}}
 
+  void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
+
   //{{{
   cFrame* findPlayFrame() {
 
@@ -252,7 +254,6 @@ public:
     return nullptr;
     }
   //}}}
-  void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
   //{{{
   void decode (uint64_t seqNum, uint64_t pts, uint8_t* pes, int pesSize) {
 
@@ -758,9 +759,8 @@ protected:
 
       case ' ' : mPlaying = !mPlaying; break;
 
-      case 0x21: mSong.prevSilencePlayFrame(); changed(); break;; // page up
-      case 0x22: mSong.nextSilencePlayFrame(); changed(); break;; // page down
-
+      case 0x21: mSong.incPlaySec (-60*60, false);  changed(); break; // page up - back one hour
+      case 0x22: mSong.incPlaySec (60*60, false);  changed(); break; // page down - forward one hour
       case 0x25: mSong.incPlaySec (getShift() ? -300 : getControl() ? -10 : -1, false);  changed(); break; // left arrow  - 1 sec
       case 0x27: mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);  changed(); break; // right arrow  + 1 sec
 
@@ -838,7 +838,7 @@ private:
         //}}}
 
         mSong.init (cAudioDecode::eAac, 2, 48000, 1024);
-        mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s);
+        mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s, (2*60*60) - 30);
         cAudioDecode audioDecode (cAudioDecode::eAac);
 
         thread player;

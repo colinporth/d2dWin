@@ -325,7 +325,7 @@ private:
         http.freeContent();
         //}}}
         mSong.init (cAudioDecode::eAac, 2, 48000, mSong.getBitrate() >= 128000 ? 1024 : 2048);
-        mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s);
+        mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s, 0);
         cAudioDecode decode (cAudioDecode::eAac);
 
         thread player;
