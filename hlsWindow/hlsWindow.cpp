@@ -25,12 +25,12 @@ using namespace std;
 using namespace chrono;
 //}}}
 
-const string kHost = "vs-hls-uk-live.akamaized.net";
-const int kChannelNum = 3;
-const vector <string> kChannels = { "bbc_one_hd", "bbc_two_hd", "bbc_four_hd", "bbc_news_channel_hd", // pa4=128000
-                                    "bbc_one_south_west", "bbc_parliament" };  // pa3=96000
+constexpr int kChannelNum = 3;
 constexpr int kBitRate = 128000;
 constexpr int kVidBitrate = 1604032; // 827008 1604032 2812032 5070016
+const string kHost = "vs-hls-uk-live.akamaized.net";
+const vector <string> kChannels = { "bbc_one_hd", "bbc_two_hd", "bbc_four_hd", "bbc_news_channel_hd", // pa4=128000
+                                    "bbc_one_south_west", "bbc_parliament" };  // pa3=96000
 
 //{{{
 class cVideoDecode {
@@ -38,7 +38,7 @@ public:
   //{{{
   class cFrame {
   public:
-    cFrame (uint64_t pts) : mPts(pts),  mOk(false) {}
+    cFrame (uint64_t pts) : mPts(pts), mOk(false) {}
     //{{{
     virtual ~cFrame() {
       _aligned_free (mYbuf);
@@ -226,6 +226,7 @@ public:
   ~cVideoDecode() {
 
     MFXVideoDECODE_Close (mSession);
+
     for (auto surface : mSurfaces)
       delete surface;
     for (auto frame : mDecodedFrames)
@@ -233,6 +234,8 @@ public:
     }
   //}}}
 
+  int getWidth() { return mWidth; }
+  int getHeight() { return mHeight; }
   int getNumSurfaces() { return (int)mSurfaces.size(); }
   int getNumAllocatedFrames() { return (int)mDecodedFrames.size(); }
 
@@ -245,10 +248,12 @@ public:
 
     cFrame* nearFrame = nullptr;
     for (auto frame : mDecodedFrames) {
-      uint64_t dist = frame->getPts() > mPlayPts ? frame->getPts() - mPlayPts : mPlayPts - frame->getPts();
-      if (dist < nearDist) {
-        nearDist = dist;
-        nearFrame = frame;
+      if (frame->ok()) {
+        uint64_t dist = frame->getPts() > mPlayPts ? frame->getPts() - mPlayPts : mPlayPts - frame->getPts();
+        if (dist < nearDist) {
+          nearDist = dist;
+          nearFrame = frame;
+          }
         }
       }
 
@@ -257,7 +262,7 @@ public:
   //}}}
 
   //{{{
-  void decode (uint64_t pts, uint8_t* pes, int pesSize) {
+  void decode (uint64_t pts, uint8_t* pes, unsigned int pesSize) {
 
     mBitstream.Data = pes;
     mBitstream.DataOffset = 0;
@@ -307,7 +312,7 @@ public:
         if (status == MFX_ERR_NONE) {
           cLog::log (LOGINFO1, "decode pts:%u %dx%d:%d",
                                surface->Data.TimeStamp, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
-          auto frame = allocateFrame (surface->Data.TimeStamp);
+          auto frame = getFreeFrame (surface->Data.TimeStamp);
           frame->setNv12 (surface->Data.Y, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
           }
         }
@@ -339,7 +344,7 @@ private:
     }
   //}}}
   //{{{
-  cFrame* allocateFrame (uint64_t pts) {
+  cFrame* getFreeFrame (uint64_t pts) {
   // return first frame older than mPlayPts, otherwise add new frame
 
     for (auto frame : mDecodedFrames)
@@ -360,6 +365,7 @@ private:
   mfxVideoParam mVideoParams;
   mfxBitstream mBitstream;
   vector <mfxFrameSurface1*> mSurfaces;
+
   int mWidth = 0;
   int mHeight = 0;
 
@@ -379,7 +385,6 @@ public:
     auto frame = mVideoDecode.findPlayFrame();
     if (frame) {
       if (frame->getPts() != mPts) {
-        //cLog::log (LOGINFO, "onDraw show:%u was:%u", frame->getPts(), mPts);
         // new Frame, update bitmap
         if (mBitmap)  {
           auto pixelSize = mBitmap->GetPixelSize();
@@ -408,12 +413,15 @@ public:
       dc->SetTransform (D2D1::Matrix3x2F::Identity());
       }
 
-    string str = dec(mVideoDecode.getNumAllocatedFrames()) + " " + dec(mVideoDecode.getNumSurfaces());
+    // info string
+    string str = dec(mVideoDecode.getNumAllocatedFrames()) +
+                 " " + dec(mVideoDecode.getNumSurfaces()) +
+                 " " + dec(mVideoDecode.getWidth()) +
+                 "x" + dec(mVideoDecode.getHeight());
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
       std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
       mWindow->getTextFormat(), getWidth(), getHeight(), &textLayout);
-    dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush());
     dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush());
     textLayout->Release();
     }
