@@ -63,17 +63,17 @@ public:
     if (names.empty()) {
       //{{{  add radio 1..6 with action lambda
       add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChan (kChannels[0]); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChannel (kChannels[0]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChan (kChannels[1]); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChannel (kChannels[1]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChan (kChannels[2]); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChannel (kChannels[2]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChan (kChannels[3]); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChannel (kChannels[3]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChan (kChannels[4]); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChannel (kChannels[4]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChan (kChannels[5]); mSongChanged = true; } ));
+        mSong.clear(); mSong.setChannel (kChannels[5]); mSongChanged = true; } ));
 
       mBitrateStr = "48k aacHE";
       addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
@@ -200,12 +200,12 @@ protected:
       case 0x0d: mSongChanged = true; break; // enter
 
       // crude chan,bitrate change
-      case '1' : mSong.clear(); mSong.setChan ("bbc_radio_one"); mSongChanged = true; break;
-      case '2' : mSong.clear(); mSong.setChan ("bbc_radio_two"); mSongChanged = true; break;
-      case '3' : mSong.clear(); mSong.setChan ("bbc_radio_three"); mSongChanged = true; break;
-      case '4' : mSong.clear(); mSong.setChan ("bbc_radio_fourfm"); mSongChanged = true;  break;
-      case '5' : mSong.clear(); mSong.setChan ("bbc_radio_five_live"); mSongChanged = true; break;
-      case '6' : mSong.clear(); mSong.setChan ("bbc_6music"); mSongChanged = true; break;
+      case '1' : mSong.clear(); mSong.setChannel ("bbc_radio_one"); mSongChanged = true; break;
+      case '2' : mSong.clear(); mSong.setChannel("bbc_radio_two"); mSongChanged = true; break;
+      case '3' : mSong.clear(); mSong.setChannel("bbc_radio_three"); mSongChanged = true; break;
+      case '4' : mSong.clear(); mSong.setChannel("bbc_radio_fourfm"); mSongChanged = true;  break;
+      case '5' : mSong.clear(); mSong.setChannel("bbc_radio_five_live"); mSongChanged = true; break;
+      case '6' : mSong.clear(); mSong.setChannel("bbc_6music"); mSongChanged = true; break;
       case '7' : mSong.clear(); mSong.setBitrate (48000, 150); mBitrateStr = "48k aacHE"; mSongChanged = true; break;
       case '8' : mSong.clear(); mSong.setBitrate (96000, 150); mBitrateStr = "96k aacHE"; mSongChanged = true; break;
       case '9' : mSong.clear(); mSong.setBitrate (128000, 300); mBitrateStr = "128k aac"; mSongChanged = true; break;
@@ -300,17 +300,17 @@ private:
   //}}}
 
   //{{{
-  void hlsThread (const string& host, const string& chan, int bitrate) {
+  void hlsThread (const string& host, const string& channel, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
     constexpr int kHlsPreload = 10; // about a minute
     cLog::setThreadName ("hls ");
 
-    mSong.setChan (chan);
+    mSong.setChannel (channel);
     mSong.setBitrate (bitrate, bitrate >= 128000 ? 300 : 150);
     while (!getExit()) {
-      const string path = "pool_904/live/uk/" + mSong.getChan() +
-                          "/" + mSong.getChan() + ".isml/" + mSong.getChan() +
+      const string path = "pool_904/live/uk/" + mSong.getChannel() +
+                          "/" + mSong.getChannel() + ".isml/" + mSong.getChannel() +
                           "-audio=" + dec(mSong.getBitrate());
       cPlatformHttp http;
       auto redirectedHost = http.getRedirect (host, path + ".norewind.m3u8");

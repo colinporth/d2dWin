@@ -25,14 +25,14 @@
 using namespace std;
 using namespace chrono;
 //}}}
-constexpr int kChannelNum = 3;
+constexpr int kChannelNum = 7;
 constexpr int kMaxVideoFrames = 200;
-constexpr int kBitRate = 128000;
+constexpr int kAudBitrate = 128000;     // 96000 128000
 constexpr int kVidBitrate = 827008; // 827008 1604032 2812032 5070016
 const string kHost = "vs-hls-uk-live.akamaized.net";
-const vector <string> kChannels = { "bbc_one_hd", "bbc_two_hd", "bbc_four_hd",
-                                    "bbc_news_channel_hd", "bbc_one_scotland_hd", // pa4=128000
-                                    "bbc_one_south_west", "bbc_parliament" };  // pa3=96000
+const vector <string> kChannels = { "bbc_one_hd",          "bbc_two_hd",          "bbc_four_hd", // pa4
+                                    "bbc_news_channel_hd", "bbc_one_scotland_hd", "s4cpbs",      // pa4
+                                    "bbc_one_south_west",  "bbc_parliament" };                   // pa3
 
 //{{{
 class cVideoDecode {
@@ -453,7 +453,7 @@ public:
     add (new cSongBox (this, 0.f,0.f, mSong));
 
     // startup
-    thread ([=](){ hlsThread (kHost, kChannels[channelNum], kBitRate); }).detach();
+    thread ([=](){ hlsThread (kHost, kChannels[channelNum], kAudBitrate, kVidBitrate); }).detach();
 
     mLogBox = add (new cLogBox (this, 20.f));
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
@@ -572,7 +572,7 @@ private:
   //}}}
 
   //{{{
-  void hlsThread (const string& host, const string& chan, int bitrate) {
+  void hlsThread (const string& host, const string& channel, int audBitrate, int vidBitrate) {
   // hls http chunk load and decode thread
 
     cLog::setThreadName ("hls ");
@@ -582,15 +582,15 @@ private:
     uint8_t* pesBuffer = nullptr;
     int pesBufferLen = 0;
 
-    mSong.setChan (chan);
-    mSong.setBitrate (bitrate, 360); // 360 audio frames per chunk
+    mSong.setChannel (channel);
+    mSong.setBitrate (audBitrate, audBitrate >= 128000 ? 360 : 180); // 360 audio frames per chunk
 
     while (!getExit()) {
-      const string path = "pool_902/live/uk/" + mSong.getChan() +
-                          "/" + mSong.getChan() +
-                          ".isml/" + mSong.getChan() +
-                          "-pa4=" + dec(mSong.getBitrate()) +
-                          "-video=" + dec(kVidBitrate);
+      const string path = "pool_902/live/uk/" + mSong.getChannel() +
+                          "/" + mSong.getChannel() +
+                          ".isml/" + mSong.getChannel() +
+                          (mSong.getBitrate() >= 128000 ? "-pa4=" : "-pa3=") + dec(mSong.getBitrate()) +
+                          "-video=" + dec(vidBitrate);
       cPlatformHttp http;
       string redirectedHost = http.getRedirect (host, path + ".m3u8");
       if (http.getContent()) {
@@ -604,7 +604,7 @@ private:
         http.freeContent();
         //}}}
 
-        mSong.init (cAudioDecode::eAac, 2, 48000, 1024);
+        mSong.init (cAudioDecode::eAac, 2, 48000, mSong.getBitrate() >= 128000 ? 1024 : 2048);
         mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s, (2*60*60) - 30);
         cAudioDecode audioDecode (cAudioDecode::eAac);
 
