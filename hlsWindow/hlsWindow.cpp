@@ -427,20 +427,11 @@ private:
 //{{{
 class cFFmpegVideoDecode : public cVideoDecode {
 public:
-  //{{{
-  cFFmpegVideoDecode() : cVideoDecode() {
-    }
-  //}}}
-  //{{{
-  virtual ~cFFmpegVideoDecode() {
-    }
-  //}}}
+  cFFmpegVideoDecode() : cVideoDecode() { }
+  virtual ~cFFmpegVideoDecode() { }
 
   int getSurfacePoolSize() { return 0; }
-  //{{{
-  void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {
-    }
-  //}}}
+  void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {}
 
 private:
   };
