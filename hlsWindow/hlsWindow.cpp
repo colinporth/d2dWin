@@ -576,7 +576,7 @@ private:
     cLog::setThreadName ("hls ");
 
     constexpr int kHlsPreload = 2;
-    uint8_t* pes = nullptr;
+    uint8_t* pesBuffer = nullptr;
 
     mSong.setChan (chan);
     mSong.setBitrate (bitrate, 360);
@@ -609,14 +609,13 @@ private:
             // get hls chunkNum chunk
             mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
-              uint64_t firstAudPts = 0;
-              uint64_t firstVidPts = 0;
-
               int pesLen = 0;
               uint64_t pts = 0;
               uint8_t* ts = http.getContent();
               uint8_t* tsEnd = ts + http.getContentSize();
               //{{{  process audio
+              int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
+
               // parse ts packets
               while ((ts < tsEnd) && (*ts++ == 0x47)) {
                 auto payStart = ts[0] & 0x40;
@@ -626,49 +625,74 @@ private:
                 auto tsBodyBytes = 187 - headerBytes;
 
                 if (pid == 34) {
-                  // audio pes
+                  // audio pid
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-                    if (ts[7] & 0x80) { // has pts
-                      pts = getPts (ts+9);
-                      if (!firstAudPts)
-                        firstAudPts = pts;
+                    if (pesLen) {
+                      //{{{  process prev audio pes
+                      uint8_t* pesBufferPtr = pesBuffer;
+
+                      while (audioDecode.parseFrame (pesBufferPtr, pesBuffer + pesLen)) {
+                        // several aacFrames per audio pes
+                        float* samples = audioDecode.decodeFrame (seqFrameNum);
+                        if (samples) {
+                          if (firstTime)
+                            mSong.setFixups (audioDecode.getNumChannels(), audioDecode.getSampleRate(), audioDecode.getNumSamples());
+                          mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, pts);
+                          pts += (audioDecode.getNumSamples() * 90) / 48;
+                          changed();
+
+                          if (firstTime) {
+                            firstTime = false;
+                            player = thread ([=](){ playThread (true); });
+                            }
+                          }
+
+                        pesBufferPtr += audioDecode.getNextFrameOffset();
+                        }
+
+                      pesLen = 0;
                       }
+                      //}}}
+
+                    if (ts[7] & 0x80) 
+                      pts = getPts (ts+9);
+
+                    // skip header
                     int pesHeaderBytes = 9 + ts[8];
                     ts += pesHeaderBytes;
                     tsBodyBytes -= pesHeaderBytes;
                     }
 
-                  // copy ts payload into pes buffer
-                  pes = (uint8_t*)realloc (pes, pesLen + tsBodyBytes);
-                  memcpy (pes + pesLen, ts, tsBodyBytes);
+                  // copy ts payload into pesBuffer
+                  pesBuffer = (uint8_t*)realloc (pesBuffer, pesLen + tsBodyBytes);
+                  memcpy (pesBuffer + pesLen, ts, tsBodyBytes);
                   pesLen += tsBodyBytes;
                   }
                 ts += tsBodyBytes;
                 }
 
-              int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
+              if (pesLen) {
+                //{{{  process last audio pes
+                uint8_t* pesBufferPtr = pesBuffer;
 
-              // process whole chunk of audFrames, !!!! could do this above for each pes like vid !!!!
-              pts = firstAudPts;
-              uint8_t* audPesPtr = pes;
-              while (audioDecode.parseFrame (audPesPtr, pes + pesLen)) {
-                float* samples = audioDecode.decodeFrame (seqFrameNum);
-                if (samples) {
-                  mSong.setFixups (audioDecode.getNumChannels(), audioDecode.getSampleRate(), audioDecode.getNumSamples());
-                  mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, pts);
-                  pts += (audioDecode.getNumSamples() * 90) / 48;
-                  changed();
-                  if (firstTime) {
-                    firstTime = false;
-                    player = thread ([=](){ playThread (true); });
+                while (audioDecode.parseFrame (pesBufferPtr, pesBuffer + pesLen)) {
+                  // several aacFrames per audio pes
+                  float* samples = audioDecode.decodeFrame (seqFrameNum);
+                  if (samples) {
+                    mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, pts);
+                    pts += (audioDecode.getNumSamples() * 90) / 48;
+                    changed();
                     }
+
+                  pesBufferPtr += audioDecode.getNextFrameOffset();
                   }
-                audPesPtr += audioDecode.getNextFrameOffset();
+
+                pesLen = 0;
                 }
+                //}}}
               //}}}
               mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
 
-              pesLen = 0;
               ts = http.getContent();
               //{{{  process video
               // parse ts packets
@@ -680,38 +704,38 @@ private:
                 auto tsBodyBytes = 187 - headerBytes;
 
                 if (pid == 33) {
-                  //  vid pes
+                  //  video pid
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-                    if (pesLen) // process prev vidPes
-                      mVideoDecode.decode (pts, pes, pesLen);
-
-                    if (ts[7] & 0x80) {
-                      // has vid pts
-                      pts = getPts (ts+9);
-                      if (!firstVidPts)
-                        firstVidPts = pts;
+                    if (pesLen) {
+                      // process prev video pes
+                      mVideoDecode.decode (pts, pesBuffer, pesLen);
+                      pesLen = 0;
                       }
 
+                    if (ts[7] & 0x80) 
+                      pts = getPts (ts+9);
+
+                    // skip header
                     int pesHeaderBytes = 9 + ts[8];
                     ts += pesHeaderBytes;
                     tsBodyBytes -= pesHeaderBytes;
-                    pesLen = 0;
                     }
 
-                  // copy ts payload into pes buffer
-                  pes = (uint8_t*)realloc (pes, pesLen + tsBodyBytes);
-                  memcpy (pes + pesLen, ts, tsBodyBytes);
+                  // copy ts payload into pesBuffer
+                  pesBuffer = (uint8_t*)realloc (pesBuffer, pesLen + tsBodyBytes);
+                  memcpy (pesBuffer + pesLen, ts, tsBodyBytes);
                   pesLen += tsBodyBytes;
                   }
                 ts += tsBodyBytes;
                 }
 
-              if (pesLen) // process last pes
-                mVideoDecode.decode (pts, pes, pesLen);
+              if (pesLen) {
+                // process last video pesBuffer
+                mVideoDecode.decode (pts, pesBuffer, pesLen);
+                pesLen = 0;
+                }
               //}}}
 
-              cLog::log (LOGINFO, "chunk:%d vidPts:%u audPts:%u diff:%u",
-                                  chunkNum, firstVidPts, firstAudPts, firstAudPts-firstVidPts);
               http.freeContent();
               }
             else {
@@ -731,7 +755,7 @@ private:
         }
       }
 
-    free (pes);
+    free (pesBuffer);
     cLog::log (LOGINFO, "exit");
     }
   //}}}
