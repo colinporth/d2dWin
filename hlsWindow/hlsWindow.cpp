@@ -240,7 +240,7 @@ public:
   int getWidth() { return mWidth; }
   int getHeight() { return mHeight; }
   int getFramePoolSize() { return (int)mFramePool.size(); }
-  int getSurfacePoolSize() { return 0; }
+  virtual int getSurfacePoolSize() = 0;
 
   void setPlayPts (uint64_t playPts) { mPlayPts = playPts; }
   //{{{
@@ -330,6 +330,7 @@ public:
     }
   //}}}
 
+  int getSurfacePoolSize() { return (int)mSurfacePool.size(); }
   //{{{
   void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {
 
@@ -421,6 +422,27 @@ private:
   mfxVideoParam mVideoParams;
   mfxBitstream mBitstream;
   vector <mfxFrameSurface1*> mSurfacePool;
+  };
+//}}}
+//{{{
+class cFFmpegVideoDecode : public cVideoDecode {
+public:
+  //{{{
+  cFFmpegVideoDecode() : cVideoDecode() {
+    }
+  //}}}
+  //{{{
+  virtual ~cFFmpegVideoDecode() {
+    }
+  //}}}
+
+  int getSurfacePoolSize() { return 0; }
+  //{{{
+  void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {
+    }
+  //}}}
+
+private:
   };
 //}}}
 //{{{
