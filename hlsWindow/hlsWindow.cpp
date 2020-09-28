@@ -10,13 +10,12 @@
 #include "../../shared/net/cWinSockHttp.h"
 
 #include "../common/cD2dWindow.h"
-#include "../boxes/cWindowBox.h"
 #include "../boxes/cClockBox.h"
 #include "../boxes/cSongBox.h"
 #include "../boxes/cLogBox.h"
+#include "../boxes/cWindowBox.h"
 
 #include "../mfx/include/mfxvideo++.h"
-
 #ifdef _DEBUG
   #pragma comment (lib,"libmfx_d.lib")
 #else
@@ -31,7 +30,8 @@ constexpr int kMaxVideoFrames = 200;
 constexpr int kBitRate = 128000;
 constexpr int kVidBitrate = 827008; // 827008 1604032 2812032 5070016
 const string kHost = "vs-hls-uk-live.akamaized.net";
-const vector <string> kChannels = { "bbc_one_hd", "bbc_two_hd", "bbc_four_hd", "bbc_news_channel_hd", // pa4=128000
+const vector <string> kChannels = { "bbc_one_hd", "bbc_two_hd", "bbc_four_hd",
+                                    "bbc_news_channel_hd", "bbc_one_scotland_hd", // pa4=128000
                                     "bbc_one_south_west", "bbc_parliament" };  // pa3=96000
 
 //{{{
