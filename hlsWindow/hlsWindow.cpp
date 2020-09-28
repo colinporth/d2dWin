@@ -25,9 +25,9 @@
 using namespace std;
 using namespace chrono;
 //}}}
-constexpr int kChannelNum = 7;
+constexpr int kChannelNum = 3;
 constexpr int kMaxVideoFrames = 200;
-constexpr int kAudBitrate = 128000;     // 96000 128000
+constexpr int kAudBitrate = 128000; //  96000  128000
 constexpr int kVidBitrate = 827008; // 827008 1604032 2812032 5070016
 const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd",          "bbc_two_hd",          "bbc_four_hd", // pa4
