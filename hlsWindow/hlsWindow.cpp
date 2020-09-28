@@ -24,20 +24,11 @@
 using namespace std;
 using namespace chrono;
 //}}}
-//{{{  urls
-//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d827008.m3u8
-//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d1604032.m3u8
-//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d2812032.m3u8
-//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_hd/bbc_one_hd.isml/bbc_one_hd-pa4%3d128000-video%3d5070016.m3u8
-
-//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_four_hd/bbc_four_hd.isml/bbc_four_hd-pa4%3d128000-video%3d5070016.m3u8
-//vs-hls-uk-live.akamaized.net/pool_902/live/uk/bbc_one_south_west/bbc_one_south_west.isml/bbc_one_south_west-pa3%3d96000-video%3d1604032.m3u8
-//}}}
 
 const string kHost = "vs-hls-uk-live.akamaized.net";
 const int kChannelNum = 3;
-const vector <string> kChannels = { "bbc_one_hd", "bbc_two_hd", "bbc_four_hd", "bbc_news_channel_hd", // 128000
-                                    "bbc_one_south_west", "bbc_parliament" };  // 96000
+const vector <string> kChannels = { "bbc_one_hd", "bbc_two_hd", "bbc_four_hd", "bbc_news_channel_hd", // pa4=128000
+                                    "bbc_one_south_west", "bbc_parliament" };  // pa3=96000
 constexpr int kBitRate = 128000;
 constexpr int kVidBitrate = 1604032; // 827008 1604032 2812032 5070016
 
@@ -266,7 +257,7 @@ public:
   //}}}
 
   //{{{
-  void decode (uint64_t seqNum, uint64_t pts, uint8_t* pes, int pesSize) {
+  void decode (uint64_t pts, uint8_t* pes, int pesSize) {
 
     mBitstream.Data = pes;
     mBitstream.DataOffset = 0;
@@ -535,16 +526,6 @@ protected:
 
 private:
   //{{{
-  static string getTaggedValue (uint8_t* buffer, char* tag) {
-
-    const char* tagPtr = strstr ((char*)buffer, tag);
-    const char* valuePtr = tagPtr + strlen (tag);
-    const char* endPtr = strchr (valuePtr, '\n');
-
-    return string (valuePtr, endPtr - valuePtr);
-    }
-  //}}}
-  //{{{
   static uint64_t getPts (uint8_t* ts) {
   // return 33 bits of pts,dts
 
@@ -563,13 +544,22 @@ private:
       }
     }
   //}}}
+  //{{{
+  static string getTagValue (uint8_t* buffer, char* tag) {
+
+    const char* tagPtr = strstr ((char*)buffer, tag);
+    const char* valuePtr = tagPtr + strlen (tag);
+    const char* endPtr = strchr (valuePtr, '\n');
+
+    return string (valuePtr, endPtr - valuePtr);
+    }
+  //}}}
 
   //{{{
   void hlsThread (const string& host, const string& chan, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
     cLog::setThreadName ("hls ");
-    int vidFrameNum = 0;
 
     //mFile = fopen ("C:/Users/colin/Desktop/hls.ts", "wb");
     constexpr int kHlsPreload = 2;
@@ -583,9 +573,9 @@ private:
       string redirectedHost = http.getRedirect (host, path + ".m3u8");
       if (http.getContent()) {
         //{{{  hls m3u8 ok, parse it for baseChunkNum, baseTimePoint
-        int mediaSequence = stoi (getTaggedValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
+        int mediaSequence = stoi (getTagValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
 
-        istringstream inputStream (getTaggedValue (http.getContent(), "#EXT-X-PROGRAM-DATE-TIME:"));
+        istringstream inputStream (getTagValue (http.getContent(), "#EXT-X-PROGRAM-DATE-TIME:"));
         system_clock::time_point programDateTimePoint;
         inputStream >> date::parse ("%FT%T", programDateTimePoint);
 
@@ -637,9 +627,8 @@ private:
                 if (pid == 33) {
                   //{{{  vid pes
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-                    // new vidPes start
-                    if (vidPes) // process last vidPes
-                      mVideoDecode.decode (vidFrameNum++, vidPts, vidPes, vidPesLen);
+                    if (vidPes) // process prev vidPes
+                      mVideoDecode.decode (vidPts, vidPes, vidPesLen);
                       //mSong.addVideoFrame (vidPes, vidPesLen, vidPts);
 
                     if (ts[7] & 0x80) // has vid pts
@@ -685,9 +674,9 @@ private:
                 ts += tsBodyBytes;
                 }
 
-              // process any outstanding vidPes
-              if (vidPes)
-                mVideoDecode.decode (vidFrameNum++, vidPts, vidPes, vidPesLen);
+              if (vidPes) // process last vidPes
+                mVideoDecode.decode (vidPts, vidPes, vidPesLen);
+                //mSong.addVideoFrame (vidPes, vidPesLen, vidPts);
 
               // process whole chunk of audFrames, !!!! could do this above for each pes like vid !!!!
               while (audioDecode.parseFrame (aacFrames, aacFramesPtr)) {

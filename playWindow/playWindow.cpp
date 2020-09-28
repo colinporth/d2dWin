@@ -220,7 +220,7 @@ protected:
 
 private:
   //{{{
-  static string getTaggedValue (uint8_t* buffer, char* tag) {
+  static string getTagValue (uint8_t* buffer, char* tag) {
 
     const char* tagPtr = strstr ((char*)buffer, tag);
     const char* valuePtr = tagPtr + strlen (tag);
@@ -316,9 +316,9 @@ private:
       auto redirectedHost = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
         //{{{  hls m3u8 ok, parse it for baseChunkNum, baseTimePoint
-        int mediaSequence = stoi (getTaggedValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
+        int mediaSequence = stoi (getTagValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
 
-        istringstream inputStream (getTaggedValue (http.getContent(), "#EXT-X-PROGRAM-DATE-TIME:"));
+        istringstream inputStream (getTagValue (http.getContent(), "#EXT-X-PROGRAM-DATE-TIME:"));
         system_clock::time_point programDateTimePoint;
         inputStream >> date::parse ("%FT%T", programDateTimePoint);
 
