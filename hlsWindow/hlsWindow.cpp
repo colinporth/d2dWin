@@ -23,6 +23,11 @@
   #pragma comment (lib,"libmfx.lib")
 #endif
 
+extern "C" {
+  #include <libavcodec/avcodec.h>
+  #include <libavformat/avformat.h>
+  }
+
 using namespace std;
 using namespace chrono;
 //}}}
@@ -484,12 +489,71 @@ private:
 class cFFmpegVideoDecode : public cVideoDecode {
 public:
   cFFmpegVideoDecode() : cVideoDecode() { }
-  virtual ~cFFmpegVideoDecode() { }
+  //{{{
+  virtual ~cFFmpegVideoDecode() {
+    if (mAvContext)
+      avcodec_close (mAvContext);
+    if (mAvParser)
+      av_parser_close (mAvParser);
+    }
+  //}}}
 
   int getSurfacePoolSize() { return 0; }
-  void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {}
+
+  //{{{
+  void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {
+
+    if (!mAvParser) {
+      mAvParser = av_parser_init (AV_CODEC_ID_H264);
+      mAvCodec = avcodec_find_decoder (AV_CODEC_ID_H264);
+      mAvContext = avcodec_alloc_context3 (mAvCodec);
+      avcodec_open2 (mAvContext, mAvCodec, NULL);
+      }
+
+    cLog::log (LOGINFO, "decode PES " + getPtsString (pts));
+
+    // init avPacket
+    AVPacket avPacket;
+    av_init_packet (&avPacket);
+    avPacket.data = pesBuffer;
+    avPacket.size = pesBufferLen;
+    auto avFrame = av_frame_alloc();
+
+    auto interpolatedPts = pts;
+    auto pesPtr = pesBuffer;
+    auto pesSize = pesBufferLen;
+    while (pesSize) {
+      auto bytesUsed = av_parser_parse2 (mAvParser, mAvContext, &avPacket.data, &avPacket.size,
+                                         pesPtr, (int)pesSize, 0, 0, AV_NOPTS_VALUE);
+      pesPtr += bytesUsed;
+      pesSize -= bytesUsed;
+      if (avPacket.size) {
+        auto ret = avcodec_send_packet (mAvContext, &avPacket);
+        while (ret >= 0) {
+          ret = avcodec_receive_frame (mAvContext, avFrame);
+          if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
+            break;
+          if (avFrame->nb_samples > 0) {
+            cLog::log (LOGINFO, "decoded %d %d", avFrame->nb_samples, mAvContext->sample_fmt);
+            //auto frame = getFreeFrame (surface->Data.TimeStamp);
+            //frame->setNv12 (surface->Data.Y, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
+            // AV_SAMPLE_FMT_S16P:
+            // 16bit signed planar, copy planar to interleaved
+            // auto srcPtr = (short*)avFrame->data[channel];
+            //interpolatedPts += (avFrame->nb_samples * 90) / 48;
+            }
+          }
+        //decoded = true;
+        }
+      }
+    av_frame_free (&avFrame);
+    }
+  //}}}
 
 private:
+  AVCodecParserContext* mAvParser = nullptr;
+  AVCodec* mAvCodec = nullptr;
+  AVCodecContext* mAvContext = nullptr;
   };
 //}}}
 
@@ -501,6 +565,7 @@ public:
     init (title, width, height, false);
 
     mVideoDecode = new cMfxVideoDecode();
+    //mVideoDecode = new cFFmpegVideoDecode();
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
 
     add (new cClockBox (this, 40.f), -135.f,35.f);
