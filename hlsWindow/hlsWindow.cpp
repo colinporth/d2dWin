@@ -491,6 +491,7 @@ public:
   cFFmpegVideoDecode() : cVideoDecode() { }
   //{{{
   virtual ~cFFmpegVideoDecode() {
+
     if (mAvContext)
       avcodec_close (mAvContext);
     if (mAvParser)
@@ -504,6 +505,8 @@ public:
   void decode (uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {
 
     if (!mAvParser) {
+      //mAvParser = av_parser_init (AV_CODEC_ID_MPEG4);
+      //mAvCodec = avcodec_find_decoder (AV_CODEC_ID_MPEG4);
       mAvParser = av_parser_init (AV_CODEC_ID_H264);
       mAvCodec = avcodec_find_decoder (AV_CODEC_ID_H264);
       mAvContext = avcodec_alloc_context3 (mAvCodec);
@@ -517,9 +520,9 @@ public:
     av_init_packet (&avPacket);
     avPacket.data = pesBuffer;
     avPacket.size = pesBufferLen;
+
     auto avFrame = av_frame_alloc();
 
-    auto interpolatedPts = pts;
     auto pesPtr = pesBuffer;
     auto pesSize = pesBufferLen;
     while (pesSize) {
@@ -534,13 +537,9 @@ public:
           if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || ret < 0)
             break;
           if (avFrame->nb_samples > 0) {
-            cLog::log (LOGINFO, "decoded %d %d", avFrame->nb_samples, mAvContext->sample_fmt);
+            cLog::log (LOGINFO, "decoded %d %d %u", avFrame->nb_samples, mAvContext->sample_fmt, pts);
             //auto frame = getFreeFrame (surface->Data.TimeStamp);
             //frame->setNv12 (surface->Data.Y, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
-            // AV_SAMPLE_FMT_S16P:
-            // 16bit signed planar, copy planar to interleaved
-            // auto srcPtr = (short*)avFrame->data[channel];
-            //interpolatedPts += (avFrame->nb_samples * 90) / 48;
             }
           }
         //decoded = true;
