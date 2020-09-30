@@ -683,7 +683,7 @@ private:
     }
   //}}}
   //{{{
-  static string getTagValue (uint8_t* buffer, char* tag) {
+  static string getTagValue (uint8_t* buffer, const char* tag) {
 
     const char* tagPtr = strstr ((char*)buffer, tag);
     const char* valuePtr = tagPtr + strlen (tag);
