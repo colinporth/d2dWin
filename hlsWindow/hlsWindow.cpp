@@ -31,6 +31,7 @@ extern "C" {
 using namespace std;
 using namespace chrono;
 //}}}
+//{{{  channels
 constexpr int kDefaultChannelNum = 3;
 constexpr int kAudBitrate = 128000; //  96000  128000
 constexpr int kVidBitrate = 827008; // 827008 1604032 2812032 5070016
@@ -39,6 +40,7 @@ const string kHost = "vs-hls-uk-live.akamaized.net";
 const vector <string> kChannels = { "bbc_one_hd",          "bbc_two_hd",          "bbc_four_hd", // pa4
                                     "bbc_news_channel_hd", "bbc_one_scotland_hd", "s4cpbs",      // pa4
                                     "bbc_one_south_west",  "bbc_parliament" };                   // pa3
+//}}}
 
 //{{{
 class cVideoDecode {
@@ -206,7 +208,6 @@ public:
       mOk = true;
       }
     //}}}
-
     //{{{
     void clear() {
       mOk = false;
@@ -935,7 +936,8 @@ private:
           numSrcSamples = mSong.getSamplesPerFrame();
 
           if (mPlaying && framePtr) {
-            mVideoDecode->setPlayPts (framePtr->getPts());
+            if (mVideoDecode)
+              mVideoDecode->setPlayPts (framePtr->getPts());
             mSong.incPlayFrame (1, true);
             changed();
             }
