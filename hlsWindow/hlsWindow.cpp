@@ -66,7 +66,7 @@ public:
                             { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
                             &mBitmap);
         mBitmap->CopyFromMemory (&D2D1::RectU(0,0, frame->getWidth(),frame->getHeight()),
-                                 frame->getBgra(), frame->getWidth() * 4);
+                                 frame->get32(), frame->getWidth() * 4);
         }
       }
 
@@ -171,7 +171,7 @@ public:
           cLog::log (LOGINFO1, "decoded pts:%u %dx%d:%d",
                                surface->Data.TimeStamp, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
           auto frame = getFreeFrame (surface->Data.TimeStamp);
-          frame->setNv12 (surface->Data.Y, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
+          frame->setNv12mfx (surface->Data.Y, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
           }
         }
       }
