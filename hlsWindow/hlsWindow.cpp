@@ -16,13 +16,6 @@
 #include "../boxes/cLogBox.h"
 #include "../boxes/cWindowBox.h"
 
-#include "../mfx/include/mfxvideo++.h"
-#ifdef _DEBUG
-  #pragma comment (lib,"libmfx_d.lib")
-#else
-  #pragma comment (lib,"libmfx.lib")
-#endif
-
 #include "../../shared/utils/cVideoDecode.h"
 
 using namespace std;
@@ -94,120 +87,6 @@ private:
 
   ID2D1Bitmap* mBitmap = nullptr;
   uint64_t mPts = 0;
-  };
-//}}}
-//{{{
-class cMfxVideoDecode : public cVideoDecode {
-public:
-  //{{{
-  cMfxVideoDecode() : cVideoDecode() {
-
-    mfxVersion kMfxVersion = { 0,1 };
-    mSession.Init (MFX_IMPL_AUTO, &kMfxVersion);
-    }
-  //}}}
-  //{{{
-  virtual ~cMfxVideoDecode() {
-
-    MFXVideoDECODE_Close (mSession);
-
-    for (auto surface : mSurfacePool)
-      delete surface;
-    }
-  //}}}
-
-  int getSurfacePoolSize() { return (int)mSurfacePool.size(); }
-  //{{{
-  void decode (bool firstPts, uint64_t pts, uint8_t* pesBuffer, unsigned int pesBufferLen) {
-
-    mBitstream.Data = pesBuffer;
-    mBitstream.DataOffset = 0;
-    mBitstream.DataLength = pesBufferLen;
-    mBitstream.MaxLength = pesBufferLen;
-    mBitstream.TimeStamp = pts;
-
-    if (!mWidth) {
-      // firstTime, decode header, init decoder
-      memset (&mVideoParams, 0, sizeof(mVideoParams));
-      mVideoParams.mfx.CodecId = MFX_CODEC_AVC;
-      mVideoParams.IOPattern = MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
-      if (MFXVideoDECODE_DecodeHeader (mSession, &mBitstream, &mVideoParams) != MFX_ERR_NONE) {
-        cLog::log (LOGERROR, "MFXVideoDECODE_DecodeHeader failed");
-        return;
-        }
-
-      //  query surface for mWidth,mHeight
-      mfxFrameAllocRequest frameAllocRequest;
-      memset (&frameAllocRequest, 0, sizeof(frameAllocRequest));
-      if (MFXVideoDECODE_QueryIOSurf (mSession, &mVideoParams, &frameAllocRequest) != MFX_ERR_NONE) {
-        cLog::log (LOGERROR, "MFXVideoDECODE_QueryIOSurf failed");
-        return;
-        }
-      mWidth = ((mfxU32)((frameAllocRequest.Info.Width)+31)) & (~(mfxU32)31);
-      mHeight = frameAllocRequest.Info.Height;
-      // unsure why this was done ??? trace it back for height as well as width ???
-      //mHeight = ((mfxU32)((frameAllocRequest.Info.Height)+31)) & (~(mfxU32)31);
-
-      if (MFXVideoDECODE_Init (mSession, &mVideoParams) != MFX_ERR_NONE) {
-        cLog::log (LOGERROR, "MFXVideoDECODE_Init failed");
-        return;
-        }
-      }
-
-    // reset decoder on skip
-    //mfxStatus status = MFXVideoDECODE_Reset (mSession, &mVideoParams);
-
-    // decode video pes
-    // - could be none or multiple frames
-    // - returned by decode order, not presentation order
-    mfxStatus status = MFX_ERR_NONE;
-    while ((status >= MFX_ERR_NONE) || (status == MFX_ERR_MORE_SURFACE)) {
-      mfxFrameSurface1* surface = nullptr;
-      mfxSyncPoint syncDecode = nullptr;
-      status = MFXVideoDECODE_DecodeFrameAsync (mSession, &mBitstream, getFreeSurface(), &surface, &syncDecode);
-      if (status == MFX_ERR_NONE) {
-        status = mSession.SyncOperation (syncDecode, 60000);
-        if (status == MFX_ERR_NONE) {
-          cLog::log (LOGINFO1, "decoded pts:%u %dx%d:%d",
-                               surface->Data.TimeStamp, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
-          auto frame = getFreeFrame (surface->Data.TimeStamp);
-          frame->setNv12mfx (surface->Info.Width, surface->Info.Height, surface->Data.Y, surface->Data.Pitch);
-          }
-        }
-      }
-    }
-  //}}}
-
-private:
-  //{{{
-  mfxFrameSurface1* getFreeSurface() {
-  // return first unlocked surface, allocate new if none
-
-    // reuse any unlocked surface
-    for (auto surface : mSurfacePool)
-      if (!surface->Data.Locked)
-        return surface;
-
-    // allocate new surface
-    auto surface = new mfxFrameSurface1;
-    memset (surface, 0, sizeof (mfxFrameSurface1));
-    memcpy (&surface->Info, &mVideoParams.mfx.FrameInfo, sizeof(mfxFrameInfo));
-    surface->Data.Y = new mfxU8[mWidth * mHeight * 12 / 8];
-    surface->Data.U = surface->Data.Y + mWidth * mHeight;
-    surface->Data.V = nullptr; // NV12 ignores V pointer
-    surface->Data.Pitch = mWidth;
-    mSurfacePool.push_back (surface);
-
-    cLog::log (LOGINFO1, "allocating new mfxFrameSurface1");
-
-    return nullptr;
-    }
-  //}}}
-
-  MFXVideoSession mSession;
-  mfxVideoParam mVideoParams;
-  mfxBitstream mBitstream;
-  vector <mfxFrameSurface1*> mSurfacePool;
   };
 //}}}
 
