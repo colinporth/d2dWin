@@ -171,7 +171,7 @@ public:
           cLog::log (LOGINFO1, "decoded pts:%u %dx%d:%d",
                                surface->Data.TimeStamp, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
           auto frame = getFreeFrame (surface->Data.TimeStamp);
-          frame->setNv12mfx (surface->Data.Y, surface->Info.Width, surface->Info.Height, surface->Data.Pitch);
+          frame->setNv12mfx (surface->Info.Width, surface->Info.Height, surface->Data.Y, surface->Data.Pitch);
           }
         }
       }
@@ -220,6 +220,7 @@ public:
 
     mVideoDecode = new cMfxVideoDecode();
     //mVideoDecode = new cFFmpegVideoDecode();
+
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
 
     add (new cClockBox (this, 40.f), -135.f,35.f);
