@@ -47,7 +47,7 @@ public:
         mPts = frame->getPts();
         if (mBitmap)  {
           auto pixelSize = mBitmap->GetPixelSize();
-          if ((pixelSize.width != frame->getWidth()) || (pixelSize.height != frame->getHeight())) {
+          if ((pixelSize.width != mVideoDecode->getWidth()) || (pixelSize.height != mVideoDecode->getHeight())) {
             // bitmap size changed, remove and recreate
             mBitmap->Release();
             mBitmap = nullptr;
@@ -55,11 +55,11 @@ public:
           }
 
         if (!mBitmap)
-          dc->CreateBitmap (D2D1::SizeU(frame->getWidth(), frame->getHeight()),
+          dc->CreateBitmap (D2D1::SizeU(mVideoDecode->getWidth(), mVideoDecode->getHeight()),
                             { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
                             &mBitmap);
-        mBitmap->CopyFromMemory (&D2D1::RectU(0,0, frame->getWidth(),frame->getHeight()),
-                                 frame->get32(), frame->getWidth() * 4);
+        mBitmap->CopyFromMemory (&D2D1::RectU(0,0, mVideoDecode->getWidth(),mVideoDecode->getHeight()),
+                                 frame->get32(), mVideoDecode->getWidth() * 4);
         }
       }
 
