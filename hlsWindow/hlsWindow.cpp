@@ -70,10 +70,10 @@ public:
       }
 
     // info string
-    string str = dec(mVideoDecode->getFramePoolSize()) +
-                 " " + dec(mVideoDecode->getSurfacePoolSize()) +
-                 " " + dec(mVideoDecode->getWidth()) +
-                 "x" + dec(mVideoDecode->getHeight());
+    string str = dec(mVideoDecode->getWidth()) +
+                 "x" + dec(mVideoDecode->getHeight()) +
+                 " " + dec(mVideoDecode->getFramePoolSize());
+
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
       std::wstring (str.begin(), str.end()).data(), (uint32_t)str.size(),
