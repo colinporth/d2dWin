@@ -266,7 +266,6 @@ private:
         cAudioDecode audioDecode (cAudioDecode::eAac);
 
         thread player;
-        bool firstTime = true;
         bool firstPts = true;
         mSongChanged = false;
         while (!getExit() && !mSongChanged) {
@@ -278,7 +277,7 @@ private:
               //{{{  process audio first
               int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
 
-              uint64_t pts = 0;
+              uint64_t pesPts = 0;
 
               // parse ts packets
               uint8_t* ts = http.getContent();
@@ -302,17 +301,13 @@ private:
                         // several aacFrames per audio pes
                         float* samples = audioDecode.decodeFrame (seqFrameNum);
                         if (samples) {
-                          if (firstTime)
-                            mSong.setFixups (audioDecode.getNumChannels(), audioDecode.getSampleRate(), audioDecode.getNumSamples());
-                          mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, pts);
-                          pts += (audioDecode.getNumSamples() * 90) / 48;
+                          mSong.setFixups (audioDecode.getNumChannels(), audioDecode.getSampleRate(), audioDecode.getNumSamples());
+                          mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, pesPts);
+                          pesPts += (audioDecode.getNumSamples() * 90) / 48;
                           changed();
 
-                          if (firstTime) {
-                            // launch player
-                            firstTime = false;
+                          if (!player.joinable())
                             player = thread ([=](){ playThread (true); });
-                            }
                           }
 
                         pesBufferPtr += audioDecode.getNextFrameOffset();
@@ -323,7 +318,7 @@ private:
                       //}}}
 
                     if (ts[7] & 0x80)
-                      pts = getPts (ts+9);
+                      pesPts = getPts (ts+9);
 
                     // skip header
                     int pesHeaderBytes = 9 + ts[8];
@@ -349,8 +344,9 @@ private:
                   // several aacFrames per audio pes
                   float* samples = audioDecode.decodeFrame (seqFrameNum);
                   if (samples) {
-                    mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, pts);
-                    pts += (audioDecode.getNumSamples() * 90) / 48;
+                    mSong.setFixups (audioDecode.getNumChannels(), audioDecode.getSampleRate(), audioDecode.getNumSamples());
+                    mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, pesPts);
+                    pesPts += (audioDecode.getNumSamples() * 90) / 48;
                     changed();
                     }
 
@@ -377,13 +373,13 @@ private:
                   if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
                     if (pesBufferLen) {
                       // process prev videoPes
-                      mVideoDecode->decode (firstPts, pts, pesBuffer, pesBufferLen);
+                      mVideoDecode->decode (pesBuffer, pesBufferLen, firstPts, pesPts);
                       firstPts = false;
                       pesBufferLen = 0;
                       }
 
                     if (ts[7] & 0x80)
-                      pts = getPts (ts+9);
+                      pesPts = getPts (ts+9);
 
                     // skip header
                     int pesHeaderBytes = 9 + ts[8];
@@ -402,7 +398,7 @@ private:
 
               if (pesBufferLen) {
                 // process last videoPes
-                mVideoDecode->decode (firstPts, pts, pesBuffer, pesBufferLen);
+                mVideoDecode->decode (pesBuffer, pesBufferLen, firstPts, pesPts);
                 pesBufferLen = 0;
                 }
               //}}}
