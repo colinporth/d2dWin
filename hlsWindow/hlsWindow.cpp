@@ -108,7 +108,7 @@ public:
     init (title, width, height, false);
     setChangeCountDown (0); // refresh evry frame
 
-    initPlayer (kChannels[channelNum], false); // use mfx decoder
+    initPlayer (kHost, kChannels[channelNum], audBitrate, vidBitrate, true, false); // use mfx decoder
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
 
     add (new cClockBox (this, 40.f), -135.f,35.f);
@@ -117,7 +117,7 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     // startup
-    thread ([=](){ hlsThread (kHost, kChannels[channelNum], audBitrate, vidBitrate); }).detach();
+    thread ([=](){ hlsThread(); }).detach();
 
     // loop till quit
     messagePump();
