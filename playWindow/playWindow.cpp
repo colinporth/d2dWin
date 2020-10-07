@@ -72,17 +72,17 @@ public:
     if (names.empty()) {
       //{{{  add radio 1..6 with action lambda
       add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[0]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[0]); mSong->setChanged (true); } ));
       addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[1]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[1]); mSong->setChanged (true); } ));
       addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[2]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[2]); mSong->setChanged (true);} ));
       addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[3]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[3]); mSong->setChanged (true); } ));
       addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[4]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[4]); mSong->setChanged (true); } ));
       addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[5]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[5]); mSong->setChanged (true); } ));
 
       mBitrateStr = "48k aacHE";
       addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
@@ -106,7 +106,7 @@ public:
             mBitrateStr = "48k aacHE";
             break;
           }
-        mSongChanged = true;
+        mSong->setChanged (true);
         }
         //}}}
         ), 4.f);
@@ -135,7 +135,7 @@ public:
           auto listBox = (cStringListBox*)box;
           mSong->clear();
           mUrl = string;
-          mSongChanged = true;
+          mSong->setChanged (true);
           cLog::log (LOGINFO, "listBox" + string);
           }
           ))->setPin (true);
@@ -152,7 +152,7 @@ public:
 
         if (!mFileList->empty()) {
           add (new cFileListBox (this, 0.f,-200.f, mFileList, [&](cFileListBox* box, int index){
-            mSong->clear(); mSongChanged = true; }))->setPin (true);
+            mSong->clear(); mSong->setChanged (true); }))->setPin (true);
 
           mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
           addFront (mJpegImageView);
@@ -206,19 +206,19 @@ protected:
 
       case 0x2e: mSong->getSelect().clearAll(); break;; // delete select
 
-      case 0x0d: mSongChanged = true; break; // enter
+      case 0x0d: mSong->setChanged (true); break; // enter
 
       // crude chan,bitrate change
-      case '1' : mSong->clear(); mSong->setChannel ("bbc_radio_one"); mSongChanged = true; break;
-      case '2' : mSong->clear(); mSong->setChannel("bbc_radio_two"); mSongChanged = true; break;
-      case '3' : mSong->clear(); mSong->setChannel("bbc_radio_three"); mSongChanged = true; break;
-      case '4' : mSong->clear(); mSong->setChannel("bbc_radio_fourfm"); mSongChanged = true;  break;
-      case '5' : mSong->clear(); mSong->setChannel("bbc_radio_five_live"); mSongChanged = true; break;
-      case '6' : mSong->clear(); mSong->setChannel("bbc_6music"); mSongChanged = true; break;
-      case '7' : mSong->clear(); mSong->setBitrate (48000, 150); mBitrateStr = "48k aacHE"; mSongChanged = true; break;
-      case '8' : mSong->clear(); mSong->setBitrate (96000, 150); mBitrateStr = "96k aacHE"; mSongChanged = true; break;
-      case '9' : mSong->clear(); mSong->setBitrate (128000, 300); mBitrateStr = "128k aac"; mSongChanged = true; break;
-      case '0' : mSong->clear(); mSong->setBitrate (320000, 300); mBitrateStr = "320k aac"; mSongChanged = true; break;
+      case '1' : mSong->clear(); mSong->setChannel ("bbc_radio_one"); mSong->setChanged (true); break;
+      case '2' : mSong->clear(); mSong->setChannel("bbc_radio_two"); mSong->setChanged (true); break;
+      case '3' : mSong->clear(); mSong->setChannel("bbc_radio_three"); mSong->setChanged (true); break;
+      case '4' : mSong->clear(); mSong->setChannel("bbc_radio_fourfm"); mSong->setChanged (true); break;
+      case '5' : mSong->clear(); mSong->setChannel("bbc_radio_five_live"); mSong->setChanged (true); break;
+      case '6' : mSong->clear(); mSong->setChannel("bbc_6music"); mSong->setChanged (true); break;
+      case '7' : mSong->clear(); mSong->setBitrate (48000, 150); mBitrateStr = "48k aacHE"; mSong->setChanged (true); break;
+      case '8' : mSong->clear(); mSong->setBitrate (96000, 150); mBitrateStr = "96k aacHE"; mSong->setChanged (true); break;
+      case '9' : mSong->clear(); mSong->setBitrate (128000, 300); mBitrateStr = "128k aac"; mSong->setChanged (true); break;
+      case '0' : mSong->clear(); mSong->setBitrate (320000, 300); mBitrateStr = "320k aac"; mSong->setChanged (true); break;
 
       default  : cLog::log (LOGINFO, "key %x", key); break;
       }
@@ -339,8 +339,8 @@ private:
 
         thread player;
         bool firstTime = true;
-        mSongChanged = false;
-        while (!getExit() && !mSongChanged) {
+        mSong->setChanged (false);;
+        while (!getExit() && !mSong->getChanged()) {
           auto chunkNum = mSong->getHlsLoadChunkNum (getNowRaw(), 12s, kHlsPreload);
           if (chunkNum) {
             // get hls chunkNum chunk
@@ -406,7 +406,7 @@ private:
       cAudioDecode decode (cAudioDecode::eAac);
 
       thread player;
-      mSongChanged = false;
+      mSong->setChanged (false);
 
       cPlatformHttp http;
       cUrl parsedUrl;
@@ -457,7 +457,7 @@ private:
                 }
               }
 
-            return !getExit() && !mSongChanged;
+            return !getExit() && !mSong->getChanged();
             }
             //}}}
 
@@ -490,7 +490,7 @@ private:
             buffer = bufferFirst;
             }
 
-          return !getExit() && !mSongChanged;
+          return !getExit() && !mSong->getChanged();
           }
         //}}}
         );
@@ -542,7 +542,7 @@ private:
         mSong->init (frameType, 2, sampleRate, frameSamples);
         decode.parseFrame (fileMapPtr, fileMapEnd);
         auto samples = decode.getFramePtr();
-        while (!getExit() && !mSongChanged && ((samples + (frameSamples * 2 * sizeof(float))) <= fileMapEnd)) {
+        while (!getExit() && !mSong->getChanged() && ((samples + (frameSamples * 2 * sizeof(float))) <= fileMapEnd)) {
           mSong->addAudioFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
           samples += frameSamples * 2 * sizeof(float);
           if (frameNum == 1)
@@ -553,7 +553,7 @@ private:
       else {
         //{{{  parse coded
         mSong->init (frameType, 2, sampleRate, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
-        while (!getExit() && !mSongChanged && decode.parseFrame (fileMapPtr, fileMapEnd)) {
+        while (!getExit() && !mSong->getChanged() && decode.parseFrame (fileMapPtr, fileMapEnd)) {
           if (decode.getFrameType() == mSong->getFrameType()) {
             auto samples = decode.decodeFrame (frameNum);
             if (samples) {
@@ -577,8 +577,8 @@ private:
       UnmapViewOfFile (fileMapFirst);
       CloseHandle (fileHandle);
 
-      if (mSongChanged) // use changed fileIndex
-        mSongChanged = false;
+      if (mSong->getChanged()) // use changed fileIndex
+        mSong->setChanged (false);
       else if (!mFileList->nextIndex())
         setExit();
       //}}}
@@ -603,7 +603,7 @@ private:
       cAudioDecode decode (mSong->getFrameType());
 
       device->start();
-      while (!getExit() && !mSongChanged) {
+      while (!getExit() && !mSong->getChanged()) {
         device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
           // lambda callback - load srcSamples
           shared_lock<shared_mutex> lock (mSong->getSharedMutex());
@@ -645,8 +645,6 @@ private:
 
   //{{{  vars
   cSong* mSong;
-  bool mSongChanged = false;
-
   bool mPlaying = true;
 
   string mBitrateStr;
