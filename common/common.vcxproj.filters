@@ -31,9 +31,6 @@
     <ClInclude Include="..\..\shared\utils\iAudio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\cWinAudio32.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\kissFft\kiss_fft.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -49,9 +46,6 @@
     <ClInclude Include="..\..\shared\format\format.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\cWinAudio16.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cD2dWindow.cpp" />
@@ -60,7 +54,5 @@
     <ClCompile Include="..\..\shared\kissFft\kiss_fft.c" />
     <ClCompile Include="..\..\shared\kissFft\kiss_fftr.c" />
     <ClCompile Include="..\..\shared\format\format.cpp" />
-    <ClCompile Include="..\..\shared\audio\cWinAudio16.cpp" />
-    <ClCompile Include="..\..\shared\audio\cWinAudio32.cpp" />
   </ItemGroup>
 </Project>

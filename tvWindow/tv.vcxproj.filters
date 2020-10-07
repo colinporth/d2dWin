@@ -5,6 +5,7 @@
     <ClCompile Include="cPlayView.cpp" />
     <ClCompile Include="..\..\shared\dvb\cTransportStream.cpp" />
     <ClCompile Include="tvWindow.cpp" />
+    <ClCompile Include="..\..\shared\audio\cWinAudio32.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\utils\utils.h">
@@ -46,13 +47,13 @@
     <ClInclude Include="..\..\shared\date\date.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\shared\utils\cWinAudio16.h">
-      <Filter>header</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\shared\dvb\huffmanTables.h">
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\dvb\cSubtitleDecoder.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\audio\cWinAudio32.h">
       <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>
