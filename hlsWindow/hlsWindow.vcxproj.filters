@@ -8,6 +8,7 @@
     <ClCompile Include="hlsWindow.cpp" />
     <ClCompile Include="..\..\shared\decoders\cMp3Decoder.cpp" />
     <ClCompile Include="..\..\shared\utils\cSong.cpp" />
+    <ClCompile Include="..\..\shared\hls\cHlsPlayer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">
@@ -109,6 +110,9 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\utils\cVideoDecode.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\hls\cHlsPlayer.h">
       <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>

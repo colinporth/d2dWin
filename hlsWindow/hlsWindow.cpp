@@ -3,13 +3,6 @@
 #include "stdafx.h"
 #include <shellapi.h>
 
-#include "../../shared/utils/cSong.h"
-
-#include "../../shared/decoders/cAudioDecode.h"
-#include "../../shared/audio/audioWASAPI.h"
-
-#include "../../shared/net/cWinSockHttp.h"
-
 #include "../common/cD2dWindow.h"
 #include "../boxes/cClockBox.h"
 #include "../boxes/cSongBox.h"
@@ -17,6 +10,8 @@
 #include "../boxes/cWindowBox.h"
 
 #include "../../shared/utils/cVideoDecode.h"
+
+#include "../../shared/hls/cHlsPlayer.h"
 
 using namespace std;
 using namespace chrono;
@@ -90,16 +85,15 @@ private:
   };
 //}}}
 
-class cAppWindow : public cD2dWindow {
+class cAppWindow : public cD2dWindow, public cHlsPlayer {
 public:
   //{{{
   void run (const string& title, int width, int height, int channelNum, int audBitrate, int vidBitrate) {
 
     init (title, width, height, false);
+    setChangeCountDown (0); // refresh evry frame
 
-    mVideoDecode = new cMfxVideoDecode();
-    //mVideoDecode = new cFFmpegVideoDecode();
-
+    initPlayer (kChannels[channelNum], false); // use mfx decoder
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
 
     add (new cClockBox (this, 40.f), -135.f,35.f);
@@ -129,39 +123,39 @@ protected:
 
       //{{{
       case 'M':  // mark
-        mSong.getSelect().addMark (mSong.getPlayFrame());
+        mSong->getSelect().addMark (mSong->getPlayFrame());
         changed();
         break;
 
       //}}}
       //{{{
       case 0x21: {// page up - back one hour
-        mSong.incPlaySec (-60*60, false);
-        auto framePtr = mSong.getAudioFramePtr(mSong.getPlayFrame());
+        mSong->incPlaySec (-60*60, false);
+        auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
         if (framePtr) {
           mVideoDecode->setPlayPts (framePtr->getPts());
           mVideoDecode->clear(framePtr->getPts());
-          }  
+          }
         changed();
         break;
         }
       //}}}
       //{{{
       case 0x22: {// page down - forward one hour
-        mSong.incPlaySec (60*60, false);
-        auto framePtr = mSong.getAudioFramePtr(mSong.getPlayFrame());
+        mSong->incPlaySec (60*60, false);
+        auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
         if (framePtr) {
           mVideoDecode->setPlayPts(framePtr->getPts());
           mVideoDecode->clear(framePtr->getPts());
           }
         changed();
         break;
-        } 
+        }
       //}}}
       //{{{
       case 0x25: {// left  arrow -1s, ctrl -10s, shift -5m
-        mSong.incPlaySec (-(getShift() ? 300 : getControl() ? 10 : 1), false);
-        auto framePtr = mSong.getAudioFramePtr(mSong.getPlayFrame());
+        mSong->incPlaySec (-(getShift() ? 300 : getControl() ? 10 : 1), false);
+        auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
         if (framePtr) {
           mVideoDecode->setPlayPts(framePtr->getPts());
           mVideoDecode->clear(framePtr->getPts());
@@ -172,8 +166,8 @@ protected:
       //}}}
       //{{{
       case 0x27: {// right arrow +1s, ctrl +10s, shift +5m
-        mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);
-        auto framePtr = mSong.getAudioFramePtr(mSong.getPlayFrame());
+        mSong->incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);
+        auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
         if (framePtr) {
           mVideoDecode->setPlayPts(framePtr->getPts());
           mVideoDecode->clear(framePtr->getPts());
@@ -184,21 +178,21 @@ protected:
       //}}}
       //{{{
       case 0x24: // home
-        mSong.setPlayFrame (
-        mSong.getSelect().empty() ? mSong.getFirstFrame() : mSong.getSelect().getFirstFrame());
+        mSong->setPlayFrame (
+        mSong->getSelect().empty() ? mSong->getFirstFrame() : mSong->getSelect().getFirstFrame());
         changed();
         break;
       //}}}
       //{{{
       case 0x23: // end
-        mSong.setPlayFrame (
-        mSong.getSelect().empty() ? mSong.getLastFrame() : mSong.getSelect().getLastFrame());
+        mSong->setPlayFrame (
+        mSong->getSelect().empty() ? mSong->getLastFrame() : mSong->getSelect().getLastFrame());
         changed();
         break;
       //}}}
       //{{{
       case 0x2e: // delete select
-        mSong.getSelect().clearAll(); changed();
+        mSong->getSelect().clearAll(); changed();
         break;
       //}}}
       //{{{
@@ -212,304 +206,7 @@ protected:
     return false;
     }
   //}}}
-
-private:
-  //{{{
-  static uint64_t getPts (uint8_t* ts) {
-  // return 33 bits of pts,dts
-
-    if ((ts[0] & 0x01) && (ts[2] & 0x01) && (ts[4] & 0x01)) {
-      // valid marker bits
-      uint64_t pts = ts[0] & 0x0E;
-      pts = (pts << 7) | ts[1];
-      pts = (pts << 8) | (ts[2] & 0xFE);
-      pts = (pts << 7) | ts[3];
-      pts = (pts << 7) | (ts[4] >> 1);
-      return pts;
-      }
-    else {
-      cLog::log (LOGERROR, "getPts marker bits - %02x %02x %02x %02x 0x02", ts[0], ts[1], ts[2], ts[3], ts[4]);
-      return 0;
-      }
-    }
-  //}}}
-  //{{{
-  static string getTagValue (uint8_t* buffer, const char* tag) {
-
-    const char* tagPtr = strstr ((char*)buffer, tag);
-    const char* valuePtr = tagPtr + strlen (tag);
-    const char* endPtr = strchr (valuePtr, '\n');
-
-    return string (valuePtr, endPtr - valuePtr);
-    }
-  //}}}
-
-  //{{{
-  void hlsThread (const string& host, const string& channel, int audBitrate, int vidBitrate) {
-  // hls http chunk load and decode thread
-
-    cLog::setThreadName ("hls ");
-
-    constexpr int kHlsPreload = 2;
-
-    uint8_t* pesBuffer = nullptr;
-    int pesBufferLen = 0;
-
-    mSong.setChannel (channel);
-    mSong.setBitrate (audBitrate, audBitrate < 128000 ? 180 : 360); // audBitrate, audioFrames per chunk
-
-    while (!getExit()) {
-      const string path = "pool_902/live/uk/" + mSong.getChannel() +
-                          "/" + mSong.getChannel() +
-                          ".isml/" + mSong.getChannel() +
-                          (mSong.getBitrate() < 128000 ? "-pa3=" : "-pa4=") + dec(mSong.getBitrate()) +
-                          "-video=" + dec(vidBitrate);
-      cPlatformHttp http;
-      string redirectedHost = http.getRedirect (host, path + ".m3u8");
-      if (http.getContent()) {
-        //{{{  got .m3u8, parse for mediaSequence, programDateTimePoint
-        int mediaSequence = stoi (getTagValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
-
-        istringstream inputStream (getTagValue (http.getContent(), "#EXT-X-PROGRAM-DATE-TIME:"));
-        system_clock::time_point programDateTimePoint;
-        inputStream >> date::parse ("%FT%T", programDateTimePoint);
-
-        http.freeContent();
-        //}}}
-
-        mSong.init (cAudioDecode::eAac, 2, 48000, mSong.getBitrate() < 128000 ? 2048 : 1024); // samplesPerFrame
-        mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s, (2*60*60) - 30);
-        cAudioDecode audioDecode (cAudioDecode::eAac);
-
-        thread player;
-        bool firstPts = true;
-        mSongChanged = false;
-        while (!getExit() && !mSongChanged) {
-          int chunkNum = mSong.getHlsLoadChunkNum (system_clock::now(), 12s, kHlsPreload);
-          if (chunkNum) {
-            // get hls chunkNum chunk
-            mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
-            if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
-              //{{{  process audio first
-              int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
-
-              uint64_t pesPts = 0;
-
-              // parse ts packets
-              uint8_t* ts = http.getContent();
-              uint8_t* tsEnd = ts + http.getContentSize();
-              while ((ts < tsEnd) && (*ts++ == 0x47)) {
-                auto payStart = ts[0] & 0x40;
-                auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
-                auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
-                ts += headerBytes;
-                auto tsBodyBytes = 187 - headerBytes;
-
-                if (pid == 34) {
-                  // audio pid
-                  if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xC0)) {
-                    if (pesBufferLen) {
-                      //{{{  process prev audioPes
-                      uint8_t* pesBufferPtr = pesBuffer;
-                      uint8_t* pesBufferEnd = pesBuffer + pesBufferLen;
-
-                      while (audioDecode.parseFrame (pesBufferPtr, pesBufferEnd)) {
-                        // several aacFrames per audio pes
-                        float* samples = audioDecode.decodeFrame (seqFrameNum);
-                        if (samples) {
-                          mSong.setFixups (audioDecode.getNumChannels(), audioDecode.getSampleRate(), audioDecode.getNumSamples());
-                          mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, pesPts);
-                          pesPts += (audioDecode.getNumSamples() * 90) / 48;
-                          changed();
-
-                          if (!player.joinable())
-                            player = thread ([=](){ playThread (true); });
-                          }
-
-                        pesBufferPtr += audioDecode.getNextFrameOffset();
-                        }
-
-                      pesBufferLen = 0;
-                      }
-                      //}}}
-
-                    if (ts[7] & 0x80)
-                      pesPts = getPts (ts+9);
-
-                    // skip header
-                    int pesHeaderBytes = 9 + ts[8];
-                    ts += pesHeaderBytes;
-                    tsBodyBytes -= pesHeaderBytes;
-                    }
-
-                  // copy ts payload into pesBuffer
-                  pesBuffer = (uint8_t*)realloc (pesBuffer, pesBufferLen + tsBodyBytes);
-                  memcpy (pesBuffer + pesBufferLen, ts, tsBodyBytes);
-                  pesBufferLen += tsBodyBytes;
-                  }
-
-                ts += tsBodyBytes;
-                }
-
-              if (pesBufferLen) {
-                //{{{  process last audioPes
-                uint8_t* pesBufferPtr = pesBuffer;
-                uint8_t* pesBufferEnd = pesBuffer + pesBufferLen;
-
-                while (audioDecode.parseFrame (pesBufferPtr, pesBufferEnd)) {
-                  // several aacFrames per audio pes
-                  float* samples = audioDecode.decodeFrame (seqFrameNum);
-                  if (samples) {
-                    mSong.setFixups (audioDecode.getNumChannels(), audioDecode.getSampleRate(), audioDecode.getNumSamples());
-                    mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames(), nullptr, pesPts);
-                    pesPts += (audioDecode.getNumSamples() * 90) / 48;
-                    changed();
-                    }
-
-                  pesBufferPtr += audioDecode.getNextFrameOffset();
-                  }
-
-                pesBufferLen = 0;
-                }
-                //}}}
-              //}}}
-              mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
-              //{{{  process video second, may block waiting for free videoFrames
-              // parse ts packets
-              ts = http.getContent();
-              while ((ts < tsEnd) && (*ts++ == 0x47)) {
-                auto payStart = ts[0] & 0x40;
-                auto pid = ((ts[0] & 0x1F) << 8) | ts[1];
-                auto headerBytes = (ts[2] & 0x20) ? 4 + ts[3] : 3;
-                ts += headerBytes;
-                auto tsBodyBytes = 187 - headerBytes;
-
-                if (pid == 33) {
-                  //  video pid
-                  if (payStart && !ts[0] && !ts[1] && (ts[2] == 1) && (ts[3] == 0xe0)) {
-                    if (pesBufferLen) {
-                      // process prev videoPes
-                      mVideoDecode->decode (pesBuffer, pesBufferLen, firstPts, pesPts);
-                      firstPts = false;
-                      pesBufferLen = 0;
-                      }
-
-                    if (ts[7] & 0x80)
-                      pesPts = getPts (ts+9);
-
-                    // skip header
-                    int pesHeaderBytes = 9 + ts[8];
-                    ts += pesHeaderBytes;
-                    tsBodyBytes -= pesHeaderBytes;
-                    }
-
-                  // copy ts payload into pesBuffer
-                  pesBuffer = (uint8_t*)realloc (pesBuffer, pesBufferLen + tsBodyBytes);
-                  memcpy (pesBuffer + pesBufferLen, ts, tsBodyBytes);
-                  pesBufferLen += tsBodyBytes;
-                  }
-
-                ts += tsBodyBytes;
-                }
-
-              if (pesBufferLen) {
-                // process last videoPes
-                mVideoDecode->decode (pesBuffer, pesBufferLen, firstPts, pesPts);
-                pesBufferLen = 0;
-                }
-              //}}}
-              http.freeContent();
-              }
-            else {
-              //{{{  failed to load expected available chunk, back off for 250ms
-              mSong.setHlsLoad (cSong::eHlsFailed, chunkNum);
-              changed();
-
-              cLog::log (LOGERROR, "late " + dec(chunkNum));
-              this_thread::sleep_for (250ms);
-              }
-              //}}}
-            }
-          else // no chunk available, back off for 100ms
-            this_thread::sleep_for (100ms);
-          }
-        player.join();
-        }
-      }
-
-    free (pesBuffer);
-    cLog::log (LOGINFO, "exit");
-    }
-  //}}}
-  //{{{
-  void playThread (bool streaming) {
-  // audio player thread, video just follows play pts
-
-    cLog::setThreadName ("play");
-    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
-
-    float silence [2048*2] = { 0.f };
-    float samples [2048*2] = { 0.f };
-
-    auto device = getDefaultAudioOutputDevice();
-    if (device) {
-      cLog::log (LOGINFO, "device @ %d", mSong.getSampleRate());
-      device->setSampleRate (mSong.getSampleRate());
-      cAudioDecode decode (mSong.getFrameType());
-
-      device->start();
-      while (!getExit() && !mSongChanged) {
-        device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
-          // lambda callback - load srcSamples
-          shared_lock<shared_mutex> lock (mSong.getSharedMutex());
-
-          auto framePtr = mSong.getAudioFramePtr (mSong.getPlayFrame());
-          if (mPlaying && framePtr && framePtr->getSamples()) {
-            if (mSong.getNumChannels() == 1) {
-              //{{{  mono to stereo
-              auto src = framePtr->getSamples();
-              auto dst = samples;
-              for (int i = 0; i < mSong.getSamplesPerFrame(); i++) {
-                *dst++ = *src;
-                *dst++ = *src++;
-                }
-              }
-              //}}}
-            else
-              memcpy (samples, framePtr->getSamples(), mSong.getSamplesPerFrame() * mSong.getNumChannels() * sizeof(float));
-            srcSamples = samples;
-            }
-          else
-            srcSamples = silence;
-          numSrcSamples = mSong.getSamplesPerFrame();
-
-          if (mPlaying && framePtr) {
-            if (mVideoDecode)
-              mVideoDecode->setPlayPts (framePtr->getPts());
-            mSong.incPlayFrame (1, true);
-            changed();
-            }
-          });
-
-        if (!streaming && (mSong.getPlayFrame() > mSong.getLastFrame()))
-          break;
-        }
-
-      device->stop();
-      }
-
-    cLog::log (LOGINFO, "exit");
-    }
-  //}}}
-
-  //{{{  vars
-  cSong mSong;
-  bool mSongChanged = false;
-  bool mPlaying = true;
   cBox* mLogBox = nullptr;
-
-  cVideoDecode* mVideoDecode = nullptr;
-  //}}}
   };
 
 // main

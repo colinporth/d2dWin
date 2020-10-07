@@ -12,7 +12,7 @@
 class cSongBox : public cD2dWindow::cBox {
 public:
   //{{{
-  cSongBox (cD2dWindow* window, float width, float height, cSong& song) :
+  cSongBox (cD2dWindow* window, float width, float height, cSong* song) :
       cBox("songBox", window, width, height), mSong(song) {
 
     mPin = true;
@@ -60,22 +60,22 @@ public:
   //{{{
   bool onDown (bool right, cPoint pos)  {
 
-    //std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
+    //std::shared_lock<std::shared_mutex> lock (mSong->getSharedMutex());
     if (pos.y > mDstOverviewTop) {
-      auto frame = mSong.getFirstFrame() + int((pos.x * mSong.getTotalFrames()) / getWidth());
-      mSong.setPlayFrame (frame);
+      auto frame = mSong->getFirstFrame() + int((pos.x * mSong->getTotalFrames()) / getWidth());
+      mSong->setPlayFrame (frame);
       mOverviewPressed = true;
       }
 
     else if (pos.y > mDstRangeTop) {
-      mPressedFrame = mSong.getPlayFrame() + ((pos.x - (getWidth()/2.f)) * mFrameStep / mFrameWidth);
-      mSong.getSelect().start (int(mPressedFrame));
+      mPressedFrame = mSong->getPlayFrame() + ((pos.x - (getWidth()/2.f)) * mFrameStep / mFrameWidth);
+      mSong->getSelect().start (int(mPressedFrame));
       mRangePressed = true;
       mWindow->changed();
       }
 
     else
-      mPressedFrame = (float)mSong.getPlayFrame();
+      mPressedFrame = (float)mSong->getPlayFrame();
 
     return true;
     }
@@ -83,19 +83,19 @@ public:
   //{{{
   bool onMove (bool right, cPoint pos, cPoint inc) {
 
-    //std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
+    //std::shared_lock<std::shared_mutex> lock (mSong->getSharedMutex());
     if (mOverviewPressed)
-      mSong.setPlayFrame (mSong.getFirstFrame() + int((pos.x * mSong.getTotalFrames()) / getWidth()));
+      mSong->setPlayFrame (mSong->getFirstFrame() + int((pos.x * mSong->getTotalFrames()) / getWidth()));
 
     else if (mRangePressed) {
       mPressedFrame += (inc.x / mFrameWidth) * mFrameStep;
-      mSong.getSelect().move ((int)mPressedFrame);
+      mSong->getSelect().move ((int)mPressedFrame);
       mWindow->changed();
       }
 
     else {
       mPressedFrame -= (inc.x / mFrameWidth) * mFrameStep;
-      mSong.setPlayFrame ((int)mPressedFrame);
+      mSong->setPlayFrame ((int)mPressedFrame);
       }
 
     return true;
@@ -104,7 +104,7 @@ public:
   //{{{
   bool onUp (bool right, bool mouseMoved, cPoint pos) {
 
-    mSong.getSelect().end();
+    mSong->getSelect().end();
     mOverviewPressed = false;
     mRangePressed = false;
     return true;
@@ -156,38 +156,38 @@ public:
     //}}}
 
     // lock
-    std::shared_lock<std::shared_mutex> lock (mSong.getSharedMutex());
+    std::shared_lock<std::shared_mutex> lock (mSong->getSharedMutex());
 
     reallocBitmap (mWindow->getDc());
 
-    if (mSong.getId() != mSongLastId) {
+    if (mSong->getId() != mSongLastId) {
       mFramesBitmapOk = false;
       mOverviewBitmapOk = false;
-      mSongLastId = mSong.getId();
+      mSongLastId = mSong->getId();
       }
 
     // draw
-    auto playFrame = mSong.getPlayFrame();
+    auto playFrame = mSong->getPlayFrame();
 
     // wave left right frames, clip right not left
     auto leftWaveFrame = playFrame - (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
     auto rightWaveFrame = playFrame + (((getWidthInt()+mFrameWidth)/2) * mFrameStep) / mFrameWidth;
-    rightWaveFrame = std::min (rightWaveFrame, mSong.getLastFrame());
-    bool mono = mSong.getNumChannels() == 1;
+    rightWaveFrame = std::min (rightWaveFrame, mSong->getLastFrame());
+    bool mono = mSong->getNumChannels() == 1;
 
     drawRange (dc, playFrame, leftWaveFrame, rightWaveFrame);
 
-    if (mSong.getNumFrames()) {
+    if (mSong->getNumFrames()) {
       drawWave (dc, playFrame, leftWaveFrame, rightWaveFrame, mono);
       drawOverview (dc, playFrame, mono);
       drawFreq (dc, playFrame);
       }
 
-    if (mSong.hasHlsBase())
-      drawTime (dc, getFrameString (mSong.getFirstFrame()),
-                    getFrameString (mSong.getPlayFrame()), getFrameString (mSong.getLastFrame()));
+    if (mSong->hasHlsBase())
+      drawTime (dc, getFrameString (mSong->getFirstFrame()),
+                    getFrameString (mSong->getPlayFrame()), getFrameString (mSong->getLastFrame()));
     else
-      drawTime (dc, L"", getFrameString (mSong.getPlayFrame()), getFrameString (mSong.getTotalFrames()));
+      drawTime (dc, L"", getFrameString (mSong->getPlayFrame()), getFrameString (mSong->getTotalFrames()));
     }
   //}}}
 
@@ -209,9 +209,9 @@ private:
   //{{{
   std::wstring getFrameString (int frame) {
 
-    if (mSong.getSamplesPerFrame() && mSong.getSampleRate()) {
+    if (mSong->getSamplesPerFrame() && mSong->getSampleRate()) {
       // can turn frame into seconds
-      auto value = ((uint64_t)frame * mSong.getSamplesPerFrame()) / (mSong.getSampleRate() / 100);
+      auto value = ((uint64_t)frame * mSong->getSamplesPerFrame()) / (mSong->getSampleRate() / 100);
       auto subSeconds = value % 100;
 
       value /= 100;
@@ -283,7 +283,7 @@ private:
 
     //cLog::log (LOGINFO, "drawFrameToBitmap %d %d %d", fromFrame, toFrame, playFrame);
     bool allFramesOk = true;
-    auto firstFrame = mSong.getFirstFrame();
+    auto firstFrame = mSong->getFirstFrame();
 
     // clear bitmap as chunks
     auto fromSrcIndex = (float)getSignedSrcIndex (fromFrame);
@@ -318,10 +318,10 @@ private:
 
       if (mFrameStep == 1) {
         //{{{  simple case, draw peak and power scaled to maxPeak
-        auto framePtr = mSong.getAudioFramePtr (frame);
+        auto framePtr = mSong->getAudioFramePtr (frame);
         if (framePtr) {
           if (framePtr->getPowerValues()) {
-            float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
+            float valueScale = mWaveHeight / 2.f / mSong->getMaxPeakValue();
             silence = framePtr->isSilence();
 
             float peakValues[2];
@@ -346,7 +346,7 @@ private:
         //}}}
       else {
         //{{{  sum mFrameStep frames, mFrameStep aligned, just draw power scaled to maxPower
-        float valueScale = mWaveHeight / 2.f / mSong.getMaxPowerValue();
+        float valueScale = mWaveHeight / 2.f / mSong->getMaxPowerValue();
         silence = false;
 
         for (auto i = 0; i < 2; i++)
@@ -355,7 +355,7 @@ private:
         auto alignedFrame = frame - (frame % mFrameStep);
         auto toSumFrame = std::min (alignedFrame + mFrameStep, rightFrame);
         for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
-          auto framePtr = mSong.getAudioFramePtr (sumFrame);
+          auto framePtr = mSong->getAudioFramePtr (sumFrame);
           if (framePtr) {
             silence |= framePtr->isSilence();
             if (framePtr->getPowerValues()) {
@@ -390,13 +390,13 @@ private:
     mBitmapTarget->EndDraw();
 
     // copy reversed spectrum column to bitmap, clip high freqs to height
-    int freqSize = std::min (mSong.getNumFreqBytes(), (int)mFreqHeight);
-    int freqOffset = mSong.getNumFreqBytes() > (int)mFreqHeight ? mSong.getNumFreqBytes() - (int)mFreqHeight : 0;
+    int freqSize = std::min (mSong->getNumFreqBytes(), (int)mFreqHeight);
+    int freqOffset = mSong->getNumFreqBytes() > (int)mFreqHeight ? mSong->getNumFreqBytes() - (int)mFreqHeight : 0;
 
     // bitmap sampled aligned to mFrameStep, !!! could sum !!! ?? ok if neg frame ???
     auto alignedFromFrame = fromFrame - (fromFrame % mFrameStep);
     for (auto frame = alignedFromFrame; frame < toFrame; frame += mFrameStep) {
-      auto framePtr = mSong.getAudioFramePtr (frame);
+      auto framePtr = mSong->getAudioFramePtr (frame);
       if (framePtr) {
         if (framePtr->getFreqLuma()) {
           uint32_t bitmapIndex = getSrcIndex (frame);
@@ -416,7 +416,7 @@ private:
     cRect dstRect = { mRect.left, mDstRangeTop, mRect.right, mDstRangeTop + mRangeHeight };
     dc->FillRectangle (dstRect, mWindow->getDarkGrayBrush());
 
-    for (auto &item : mSong.getSelect().getItems()) {
+    for (auto &item : mSong->getSelect().getItems()) {
       auto firstx = (getWidth()/2.f) + (item.getFirstFrame() - playFrame) * mFrameWidth / mFrameStep;
       float lastx = item.getMark() ? firstx + 1.f :
                                      (getWidth()/2.f) + (item.getLastFrame() - playFrame) * mFrameWidth / mFrameStep;
@@ -579,9 +579,9 @@ private:
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     //{{{  draw playFrame
-    auto framePtr = mSong.getAudioFramePtr (playFrame);
+    auto framePtr = mSong->getAudioFramePtr (playFrame);
     if (framePtr) {
-      float valueScale = mWaveHeight / 2.f / mSong.getMaxPeakValue();
+      float valueScale = mWaveHeight / 2.f / mSong->getMaxPeakValue();
       auto peakValues = framePtr->getPeakValues();
 
       dstRect = { mRect.left + (dstPlay * mFrameWidth)-1.f,
@@ -596,12 +596,12 @@ private:
   //{{{
   void drawOverview (ID2D1DeviceContext* dc, int playFrame, bool mono) {
 
-    if (!mSong.getTotalFrames())
+    if (!mSong->getTotalFrames())
       return;
 
-    int firstFrame = mSong.getFirstFrame();
-    float playFrameX = ((playFrame - firstFrame) * getWidth()) / mSong.getTotalFrames();
-    float valueScale = mOverviewHeight / 2.f / mSong.getMaxPowerValue();
+    int firstFrame = mSong->getFirstFrame();
+    float playFrameX = ((playFrame - firstFrame) * getWidth()) / mSong->getTotalFrames();
+    float valueScale = mOverviewHeight / 2.f / mSong->getMaxPowerValue();
     drawOverviewWave (dc, firstFrame, playFrame, playFrameX, valueScale, mono);
 
     if (mOverviewPressed) {
@@ -637,7 +637,7 @@ private:
       }
     else {
       //  draw playFrame
-      auto framePtr = mSong.getAudioFramePtr (playFrame);
+      auto framePtr = mSong->getAudioFramePtr (playFrame);
       if (framePtr && framePtr->getPowerValues()) {
         auto powerValues = framePtr->getPowerValues();
         cRect dstRect = { mRect.left + playFrameX,
@@ -655,8 +655,8 @@ private:
   void drawOverviewWave (ID2D1DeviceContext* dc, int firstFrame, int playFrame, float playFrameX, float valueScale, bool mono) {
   // draw Overview using bitmap cache
 
-    int lastFrame = mSong.getLastFrame();
-    int totalFrames = mSong.getTotalFrames();
+    int lastFrame = mSong->getLastFrame();
+    int totalFrames = mSong->getTotalFrames();
 
     bool forceRedraw = !mOverviewBitmapOk ||
                        (valueScale != mOverviewValueScale) ||
@@ -682,7 +682,7 @@ private:
           toFrame = lastFrame+1;
 
         if (forceRedraw || (frame >= mOverviewLastFrame)) {
-          auto framePtr = mSong.getAudioFramePtr (frame);
+          auto framePtr = mSong->getAudioFramePtr (frame);
           if (framePtr) {
             // !!! should accumulate silence and distinguish from silence better !!!
             if (framePtr->getPowerValues()) {
@@ -693,7 +693,7 @@ private:
                 int numSummedFrames = 1;
                 frame++;
                 while (frame < toFrame) {
-                  framePtr = mSong.getAudioFramePtr (frame);
+                  framePtr = mSong->getAudioFramePtr (frame);
                   if (framePtr) {
                     if (framePtr->getPowerValues()) {
                       auto powerValues = framePtr->getPowerValues();
@@ -769,12 +769,12 @@ private:
       }
 
     int rightFrame = (int)(playFrame + width);
-    rightFrame = std::min (rightFrame, mSong.getLastFrame());
+    rightFrame = std::min (rightFrame, mSong->getLastFrame());
 
     // calc lens max power
     float maxPowerValue = 0.f;
     for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
-      auto framePtr = mSong.getAudioFramePtr (frame);
+      auto framePtr = mSong->getAudioFramePtr (frame);
       if (framePtr && framePtr->getPowerValues()) {
         auto powerValues = framePtr->getPowerValues();
         maxPowerValue = std::max (maxPowerValue, *powerValues++);
@@ -790,7 +790,7 @@ private:
     for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
       dstRect.right = dstRect.left + 1.f;
 
-      auto framePtr = mSong.getAudioFramePtr (frame);
+      auto framePtr = mSong->getAudioFramePtr (frame);
       if (framePtr && framePtr->getPowerValues()) {
         if (framePtr->hasTitle()) {
           //{{{  draw song title yellow bar and text
@@ -832,10 +832,10 @@ private:
 
     float valueScale = 100.f / 255.f;
 
-    auto framePtr = mSong.getAudioFramePtr (playFrame);
+    auto framePtr = mSong->getAudioFramePtr (playFrame);
     if (framePtr && framePtr->getFreqValues()) {
       auto freqValues = framePtr->getFreqValues();
-      for (auto i = 0; (i < mSong.getNumFreqBytes()) && ((i*2) < getWidthInt()); i++) {
+      for (auto i = 0; (i < mSong->getNumFreqBytes()) && ((i*2) < getWidthInt()); i++) {
         auto value =  freqValues[i] * valueScale;
         if (value > 1.f)  {
           cRect dstRect = { mRect.left + (i*2),mRect.bottom - value, mRect.left + ((i+1) * 2),mRect.bottom };
@@ -862,13 +862,13 @@ private:
     mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
     dstRect.top = mRect.bottom - mSmallTimeTextFormat->GetFontSize();
     dc->DrawText (last.data(), (uint32_t)last.size(), mSmallTimeTextFormat, dstRect,
-                  (mSong.getHlsLoad() == cSong::eHlsIdle) ? mWindow->getWhiteBrush() :
-                    (mSong.getHlsLoad() == cSong::eHlsFailed) ? mWindow->getRedBrush() : mWindow->getGreenBrush());
+                  (mSong->getHlsLoad() == cSong::eHlsIdle) ? mWindow->getWhiteBrush() :
+                    (mSong->getHlsLoad() == cSong::eHlsFailed) ? mWindow->getRedBrush() : mWindow->getGreenBrush());
     }
   //}}}
 
   //{{{  private vars
-  cSong& mSong;
+  cSong* mSong;
   int mSongLastId = 0;
 
   // zoom - 0 unity, > 0 zoomOut framesPerPix, < 0 zoomIn pixPerFrame

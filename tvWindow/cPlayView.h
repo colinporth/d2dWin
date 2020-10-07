@@ -15,7 +15,7 @@ extern "C" {
   #include <libavformat/avformat.h>
   }
 
-#include "mfxvideo++.h"
+#include "../../libmfx/include/mfxvideo++.h"
 //}}}
 
 class cPlayView : public cD2dWindow::cView {

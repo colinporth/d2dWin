@@ -53,9 +53,18 @@ const string kLink = "a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hl
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
+  ~cAppWindow() {
+    delete mSong;
+    }
+  //}}}
+  //{{{
   void run (const string& title, int width, int height, const vector<string>& names) {
 
+    mSong = new cSong();
+
     init (title, width, height, false);
+    setChangeCountDown (0); // refresh evry frame
+
     add (new cCalendarBox (this, 190.f,150.f), -190.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
@@ -63,37 +72,37 @@ public:
     if (names.empty()) {
       //{{{  add radio 1..6 with action lambda
       add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChannel (kChannels[0]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[0]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChannel (kChannels[1]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[1]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChannel (kChannels[2]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[2]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChannel (kChannels[3]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[3]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChannel (kChannels[4]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[4]); mSongChanged = true; } ));
       addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index) {
-        mSong.clear(); mSong.setChannel (kChannels[5]); mSongChanged = true; } ));
+        mSong->clear(); mSong->setChannel (kChannels[5]); mSongChanged = true; } ));
 
       mBitrateStr = "48k aacHE";
       addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
         //{{{  lambda
-        mSong.clear();
-        switch (mSong.getBitrate()) {
+        mSong->clear();
+        switch (mSong->getBitrate()) {
           case 48000:
-            mSong.setBitrate (96000, 150);
+            mSong->setBitrate (96000, 150);
             mBitrateStr = "96k aacHE";
             break;
           case 96000:
-            mSong.setBitrate (128000, 300);
+            mSong->setBitrate (128000, 300);
             mBitrateStr = "128k aac";
             break;
           case 128000:
-            mSong.setBitrate (320000, 300);
+            mSong->setBitrate (320000, 300);
             mBitrateStr = "320k aac";
             break;
           case 320000:
-            mSong.setBitrate (48000, 150);
+            mSong->setBitrate (48000, 150);
             mBitrateStr = "48k aacHE";
             break;
           }
@@ -124,7 +133,7 @@ public:
 
         add (new cStringListBox (this, 500.f, 300.f, mShoutCast, [&](cStringListBox* box, const std::string& string){
           auto listBox = (cStringListBox*)box;
-          mSong.clear();
+          mSong->clear();
           mUrl = string;
           mSongChanged = true;
           cLog::log (LOGINFO, "listBox" + string);
@@ -143,7 +152,7 @@ public:
 
         if (!mFileList->empty()) {
           add (new cFileListBox (this, 0.f,-200.f, mFileList, [&](cFileListBox* box, int index){
-            mSong.clear(); mSongChanged = true; }))->setPin (true);
+            mSong->clear(); mSongChanged = true; }))->setPin (true);
 
           mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
           addFront (mJpegImageView);
@@ -177,41 +186,41 @@ protected:
       case 'F' : toggleFullScreen(); break;
       case 'L' : mLogBox->togglePin(); break;
 
-      case 'M' : mSong.getSelect().addMark (mSong.getPlayFrame()); changed(); break;
+      case 'M' : mSong->getSelect().addMark (mSong->getPlayFrame()); break;
 
       case ' ' : mPlaying = !mPlaying; break;
 
-      case 0x21: mSong.prevSilencePlayFrame(); changed(); break;; // page up
-      case 0x22: mSong.nextSilencePlayFrame(); changed(); break;; // page down
+      case 0x21: mSong->prevSilencePlayFrame(); break;; // page up
+      case 0x22: mSong->nextSilencePlayFrame(); break;; // page down
 
-      case 0x25: mSong.incPlaySec (getShift() ? -300 : getControl() ? -10 : -1, false);  changed(); break; // left arrow  - 1 sec
-      case 0x27: mSong.incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);  changed(); break; // right arrow  + 1 sec
+      case 0x25: mSong->incPlaySec (getShift() ? -300 : getControl() ? -10 : -1, false); break; // left arrow  - 1 sec
+      case 0x27: mSong->incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false); break; // right arrow  + 1 sec
 
-      case 0x24: mSong.setPlayFrame (
-        mSong.getSelect().empty() ? mSong.getFirstFrame() : mSong.getSelect().getFirstFrame()); changed(); break; // home
-      case 0x23: mSong.setPlayFrame (
-        mSong.getSelect().empty() ? mSong.getLastFrame() : mSong.getSelect().getLastFrame()); changed(); break; // end
+      case 0x24: mSong->setPlayFrame (
+        mSong->getSelect().empty() ? mSong->getFirstFrame() : mSong->getSelect().getFirstFrame()); break; // home
+      case 0x23: mSong->setPlayFrame (
+        mSong->getSelect().empty() ? mSong->getLastFrame() : mSong->getSelect().getLastFrame()); break; // end
 
-      case 0x26: if (mFileList && mFileList->prevIndex()) changed(); break; // up arrow
-      case 0x28: if (mFileList && mFileList->nextIndex()) changed(); break; // down arrow
+      case 0x26: if (mFileList && mFileList->prevIndex()) break; // up arrow
+      case 0x28: if (mFileList && mFileList->nextIndex()) break; // down arrow
 
-      case 0x2e: mSong.getSelect().clearAll(); changed(); break;; // delete select
+      case 0x2e: mSong->getSelect().clearAll(); break;; // delete select
 
       case 0x0d: mSongChanged = true; break; // enter
 
       // crude chan,bitrate change
-      case '1' : mSong.clear(); mSong.setChannel ("bbc_radio_one"); mSongChanged = true; break;
-      case '2' : mSong.clear(); mSong.setChannel("bbc_radio_two"); mSongChanged = true; break;
-      case '3' : mSong.clear(); mSong.setChannel("bbc_radio_three"); mSongChanged = true; break;
-      case '4' : mSong.clear(); mSong.setChannel("bbc_radio_fourfm"); mSongChanged = true;  break;
-      case '5' : mSong.clear(); mSong.setChannel("bbc_radio_five_live"); mSongChanged = true; break;
-      case '6' : mSong.clear(); mSong.setChannel("bbc_6music"); mSongChanged = true; break;
-      case '7' : mSong.clear(); mSong.setBitrate (48000, 150); mBitrateStr = "48k aacHE"; mSongChanged = true; break;
-      case '8' : mSong.clear(); mSong.setBitrate (96000, 150); mBitrateStr = "96k aacHE"; mSongChanged = true; break;
-      case '9' : mSong.clear(); mSong.setBitrate (128000, 300); mBitrateStr = "128k aac"; mSongChanged = true; break;
-      case '0' : mSong.clear(); mSong.setBitrate (320000, 300); mBitrateStr = "320k aac"; mSongChanged = true; break;
+      case '1' : mSong->clear(); mSong->setChannel ("bbc_radio_one"); mSongChanged = true; break;
+      case '2' : mSong->clear(); mSong->setChannel("bbc_radio_two"); mSongChanged = true; break;
+      case '3' : mSong->clear(); mSong->setChannel("bbc_radio_three"); mSongChanged = true; break;
+      case '4' : mSong->clear(); mSong->setChannel("bbc_radio_fourfm"); mSongChanged = true;  break;
+      case '5' : mSong->clear(); mSong->setChannel("bbc_radio_five_live"); mSongChanged = true; break;
+      case '6' : mSong->clear(); mSong->setChannel("bbc_6music"); mSongChanged = true; break;
+      case '7' : mSong->clear(); mSong->setBitrate (48000, 150); mBitrateStr = "48k aacHE"; mSongChanged = true; break;
+      case '8' : mSong->clear(); mSong->setBitrate (96000, 150); mBitrateStr = "96k aacHE"; mSongChanged = true; break;
+      case '9' : mSong->clear(); mSong->setBitrate (128000, 300); mBitrateStr = "128k aac"; mSongChanged = true; break;
+      case '0' : mSong->clear(); mSong->setBitrate (320000, 300); mBitrateStr = "320k aac"; mSongChanged = true; break;
 
-      default  : cLog::log (LOGINFO, "key %x", key); changed(); break;
+      default  : cLog::log (LOGINFO, "key %x", key); break;
       }
 
     return false;
@@ -280,7 +289,7 @@ private:
         string titleStr = icyInfo.substr (searchStrPos + searchStr.size(), searchEndPos - searchStrPos - searchStr.size());
         if (titleStr != mLastTitleStr) {
           cLog::log (LOGINFO1, "addIcyInfo found title = " + titleStr);
-          mSong.getSelect().addMark (frame, titleStr);
+          mSong->getSelect().addMark (frame, titleStr);
           mLastTitleStr = titleStr;
           }
         }
@@ -306,12 +315,12 @@ private:
     constexpr int kHlsPreload = 10; // about a minute
     cLog::setThreadName ("hls ");
 
-    mSong.setChannel (channel);
-    mSong.setBitrate (bitrate, bitrate >= 128000 ? 300 : 150);
+    mSong->setChannel (channel);
+    mSong->setBitrate (bitrate, bitrate >= 128000 ? 300 : 150);
     while (!getExit()) {
-      const string path = "pool_904/live/uk/" + mSong.getChannel() +
-                          "/" + mSong.getChannel() + ".isml/" + mSong.getChannel() +
-                          "-audio=" + dec(mSong.getBitrate());
+      const string path = "pool_904/live/uk/" + mSong->getChannel() +
+                          "/" + mSong->getChannel() + ".isml/" + mSong->getChannel() +
+                          "-audio=" + dec(mSong->getBitrate());
       cPlatformHttp http;
       auto redirectedHost = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
@@ -324,30 +333,29 @@ private:
 
         http.freeContent();
         //}}}
-        mSong.init (cAudioDecode::eAac, 2, 48000, mSong.getBitrate() >= 128000 ? 1024 : 2048);
-        mSong.setHlsBase (mediaSequence, programDateTimePoint, -37s, 0);
+        mSong->init (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048);
+        mSong->setHlsBase (mediaSequence, programDateTimePoint, -37s, 0);
         cAudioDecode decode (cAudioDecode::eAac);
 
         thread player;
         bool firstTime = true;
         mSongChanged = false;
         while (!getExit() && !mSongChanged) {
-          auto chunkNum = mSong.getHlsLoadChunkNum (getNowRaw(), 12s, kHlsPreload);
+          auto chunkNum = mSong->getHlsLoadChunkNum (getNowRaw(), 12s, kHlsPreload);
           if (chunkNum) {
             // get hls chunkNum chunk
-            mSong.setHlsLoad (cSong::eHlsLoading, chunkNum);
+            mSong->setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               cLog::log (LOGINFO1, "got " + dec(chunkNum) +
                                    " at " + date::format ("%T", floor<seconds>(getNow())));
-              int seqFrameNum = mSong.getHlsFrameFromChunkNum (chunkNum);
+              int seqFrameNum = mSong->getHlsFrameFromChunkNum (chunkNum);
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
                 auto samples = decode.decodeFrame (seqFrameNum);
                 if (samples) {
-                  mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                  mSong.addAudioFrame (seqFrameNum++, samples, true, mSong.getNumFrames());
-                  changed();
+                  mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
+                  mSong->addAudioFrame (seqFrameNum++, samples, true, mSong->getNumFrames());
                   if (firstTime) {
                     //{{{  something to play, launch player
                     firstTime = false;
@@ -358,13 +366,11 @@ private:
                 aacFrames += decode.getNextFrameOffset();
                 }
               http.freeContent();
-              mSong.setHlsLoad (cSong::eHlsIdle, chunkNum);
+              mSong->setHlsLoad (cSong::eHlsIdle, chunkNum);
               }
             else {
               //{{{  failed to load expected available chunk, back off for 250ms
-              mSong.setHlsLoad (cSong::eHlsFailed, chunkNum);
-              changed();
-
+              mSong->setHlsLoad (cSong::eHlsFailed, chunkNum);
               cLog::log (LOGERROR, "late " + dec(chunkNum));
               this_thread::sleep_for (250ms);
               }
@@ -460,16 +466,15 @@ private:
             frameNum = 0;
             int sampleRate;
             auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
-            mSong.init (frameType, 2, 44100, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
+            mSong->init (frameType, 2, 44100, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
             }
 
           while (decode.parseFrame (buffer, bufferEnd)) {
-            if (decode.getFrameType() == mSong.getFrameType()) {
+            if (decode.getFrameType() == mSong->getFrameType()) {
               auto samples = decode.decodeFrame (frameNum);
               if (samples) {
-                mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                mSong.addAudioFrame (frameNum++, samples, true, mSong.getNumFrames()+1);
-                changed();
+                mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
+                mSong->addAudioFrame (frameNum++, samples, true, mSong->getNumFrames()+1);
                 if (frameNum == 1) // launch player after first frame
                   player = thread ([=](){ playThread (true); });
                 }
@@ -534,13 +539,12 @@ private:
       if (frameType == cAudioDecode::eWav) {
         //{{{  parse wav
         auto frameSamples = 1024;
-        mSong.init (frameType, 2, sampleRate, frameSamples);
+        mSong->init (frameType, 2, sampleRate, frameSamples);
         decode.parseFrame (fileMapPtr, fileMapEnd);
         auto samples = decode.getFramePtr();
         while (!getExit() && !mSongChanged && ((samples + (frameSamples * 2 * sizeof(float))) <= fileMapEnd)) {
-          mSong.addAudioFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
+          mSong->addAudioFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
           samples += frameSamples * 2 * sizeof(float);
-          changed();
           if (frameNum == 1)
             player = thread ([=](){ playThread (false); });
           }
@@ -548,16 +552,15 @@ private:
         //}}}
       else {
         //{{{  parse coded
-        mSong.init (frameType, 2, sampleRate, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
+        mSong->init (frameType, 2, sampleRate, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
         while (!getExit() && !mSongChanged && decode.parseFrame (fileMapPtr, fileMapEnd)) {
-          if (decode.getFrameType() == mSong.getFrameType()) {
+          if (decode.getFrameType() == mSong->getFrameType()) {
             auto samples = decode.decodeFrame (frameNum);
             if (samples) {
-              int numFrames = mSong.getNumFrames();
+              int numFrames = mSong->getNumFrames();
               int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
-              mSong.setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-              mSong.addAudioFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
-              changed();
+              mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
+              mSong->addAudioFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
               if (frameNum == 1)
                 player = thread ([=](){ playThread (false); });
               }
@@ -595,43 +598,41 @@ private:
 
     auto device = getDefaultAudioOutputDevice();
     if (device) {
-      cLog::log (LOGINFO, "device @ %d", mSong.getSampleRate());
-      device->setSampleRate (mSong.getSampleRate());
-      cAudioDecode decode (mSong.getFrameType());
+      cLog::log (LOGINFO, "device @ %d", mSong->getSampleRate());
+      device->setSampleRate (mSong->getSampleRate());
+      cAudioDecode decode (mSong->getFrameType());
 
       device->start();
       while (!getExit() && !mSongChanged) {
         device->process ([&](float*& srcSamples, int& numSrcSamples) mutable noexcept {
           // lambda callback - load srcSamples
-          shared_lock<shared_mutex> lock (mSong.getSharedMutex());
+          shared_lock<shared_mutex> lock (mSong->getSharedMutex());
 
-          auto framePtr = mSong.getAudioFramePtr (mSong.getPlayFrame());
+          auto framePtr = mSong->getAudioFramePtr (mSong->getPlayFrame());
           if (mPlaying && framePtr && framePtr->getSamples()) {
-            if (mSong.getNumChannels() == 1) {
+            if (mSong->getNumChannels() == 1) {
               //{{{  mono to stereo
               auto src = framePtr->getSamples();
               auto dst = samples;
-              for (int i = 0; i < mSong.getSamplesPerFrame(); i++) {
+              for (int i = 0; i < mSong->getSamplesPerFrame(); i++) {
                 *dst++ = *src;
                 *dst++ = *src++;
                 }
               }
               //}}}
             else
-              memcpy (samples, framePtr->getSamples(), mSong.getSamplesPerFrame() * mSong.getNumChannels() * sizeof(float));
+              memcpy (samples, framePtr->getSamples(), mSong->getSamplesPerFrame() * mSong->getNumChannels() * sizeof(float));
             srcSamples = samples;
             }
           else
             srcSamples = silence;
-          numSrcSamples = mSong.getSamplesPerFrame();
+          numSrcSamples = mSong->getSamplesPerFrame();
 
-          if (mPlaying && framePtr) {
-            mSong.incPlayFrame (1, true);
-            changed();
-            }
+          if (mPlaying && framePtr)
+            mSong->incPlayFrame (1, true);
           });
 
-        if (!streaming && (mSong.getPlayFrame() > mSong.getLastFrame()))
+        if (!streaming && (mSong->getPlayFrame() > mSong->getLastFrame()))
           break;
         }
 
@@ -643,7 +644,7 @@ private:
   //}}}
 
   //{{{  vars
-  cSong mSong;
+  cSong* mSong;
   bool mSongChanged = false;
 
   bool mPlaying = true;

@@ -112,7 +112,7 @@ void cD2dWindow::init (const string& title, int width, int height, bool fullScre
         this_thread::sleep_for (10ms);
 
       while (mDeviceContext && !mExit) {
-        if (mCountDown-- > 0)
+        if (!mChangeCountDown && (mCountDown-- > 0))
           this_thread::sleep_for (10ms);
         else {
           mCountDown = mChangeCountDown;
