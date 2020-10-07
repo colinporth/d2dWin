@@ -223,6 +223,6 @@ int WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int 
   int channelNum = names.empty() ? kDefaultChannelNum : stoi (names[0]);
 
   cAppWindow appWindow;
-  appWindow.run ("hlsWindow", 800, 420, channelNum, kAudBitrate, kVidBitrate);
+  appWindow.run ("hlsWindow", 800, 450, channelNum, kAudBitrate, kVidBitrate);
   return 0;
   }
