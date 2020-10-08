@@ -99,6 +99,7 @@
     <ClInclude Include="..\..\shared\utils\cSemaphore.h" />
     <ClInclude Include="..\..\shared\utils\cSong.h" />
     <ClInclude Include="..\..\shared\utils\cVideoDecode.h" />
+    <ClInclude Include="..\..\shared\utils\readerWriterQueue.h" />
     <ClInclude Include="..\boxes\cBmpBox.h" />
     <ClInclude Include="..\boxes\cCalendarBox.h" />
     <ClInclude Include="..\boxes\cClockBox.h" />

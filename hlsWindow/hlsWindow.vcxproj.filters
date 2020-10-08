@@ -111,5 +111,8 @@
     <ClInclude Include="..\..\shared\hls\cHlsPlayer.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\shared\utils\readerWriterQueue.h">
+      <Filter>h</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
