@@ -105,10 +105,10 @@ public:
   //{{{
   void run (const string& title, int width, int height, int channelNum, int audBitrate, int vidBitrate) {
 
-    init (title, width, height, false);
+    cD2dWindow::init (title, width, height, false);
     setChangeCountDown (0); // refresh evry frame
 
-    initPlayer (kHost, kChannels[channelNum], audBitrate, vidBitrate, true, false); // use mfx decoder
+    cHlsPlayer::init (kHost, kChannels[channelNum], audBitrate, vidBitrate, false); // use mfx decoder
     add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
 
     add (new cClockBox (this, 40.f), -135.f,35.f);
