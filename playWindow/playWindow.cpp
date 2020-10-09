@@ -348,7 +348,7 @@ private:
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               cLog::log (LOGINFO1, "got " + dec(chunkNum) +
                                    " at " + date::format ("%T", floor<seconds>(getNow())));
-              int seqFrameNum = mSong->getHlsFrameFromChunkNum (chunkNum);
+              int seqFrameNum = mSong->getFrameNumFromChunkNum (chunkNum);
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {

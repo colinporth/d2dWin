@@ -117,7 +117,7 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     // startup
-    thread ([=](){ hlsThread(); }).detach();
+    thread ([=](){ loaderThread(); }).detach();
 
     // loop till quit
     messagePump();
