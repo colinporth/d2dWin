@@ -94,7 +94,6 @@ public:
 
 private:
   cVideoDecode* mVideoDecode;
-
   ID2D1Bitmap* mBitmap = nullptr;
   uint64_t mPts = 0;
   };
