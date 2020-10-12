@@ -861,9 +861,7 @@ private:
     // small coloured last, right
     mSmallTimeTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
     dstRect.top = mRect.bottom - mSmallTimeTextFormat->GetFontSize();
-    dc->DrawText (last.data(), (uint32_t)last.size(), mSmallTimeTextFormat, dstRect,
-                  (mSong->getHlsLoad() == cSong::eHlsIdle) ? mWindow->getWhiteBrush() :
-                    (mSong->getHlsLoad() == cSong::eHlsFailed) ? mWindow->getRedBrush() : mWindow->getGreenBrush());
+    dc->DrawText (last.data(), (uint32_t)last.size(), mSmallTimeTextFormat, dstRect, mWindow->getWhiteBrush());
     }
   //}}}
 

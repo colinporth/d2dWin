@@ -344,7 +344,6 @@ private:
           auto chunkNum = mSong->getHlsLoadChunkNum (getNowRaw(), 12s, kHlsPreload);
           if (chunkNum) {
             // get hls chunkNum chunk
-            mSong->setHlsLoad (cSong::eHlsLoading, chunkNum);
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               cLog::log (LOGINFO1, "got " + dec(chunkNum) +
                                    " at " + date::format ("%T", floor<seconds>(getNow())));
@@ -366,11 +365,9 @@ private:
                 aacFrames += decode.getNextFrameOffset();
                 }
               http.freeContent();
-              mSong->setHlsLoad (cSong::eHlsIdle, chunkNum);
               }
             else {
               //{{{  failed to load expected available chunk, back off for 250ms
-              mSong->setHlsLoad (cSong::eHlsFailed, chunkNum);
               cLog::log (LOGERROR, "late " + dec(chunkNum));
               this_thread::sleep_for (250ms);
               }
