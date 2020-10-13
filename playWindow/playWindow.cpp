@@ -341,13 +341,13 @@ private:
         bool firstTime = true;
         mSong->setChanged (false);;
         while (!getExit() && !mSong->getChanged()) {
-          auto chunkNum = mSong->getHlsLoadChunkNum (getNowRaw(), 12s, kHlsPreload);
+          int seqFrameNum;
+          auto chunkNum = mSong->getLoadChunkNum (getNowRaw(), 12s, kHlsPreload, seqFrameNum);
           if (chunkNum) {
             // get hls chunkNum chunk
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               cLog::log (LOGINFO1, "got " + dec(chunkNum) +
                                    " at " + date::format ("%T", floor<seconds>(getNow())));
-              int seqFrameNum = mSong->getFrameNumFromChunkNum (chunkNum);
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
