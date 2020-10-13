@@ -108,7 +108,7 @@ public:
     setChangeCountDown (0); // refresh evry frame
 
     cHlsPlayer::init (kHost, kChannels[channelNum], audBitrate, vidBitrate, false); // use mfx decoder
-    add (new cVideoDecodeBox (this, 0.f,0.f, mVideoDecode), 0.f,0.f);
+    add (new cVideoDecodeBox (this, 0.f,0.f, getVideoDecode()), 0.f,0.f);
 
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
@@ -147,8 +147,8 @@ protected:
         mSong->incPlaySec (-60*60, false);
         auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
         if (framePtr) {
-          mVideoDecode->setPlayPts (framePtr->getPts());
-          mVideoDecode->clear(framePtr->getPts());
+          getVideoDecode()->setPlayPts (framePtr->getPts());
+          getVideoDecode()->clear(framePtr->getPts());
           }
         changed();
         break;
@@ -159,8 +159,8 @@ protected:
         mSong->incPlaySec (60*60, false);
         auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
         if (framePtr) {
-          mVideoDecode->setPlayPts(framePtr->getPts());
-          mVideoDecode->clear(framePtr->getPts());
+          getVideoDecode()->setPlayPts(framePtr->getPts());
+          getVideoDecode()->clear(framePtr->getPts());
           }
         changed();
         break;
@@ -171,8 +171,8 @@ protected:
         mSong->incPlaySec (-(getShift() ? 300 : getControl() ? 10 : 1), false);
         auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
         if (framePtr) {
-          mVideoDecode->setPlayPts(framePtr->getPts());
-          mVideoDecode->clear(framePtr->getPts());
+          getVideoDecode()->setPlayPts(framePtr->getPts());
+          getVideoDecode()->clear(framePtr->getPts());
           }
         changed();
         break;
@@ -183,8 +183,8 @@ protected:
         mSong->incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);
         auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
         if (framePtr) {
-          mVideoDecode->setPlayPts(framePtr->getPts());
-          mVideoDecode->clear(framePtr->getPts());
+          getVideoDecode()->setPlayPts(framePtr->getPts());
+          getVideoDecode()->clear(framePtr->getPts());
         }
         changed();
         break;

@@ -1,4 +1,4 @@
-// cLogBox.h
+// cTtitleBox.h
 //{{{  includes
 #pragma once
 #include "../common/cD2dWindow.h"
@@ -20,7 +20,7 @@ public:
     IDWriteTextLayout* textLayout;
     mWindow->getDwriteFactory()->CreateTextLayout (
       std::wstring (mTitle.begin(), mTitle.end()).data(), (uint32_t)mTitle.size(), mWindow->getTextFormat(),
-               mWindow->getSize().x, mWindow->getSize().y, &textLayout);
+      mWindow->getSize().x, mWindow->getSize().y, &textLayout);
     if (textLayout) {
       dc->DrawTextLayout (getTL(2.f), textLayout, mWindow->getBlackBrush(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
       dc->DrawTextLayout (getTL(), textLayout, mWindow->getWhiteBrush(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
