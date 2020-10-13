@@ -312,11 +312,12 @@ private:
   void hlsThread (const string& host, const string& channel, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
-    constexpr int kHlsPreload = 10; // about a minute
     cLog::setThreadName ("hls ");
 
+    mSong->init (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048, 3000);
     mSong->setChannel (channel);
     mSong->setBitrate (bitrate, bitrate >= 128000 ? 300 : 150);
+
     while (!getExit()) {
       const string path = "pool_904/live/uk/" + mSong->getChannel() +
                           "/" + mSong->getChannel() + ".isml/" + mSong->getChannel() +
@@ -326,24 +327,22 @@ private:
       if (http.getContent()) {
         //{{{  hls m3u8 ok, parse it for baseChunkNum, baseTimePoint
         int mediaSequence = stoi (getTagValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
-
         istringstream inputStream (getTagValue (http.getContent(), "#EXT-X-PROGRAM-DATE-TIME:"));
         system_clock::time_point programDateTimePoint;
         inputStream >> date::parse ("%FT%T", programDateTimePoint);
-
         http.freeContent();
-        //}}}
-        mSong->init (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048);
+
         mSong->setHlsBase (mediaSequence, programDateTimePoint, -37s, 0);
+        //}}}
         cAudioDecode decode (cAudioDecode::eAac);
 
         thread player;
         bool firstTime = true;
         mSong->setChanged (false);;
         while (!getExit() && !mSong->getChanged()) {
-          int seqFrameNum;
-          auto chunkNum = mSong->getLoadChunkNum (getNowRaw(), 12s, kHlsPreload, seqFrameNum);
-          if (chunkNum) {
+          int chunkNum;
+          int frameNum;
+          if (mSong->loadChunk (getNowRaw(), 12s, 5, chunkNum, frameNum)) {
             // get hls chunkNum chunk
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               cLog::log (LOGINFO1, "got " + dec(chunkNum) +
@@ -351,10 +350,10 @@ private:
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
-                auto samples = decode.decodeFrame (seqFrameNum);
+                auto samples = decode.decodeFrame (frameNum);
                 if (samples) {
                   mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                  mSong->addAudioFrame (seqFrameNum++, samples, true, mSong->getNumFrames());
+                  mSong->addFrame (frameNum++, samples, true, mSong->getNumFrames());
                   if (firstTime) {
                     //{{{  something to play, launch player
                     firstTime = false;
@@ -463,7 +462,7 @@ private:
             frameNum = 0;
             int sampleRate;
             auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
-            mSong->init (frameType, 2, 44100, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
+            mSong->init (frameType, 2, 44100, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, 3000);
             }
 
           while (decode.parseFrame (buffer, bufferEnd)) {
@@ -471,7 +470,7 @@ private:
               auto samples = decode.decodeFrame (frameNum);
               if (samples) {
                 mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                mSong->addAudioFrame (frameNum++, samples, true, mSong->getNumFrames()+1);
+                mSong->addFrame (frameNum++, samples, true, mSong->getNumFrames()+1);
                 if (frameNum == 1) // launch player after first frame
                   player = thread ([=](){ playThread (true); });
                 }
@@ -540,7 +539,7 @@ private:
         decode.parseFrame (fileMapPtr, fileMapEnd);
         auto samples = decode.getFramePtr();
         while (!getExit() && !mSong->getChanged() && ((samples + (frameSamples * 2 * sizeof(float))) <= fileMapEnd)) {
-          mSong->addAudioFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
+          mSong->addFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
           samples += frameSamples * 2 * sizeof(float);
           if (frameNum == 1)
             player = thread ([=](){ playThread (false); });
@@ -557,7 +556,7 @@ private:
               int numFrames = mSong->getNumFrames();
               int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
               mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-              mSong->addAudioFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
+              mSong->addFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
               if (frameNum == 1)
                 player = thread ([=](){ playThread (false); });
               }
