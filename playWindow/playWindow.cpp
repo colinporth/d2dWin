@@ -90,19 +90,19 @@ public:
         mSong->clear();
         switch (mSong->getBitrate()) {
           case 48000:
-            mSong->setBitrate (96000, 150);
+            mSong->setBitrateFramesPerChunk(96000, 150);
             mBitrateStr = "96k aacHE";
             break;
           case 96000:
-            mSong->setBitrate (128000, 300);
+            mSong->setBitrateFramesPerChunk(128000, 300);
             mBitrateStr = "128k aac";
             break;
           case 128000:
-            mSong->setBitrate (320000, 300);
+            mSong->setBitrateFramesPerChunk(320000, 300);
             mBitrateStr = "320k aac";
             break;
           case 320000:
-            mSong->setBitrate (48000, 150);
+            mSong->setBitrateFramesPerChunk(48000, 150);
             mBitrateStr = "48k aacHE";
             break;
           }
@@ -215,10 +215,10 @@ protected:
       case '4' : mSong->clear(); mSong->setChannel("bbc_radio_fourfm"); mSong->setChanged (true); break;
       case '5' : mSong->clear(); mSong->setChannel("bbc_radio_five_live"); mSong->setChanged (true); break;
       case '6' : mSong->clear(); mSong->setChannel("bbc_6music"); mSong->setChanged (true); break;
-      case '7' : mSong->clear(); mSong->setBitrate (48000, 150); mBitrateStr = "48k aacHE"; mSong->setChanged (true); break;
-      case '8' : mSong->clear(); mSong->setBitrate (96000, 150); mBitrateStr = "96k aacHE"; mSong->setChanged (true); break;
-      case '9' : mSong->clear(); mSong->setBitrate (128000, 300); mBitrateStr = "128k aac"; mSong->setChanged (true); break;
-      case '0' : mSong->clear(); mSong->setBitrate (320000, 300); mBitrateStr = "320k aac"; mSong->setChanged (true); break;
+      case '7' : mSong->clear(); mSong->setBitrateFramesPerChunk(48000, 150); mBitrateStr = "48k aacHE"; mSong->setChanged (true); break;
+      case '8' : mSong->clear(); mSong->setBitrateFramesPerChunk(96000, 150); mBitrateStr = "96k aacHE"; mSong->setChanged (true); break;
+      case '9' : mSong->clear(); mSong->setBitrateFramesPerChunk(128000, 300); mBitrateStr = "128k aac"; mSong->setChanged (true); break;
+      case '0' : mSong->clear(); mSong->setBitrateFramesPerChunk(320000, 300); mBitrateStr = "320k aac"; mSong->setChanged (true); break;
 
       default  : cLog::log (LOGINFO, "key %x", key); break;
       }
@@ -316,7 +316,7 @@ private:
 
     mSong->init (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048, 3000);
     mSong->setChannel (channel);
-    mSong->setBitrate (bitrate, bitrate >= 128000 ? 300 : 150);
+    mSong->setBitrateFramesPerChunk(bitrate, bitrate >= 128000 ? 300 : 150);
 
     while (!getExit()) {
       const string path = "pool_904/live/uk/" + mSong->getChannel() +

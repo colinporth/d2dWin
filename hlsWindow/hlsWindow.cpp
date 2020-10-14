@@ -106,7 +106,9 @@ public:
     cD2dWindow::init (title, width, height, false);
     setChangeCountDown (0); // refresh evry frame
 
-    cLoaderPlayer::init (kHost, kChannels[channelNum], audBitrate, vidBitrate, false); // use mfx decoder
+    cLoaderPlayer::initialise (false, kHost, "pool_902/live/uk/", kChannels[channelNum],
+                               audBitrate, vidBitrate,
+                               true, true, true, true); // use mfx decoder
     if (getVideoDecode())
       add (new cVideoDecodeBox (this, 0.f,0.f, getVideoDecode()), 0.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
@@ -115,7 +117,7 @@ public:
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
 
     // startup
-    thread ([=](){ loaderThread(); }).detach();
+    thread ([=](){ hlsLoaderThread(); }).detach();
 
     // loop till quit
     messagePump();
