@@ -25,8 +25,7 @@
 #include "../boxes/cWindowBox.h"
 
 #include "../../shared/utils/cVideoDecode.h"
-
-#include "../../shared/hls/cHlsPlayer.h"
+#include "../../shared/utils/cLoaderPlayer.h"
 
 using namespace std;
 using namespace chrono;
@@ -99,7 +98,7 @@ private:
   };
 //}}}
 
-class cAppWindow : public cD2dWindow, public cHlsPlayer {
+class cAppWindow : public cD2dWindow, public cLoaderPlayer {
 public:
   //{{{
   void run (const string& title, int width, int height, int channelNum, int audBitrate, int vidBitrate) {
@@ -107,9 +106,9 @@ public:
     cD2dWindow::init (title, width, height, false);
     setChangeCountDown (0); // refresh evry frame
 
-    cHlsPlayer::init (kHost, kChannels[channelNum], audBitrate, vidBitrate, false); // use mfx decoder
-    add (new cVideoDecodeBox (this, 0.f,0.f, getVideoDecode()), 0.f,0.f);
-
+    cLoaderPlayer::init (kHost, kChannels[channelNum], audBitrate, vidBitrate, false); // use mfx decoder
+    if (getVideoDecode())
+      add (new cVideoDecodeBox (this, 0.f,0.f, getVideoDecode()), 0.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
     mLogBox = add (new cLogBox (this, 20.f));
