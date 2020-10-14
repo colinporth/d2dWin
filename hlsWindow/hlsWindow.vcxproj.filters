@@ -8,6 +8,7 @@
     <ClCompile Include="..\..\shared\decoders\cMp3Decoder.cpp" />
     <ClCompile Include="..\..\shared\utils\cSong.cpp" />
     <ClCompile Include="..\..\shared\utils\cLoaderPlayer.cpp" />
+    <ClCompile Include="..\..\shared\utils\cVideoDecode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="h">

@@ -107,8 +107,7 @@ public:
     setChangeCountDown (0); // refresh evry frame
 
     cLoaderPlayer::initialise (false, kHost, "pool_902/live/uk/", kChannels[channelNum],
-                               audBitrate, vidBitrate,
-                               true, true, true, true); // use mfx decoder
+                               audBitrate, vidBitrate, eLoader (eMfx | eBgra | eQueueAudio | eQueueVideo));
     if (getVideoDecode())
       add (new cVideoDecodeBox (this, 0.f,0.f, getVideoDecode()), 0.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
