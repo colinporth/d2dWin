@@ -314,7 +314,7 @@ private:
 
     cLog::setThreadName ("hls ");
 
-    mSong->init (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048, 3000);
+    mSong->initialise (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048, 3000);
     mSong->setChannel (channel);
     mSong->setBitrateFramesPerChunk(bitrate, bitrate >= 128000 ? 300 : 150);
 
@@ -462,7 +462,7 @@ private:
             frameNum = 0;
             int sampleRate;
             auto frameType = cAudioDecode::parseSomeFrames (bufferFirst, bufferEnd, sampleRate);
-            mSong->init (frameType, 2, 44100, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, 3000);
+            mSong->initialise (frameType, 2, 44100, (frameType == cAudioDecode::eMp3) ? 1152 : 2048, 3000);
             }
 
           while (decode.parseFrame (buffer, bufferEnd)) {
@@ -535,7 +535,7 @@ private:
       if (frameType == cAudioDecode::eWav) {
         //{{{  parse wav
         auto frameSamples = 1024;
-        mSong->init (frameType, 2, sampleRate, frameSamples);
+        mSong->initialise (frameType, 2, sampleRate, frameSamples);
         decode.parseFrame (fileMapPtr, fileMapEnd);
         auto samples = decode.getFramePtr();
         while (!getExit() && !mSong->getChanged() && ((samples + (frameSamples * 2 * sizeof(float))) <= fileMapEnd)) {
@@ -548,7 +548,7 @@ private:
         //}}}
       else {
         //{{{  parse coded
-        mSong->init (frameType, 2, sampleRate, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
+        mSong->initialise (frameType, 2, sampleRate, (frameType == cAudioDecode::eMp3) ? 1152 : 2048);
         while (!getExit() && !mSong->getChanged() && decode.parseFrame (fileMapPtr, fileMapEnd)) {
           if (decode.getFrameType() == mSong->getFrameType()) {
             auto samples = decode.decodeFrame (frameNum);
