@@ -353,7 +353,7 @@ private:
                 auto samples = decode.decodeFrame (frameNum);
                 if (samples) {
                   mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                  mSong->addFrame (frameNum++, samples, true, mSong->getNumFrames());
+                  mSong->addFrame (frameNum++, samples, true, mSong->getNumFrames(), 0);
                   if (firstTime) {
                     //{{{  something to play, launch player
                     firstTime = false;
@@ -470,7 +470,7 @@ private:
               auto samples = decode.decodeFrame (frameNum);
               if (samples) {
                 mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                mSong->addFrame (frameNum++, samples, true, mSong->getNumFrames()+1);
+                mSong->addFrame (frameNum++, samples, true, mSong->getNumFrames()+1, 0);
                 if (frameNum == 1) // launch player after first frame
                   player = thread ([=](){ playThread (true); });
                 }
@@ -539,7 +539,7 @@ private:
         decode.parseFrame (fileMapPtr, fileMapEnd);
         auto samples = decode.getFramePtr();
         while (!getExit() && !mSong->getChanged() && ((samples + (frameSamples * 2 * sizeof(float))) <= fileMapEnd)) {
-          mSong->addFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)));
+          mSong->addFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)), 0);
           samples += frameSamples * 2 * sizeof(float);
           if (frameNum == 1)
             player = thread ([=](){ playThread (false); });
@@ -556,7 +556,7 @@ private:
               int numFrames = mSong->getNumFrames();
               int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
               mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-              mSong->addFrame (frameNum++, samples, true, totalFrames+1, decode.getFramePtr());
+              mSong->addFrame (frameNum++, samples, true, totalFrames+1, 0);
               if (frameNum == 1)
                 player = thread ([=](){ playThread (false); });
               }

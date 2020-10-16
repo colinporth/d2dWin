@@ -68,7 +68,7 @@ public:
                             { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE, 0,0 },
                             &mBitmap);
         mBitmap->CopyFromMemory (&D2D1::RectU(0,0, mVideoDecode->getWidth(),mVideoDecode->getHeight()),
-                                 frame->get32(), mVideoDecode->getWidth() * 4);
+                                 frame->getBuffer(), mVideoDecode->getWidth() * 4);
         }
       }
 
@@ -104,10 +104,12 @@ public:
   void run (const string& title, int width, int height, int channelNum, int audBitrate, int vidBitrate) {
 
     cD2dWindow::init (title, width, height, false);
-    setChangeCountDown (0); // refresh evry frame
+    setChangeCountDown (0); // refresh every frame
 
     cLoaderPlayer::initialise (false, kHost, "pool_902/live/uk/", kChannels[channelNum],
-                               audBitrate, vidBitrate, eLoader (eMfx | eBgra | eQueueAudio | eQueueVideo));
+                               audBitrate, vidBitrate,
+                               eLoader (eBgra | eQueueAudio | eQueueVideo));
+                               //eLoader (eMfx | eBgra | eQueueAudio | eQueueVideo));
     if (getVideoDecode())
       add (new cVideoDecodeBox (this, 0.f,0.f, getVideoDecode()), 0.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);

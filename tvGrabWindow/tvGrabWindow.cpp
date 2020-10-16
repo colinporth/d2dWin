@@ -25,7 +25,7 @@ public:
     vector <string> kChannelStrings = { "all" };
     auto frequency = param.empty() ? 626 : atoi (param.c_str());
     if (frequency) {
-      mDvb = new cDvb (frequency * 1000, rootName, kChannelStrings, kChannelStrings);
+      mDvb = new cDvb (frequency * 1000, rootName, kChannelStrings, kChannelStrings, false);
       add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDvb->getTransportStream()), 0.f,0.f);
       add (new cTsPidBox (this, -getHeight()/2.f,0.f, mDvb->getTransportStream()), getHeight()/2.f,0.f);
 
@@ -42,7 +42,7 @@ public:
       }
 
     else {
-      mDvb = new cDvb (0, "/tv", { "all" }, { "" });
+      mDvb = new cDvb (0, "/tv", { "all" }, { "" }, false);
       add (new cTsEpgBox (this, getHeight()/2.f, 0.f, mDvb->getTransportStream()), 0.f,0.f);
       add (new cTsPidBox (this, -getHeight()/2.f, 0.f, mDvb->getTransportStream()), getHeight()/2.f,0.f);
       thread ([=]() { mDvb->readThread (param); }).detach();
