@@ -318,7 +318,7 @@ private:
 
       if (mFrameStep == 1) {
         //{{{  simple case, draw peak and power scaled to maxPeak
-        auto framePtr = mSong->getAudioFramePtr (frame);
+        auto framePtr = mSong->getFramePtr (frame);
         if (framePtr) {
           if (framePtr->getPowerValues()) {
             float valueScale = mWaveHeight / 2.f / mSong->getMaxPeakValue();
@@ -355,7 +355,7 @@ private:
         auto alignedFrame = frame - (frame % mFrameStep);
         auto toSumFrame = std::min (alignedFrame + mFrameStep, rightFrame);
         for (auto sumFrame = alignedFrame; sumFrame < toSumFrame; sumFrame++) {
-          auto framePtr = mSong->getAudioFramePtr (sumFrame);
+          auto framePtr = mSong->getFramePtr (sumFrame);
           if (framePtr) {
             silence |= framePtr->isSilence();
             if (framePtr->getPowerValues()) {
@@ -396,7 +396,7 @@ private:
     // bitmap sampled aligned to mFrameStep, !!! could sum !!! ?? ok if neg frame ???
     auto alignedFromFrame = fromFrame - (fromFrame % mFrameStep);
     for (auto frame = alignedFromFrame; frame < toFrame; frame += mFrameStep) {
-      auto framePtr = mSong->getAudioFramePtr (frame);
+      auto framePtr = mSong->getFramePtr (frame);
       if (framePtr) {
         if (framePtr->getFreqLuma()) {
           uint32_t bitmapIndex = getSrcIndex (frame);
@@ -579,7 +579,7 @@ private:
     dc->SetAntialiasMode (D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     //{{{  draw playFrame
-    auto framePtr = mSong->getAudioFramePtr (playFrame);
+    auto framePtr = mSong->getFramePtr (playFrame);
     if (framePtr) {
       float valueScale = mWaveHeight / 2.f / mSong->getMaxPeakValue();
       auto peakValues = framePtr->getPeakValues();
@@ -637,7 +637,7 @@ private:
       }
     else {
       //  draw playFrame
-      auto framePtr = mSong->getAudioFramePtr (playFrame);
+      auto framePtr = mSong->getFramePtr (playFrame);
       if (framePtr && framePtr->getPowerValues()) {
         auto powerValues = framePtr->getPowerValues();
         cRect dstRect = { mRect.left + playFrameX,
@@ -682,7 +682,7 @@ private:
           toFrame = lastFrame+1;
 
         if (forceRedraw || (frame >= mOverviewLastFrame)) {
-          auto framePtr = mSong->getAudioFramePtr (frame);
+          auto framePtr = mSong->getFramePtr (frame);
           if (framePtr) {
             // !!! should accumulate silence and distinguish from silence better !!!
             if (framePtr->getPowerValues()) {
@@ -693,7 +693,7 @@ private:
                 int numSummedFrames = 1;
                 frame++;
                 while (frame < toFrame) {
-                  framePtr = mSong->getAudioFramePtr (frame);
+                  framePtr = mSong->getFramePtr (frame);
                   if (framePtr) {
                     if (framePtr->getPowerValues()) {
                       auto powerValues = framePtr->getPowerValues();
@@ -774,7 +774,7 @@ private:
     // calc lens max power
     float maxPowerValue = 0.f;
     for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
-      auto framePtr = mSong->getAudioFramePtr (frame);
+      auto framePtr = mSong->getFramePtr (frame);
       if (framePtr && framePtr->getPowerValues()) {
         auto powerValues = framePtr->getPowerValues();
         maxPowerValue = std::max (maxPowerValue, *powerValues++);
@@ -790,7 +790,7 @@ private:
     for (auto frame = int(leftFrame); frame <= rightFrame; frame++) {
       dstRect.right = dstRect.left + 1.f;
 
-      auto framePtr = mSong->getAudioFramePtr (frame);
+      auto framePtr = mSong->getFramePtr (frame);
       if (framePtr && framePtr->getPowerValues()) {
         if (framePtr->hasTitle()) {
           //{{{  draw song title yellow bar and text
@@ -832,7 +832,7 @@ private:
 
     float valueScale = 100.f / 255.f;
 
-    auto framePtr = mSong->getAudioFramePtr (playFrame);
+    auto framePtr = mSong->getFramePtr (playFrame);
     if (framePtr && framePtr->getFreqValues()) {
       auto freqValues = framePtr->getFreqValues();
       for (auto i = 0; (i < mSong->getNumFreqBytes()) && ((i*2) < getWidthInt()); i++) {

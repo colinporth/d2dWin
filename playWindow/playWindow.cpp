@@ -604,7 +604,7 @@ private:
           // lambda callback - load srcSamples
           shared_lock<shared_mutex> lock (mSong->getSharedMutex());
 
-          auto framePtr = mSong->getAudioFramePtr (mSong->getPlayFrame());
+          auto framePtr = mSong->getFramePtr (mSong->getPlayFrame());
           if (mPlaying && framePtr && framePtr->getSamples()) {
             if (mSong->getNumChannels() == 1) {
               //{{{  mono to stereo

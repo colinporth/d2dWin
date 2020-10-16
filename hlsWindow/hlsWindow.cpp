@@ -147,7 +147,7 @@ protected:
       //{{{
       case 0x21: {// page up - back one hour
         mSong->incPlaySec (-60*60, false);
-        auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
+        auto framePtr = mSong->getFramePtr(mSong->getPlayFrame());
         if (framePtr) {
           getVideoDecode()->setPlayPts (framePtr->getPts());
           getVideoDecode()->clear(framePtr->getPts());
@@ -159,7 +159,7 @@ protected:
       //{{{
       case 0x22: {// page down - forward one hour
         mSong->incPlaySec (60*60, false);
-        auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
+        auto framePtr = mSong->getFramePtr(mSong->getPlayFrame());
         if (framePtr) {
           getVideoDecode()->setPlayPts(framePtr->getPts());
           getVideoDecode()->clear(framePtr->getPts());
@@ -171,7 +171,7 @@ protected:
       //{{{
       case 0x25: {// left  arrow -1s, ctrl -10s, shift -5m
         mSong->incPlaySec (-(getShift() ? 300 : getControl() ? 10 : 1), false);
-        auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
+        auto framePtr = mSong->getFramePtr(mSong->getPlayFrame());
         if (framePtr) {
           getVideoDecode()->setPlayPts(framePtr->getPts());
           getVideoDecode()->clear(framePtr->getPts());
@@ -183,7 +183,7 @@ protected:
       //{{{
       case 0x27: {// right arrow +1s, ctrl +10s, shift +5m
         mSong->incPlaySec (getShift() ? 300 : getControl() ?  10 :  1, false);
-        auto framePtr = mSong->getAudioFramePtr(mSong->getPlayFrame());
+        auto framePtr = mSong->getFramePtr(mSong->getPlayFrame());
         if (framePtr) {
           getVideoDecode()->setPlayPts(framePtr->getPts());
           getVideoDecode()->clear(framePtr->getPts());
