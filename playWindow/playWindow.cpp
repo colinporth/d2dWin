@@ -325,7 +325,7 @@ private:
 
     cLog::setThreadName ("hls ");
 
-    mSong->initialise (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048, 3000);
+    mSong->initialise (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048, 1000);
     mSong->setChannel (channel);
     mSong->setBitrateFramesPerChunk(bitrate, bitrate >= 128000 ? 300 : 150);
 
