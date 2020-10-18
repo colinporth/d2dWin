@@ -69,55 +69,19 @@ public:
     add (new cClockBox (this, 40.f), -135.f,35.f);
     add (new cSongBox (this, 0.f,0.f, mSong));
 
-    if (names.empty()) {
-      //{{{  add radio 1..6 with action lambda
-      add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[0]); mSong->setChanged (true); } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[1]); mSong->setChanged (true); } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[2]); mSong->setChanged (true);} ));
-      addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[3]); mSong->setChanged (true); } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[4]); mSong->setChanged (true); } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index) {
-        mSong->clear(); mSong->setChannel (kChannels[5]); mSong->setChanged (true); } ));
-
-      mBitrateStr = "48k aacHE";
-      addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
-        //{{{  lambda
-        mSong->clear();
-        switch (mSong->getBitrate()) {
-          case 48000:
-            mSong->setBitrateFramesPerChunk(96000, 150);
-            mBitrateStr = "96k aacHE";
-            break;
-          case 96000:
-            mSong->setBitrateFramesPerChunk(128000, 300);
-            mBitrateStr = "128k aac";
-            break;
-          case 128000:
-            mSong->setBitrateFramesPerChunk(320000, 300);
-            mBitrateStr = "320k aac";
-            break;
-          case 320000:
-            mSong->setBitrateFramesPerChunk(48000, 150);
-            mBitrateStr = "48k aacHE";
-            break;
-          }
-        mSong->setChanged (true);
-        }
-        //}}}
-        ), 4.f);
-
-      add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
-
-      // startup radio4
-      thread ([=](){ hlsThread (kHost, kChannels[3], kBitRate); }).detach();
-      }
-      //}}}
+    string radioChannelName;
+    if (names.empty())
+      radioChannelName = kChannels[3];
     else {
+      for (auto channelName : kChannels) {
+        if (names[0] == channelName) {
+          radioChannelName = names[0];
+          break;
+          }
+        }
+      }
+
+    if (radioChannelName.empty()) {
       cUrl url;
       url.parse (names[0]);
       if (url.getScheme() == "http") {
@@ -163,6 +127,53 @@ public:
         }
         //}}}
       }
+    else {
+      //{{{  add radio 1..6 with action lambda
+      add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index) {
+        mSong->clear(); mSong->setChannel (kChannels[0]); mSong->setChanged (true); } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index) {
+        mSong->clear(); mSong->setChannel (kChannels[1]); mSong->setChanged (true); } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index) {
+        mSong->clear(); mSong->setChannel (kChannels[2]); mSong->setChanged (true);} ));
+      addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index) {
+        mSong->clear(); mSong->setChannel (kChannels[3]); mSong->setChanged (true); } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index) {
+        mSong->clear(); mSong->setChannel (kChannels[4]); mSong->setChanged (true); } ));
+      addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index) {
+        mSong->clear(); mSong->setChannel (kChannels[5]); mSong->setChanged (true); } ));
+
+      mBitrateStr = "48k aacHE";
+      addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
+        //{{{  lambda
+        mSong->clear();
+        switch (mSong->getBitrate()) {
+          case 48000:
+            mSong->setBitrateFramesPerChunk(96000, 150);
+            mBitrateStr = "96k aacHE";
+            break;
+          case 96000:
+            mSong->setBitrateFramesPerChunk(128000, 300);
+            mBitrateStr = "128k aac";
+            break;
+          case 128000:
+            mSong->setBitrateFramesPerChunk(320000, 300);
+            mBitrateStr = "320k aac";
+            break;
+          case 320000:
+            mSong->setBitrateFramesPerChunk(48000, 150);
+            mBitrateStr = "48k aacHE";
+            break;
+          }
+        mSong->setChanged (true);
+        }
+        //}}}
+        ), 4.f);
+
+      add (new cTitleBox (this, 500.f,20.f, mDebugStr), 0.f,40.f);
+
+      thread ([=](){ hlsThread (kHost, radioChannelName, kBitRate); }).detach();
+      }
+      //}}}
 
     mLogBox = add (new cLogBox (this, 20.f));
     add (new cWindowBox (this, 60.f,24.f), -60.f,0.f)->setPin (false);
