@@ -100,7 +100,7 @@ public:
   //}}}
 
 private:
-  const D2D1::ColorF kColours[LOGMAX] = {
+  const D2D1::ColorF kColours[LOGINFO3+1] = {
     {  1.f,  1.f,  0.f, 1.f }, // LOGTITLE  yellow
     {  1.f,  1.f,  1.f, 1.f }, // LOGNOTICE white
     {  1.f, 0.5f, 0.5f, 1.f }, // LOGERROR  light red

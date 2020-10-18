@@ -342,7 +342,7 @@ private:
         while (!getExit() && !mSong->getChanged()) {
           int chunkNum;
           int frameNum;
-          if (mSong->loadChunk (getNowRaw(), 12s, 5, chunkNum, frameNum)) {
+          if (mSong->loadChunk (getNowRaw(), 2, chunkNum, frameNum)) {
             // get hls chunkNum chunk
             if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
               cLog::log (LOGINFO1, "got " + dec(chunkNum) +

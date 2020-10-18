@@ -108,8 +108,8 @@ public:
 
     cLoaderPlayer::initialise (false, kHost, "pool_902/live/uk/", kChannels[channelNum],
                                audBitrate, vidBitrate,
-                               eLoader (eBgra | eQueueAudio | eQueueVideo));
-                               //eLoader (eMfx | eBgra | eQueueAudio | eQueueVideo));
+                               //eLoader (eBgra | eQueueAudio | eQueueVideo));
+                               eLoader (eMfx | eBgra | eQueueAudio | eQueueVideo));
     if (getVideoDecode())
       add (new cVideoDecodeBox (this, 0.f,0.f, getVideoDecode()), 0.f,0.f);
     add (new cClockBox (this, 40.f), -135.f,35.f);
