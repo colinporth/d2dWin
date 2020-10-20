@@ -35,13 +35,14 @@
 using namespace std;
 using namespace chrono;
 //}}}
+//{{{  channels
 const string kHost = "as-hls-uk-live.bbcfmt.s.llnwi.net";
 const vector <string> kChannels = { "bbc_radio_one",    "bbc_radio_two",       "bbc_radio_three",
                                     "bbc_radio_fourfm", "bbc_radio_five_live", "bbc_6music" };
 const int kBitRate = 128000;
 
-//{{{  proper link to m3u8, fix it to use it one day
-const string kLink = "a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_med/llnw/";
+// proper link to m3u8, fix it to use it one day
+// const string kLink = "a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_med/llnw/";
 // + channel.m3u8"
 // - returns
 //    #EXTM3U
@@ -185,7 +186,6 @@ public:
     delete mJpegImageView;
     }
   //}}}
-
 protected:
   //{{{
   bool onKey (int key) {
@@ -237,7 +237,6 @@ protected:
     return false;
     }
   //}}}
-
 private:
   //{{{
   static string getTagValue (uint8_t* buffer, char* tag) {
@@ -318,7 +317,6 @@ private:
       }
     }
   //}}}
-
   //{{{
   void hlsThread (const string& host, const string& channel, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
@@ -327,7 +325,7 @@ private:
 
     mSong->initialise (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048, 1000);
     mSong->setChannel (channel);
-    mSong->setBitrateFramesPerChunk(bitrate, bitrate >= 128000 ? 300 : 150);
+    mSong->setBitrateFramesPerChunk (bitrate, bitrate >= 128000 ? 300 : 150);
 
     while (!getExit()) {
       const string path = "pool_904/live/uk/" + mSong->getChannel() +
@@ -348,29 +346,22 @@ private:
         cAudioDecode decode (cAudioDecode::eAac);
 
         thread player;
-        bool firstTime = true;
         mSong->setChanged (false);;
         while (!getExit() && !mSong->getChanged()) {
-          int chunkNum;
-          int frameNum;
-          if (mSong->loadChunk (getNowRaw(), 2, chunkNum, frameNum)) {
+          if (mSong->loadChunk (getNowRaw(), 2, mChunkNum, mFrameNum)) {
             // get hls chunkNum chunk
-            if (http.get (redirectedHost, path + '-' + dec(chunkNum) + ".ts") == 200) {
-              cLog::log (LOGINFO1, "got " + dec(chunkNum) +
+            if (http.get (redirectedHost, path + '-' + dec(mChunkNum) + ".ts") == 200) {
+              cLog::log (LOGINFO1, "got " + dec(mChunkNum) +
                                    " at " + date::format ("%T", floor<seconds>(getNow())));
               auto aacFrames = http.getContent();
               auto aacFramesEnd = extractAacFramesFromTs (aacFrames, http.getContentSize());
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
-                auto samples = decode.decodeFrame (frameNum);
+                auto samples = decode.decodeFrame (mFrameNum);
                 if (samples) {
                   mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
-                  mSong->addFrame (frameNum++, samples, true, mSong->getNumFrames(), 0);
-                  if (firstTime) {
-                    //{{{  something to play, launch player
-                    firstTime = false;
+                  mSong->addFrame (mFrameNum++, samples, true, mSong->getNumFrames(), 0);
+                  if (!player.joinable())
                     player = thread ([=](){ playThread (true); });
-                    }
-                    //}}}
                   }
                 aacFrames += decode.getNextFrameOffset();
                 }
@@ -378,7 +369,7 @@ private:
               }
             else {
               //{{{  failed to load expected available chunk, back off for 250ms
-              cLog::log (LOGERROR, "late " + dec(chunkNum));
+              cLog::log (LOGERROR, "late " + dec(mChunkNum));
               this_thread::sleep_for (250ms);
               }
               //}}}
@@ -649,7 +640,6 @@ private:
     cLog::log (LOGINFO, "exit");
     }
   //}}}
-
   //{{{  vars
   cSong* mSong;
   bool mPlaying = true;
@@ -658,6 +648,9 @@ private:
 
   cFileList* mFileList = nullptr;
   cJpegImageView* mJpegImageView = nullptr;
+
+  int mChunkNum;
+  int mFrameNum;
 
   string mLastTitleStr;
   vector<string> mShoutCast;
@@ -675,7 +668,7 @@ int WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int 
 
   int numArgs;
   auto args = CommandLineToArgvW (GetCommandLineW(), &numArgs);
-  vector<string> names;
+  vector <string> names;
   for (int i = 1; i < numArgs; i++)
     names.push_back (wcharToString (args[i]));
 
