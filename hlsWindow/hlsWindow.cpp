@@ -100,6 +100,8 @@ private:
 
 class cAppWindow : public cD2dWindow, public cLoaderPlayer {
 public:
+  cAppWindow() : cLoaderPlayer(128) {}
+
   //{{{
   void run (const string& title, int width, int height, int channelNum, int audBitrate, int vidBitrate) {
 
