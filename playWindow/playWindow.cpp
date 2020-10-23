@@ -335,13 +335,15 @@ private:
       auto redirectedHost = http.getRedirect (host, path + ".norewind.m3u8");
       if (http.getContent()) {
         //{{{  hls m3u8 ok, parse it for baseChunkNum, baseTimePoint
-        int mediaSequence = stoi (getTagValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
+        int extXMediaSequence = stoi (getTagValue (http.getContent(), "#EXT-X-MEDIA-SEQUENCE:"));
         istringstream inputStream (getTagValue (http.getContent(), "#EXT-X-PROGRAM-DATE-TIME:"));
-        system_clock::time_point programDateTimePoint;
-        inputStream >> date::parse ("%FT%T", programDateTimePoint);
+
+        system_clock::time_point extXProgramDateTimePoint;
+        inputStream >> date::parse ("%FT%T", extXProgramDateTimePoint);
+
         http.freeContent();
 
-        mSong->setHlsBase (mediaSequence, programDateTimePoint, -37s, 0);
+        mSong->setHlsBase (extXMediaSequence, extXProgramDateTimePoint, -37s);
         //}}}
         cAudioDecode decode (cAudioDecode::eAac);
 
