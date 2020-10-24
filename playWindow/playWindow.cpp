@@ -39,7 +39,6 @@ using namespace chrono;
 const string kHost = "as-hls-uk-live.bbcfmt.s.llnwi.net";
 const vector <string> kChannels = { "bbc_radio_one",    "bbc_radio_two",       "bbc_radio_three",
                                     "bbc_radio_fourfm", "bbc_radio_five_live", "bbc_6music" };
-const int kBitRate = 128000;
 
 // proper link to m3u8, fix it to use it one day
 // const string kLink = "a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_med/llnw/";
@@ -50,7 +49,6 @@ const int kBitRate = 128000;
 //    #EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=135680,CODECS="mp4a.40.2"
 //    http://as-hls-uk-live.bbcfmt.s.llnwi.net/pool_904/live/uk/bbc_radio_three/bbc_radio_three.isml/bbc_radio_three-audio%3d128000.norewind.m3u8
 //}}}
-
 class cAppWindow : public cD2dWindow {
 public:
   //{{{
@@ -143,9 +141,10 @@ public:
       addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index) {
         mSong->clear(); mSong->setChannel (kChannels[5]); mSong->setChanged (true); } ));
 
-      mBitrateStr = "48k aacHE";
+      constexpr int kBitRate = 128000;
+      mBitrateStr = "128k aac";
       addRight (new cTitleBox (this, 60.f,20.f, mBitrateStr, [&](cTitleBox* box){
-        //{{{  lambda
+        //{{{  lambda - hit bitrate info box
         mSong->clear();
         switch (mSong->getBitrate()) {
           case 48000:
@@ -317,13 +316,14 @@ private:
       }
     }
   //}}}
+
   //{{{
   void hlsThread (const string& host, const string& channel, int bitrate) {
   // hls chunk http load and analyse thread, single thread helps chan change and jumping backwards
 
     cLog::setThreadName ("hls ");
 
-    mSong->initialise (cAudioDecode::eAac, 2, 48000, mSong->getBitrate() >= 128000 ? 1024 : 2048, 1000);
+    mSong->initialise (cAudioDecode::eAac, 2, 48000, bitrate < 128000 ? 2048 : 1024, 1000);
     mSong->setChannel (channel);
     mSong->setBitrateFramesPerChunk (bitrate, bitrate >= 128000 ? 300 : 150);
 
@@ -360,7 +360,6 @@ private:
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
                 auto samples = decode.decodeFrame (mFrameNum);
                 if (samples) {
-                  mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
                   mSong->addFrame (mFrameNum++, samples, true, mSong->getNumFrames(), 0);
                   if (!player.joinable())
                     player = thread ([=](){ playThread (true); });
@@ -473,7 +472,7 @@ private:
             if (decode.getFrameType() == mSong->getFrameType()) {
               auto samples = decode.decodeFrame (frameNum);
               if (samples) {
-                mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
+                mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamplesPerFrame());
                 mSong->addFrame (frameNum++, samples, true, mSong->getNumFrames()+1, 0);
                 if (frameNum == 1) // launch player after first frame
                   player = thread ([=](){ playThread (true); });
@@ -559,7 +558,7 @@ private:
             if (samples) {
               int numFrames = mSong->getNumFrames();
               int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
-              mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamples());
+              mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamplesPerFrame());
               mSong->addFrame (frameNum++, samples, true, totalFrames+1, 0);
               if (frameNum == 1)
                 player = thread ([=](){ playThread (false); });
