@@ -323,9 +323,10 @@ private:
 
     cLog::setThreadName ("hls ");
 
+    // uses aacHE for bitrates less than 128000, more samplesPerFrame, less framesPerChunk
     mSong->initialise (cAudioDecode::eAac, 2, 48000, bitrate < 128000 ? 2048 : 1024, 1000);
+    mSong->setBitrateFramesPerChunk (bitrate, bitrate < 128000 ? 150 : 300);
     mSong->setChannel (channel);
-    mSong->setBitrateFramesPerChunk (bitrate, bitrate >= 128000 ? 300 : 150);
 
     while (!getExit()) {
       const string path = "pool_904/live/uk/" + mSong->getChannel() +
