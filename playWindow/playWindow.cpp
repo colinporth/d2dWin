@@ -7,12 +7,12 @@
 #include "../../shared/decoders/cAudioDecode.h"
 #include "../../shared/net/cWinSockHttp.h"
 
-#include "../../shared/hls/r1x80.h"
-#include "../../shared/hls/r2x80.h"
-#include "../../shared/hls/r3x80.h"
-#include "../../shared/hls/r4x80.h"
-#include "../../shared/hls/r5x80.h"
-#include "../../shared/hls/r6x80.h"
+#include "../../shared/resources/r1x80.h"
+#include "../../shared/resources/r2x80.h"
+#include "../../shared/resources/r3x80.h"
+#include "../../shared/resources/r4x80.h"
+#include "../../shared/resources/r5x80.h"
+#include "../../shared/resources/r6x80.h"
 
 #include "../common/cD2dWindow.h"
 #include "../boxes/cLogBox.h"
@@ -361,7 +361,7 @@ private:
               while (decode.parseFrame (aacFrames, aacFramesEnd)) {
                 auto samples = decode.decodeFrame (mFrameNum);
                 if (samples) {
-                  mSong->addFrame (mFrameNum++, samples, true, mSong->getNumFrames(), 0);
+                  mSong->addFrame (true, mFrameNum++, samples, true, mSong->getNumFrames(), 0);
                   if (!player.joinable())
                     player = thread ([=](){ playThread (true); });
                   }
@@ -474,7 +474,7 @@ private:
               auto samples = decode.decodeFrame (frameNum);
               if (samples) {
                 mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamplesPerFrame());
-                mSong->addFrame (frameNum++, samples, true, mSong->getNumFrames()+1, 0);
+                mSong->addFrame (true, frameNum++, samples, true, mSong->getNumFrames()+1, 0);
                 if (frameNum == 1) // launch player after first frame
                   player = thread ([=](){ playThread (true); });
                 }
@@ -543,7 +543,7 @@ private:
         decode.parseFrame (fileMapPtr, fileMapEnd);
         auto samples = decode.getFramePtr();
         while (!getExit() && !mSong->getChanged() && ((samples + (frameSamples * 2 * sizeof(float))) <= fileMapEnd)) {
-          mSong->addFrame (frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)), 0);
+          mSong->addFrame (true, frameNum++, (float*)samples, false, fileMapSize / (frameSamples * 2 * sizeof(float)), 0);
           samples += frameSamples * 2 * sizeof(float);
           if (frameNum == 1)
             player = thread ([=](){ playThread (false); });
@@ -560,7 +560,7 @@ private:
               int numFrames = mSong->getNumFrames();
               int totalFrames = (numFrames > 0) ? int(fileMapEnd - fileMapFirst) / (int(decode.getFramePtr() - fileMapFirst) / numFrames) : 0;
               mSong->setFixups (decode.getNumChannels(), decode.getSampleRate(), decode.getNumSamplesPerFrame());
-              mSong->addFrame (frameNum++, samples, true, totalFrames+1, 0);
+              mSong->addFrame (true, frameNum++, samples, true, totalFrames+1, 0);
               if (frameNum == 1)
                 player = thread ([=](){ playThread (false); });
               }
