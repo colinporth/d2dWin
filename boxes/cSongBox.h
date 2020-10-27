@@ -160,12 +160,6 @@ public:
 
     reallocBitmap (mWindow->getDc());
 
-    if (mSong->getId() != mSongLastId) {
-      mFramesBitmapOk = false;
-      mOverviewBitmapOk = false;
-      mSongLastId = mSong->getId();
-      }
-
     // draw
     auto playFrame = mSong->getPlayFrame();
 
@@ -867,7 +861,6 @@ private:
 
   //{{{  private vars
   cSong* mSong;
-  int mSongLastId = 0;
 
   // zoom - 0 unity, > 0 zoomOut framesPerPix, < 0 zoomIn pixPerFrame
   int mZoom = 0;

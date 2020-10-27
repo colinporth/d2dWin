@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="bin2c.c" />
+    <ClCompile Include="bin2c.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{E4447D52-6EEB-419D-933B-320A5957BCAE}</ProjectGuid>
