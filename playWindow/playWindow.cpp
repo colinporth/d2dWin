@@ -7,12 +7,12 @@
 #include "../../shared/decoders/cAudioDecode.h"
 #include "../../shared/net/cWinSockHttp.h"
 
-#include "../../shared/resources/r1x80.h"
-#include "../../shared/resources/r2x80.h"
-#include "../../shared/resources/r3x80.h"
-#include "../../shared/resources/r4x80.h"
-#include "../../shared/resources/r5x80.h"
-#include "../../shared/resources/r6x80.h"
+#include "../../shared/resources/r1.h"
+#include "../../shared/resources/r2.h"
+#include "../../shared/resources/r3.h"
+#include "../../shared/resources/r4.h"
+#include "../../shared/resources/r5.h"
+#include "../../shared/resources/r6.h"
 
 #include "../common/cD2dWindow.h"
 #include "../boxes/cLogBox.h"
@@ -128,17 +128,17 @@ public:
       }
     else {
       //{{{  add radio 1..6 with action lambda
-      add (new cBmpBox (this, 40.f,40.f, 1, r1x80, [&](cBmpBox* box, int index) {
+      add (new cBmpBox (this, 40.f,40.f, 1, r1, [&](cBmpBox* box, int index) {
         mSong->clear(); mSong->setChannel (kChannels[0]); mSong->setChanged (true); } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 2, r2x80, [&](cBmpBox* box, int index) {
+      addRight (new cBmpBox (this, 40.f,40.f, 2, r2, [&](cBmpBox* box, int index) {
         mSong->clear(); mSong->setChannel (kChannels[1]); mSong->setChanged (true); } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 3, r3x80, [&](cBmpBox* box, int index) {
+      addRight (new cBmpBox (this, 40.f,40.f, 3, r3, [&](cBmpBox* box, int index) {
         mSong->clear(); mSong->setChannel (kChannels[2]); mSong->setChanged (true);} ));
-      addRight (new cBmpBox (this, 40.f,40.f, 4, r4x80, [&](cBmpBox* box, int index) {
+      addRight (new cBmpBox (this, 40.f,40.f, 4, r4, [&](cBmpBox* box, int index) {
         mSong->clear(); mSong->setChannel (kChannels[3]); mSong->setChanged (true); } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 5, r5x80, [&](cBmpBox* box, int index) {
+      addRight (new cBmpBox (this, 40.f,40.f, 5, r5, [&](cBmpBox* box, int index) {
         mSong->clear(); mSong->setChannel (kChannels[4]); mSong->setChanged (true); } ));
-      addRight (new cBmpBox (this, 40.f,40.f, 6, r6x80, [&](cBmpBox* box, int index) {
+      addRight (new cBmpBox (this, 40.f,40.f, 6, r6,[&](cBmpBox* box, int index) {
         mSong->clear(); mSong->setChannel (kChannels[5]); mSong->setChanged (true); } ));
 
       constexpr int kBitRate = 128000;
