@@ -177,11 +177,9 @@ public:
       drawFreq (dc, playFrame);
       }
 
-    if (mSong->hasHlsBase())
-      drawTime (dc, getFrameString (mSong->getFirstFrame()),
-                    getFrameString (mSong->getPlayFrame()), getFrameString (mSong->getLastFrame()));
-    else
-      drawTime (dc, L"", getFrameString (mSong->getPlayFrame()), getFrameString (mSong->getTotalFrames()));
+    drawTime (dc, getFrameString (mSong->getFirstFrame()),
+                  getFrameString (mSong->getPlayFrame()), 
+                  getFrameString (mSong->getLengthFrame()));
     }
   //}}}
 
