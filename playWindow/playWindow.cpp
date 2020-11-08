@@ -167,7 +167,6 @@ public:
 
         add (new cStringListBox (this, 500.f, 300.f, mShoutCast, [&](cStringListBox* box, const std::string& string){
           auto listBox = (cStringListBox*)box;
-          mSong->clear();
           mUrl = string;
           mSong->setChanged (true);
           cLog::log (LOGINFO, "listBox" + string);
@@ -186,7 +185,7 @@ public:
 
         if (!mFileList->empty()) {
           add (new cFileListBox (this, 0.f,-200.f, mFileList, [&](cFileListBox* box, int index){
-            mSong->clear(); mSong->setChanged (true); }))->setPin (true);
+           mSong->setChanged (true); }))->setPin (true);
 
           mJpegImageView = new cJpegImageView (this, 0.f,-220.f, false, false, nullptr);
           addFront (mJpegImageView);
@@ -320,12 +319,13 @@ private:
 
     cLog::setThreadName ("hls ");
 
-    cHlsSong* hlsSong = new cHlsSong (bitrate < 128000 ? 150 : 300 );
-    hlsSong->initialise (eAudioFrameType::eAacAdts, 2, 48000, bitrate < 128000 ? 2048 : 1024, 1000);
-    auto audioDecoder = createAudioDecoder (eAudioFrameType::eAacAdts);
-
+    cHlsSong* hlsSong = new cHlsSong (eAudioFrameType::eAacAdts, 2, 48000,
+      bitrate < 128000 ? 2048 : 1024, bitrate < 128000 ? 150 : 300, bitrate < 128000 ? 3840 : 1920,
+      1000);
     mSong = hlsSong;
     add (new cSongBox (this, 0.f,0.f, mSong));
+
+    iAudioDecoder* audioDecoder = createAudioDecoder (eAudioFrameType::eAacAdts);
 
     while (!getExit()) {
       const string path = "pool_904/live/uk/" + channel + "/" + channel + ".isml/" + channel + "-audio=" + dec(bitrate);
